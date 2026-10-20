@@ -1,0 +1,47 @@
+{
+  "name": "@zcc-ext/git-tree",
+  "version": "0.1.0",
+  "author": "Ros Haitovich <rhaitovich@salesforce.com>",
+  "type": "module",
+  "description": "View a Git Tree of your project repository, inspect commits and diffs, compare branches, track code reviews, and run Git actions directly from the tree.",
+  "engines": {
+    "zcc": ">=1.0.0",
+    "zccPluginSdk": ">=0.1.0"
+  },
+  "scripts": {
+    "build": "node --import tsx scripts/build-app.mjs",
+    "package": "node --import tsx scripts/build-app.mjs"
+  },
+  "zcc": {
+    "name": "Git Tree",
+    "description": "Interactive Git Tree for each project: commit DAG visualization, branch/tag/stash actions, commit details & diff viewer, two-commit comparisons, code reviews, and agent tools.",
+    "branding": {
+      "icon": "GitBranch"
+    },
+    "server": "./server.mjs",
+    "app": "./app.js",
+    "projectTab": {
+      "label": "Git Tree",
+      "icon": "GitBranch",
+      "global": false
+    },
+    "skills": [
+      "skills"
+    ]
+  },
+  "dependencies": {
+    "@zana-ai/zcc-ui": "workspace:*",
+    "lucide-react": "^1.35.0"
+  },
+  "devDependencies": {
+    "@zana-ai/zcc-plugin-build": "workspace:*",
+    "@zana-ai/zcc-plugin-sdk": "workspace:*",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "happy-dom": "^20.10.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  }
+}
