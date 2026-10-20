@@ -22,6 +22,7 @@ export type GitRunner = (request: GitExecRequest) => Promise<GitExecResult>;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_BYTES = 16 * 1024 * 1024; // 16 MiB cap
 const MAX_CONCURRENT_GIT_PROCS = 6;
+const MAX_QUEUED_GIT_PROCS = 256;
 
 /**
  * Validates that a user-supplied ref, branch, tag, remote, or revision token
@@ -48,10 +49,16 @@ class ConcurrencyLimiter {
   private active = 0;
   private readonly queue: Array<() => void> = [];
 
-  constructor(private readonly maxConcurrency: number) {}
+  constructor(
+    private readonly maxConcurrency: number,
+    private readonly maxQueued = MAX_QUEUED_GIT_PROCS
+  ) {}
 
   async run<T>(task: () => Promise<T>): Promise<T> {
     if (this.active >= this.maxConcurrency) {
+      if (this.queue.length >= this.maxQueued) {
+        throw new Error('Too many pending git operations; please retry shortly.');
+      }
       await new Promise<void>((resolve) => this.queue.push(resolve));
     }
     this.active += 1;

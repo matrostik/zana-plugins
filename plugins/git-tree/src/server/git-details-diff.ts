@@ -26,23 +26,26 @@ function normalizeStatusChar(raw: string): FileChangeStatus {
   return 'M';
 }
 
+const SIGNATURE_LABELS: Record<string, string> = {
+  G: 'Good valid signature',
+  B: 'Bad signature',
+  U: 'Good signature with unknown validity',
+  X: 'Good signature that has expired',
+  Y: 'Good signature made by an expired key',
+  R: 'Good signature made by a revoked key',
+  E: 'Signature cannot be checked (missing key)'
+};
+
 function signatureInfoFromCode(code: string, signer: string, keyId: string): GitSignatureInfo | undefined {
-  const status = code.trim().charAt(0) as GitSignatureInfo['status'];
-  if (!status || status === 'N') return undefined;
-  const labels: Record<string, string> = {
-    G: 'Good valid signature',
-    B: 'Bad signature',
-    U: 'Good signature with unknown validity',
-    X: 'Good signature that has expired',
-    Y: 'Good signature made by an expired key',
-    R: 'Good signature made by a revoked key',
-    E: 'Signature cannot be checked (missing key)'
-  };
+  const first = code.trim().charAt(0);
+  // `N` means unsigned; anything outside the known `%G?` codes is ignored.
+  if (!first || first === 'N' || !(first in SIGNATURE_LABELS)) return undefined;
+  const status = first as GitSignatureInfo['status'];
   return {
     status,
     signer: signer.trim() || undefined,
     keyId: keyId.trim() || undefined,
-    label: labels[status] ?? 'Signed commit'
+    label: SIGNATURE_LABELS[status]
   };
 }
 

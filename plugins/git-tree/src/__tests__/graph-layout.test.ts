@@ -5,6 +5,7 @@ import {
   buildSplitDiffRows,
   computeGraphLayout,
   formatCommitTimestamp,
+  isSafeLinkHref,
   replaceGitmojiShortcodes,
   tokenizeCommitMessage
 } from '../app/graph-layout.js';
@@ -146,6 +147,40 @@ describe('graph-layout', () => {
     expect(
       tokens.some((t) => t.kind === 'link' && t.href === 'https://example.com/pr/1')
     ).toBe(true);
+  });
+
+  it('accepts only http(s) hrefs as safe links', () => {
+    expect(isSafeLinkHref('https://example.com')).toBe(true);
+    expect(isSafeLinkHref('http://example.com')).toBe(true);
+    expect(isSafeLinkHref('  HTTPS://Example.com  ')).toBe(true);
+    expect(isSafeLinkHref('javascript:alert(1)')).toBe(false);
+    expect(isSafeLinkHref('data:text/html,<script>1</script>')).toBe(false);
+    expect(isSafeLinkHref('file:///etc/passwd')).toBe(false);
+    expect(isSafeLinkHref('')).toBe(false);
+  });
+
+  it('renders an issue match as plain text when its URL template uses an unsafe scheme', () => {
+    const tokens = tokenizeCommitMessage('Fix PROJ-42 now', [
+      {
+        id: 'evil',
+        pattern: 'PROJ-(\\d+)',
+        urlTemplate: 'javascript:alert($1)'
+      }
+    ]);
+    expect(tokens.some((t) => t.kind === 'link')).toBe(false);
+    expect(tokens.map((t) => t.text).join('')).toContain('PROJ-42');
+  });
+
+  it('skips user issue regexes on overlong segments to avoid ReDoS', () => {
+    const longSegment = 'a'.repeat(5000);
+    const tokens = tokenizeCommitMessage(longSegment, [
+      {
+        id: 'catastrophic',
+        pattern: '(a+)+$',
+        urlTemplate: 'https://example.com/$1'
+      }
+    ]);
+    expect(tokens).toEqual([{ kind: 'text', text: longSegment }]);
   });
 
   it('builds a hierarchical file tree with and without folder compaction', () => {

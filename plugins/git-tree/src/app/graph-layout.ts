@@ -328,6 +328,38 @@ export interface FormattedTextToken {
 }
 
 /**
+ * Only http(s) links may be rendered as anchors. This blocks `javascript:`,
+ * `data:`, and other script-capable schemes that a malicious (or mistyped)
+ * issue-link URL template could otherwise produce.
+ */
+export function isSafeLinkHref(href: string): boolean {
+  return /^https?:\/\//i.test(href.trim());
+}
+
+/**
+ * Caps the input length and total execution time for user-supplied issue-link
+ * regexes so a catastrophic-backtracking pattern cannot freeze the renderer.
+ */
+const MAX_ISSUE_MATCH_INPUT = 4096;
+
+/** Memoized compilation of user-supplied issue-link patterns. */
+const issueRuleRegexCache = new Map<string, RegExp | null>();
+
+function compileIssueRule(pattern: string): RegExp | null {
+  if (issueRuleRegexCache.has(pattern)) {
+    return issueRuleRegexCache.get(pattern) ?? null;
+  }
+  let compiled: RegExp | null;
+  try {
+    compiled = new RegExp(pattern, 'g');
+  } catch {
+    compiled = null;
+  }
+  issueRuleRegexCache.set(pattern, compiled);
+  return compiled;
+}
+
+/**
  * Tokenizes commit messages for inline code (`...`), URLs, and configured Issue Linking rules.
  */
 export function tokenizeCommitMessage(
@@ -349,35 +381,45 @@ export function tokenizeCommitMessage(
       return;
     }
 
+    // Overlong segments are not scanned with user regexes to avoid ReDoS.
+    if (segment.length > MAX_ISSUE_MATCH_INPUT) {
+      tokens.push({ kind: 'text', text: segment });
+      return;
+    }
+
     for (const rule of issueRules) {
-      try {
-        const rx = new RegExp(rule.pattern, 'g');
-        let subLast = 0;
-        let m: RegExpExecArray | null;
-        const subTokens: FormattedTextToken[] = [];
-        while ((m = rx.exec(segment)) !== null) {
-          if (m.index > subLast) {
-            subTokens.push({ kind: 'text', text: segment.slice(subLast, m.index) });
+      const rx = compileIssueRule(rule.pattern);
+      if (!rx) continue;
+      rx.lastIndex = 0;
+      let subLast = 0;
+      let m: RegExpExecArray | null;
+      const subTokens: FormattedTextToken[] = [];
+      while ((m = rx.exec(segment)) !== null) {
+        if (m.index > subLast) {
+          subTokens.push({ kind: 'text', text: segment.slice(subLast, m.index) });
+        }
+        let url = rule.urlTemplate;
+        m.forEach((group, idx) => {
+          if (group !== undefined) {
+            url = url.replace(new RegExp(`\\$${idx}`, 'g'), group);
           }
-          let url = rule.urlTemplate;
-          m.forEach((group, idx) => {
-            if (group !== undefined) {
-              url = url.replace(new RegExp(`\\$${idx}`, 'g'), group);
-            }
-          });
+        });
+        // Only emit a link when the resolved URL uses a safe scheme; otherwise
+        // render the matched text verbatim so no script-capable href is created.
+        if (isSafeLinkHref(url)) {
           subTokens.push({ kind: 'link', text: m[0], href: url });
-          subLast = m.index + m[0].length;
-          if (m[0].length === 0) break;
+        } else {
+          subTokens.push({ kind: 'text', text: m[0] });
         }
-        if (subTokens.length > 0) {
-          if (subLast < segment.length) {
-            subTokens.push({ kind: 'text', text: segment.slice(subLast) });
-          }
-          tokens.push(...subTokens);
-          return;
+        subLast = m.index + m[0].length;
+        if (m[0].length === 0) break;
+      }
+      if (subTokens.length > 0) {
+        if (subLast < segment.length) {
+          subTokens.push({ kind: 'text', text: segment.slice(subLast) });
         }
-      } catch {
-        // Ignore invalid user regex
+        tokens.push(...subTokens);
+        return;
       }
     }
 

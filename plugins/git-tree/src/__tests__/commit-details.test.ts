@@ -60,7 +60,18 @@ describe('loadCommitDetails for a commit', () => {
     ]);
     const details = await loadCommitDetails({ cwd: '/r', git, commitHash: HASH });
     expect(details).toMatchObject({ hash: HASH, subject: 'Fix bug', body: 'Body line', authorDate: 100, commitDate: 200 });
-    expect(details.signature).toBeDefined();
+    expect(details.signature).toMatchObject({ status: 'G', label: 'Good valid signature' });
+  });
+
+  it('omits the signature for unsigned and unrecognized signature codes', async () => {
+    for (const sig of ['N', 'Z', '']) {
+      const git = scripted([
+        ['show --quiet', { code: 0, stdout: meta(sig, 'No sig', '') }],
+        ['diff-tree', { code: 0, stdout: '' }]
+      ]);
+      const details = await loadCommitDetails({ cwd: '/r', git, commitHash: HASH });
+      expect(details.signature).toBeUndefined();
+    }
   });
 
   it('falls back to the requested hash when the header is empty', async () => {
