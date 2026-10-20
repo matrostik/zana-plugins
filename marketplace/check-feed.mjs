@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const feed = JSON.parse(readFileSync(join(root, 'marketplace', 'marketplace.json'), 'utf8'));
+if (!Array.isArray(feed)) {
+  console.error('marketplace.json must be a JSON array');
+  process.exit(1);
+}
 const pluginsDir = join(root, 'plugins');
 if (!existsSync(pluginsDir)) {
   console.error(`plugins directory not found: ${pluginsDir}`);
