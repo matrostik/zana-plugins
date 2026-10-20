@@ -1,0 +1,21 @@
+[
+  {
+    "id": "git-tree",
+    "displayName": "Git Tree",
+    "description": "Interactive Git Tree for each project: commit DAG, branch/tag/stash actions, commit details and diffs, comparisons, code reviews, and agent tools.",
+    "icon": { "lucide": "GitBranch" },
+    "tags": ["community"],
+    "author": {
+      "name": "Ros Haitovich",
+      "github": "matrostik",
+      "url": "https://github.com/matrostik"
+    },
+    "source": {
+      "git": {
+        "url": "https://github.com/matrostik/zana-plugins",
+        "subdir": "plugins/git-tree",
+        "ref": "master"
+      }
+    }
+  }
+]
