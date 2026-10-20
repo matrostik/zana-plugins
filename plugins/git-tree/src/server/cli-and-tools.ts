@@ -177,9 +177,7 @@ export function registerGitTreeCliAndTools(args: {
           const fromHash = readFlag(argv, '--from');
           const filePath =
             readFlag(argv, '--file') ??
-            (!hasNamedFlag(argv, '--commit') && !hasNamedFlag(argv, '--from') && argv[2] && !argv[2].startsWith('-')
-              ? argv[2]
-              : '');
+            (argv[2] && !argv[2].startsWith('-') ? argv[2] : '');
           if (!filePath) {
             return { exitCode: 1, stderr: 'Missing --file <relativePath> for diff.\n' };
           }

@@ -50,6 +50,7 @@ describe('ControlBar selectors', () => {
     expect(single.queryByLabelText('Select repository')).toBeNull();
     single.unmount();
 
+    const multiSelect = vi.fn();
     const multi = props({
       projects: [{ id: 'p1', name: 'One' }, { id: 'p2', name: 'Two' }],
       selectedProjectId: 'p1',
@@ -58,9 +59,9 @@ describe('ControlBar selectors', () => {
         { relPath: 'pkg', label: 'pkg', currentBranch: null, headHash: null, isWorktree: true }
       ]
     });
-    const { getByLabelText } = render(<ControlBar {...multi} />);
+    const { getByLabelText } = render(<ControlBar {...multi} onSelectProject={multiSelect} />);
     fireEvent.change(getByLabelText('Select project'), { target: { value: 'p2' } });
-    expect(multi.onSelectProject).toBeUndefined();
+    expect(multiSelect).toHaveBeenCalledWith('p2');
     fireEvent.change(getByLabelText('Select repository'), { target: { value: 'pkg' } });
     expect(multi.onSelectRepo).toHaveBeenCalledWith('pkg');
   });

@@ -197,16 +197,19 @@ export class GitGraphStorage {
   async listProjectCodeReviews(projectId: string): Promise<CodeReviewRecord[]> {
     const prefix = `code-review:${projectId}:`;
     const keys = await this.kv.list(prefix);
-    const records: CodeReviewRecord[] = [];
+    const fetched = await Promise.all(keys.map((key) => this.kv.get<CodeReviewRecord>(key)));
     const now = this.now();
-    for (const key of keys) {
-      const record = await this.kv.get<CodeReviewRecord>(key);
+    const records: CodeReviewRecord[] = [];
+    for (let i = 0; i < keys.length; i++) {
+      const record = fetched[i];
       if (!record) continue;
       if (now - record.lastActiveAt > NINETY_DAYS_MS) {
-        await this.kv.delete(key);
+        await this.kv.delete(keys[i]);
         continue;
       }
       records.push(record);
+    }
+    return records;
     }
     return records.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
   }

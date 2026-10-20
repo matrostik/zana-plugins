@@ -62,9 +62,10 @@ export function computeGraphLayout(
   const headAncestors = new Set<string>();
   if (headHash && rowByHash.has(headHash)) {
     const queue: string[] = [headHash];
+    let head = 0;
     headAncestors.add(headHash);
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    while (head < queue.length) {
+      const current = queue[head++];
       const idx = rowByHash.get(current);
       if (idx === undefined) continue;
       for (const parent of commits[idx].parents) {

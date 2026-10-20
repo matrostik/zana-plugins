@@ -28,7 +28,6 @@ export interface GitTreePluginDeps {
   fs?: ProjectFsDeps;
   now?: () => number;
 }
-export type GitGraphPluginDeps = GitTreePluginDeps;
 
 export const GIT_TREE_CHANGED_CHANNEL = 'git-tree:changed';
 export const GIT_GRAPH_CHANGED_CHANNEL = 'git-graph:changed';
