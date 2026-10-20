@@ -4,11 +4,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const feed = JSON.parse(readFileSync(join(root, 'marketplace', 'marketplace.json'), 'utf8'));
-if (!Array.isArray(feed)) {
-  console.error('marketplace.json must be a JSON array');
+const manifest = JSON.parse(readFileSync(join(root, 'marketplace', 'marketplace.json'), 'utf8'));
+if (!manifest || typeof manifest !== 'object' || !Array.isArray(manifest.plugins)) {
+  console.error('marketplace.json must be an object with a "plugins" array');
   process.exit(1);
 }
+const feed = manifest.plugins;
 const pluginsDir = join(root, 'plugins');
 if (!existsSync(pluginsDir)) {
   console.error(`plugins directory not found: ${pluginsDir}`);
