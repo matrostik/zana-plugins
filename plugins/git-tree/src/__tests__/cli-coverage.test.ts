@@ -69,6 +69,13 @@ describe('git-tree CLI branches', () => {
     expect(noFile.stderr).toMatch(/Missing --file/);
   });
 
+  it('does not treat a --commit value as the diff file path', async () => {
+    const h = await host();
+    const res = await h.runCli(['diff', '--commit', 'abc123'], { projectId: 'p1' });
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toMatch(/Missing --file/);
+  });
+
   it('accepts positional and flag forms for details, compare, and diff', async () => {
     const h = await host();
     const head = (await git({ cwd: repo, args: ['rev-parse', 'HEAD'] })).stdout.trim();

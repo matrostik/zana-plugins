@@ -42,6 +42,20 @@ export function assertSafeGitToken(value: string, label = 'git reference'): stri
   return trimmed;
 }
 
+const ALLOWED_REMOTE_URL = /^(https?:\/\/|ssh:\/\/|git@)/;
+
+/**
+ * Validates a remote URL and restricts it to network schemes (https, http, ssh, scp-style git@),
+ * rejecting local paths such as file:// and unauthenticated git:// endpoints.
+ */
+export function assertSafeRemoteUrl(value: string): string {
+  const url = assertSafeGitToken(value, 'remote URL');
+  if (!ALLOWED_REMOTE_URL.test(url)) {
+    throw new Error("Invalid remote URL: only https://, http://, ssh:// and git@ URLs are allowed.");
+  }
+  return url;
+}
+
 /**
  * Concurrency semaphore so parallel UI requests never flood the host with git processes.
  */

@@ -14,6 +14,10 @@ function readFlag(argv: string[], flag: string): string | undefined {
   return undefined;
 }
 
+function hasNamedFlag(argv: string[], flag: string): boolean {
+  return argv.includes(flag);
+}
+
 export function registerGitTreeCliAndTools(args: {
   zcc: ZccPluginApi;
   git: GitRunner;
@@ -173,7 +177,9 @@ export function registerGitTreeCliAndTools(args: {
           const fromHash = readFlag(argv, '--from');
           const filePath =
             readFlag(argv, '--file') ??
-            (argv[2] && !argv[2].startsWith('-') ? argv[2] : '');
+            (!hasNamedFlag(argv, '--commit') && !hasNamedFlag(argv, '--from') && argv[2] && !argv[2].startsWith('-')
+              ? argv[2]
+              : '');
           if (!filePath) {
             return { exitCode: 1, stderr: 'Missing --file <relativePath> for diff.\n' };
           }

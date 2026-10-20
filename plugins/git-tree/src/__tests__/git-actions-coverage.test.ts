@@ -331,6 +331,12 @@ describe('executeGitAction: remotes and unsupported actions', () => {
     await run(add, 'addRemote', { name: 'fork', url: 'https://x/y.git', fetch: true });
     expect(add.calls[0]).toEqual(['remote', 'add', '-f', 'fork', 'https://x/y.git']);
 
+    const badScheme = recorder();
+    await expect(run(badScheme, 'addRemote', { name: 'evil', url: 'file:///etc/passwd' })).rejects.toThrow(
+      /only https/
+    );
+    expect(badScheme.calls).toEqual([]);
+
     const rename = recorder();
     await run(rename, 'editRemote', { oldName: 'origin', newName: 'upstream', url: 'https://u' });
     expect(rename.calls.map((c) => c.join(' '))).toEqual([
@@ -343,7 +349,7 @@ describe('executeGitAction: remotes and unsupported actions', () => {
     expect(sameName.calls).toEqual([['remote', 'set-url', 'origin', 'https://o']]);
 
     const renameFail = recorder([['remote rename', { code: 1, stderr: 'exists' }]]);
-    const renameRes = await run(renameFail, 'editRemote', { oldName: 'a', newName: 'b', url: 'u' });
+    const renameRes = await run(renameFail, 'editRemote', { oldName: 'a', newName: 'b', url: 'https://u' });
     expect(renameRes.ok).toBe(false);
 
     const del = recorder();

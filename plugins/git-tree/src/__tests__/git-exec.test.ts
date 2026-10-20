@@ -2,7 +2,27 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { assertSafeGitToken, createTempFileGitRunner } from '../server/git-exec.js';
+import { assertSafeGitToken, assertSafeRemoteUrl, createTempFileGitRunner } from '../server/git-exec.js';
+
+describe('assertSafeRemoteUrl', () => {
+  it('allows https, http, ssh, and scp-style git@ URLs', () => {
+    expect(assertSafeRemoteUrl('https://github.com/org/repo.git')).toBe('https://github.com/org/repo.git');
+    expect(assertSafeRemoteUrl('http://host/repo.git')).toBe('http://host/repo.git');
+    expect(assertSafeRemoteUrl('ssh://git@host/repo.git')).toBe('ssh://git@host/repo.git');
+    expect(assertSafeRemoteUrl('git@github.com:org/repo.git')).toBe('git@github.com:org/repo.git');
+  });
+
+  it('rejects file://, git://, and local paths', () => {
+    expect(() => assertSafeRemoteUrl('file:///etc/passwd')).toThrow(/only https/);
+    expect(() => assertSafeRemoteUrl('git://attacker.com/repo')).toThrow(/only https/);
+    expect(() => assertSafeRemoteUrl('/etc/passwd')).toThrow(/only https/);
+  });
+
+  it('still applies the token checks', () => {
+    expect(() => assertSafeRemoteUrl('   ')).toThrow('remote URL is required.');
+    expect(() => assertSafeRemoteUrl('-https://x')).toThrow(/cannot start with '-'/);
+  });
+});
 
 describe('assertSafeGitToken', () => {
   it('rejects empty, option-like, and control-character values', () => {

@@ -1,4 +1,4 @@
-import { assertSafeGitToken, type GitRunner } from './git-exec.js';
+import { assertSafeGitToken, assertSafeRemoteUrl, type GitRunner } from './git-exec.js';
 import type { GitRemoteInfo, GitTagDetails, PullRequestConfig } from './types.js';
 
 export type GitMutationAction = {
@@ -382,7 +382,7 @@ export async function executeGitAction(args: {
     // --- Remote Management ---
     case 'addRemote': {
       const name = assertSafeGitToken(str('name'), 'remote name');
-      const url = assertSafeGitToken(str('url'), 'remote URL');
+      const url = assertSafeRemoteUrl(str('url'));
       const fetchNow = bool('fetch');
       const cmd = ['remote', 'add'];
       if (fetchNow) cmd.push('-f');
@@ -393,7 +393,7 @@ export async function executeGitAction(args: {
     case 'editRemote': {
       const oldName = assertSafeGitToken(str('oldName'), 'remote name');
       const newName = assertSafeGitToken(str('newName') || oldName, 'new remote name');
-      const url = assertSafeGitToken(str('url'), 'remote URL');
+      const url = assertSafeRemoteUrl(str('url'));
       if (oldName !== newName) {
         const renameRes = await runGitMutation(cwd, git, ['remote', 'rename', oldName, newName]);
         if (!renameRes.ok) return renameRes;
