@@ -209,8 +209,6 @@ export class GitGraphStorage {
       }
       records.push(record);
     }
-    return records;
-    }
     return records.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
   }
 }
