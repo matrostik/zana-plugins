@@ -49,6 +49,9 @@ zcc plugin install .
 zcc plugin dev
 ```
 
+For the complete end-to-end authoring and architecture guide, see:
+👉 **[Plugin Development Guide (Creation, Usage, & Best Practices)](./docs/plugin-guide.md)**
+
 Useful checks while you develop:
 
 ```bash
