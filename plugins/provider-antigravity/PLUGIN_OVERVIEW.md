@@ -1,34 +1,36 @@
-# Antigravity Provider
+# Antigravity Provider Plugin (`@zcc-ext/provider-antigravity`)
 
-Run Zana threads with your **Google Antigravity subscription** through the **Antigravity CLI** (`agy`) over the Agent Client Protocol (ACP).
-
----
-
-## Highlights
-
-* **Google Antigravity Subscription**: Access Google's flagship models including **Gemini 4 Argon**, **Gemini 3.8 Flash**, **Claude Opus 5.5**, and **Claude Sonnet 5.5** directly inside Zana threads.
-* **Automatic CLI Delegation**: Seamlessly uses your active `agy` authentication and environment.
-* **Dynamic Model Discovery & Robust Fallbacks**: Discovers all active models via `agy models` while keeping reliable built-in fallback profiles so your model picker is never blank.
-* **Integrated Setup Doctor**: Check `agy` installation, verify connectivity, and inspect model commands directly from **Settings → Plugins → Antigravity Provider**.
+Google Antigravity ACP thread provider for Zana Command Center, powered directly by Google's official **Native ACP Server (`agy_acp_server`)**.
 
 ---
 
-## Quickstart
+## Architecture
 
-1. Ensure the Antigravity CLI (`agy`) is installed and available in your terminal PATH:
-   ```bash
-   agy --version
-   ```
-2. Authenticate with your Google account:
-   ```bash
-   agy
-   ```
-3. Open Zana, create a new thread, and select **Antigravity** from the model dropdown.
+1. **Managed Native ACP Distribution (`src/native-runtime.ts`)**:
+   - Downloads and verifies Google's official ACP Registry distribution (`v1.4.3`, `https://cdn.agentclientprotocol.com/registry/v1/latest/antigravity.json`) across `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64`, `linux-x86_64`, and `linux-aarch64`.
+   - Enforces SHA-256 archive verification before extraction into `~/.zcc/runtimes/antigravity-acp/<version>/`.
+   - Validates required companion binaries (`localharness_external.exe` on Windows alongside `agy_acp_server.exe`).
+   - Supports atomic rollback (`runtime:rollback` RPC) via `current.json` (`previousVersion`) and cleans up process trees on Windows using `taskkill /PID <pid> /T /F`.
+
+2. **Authentication, Readiness & Sanitized `GEMINI_HOME` (`src/native-auth.ts`)**:
+   - Supports all four official Google ACP authentication methods: `oauth-personal` (default), `oauth-business`, `gemini-api-key`, and `agent-platform`.
+   - Prepares a sanitized ZCC `GEMINI_HOME` (`~/.zcc/state/antigravity-gemini-home`) that syncs `antigravity-acp/settings.json` and `antigravity-acp/acp_token.json` with `~/.gemini/antigravity-acp/` while automatically disabling unreachable IDE-only named-pipe MCP proxies (`*-antigravityide`) in `config/mcp_config.json` so prompts never stall on dead IDE pipes.
+   - Provides a fast, non-spawning readiness & model cache (`getFastNativeReadiness`) so `model/list`, `provider/health`, and Settings loads complete in `< 2ms` without spawning background 372 MB `agy_acp_server` processes.
+   - Provides an explicit 5-stage live readiness probe (`probeNativeAcpReadiness` with `BROWSER=echo`) and interactive Google OAuth sign-in (`startNativeAcpSignIn`).
+
+3. **Host Provider Bridge (`host.ts`)**:
+   - Launches `agy_acp_server` as a persistent per-thread ACP server with `_meta.parameterizedModelPicker: true` and `nativeReasoning.configId: 'thinking_level'`.
+   - Intercepts `provider/health` and `model/list` directly in the host bridge using `getFastNativeReadiness`.
+   - Transparently upgrades legacy `agy-*` `providerThreadId` resume requests into fresh `thread/start` sessions.
 
 ---
 
-## Configuration
+## Building and Testing
 
-In **Settings → Plugins → Antigravity Provider**, you can:
-* Verify connection status and installed `agy` version.
-* Customize the Antigravity executable command or path (default: `agy`).
+```bash
+# Build server.mjs, app.js, dist/host.js, and *.meta.json
+node plugins/provider-antigravity/scripts/build.mjs
+
+# Run unit & component tests
+npx vitest run plugins/provider-antigravity
+```

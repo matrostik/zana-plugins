@@ -28,34 +28,9 @@
       }
     },
     {
-      "id": "provider-gemini",
-      "displayName": "Gemini Provider",
-      "description": "Run Zana threads with your Google AI subscription via the Gemini CLI over the Agent Client Protocol (ACP).",
-      "icon": {
-        "lucide": "Sparkles"
-      },
-      "tags": [
-        "community",
-        "providers",
-        "ai"
-      ],
-      "author": {
-        "name": "Ros Haitovich",
-        "github": "matrostik",
-        "url": "https://github.com/matrostik"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/matrostik/zana-plugins",
-          "subdir": "plugins/provider-gemini",
-          "ref": "master"
-        }
-      }
-    },
-    {
       "id": "provider-antigravity",
       "displayName": "Antigravity Provider",
-      "description": "Run Zana threads with your Google Antigravity subscription via the Antigravity CLI (agy).",
+      "description": "Run Zana threads with your Google Antigravity subscription via Google's official Native ACP server (agy_acp_server).",
       "icon": {
         "lucide": "Sparkles"
       },

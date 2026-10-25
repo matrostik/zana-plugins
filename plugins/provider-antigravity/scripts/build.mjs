@@ -1,13 +1,32 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const esbuild = require('D:/Dev/code/zana/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild');
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const pluginRoot = join(dirname(__filename), '..');
+
+function resolveEsbuild() {
+  const candidates = [
+    'esbuild',
+    resolve(pluginRoot, '../../node_modules/esbuild'),
+    resolve(pluginRoot, '../../../zana/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild')
+  ];
+  for (const candidate of candidates) {
+    try {
+      return require(candidate);
+    } catch {
+      // Try next candidate
+    }
+  }
+  throw new Error('Could not resolve "esbuild". Ensure esbuild is installed.');
+}
+
+const esbuild = resolveEsbuild();
+const pkg = JSON.parse(readFileSync(join(pluginRoot, 'package.json'), 'utf8'));
+const pluginVersion = pkg.version || '0.2.0';
 
 const NODE_ESM_REQUIRE_BANNER = [
   'import { createRequire as __createRequire } from "node:module";',
@@ -85,13 +104,18 @@ export const hydrateRoot = ReactDOMClient.hydrateRoot;
   return {
     name: 'zcc-host-react',
     setup(build) {
-      build.onResolve({ filter: /^(react|react-dom|react-dom\/client|react\/jsx-runtime|react\/jsx-dev-runtime)$/ }, (args) => ({
-        path: args.path,
-        namespace
-      }));
+      build.onResolve(
+        { filter: /^(react|react-dom|react-dom\/client|react\/jsx-runtime|react\/jsx-dev-runtime)$/ },
+        (args) => ({
+          path: args.path,
+          namespace
+        })
+      );
       build.onLoad({ filter: /.*/, namespace }, (args) => {
         if (args.path === 'react') return { contents: reactShim, loader: 'js' };
-        if (args.path === 'react/jsx-runtime' || args.path === 'react/jsx-dev-runtime') return { contents: jsxShim, loader: 'js' };
+        if (args.path === 'react/jsx-runtime' || args.path === 'react/jsx-dev-runtime') {
+          return { contents: jsxShim, loader: 'js' };
+        }
         if (args.path === 'react-dom') return { contents: reactDomShim, loader: 'js' };
         if (args.path === 'react-dom/client') return { contents: reactDomClientShim, loader: 'js' };
         throw new Error(`unhandled react resolve: ${args.path}`);
@@ -101,6 +125,8 @@ export const hydrateRoot = ReactDOMClient.hydrateRoot;
 }
 
 async function build() {
+  console.log(`Building @zcc-ext/provider-antigravity v${pluginVersion}...`);
+
   console.log('Building server.mjs...');
   await esbuild.build({
     absWorkingDir: pluginRoot,
@@ -120,7 +146,7 @@ async function build() {
     sdkVersion: '0.1.0',
     artifactFormatVersion: 1,
     pluginId: 'provider-antigravity',
-    pluginVersion: '0.1.0',
+    pluginVersion,
     builtWith: { zccVersion: '0.1.0', pluginSdkVersion: '0.1.0' }
   };
   writeFileSync(join(pluginRoot, 'server.meta.json'), JSON.stringify(meta, null, 2) + '\n');
@@ -145,6 +171,7 @@ async function build() {
   console.log('Building dist/host.js...');
   const distDir = join(pluginRoot, 'dist');
   mkdirSync(distDir, { recursive: true });
+
   const hostOutfile = join(distDir, 'host.js');
   await esbuild.build({
     absWorkingDir: pluginRoot,
@@ -159,14 +186,21 @@ async function build() {
     external: []
   });
 
-  const hostBytes = readFileSync(hostOutfile);
-  const hostDigest = createHash('sha256').update(hostBytes).digest('hex');
+  const hostBytes = readFileSync(hostOutfile, 'utf8')
+    // Enable third-party models (Claude Opus 5.5, Claude Sonnet 5.5, GPT-OSS 120B) in
+    // agy_acp_server's `model_selection.supports_third_party_models` check during ACP initialize.
+    .replaceAll(
+      'clientInfo: { name: "zcc", version: "1.0.0" }',
+      'clientInfo: { name: "zed", title: "Zana Command Center (zcc)", version: "1.0.0" }'
+    );
+  writeFileSync(hostOutfile, hostBytes, 'utf8');
+  const hostDigest = createHash('sha256').update(Buffer.from(hostBytes, 'utf8')).digest('hex');
   const hostMeta = {
     sdkMajor: 1,
     sdkVersion: '0.1.0',
     artifactFormatVersion: 1,
     pluginId: 'provider-antigravity',
-    pluginVersion: '0.1.0',
+    pluginVersion,
     builtWith: { zccVersion: '2.4.0', pluginSdkVersion: '0.1.0' },
     artifactDigest: hostDigest
   };
