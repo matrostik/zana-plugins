@@ -100,6 +100,15 @@ export const CODENOD_STYLES = `
 .cn-section { margin-bottom: 24px; }
 .cn-section h3 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--cn-muted); }
 .cn-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cn-spinner {
+  width: 12px; height: 12px; flex: none; border-radius: 50%;
+  border: 2px solid var(--cn-border-strong); border-top-color: var(--cn-accent);
+  animation: cn-spin 0.8s linear infinite;
+}
+@keyframes cn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .cn-spinner { animation: none; }
+}
 .cn-settings { padding: 16px; overflow: auto; flex: 1; max-width: 900px; }
 .cn-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .cn-combobox { position: relative; max-width: 520px; }

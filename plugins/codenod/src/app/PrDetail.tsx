@@ -276,7 +276,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
           <>
             {review.stale ? <p className="cn-banner">New commits were pushed after this review. Re-review before approving.</p> : null}
             {reviewing ? (
-              <p className="cn-banner" role="status">
+              <p className="cn-banner cn-inline" role="status" aria-busy="true">
+                <span className="cn-spinner" aria-hidden="true" />
                 Review {review.status} · {runs.filter((run) => run.status === 'completed').length}/{runs.length} model(s) done
               </p>
             ) : null}

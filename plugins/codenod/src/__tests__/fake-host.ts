@@ -53,6 +53,9 @@ export interface FakeHostOptions {
   consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>;
 }
 
+/** Mirrors the host, which truncates `lastAssistantText` on lifecycle events. */
+const LIFECYCLE_TEXT_MAX_CHARS = 4_096;
+
 export function createFakeHost(options: FakeHostOptions = {}) {
   const kv = new Map<string, unknown>();
   const rpc = new Map<string, (args: unknown) => unknown>();
@@ -76,7 +79,8 @@ export function createFakeHost(options: FakeHostOptions = {}) {
     setTimeout(() => {
       thread.output = options.reply ? options.reply(thread, prompt) : '{}';
       thread.status = 'idle';
-      void emit('thread.idle', { name: 'thread.idle', threadId: thread.id, lastAssistantText: thread.output });
+      const lastAssistantText = thread.output.length <= LIFECYCLE_TEXT_MAX_CHARS ? thread.output : `${thread.output.slice(0, LIFECYCLE_TEXT_MAX_CHARS)}…`;
+      void emit('thread.idle', { name: 'thread.idle', threadId: thread.id, lastAssistantText });
     }, 5);
   };
 

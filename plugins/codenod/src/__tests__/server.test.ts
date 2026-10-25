@@ -77,10 +77,10 @@ function reply(thread: FakeThread, prompt: string): string {
   return ANALYSIS(7, 'user.name.trim() throws when the user is null');
 }
 
-async function setup(options: { consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean> } = {}) {
+async function setup(options: { consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>; reply?: typeof reply } = {}) {
   const state = { headSha: 'sha1' };
   const github = githubFixture(state);
-  const host = createFakeHost({ reply, consumeApproval: options.consumeApproval });
+  const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval });
   await createCodenodPlugin(host.zcc, { run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
   return { host, github, state };
 }
@@ -165,6 +165,19 @@ describe('codenod server', () => {
     expect(prompt).toContain('There is no checkout');
     expect(host.inbox[0]).toMatchObject({ projectId: 'home' });
     expect(host.inbox[0].comments).toContain('acme/api#4');
+  });
+
+  it('reads long replies from the thread output instead of the truncated idle event text', async () => {
+    const longDescription = `user.name.trim() throws when the user is null. ${'Callers pass unvalidated records here. '.repeat(120)}`;
+    const { host } = await setup({ reply: () => ANALYSIS(6, longDescription) });
+    await host.callRpc('setModels', { models: [MODELS[0]] });
+    await host.callRpc('refresh');
+    await host.callRpc('startReview', { prId: PR_ID });
+    const detail = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.review?.status === 'completed');
+
+    expect(ANALYSIS(6, longDescription).length).toBeGreaterThan(4_096);
+    expect(detail.runs[0]).toMatchObject({ status: 'completed', summary: 'Review by risk 6' });
+    expect([...host.threads.values()][0].sent).toEqual([]);
   });
 
   it('posts selected findings as inline comments', async () => {
@@ -268,3 +281,4 @@ describe('codenod server', () => {
     await expect(host.callRpc('startReview', { prId: PR_ID })).rejects.toThrow(/No review model/);
   });
 });
+

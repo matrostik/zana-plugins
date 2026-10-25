@@ -147,6 +147,12 @@ describe('parse', () => {
     expect(parseAnalysis('{"riskScore": 3}', { hasRequirements: true })).toMatchObject({ ok: false });
     expect(parseAnalysis('{"summary": "x"}', { hasRequirements: true })).toMatchObject({ ok: false, problem: expect.stringContaining('riskScore') });
   });
+
+  it('reports a truncated reply instead of parsing a nested issue object', () => {
+    const truncated = `${JSON.stringify(VALID).slice(0, 200)}…`;
+    expect(parseAnalysis(truncated, { hasRequirements: false })).toEqual({ ok: false, problem: 'the reply was cut off before the JSON object was complete' });
+    expect(parseAnalysis(`Checked {config} first. ${JSON.stringify(VALID)}`, { hasRequirements: false }).ok).toBe(true);
+  });
 });
 
 function issue(overrides: Partial<ParsedIssue>): ParsedIssue {

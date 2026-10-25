@@ -68,6 +68,18 @@ describe('PrList', () => {
     expect(onTabChange).toHaveBeenCalledWith('mine');
   });
 
+  it('shows a loading ring while a review is running', () => {
+    const running = item({
+      id: 'github.com/acme/api#9',
+      number: 9,
+      title: 'In progress',
+      review: { id: 'r9', status: 'running', riskScore: null, headSha: 'sha1', createdAt: 0, stale: false, findingCount: 0 }
+    });
+    render(<PrList items={[running, ITEMS[1]]} tab="needs-review" onTabChange={() => {}} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} hasWatchedRepos />);
+    expect(screen.getByText('Reviewing…').querySelector('.cn-spinner')).toBeTruthy();
+    expect(screen.getByText(/Risk 8/).querySelector('.cn-spinner')).toBeNull();
+  });
+
   it('asks the user to watch a repository when none are configured', () => {
     render(<PrList items={[]} tab="needs-review" onTabChange={() => {}} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} hasWatchedRepos={false} />);
     expect(screen.getByText('Watch a repository in Settings to see its pull requests.')).toBeTruthy();

@@ -18,7 +18,14 @@ const CI_LABELS: Record<string, { text: string; tone: string }> = {
 
 function ReviewBadge({ review }: { review: PrListItem['review'] }) {
   if (!review) return <span className="cn-badge">Not reviewed</span>;
-  if (review.status === 'queued' || review.status === 'running') return <span className="cn-badge cn-badge-warn">Reviewing…</span>;
+  if (review.status === 'queued' || review.status === 'running') {
+    return (
+      <span className="cn-badge cn-badge-warn">
+        <span className="cn-spinner" aria-hidden="true" />
+        Reviewing…
+      </span>
+    );
+  }
   if (review.status === 'failed') return <span className="cn-badge cn-badge-danger">Review failed</span>;
   if (review.status === 'cancelled') return <span className="cn-badge">Review cancelled</span>;
   const tone = scoreTone(review.riskScore, 'risk');

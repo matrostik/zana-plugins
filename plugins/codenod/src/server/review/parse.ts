@@ -49,6 +49,29 @@ export function extractJsonObject(text: string): string | null {
   return null;
 }
 
+/** True when the first `{` in `text` is never closed, i.e. the reply was truncated mid-object. */
+function startsWithUnclosedObject(text: string): boolean {
+  const unfenced = text.replace(/```(?:json)?/gi, '');
+  const start = unfenced.indexOf('{');
+  if (start === -1) return false;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < unfenced.length; index++) {
+    const char = unfenced[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return false;
+  }
+  return true;
+}
+
 function boundedScore(value: unknown, min: number, max: number): number | null {
   const numeric = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (typeof numeric !== 'number' || !Number.isFinite(numeric)) return null;
@@ -90,6 +113,7 @@ export function parseAnalysis(text: string, options: { hasRequirements: boolean 
   if (!text.trim()) return { ok: false, problem: 'the reply was empty' };
   const json = extractJsonObject(text);
   if (!json) return { ok: false, problem: 'the reply did not contain a valid JSON object' };
+  if (startsWithUnclosedObject(text)) return { ok: false, problem: 'the reply was cut off before the JSON object was complete' };
   const data = JSON.parse(json) as Record<string, unknown>;
   const summary = note(data.summary);
   if (!summary) return { ok: false, problem: 'the JSON object has no "summary" string' };

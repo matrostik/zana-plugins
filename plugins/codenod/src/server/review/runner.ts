@@ -76,7 +76,9 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
       return;
     }
     if (event.name === 'thread.idle') {
-      const text = event.lastAssistantText?.trim() ? event.lastAssistantText : await currentOutput(event.threadId);
+      // The host truncates lifecycle `lastAssistantText` (4096 chars), so prefer the full thread output.
+      const output = await currentOutput(event.threadId);
+      const text = output.trim() ? output : event.lastAssistantText ?? '';
       if (text.trim() && text !== waiter.baseline) settle(event.threadId, { text });
     }
   }
