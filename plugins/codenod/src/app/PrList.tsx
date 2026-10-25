@@ -38,6 +38,7 @@ export function PrList(props: {
   onQueryChange(query: string): void;
   selectedId: string | null;
   onSelect(id: string): void;
+  hasWatchedRepos: boolean;
 }) {
   const counts = useMemo(() => {
     const result: Record<PrBucket, number> = { 'needs-review': 0, mine: 0, watched: 0 };
@@ -81,7 +82,11 @@ export function PrList(props: {
       </div>
       {visible.length === 0 ? (
         <p className="cn-empty">
-          {props.items.length === 0 ? 'No open pull requests yet. Press Refresh to sync from GitHub.' : 'Nothing here.'}
+          {!props.hasWatchedRepos
+            ? 'Watch a repository in Settings to see its pull requests.'
+            : props.items.length === 0
+              ? 'No open pull requests yet. Press Refresh to sync from GitHub.'
+              : 'Nothing here.'}
         </p>
       ) : (
         <ul className="cn-rows">

@@ -7,6 +7,8 @@ description: Triage and AI-review GitHub pull requests with the CodeNod plugin â
 
 Use CodeNod when the user asks which pull requests need their review, wants an AI review of a GitHub pull request, or wants to read or post the findings of an earlier review.
 
+The review inbox (`list` / `sync` / `codenod_list_prs`) only includes pull requests in watched repositories. `review` and `show` still work for a pull request URL even if that repository is not watched.
+
 Pull requests are referenced as a URL (`https://github.com/acme/api/pull/42`), `host/owner/repo#42` for GitHub Enterprise, or `owner/repo#42` for the default host.
 
 ## CLI Usage

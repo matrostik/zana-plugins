@@ -111,6 +111,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
             onQueryChange={setQuery}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            hasWatchedRepos={overview?.hasWatchedRepos ?? false}
           />
           {selectedId ? (
             <PrDetail

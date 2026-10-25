@@ -116,7 +116,7 @@ function ReposSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
     <section className="cn-section" aria-labelledby="cn-repos-heading">
       <h3 id="cn-repos-heading">Watched repositories</h3>
       <p className="cn-muted cn-small">
-        Open pull requests in watched repositories appear under Watched. Auto-review runs once per new commit when your review is requested, skipping drafts and your own pull requests.
+        Needs my review, Mine, and Watched only include pull requests from repositories you add here. Auto-review runs once per new commit when your review is requested, skipping drafts and your own pull requests.
         The spec pattern (for example <span className="cn-mono">docs/specs/**/*.md</span>) adds matching changed or referenced files as requirements.
       </p>
       {error ? <p className="cn-banner cn-banner-error">{error}</p> : null}

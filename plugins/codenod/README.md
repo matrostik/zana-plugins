@@ -17,8 +17,8 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 3. Click **Settings** in the CodeNod toolbar.
 4. Under **Review models**, tick one or more models and click **Save models**.
 5. Check **GitHub sign-in**. Each host should show "signed in". If not, see Troubleshooting.
-6. Optional: under **Watched repositories**, add repositories you want to follow, and tick **Auto-review** for any that should be reviewed automatically.
-7. Click **Refresh**. Your pull requests appear under **Needs my review**, **Mine**, and **Watched**.
+6. Under **Watched repositories**, add at least one repository. Tick **Auto-review** for any that should be reviewed automatically.
+7. Click **Refresh**. Open pull requests in those repositories appear under **Needs my review**, **Mine**, and **Watched**.
 
 ## How To Review a Pull Request
 
@@ -33,7 +33,7 @@ Use **Deep Review in thread** to open a normal, visible Zana thread with the pul
 
 ## What You Get
 
-- **Review inbox** with three lists: pull requests waiting for your review, your own, and watched repositories. Each row shows CI state and the latest review.
+- **Review inbox** with three lists: pull requests waiting for your review, your own, and every open PR in watched repositories. The inbox only includes repositories you add. Each row shows CI state and the latest review.
 - **Five scores**: risk (higher is riskier), plus test coverage, requirements, simplicity, and stability (higher is better).
 - **Findings** in four categories: security, performance, logic, and style, each with a severity, file, line, and suggested fix.
 - **Multi-model consensus**: each model reviews on its own; matching findings are merged and ranked by how many models agree. Up to 5 models per review.

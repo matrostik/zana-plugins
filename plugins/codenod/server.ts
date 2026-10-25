@@ -231,7 +231,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     syncing: sync.isSyncing(),
     lastSyncAt: (await zcc.storage.kv.get<number>('lastSyncAt')) ?? null,
     activeReviews: reviews.activeCount(),
-    hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
+    hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0,
+    hasWatchedRepos: store.listRepos().length > 0
   }));
 
   zcc.rpc.method('detail', (args) => {

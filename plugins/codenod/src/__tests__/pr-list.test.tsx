@@ -41,7 +41,7 @@ describe('PrList', () => {
     const onQueryChange = vi.fn();
     const onSelect = vi.fn();
     const { rerender } = render(
-      <PrList items={ITEMS} tab="needs-review" onTabChange={() => {}} query="" onQueryChange={onQueryChange} selectedId={null} onSelect={onSelect} />
+      <PrList items={ITEMS} tab="needs-review" onTabChange={() => {}} query="" onQueryChange={onQueryChange} selectedId={null} onSelect={onSelect} hasWatchedRepos />
     );
     expect(screen.getByRole('tab', { name: /Needs my review/ }).textContent).toContain('2');
     expect(screen.getByRole('tab', { name: /Mine/ }).textContent).toContain('1');
@@ -53,7 +53,7 @@ describe('PrList', () => {
 
     fireEvent.change(screen.getByLabelText('Filter pull requests'), { target: { value: 'nav' } });
     expect(onQueryChange).toHaveBeenCalledWith('nav');
-    rerender(<PrList items={ITEMS} tab="needs-review" onTabChange={() => {}} query="nav" onQueryChange={onQueryChange} selectedId={null} onSelect={onSelect} />);
+    rerender(<PrList items={ITEMS} tab="needs-review" onTabChange={() => {}} query="nav" onQueryChange={onQueryChange} selectedId={null} onSelect={onSelect} hasWatchedRepos />);
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: /Fix nav/ }));
@@ -62,9 +62,14 @@ describe('PrList', () => {
 
   it('switches tabs and shows an empty state', () => {
     const onTabChange = vi.fn();
-    render(<PrList items={[]} tab="watched" onTabChange={onTabChange} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} />);
+    render(<PrList items={[]} tab="watched" onTabChange={onTabChange} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} hasWatchedRepos />);
     expect(screen.getByText(/Press Refresh/)).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /Mine/ }));
     expect(onTabChange).toHaveBeenCalledWith('mine');
+  });
+
+  it('asks the user to watch a repository when none are configured', () => {
+    render(<PrList items={[]} tab="needs-review" onTabChange={() => {}} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} hasWatchedRepos={false} />);
+    expect(screen.getByText('Watch a repository in Settings to see its pull requests.')).toBeTruthy();
   });
 });

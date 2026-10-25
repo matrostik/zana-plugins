@@ -13,6 +13,7 @@ export interface Overview {
   lastSyncAt: number | null;
   activeReviews: number;
   hasModels: boolean;
+  hasWatchedRepos: boolean;
 }
 
 export interface ConfigSnapshot {

@@ -51,6 +51,7 @@ function githubFixture(state: { headSha: string }) {
     'GET /user': () => ({ login: 'me' }),
     'GET /search/issues': (url) => {
       const query = url.searchParams.get('q') ?? '';
+      if (query.includes('author:@me')) return { items: [] };
       if (query.includes('review-requested:@me') || query.includes('repo:acme/api')) return { items: [searchItem()] };
       return { items: [] };
     },
@@ -110,13 +111,38 @@ async function reviewToCompletion(host: Awaited<ReturnType<typeof setup>>['host'
 describe('codenod server', () => {
   it('syncs the inbox from GitHub search', async () => {
     const { host } = await setup();
+    await host.callRpc('addRepo', { repo: 'acme/api' });
     await host.callRpc('refresh');
-    const overview = (await host.callRpc('overview')) as { prs: PrListItem[]; hosts: Array<{ host: string; login: string; authSource: string }> };
+    const overview = (await host.callRpc('overview')) as { prs: PrListItem[]; hosts: Array<{ host: string; login: string; authSource: string }>; hasWatchedRepos: boolean };
+    expect(overview.hasWatchedRepos).toBe(true);
     expect(overview.prs).toHaveLength(1);
-    expect(overview.prs[0]).toMatchObject({ id: PR_ID, buckets: ['needs-review'], ciState: 'success', headSha: 'sha1', author: 'teammate' });
+    expect(overview.prs[0]).toMatchObject({ id: PR_ID, buckets: expect.arrayContaining(['needs-review', 'watched']), ciState: 'success', headSha: 'sha1', author: 'teammate' });
     expect(overview.hosts[0]).toMatchObject({ host: 'github.com', login: 'me', authSource: 'gh' });
     const listed = await host.runCli(['list']);
     expect(listed.stdout).toContain('acme/api#4');
+  });
+
+  it('does not list pull requests until a repository is watched', async () => {
+    const { host, github } = await setup();
+    await host.callRpc('refresh');
+    const overview = (await host.callRpc('overview')) as { prs: PrListItem[]; hasWatchedRepos: boolean };
+    expect(overview.hasWatchedRepos).toBe(false);
+    expect(overview.prs).toEqual([]);
+    expect(github.calls.some((call) => call.url.includes('/search/issues'))).toBe(false);
+  });
+
+  it('drops unwatched pull requests from the inbox on the next sync', async () => {
+    const { host } = await setup();
+    await host.callRpc('addRepo', { repo: 'acme/api' });
+    await host.callRpc('refresh');
+    expect(((await host.callRpc('overview')) as { prs: PrListItem[] }).prs).toHaveLength(1);
+    await host.callRpc('removeRepo', { id: 'github.com/acme/api' });
+    await host.callRpc('refresh');
+    const overview = (await host.callRpc('overview')) as { prs: PrListItem[]; hasWatchedRepos: boolean };
+    expect(overview.hasWatchedRepos).toBe(false);
+    expect(overview.prs).toEqual([]);
+    const detail = (await host.callRpc('detail', { prId: PR_ID })) as PrDetail;
+    expect(detail.pr.state).toBe('closed');
   });
 
   it('runs a multi-model review in hidden threads with consensus', async () => {

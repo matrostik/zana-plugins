@@ -90,10 +90,12 @@ export function createSyncService(deps: {
     try {
       status.login = await viewerLogin(host);
       const found = new Map<string, { item: GhSearchItem; ref: PrRef; buckets: Set<PrBucket> }>();
+      const watched = deps.store.listRepos().filter((repo) => repo.host === host);
+      const watchedKeys = new Set(watched.map((repo) => `${repo.owner}/${repo.name}`.toLowerCase()));
       const collect = (items: GhSearchItem[], bucket: PrBucket) => {
         for (const item of items) {
           const repo = repoFromRepositoryUrl(item.repository_url);
-          if (!repo) continue;
+          if (!repo || !watchedKeys.has(`${repo.owner}/${repo.name}`.toLowerCase())) continue;
           const ref: PrRef = { host, owner: repo.owner, name: repo.name, number: item.number };
           const id = prId(ref);
           const entry = found.get(id) ?? { item, ref, buckets: new Set<PrBucket>() };
@@ -102,15 +104,21 @@ export function createSyncService(deps: {
         }
       };
 
-      collect(await deps.github.searchPullRequests(host, `${OPEN_PR_QUERY} review-requested:@me`), 'needs-review');
-      collect(await deps.github.searchPullRequests(host, `${OPEN_PR_QUERY} author:@me`), 'mine');
-      const watched = deps.store.listRepos().filter((repo) => repo.host === host);
-      for (let index = 0; index < watched.length; index += REPOS_PER_QUERY) {
-        const qualifiers = watched
-          .slice(index, index + REPOS_PER_QUERY)
-          .map((repo) => `repo:${repo.owner}/${repo.name}`)
-          .join(' ');
-        collect(await deps.github.searchPullRequests(host, `${OPEN_PR_QUERY} ${qualifiers}`), 'watched');
+      const searchWatched = async (extra: string, bucket: PrBucket) => {
+        for (let index = 0; index < watched.length; index += REPOS_PER_QUERY) {
+          const qualifiers = watched
+            .slice(index, index + REPOS_PER_QUERY)
+            .map((repo) => `repo:${repo.owner}/${repo.name}`)
+            .join(' ');
+          const query = extra ? `${OPEN_PR_QUERY} ${extra} ${qualifiers}` : `${OPEN_PR_QUERY} ${qualifiers}`;
+          collect(await deps.github.searchPullRequests(host, query), bucket);
+        }
+      };
+
+      if (watched.length > 0) {
+        await searchWatched('review-requested:@me', 'needs-review');
+        await searchWatched('author:@me', 'mine');
+        await searchWatched('', 'watched');
       }
 
       const changed: PullRequestRow[] = [];
