@@ -3,6 +3,7 @@ import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana
 import type { ChangedFile, FindingRow, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { errorText, relativeTime, scoreTone } from './format.ts';
+import { ProviderModelPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'diff';
@@ -110,7 +111,7 @@ function DiffView({ rpc, prId }: { rpc: Rpc; prId: string }) {
 
 function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: ModelChoice[]): void; onClose(): void }) {
   const [providers, setProviders] = useState<AvailableProvider[] | null>(null);
-  const [chosen, setChosen] = useState<string[]>(props.defaults.map((model) => `${model.providerId}\u0000${model.model}`));
+  const [chosen, setChosen] = useState<ModelChoice[]>(props.defaults);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     props.rpc
@@ -118,46 +119,16 @@ function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: M
       .then((value) => setProviders(value as AvailableProvider[]))
       .catch((cause) => setError(errorText(cause)));
   }, [props.rpc]);
-  const toggle = (key: string) => setChosen((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key].slice(0, 5)));
   return (
     <div className="cn-banner" role="dialog" aria-label="Choose review models">
       {error ? <p className="cn-banner-error">{error}</p> : null}
       {!providers ? (
         <p className="cn-muted">Loading models…</p>
       ) : (
-        providers.map((provider) => (
-          <fieldset key={provider.providerId} className="cn-section">
-            <legend>{provider.displayName}</legend>
-            {provider.models.length === 0 ? <span className="cn-muted cn-small">{provider.error ?? 'No models'}</span> : null}
-            <div className="cn-inline">
-              {provider.models.map((model) => {
-                const key = `${provider.providerId}\u0000${model.id}`;
-                return (
-                  <label key={key} className="cn-check">
-                    <input type="checkbox" checked={chosen.includes(key)} onChange={() => toggle(key)} />
-                    {model.label}
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        ))
+        providers.map((provider) => <ProviderModelPicker key={provider.providerId} provider={provider} value={chosen} onChange={setChosen} />)
       )}
       <div className="cn-inline">
-        <button
-          type="button"
-          className="cn-btn cn-btn-primary"
-          disabled={chosen.length === 0}
-          onClick={() =>
-            props.onRun(
-              chosen.map((key) => {
-                const [providerId, model] = key.split('\u0000');
-                const reasoningLevel = props.defaults.find((item) => item.providerId === providerId && item.model === model)?.reasoningLevel;
-                return { providerId, model, ...(reasoningLevel ? { reasoningLevel } : {}) };
-              })
-            )
-          }
-        >
+        <button type="button" className="cn-btn cn-btn-primary" disabled={chosen.length === 0} onClick={() => props.onRun(chosen)}>
           Review with {chosen.length} model{chosen.length === 1 ? '' : 's'}
         </button>
         <button type="button" className="cn-btn" onClick={props.onClose}>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRealtime, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ModelChoice } from '../server/types.ts';
 import { errorText, relativeTime } from './format.ts';
+import { ProviderModelPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, ConfigSnapshot, Rpc } from './types.ts';
 
 const AUTH_LABELS: Record<string, string> = { gh: 'gh CLI', 'git-credential': 'git credential helper', setting: 'pasted token' };
@@ -19,16 +20,6 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
       .then((value) => setProviders(value as AvailableProvider[]))
       .catch((cause) => setError(errorText(cause)));
   }, [rpc]);
-
-  const index = (providerId: string, model: string) => draft.findIndex((item) => item.providerId === providerId && item.model === model);
-  const toggle = (providerId: string, model: string) =>
-    setDraft((current) => {
-      const position = current.findIndex((item) => item.providerId === providerId && item.model === model);
-      if (position !== -1) return current.filter((_, itemIndex) => itemIndex !== position);
-      return [...current, { providerId, model }].slice(0, 5);
-    });
-  const setReasoning = (providerId: string, model: string, reasoningLevel: string) =>
-    setDraft((current) => current.map((item) => (item.providerId === providerId && item.model === model ? { ...item, ...(reasoningLevel ? { reasoningLevel } : { reasoningLevel: undefined }) } : item)));
 
   const save = async () => {
     setError(null);
@@ -55,36 +46,7 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
         <p className="cn-muted">No AI provider is available in Zana. Sign in to one under Settings → Providers.</p>
       ) : (
         providers.map((provider) => (
-          <fieldset key={provider.providerId} className="cn-section">
-            <legend>{provider.displayName}</legend>
-            {provider.models.length === 0 ? <span className="cn-muted cn-small">{provider.error ?? 'No models reported'}</span> : null}
-            {provider.models.map((model) => {
-              const position = index(provider.providerId, model.id);
-              return (
-                <div key={model.id} className="cn-inline">
-                  <label className="cn-check">
-                    <input type="checkbox" checked={position !== -1} onChange={() => toggle(provider.providerId, model.id)} />
-                    {model.label}
-                  </label>
-                  {position !== -1 && model.reasoningLevels.length > 0 ? (
-                    <select
-                      className="cn-select cn-small"
-                      aria-label={`Reasoning level for ${model.label}`}
-                      value={draft[position].reasoningLevel ?? ''}
-                      onChange={(event) => setReasoning(provider.providerId, model.id, event.target.value)}
-                    >
-                      <option value="">Default reasoning</option>
-                      {model.reasoningLevels.map((level) => (
-                        <option key={level} value={level}>
-                          {level}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-                </div>
-              );
-            })}
-          </fieldset>
+          <ProviderModelPicker key={provider.providerId} provider={provider} value={draft} onChange={setDraft} showReasoning />
         ))
       )}
       <div className="cn-inline">

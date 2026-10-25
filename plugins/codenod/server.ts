@@ -11,6 +11,7 @@ import { createThreadWaiter, type ThreadsApi } from './src/server/review/runner.
 import { CHANGED_EVENT, createReviewService, type ReviewConfig, type WorkspaceMode } from './src/server/review/service.ts';
 import { createSyncService } from './src/server/sync.ts';
 import type { ModelChoice, PrBucket, ReviewEvent, ReviewRow } from './src/server/types.ts';
+import { mergeCatalogModels } from './src/server/models-catalog.ts';
 import { asRecord, asString, asStringArray, errorMessage, sleep } from './src/server/util.ts';
 import { getPrDetail, listPullRequests } from './src/server/views.ts';
 
@@ -355,11 +356,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
           providerId: provider.id,
           displayName: provider.displayName ?? provider.id,
           error: catalog.modelLoadError?.detail ?? catalog.modelLoadError?.code ?? null,
-          models: catalog.models.map((model) => ({
-            id: model.id,
-            label: model.model || model.id,
-            reasoningLevels: model.supportedReasoningEfforts.map((effort) => effort.reasoningEffort)
-          }))
+          models: mergeCatalogModels(catalog)
         };
       })
     );

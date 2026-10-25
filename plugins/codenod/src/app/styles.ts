@@ -102,6 +102,20 @@ export const CODENOD_STYLES = `
 .cn-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .cn-settings { padding: 16px; overflow: auto; flex: 1; max-width: 900px; }
 .cn-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.cn-combobox { position: relative; max-width: 520px; }
+.cn-combobox .cn-input { width: 100%; }
+.cn-combobox-list {
+  position: absolute; z-index: 8; left: 0; right: 0; max-height: 240px; overflow: auto; margin: 4px 0 0; padding: 4px 0;
+  list-style: none; background: var(--cn-card); border: 1px solid var(--cn-border-strong); border-radius: 6px;
+}
+.cn-combobox-option {
+  display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; padding: 6px 10px;
+  border: none; background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.cn-combobox-option[aria-selected="true"], .cn-combobox-option:hover { background: var(--cn-hover); }
+.cn-combobox-empty { padding: 8px 10px; color: var(--cn-muted); }
+.cn-selected-models { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cn-selected-model { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 720px) {
   .cn-body { flex-direction: column; }
   .cn-list { width: 100%; max-height: 45%; border-right: none; border-bottom: 1px solid var(--cn-border); }
