@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import createCodenodPlugin from '../../server.ts';
+import type { ConfigSnapshot } from '../app/types.ts';
 import type { CommandRunner } from '../server/github/auth.ts';
+import { DEFAULT_REVIEW_INSTRUCTIONS } from '../server/review/prompts.ts';
 import type { FetchLike } from '../server/github/client.ts';
 import type { PrDetail, PrListItem } from '../server/views.ts';
 import { createFakeFetch, createFakeHost, respond, type FakeThread } from './fake-host.ts';
@@ -48,7 +50,7 @@ function githubFixture(state: { headSha: string }) {
     user: { login: 'teammate' }
   });
   return createFakeFetch({
-    'GET /user': () => ({ login: 'me' }),
+    'GET /user': () => ({ login: 'me', name: 'Mona Lisa', email: null, avatar_url: 'https://avatars.example/me' }),
     'GET /search/issues': (url) => {
       const query = url.searchParams.get('q') ?? '';
       if (query.includes('author:@me')) return { items: [] };
@@ -77,10 +79,12 @@ function reply(thread: FakeThread, prompt: string): string {
   return ANALYSIS(7, 'user.name.trim() throws when the user is null');
 }
 
-async function setup(options: { consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>; reply?: typeof reply } = {}) {
+async function setup(
+  options: { consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>; reply?: typeof reply; settings?: Record<string, string | number | boolean> } = {}
+) {
   const state = { headSha: 'sha1' };
   const github = githubFixture(state);
-  const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval });
+  const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval, settings: options.settings });
   await createCodenodPlugin(host.zcc, { run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
   return { host, github, state };
 }
@@ -282,3 +286,81 @@ describe('codenod server', () => {
   });
 });
 
+describe('codenod settings', () => {
+  const config = (host: Awaited<ReturnType<typeof setup>>['host']) => host.callRpc('config') as Promise<ConfigSnapshot>;
+
+  it('copies legacy plugin settings once and then ignores them', async () => {
+    const { host, github } = await setup({
+      settings: { githubHosts: 'GIT.example.com, bad_host!, github.com', customInstructions: '  Be strict  ', syncIntervalMinutes: 10, workspaceMode: 'diff-only', fallbackProject: 'home', archiveReviewThreads: false }
+    });
+
+    const first = await config(host);
+    expect(first.settings).toEqual({
+      customInstructions: 'Be strict',
+      githubHosts: ['git.example.com'],
+      syncIntervalMinutes: 10,
+      maxConcurrentReviews: 2,
+      reviewTimeoutMinutes: 20,
+      workspaceMode: 'diff-only',
+      fallbackProjectId: 'home',
+      archiveReviewThreads: false
+    });
+    expect(host.kv.get('settingsMigrated')).toBe(true);
+
+    host.settingValues.customInstructions = 'Changed in the old screen';
+    await createCodenodPlugin(host.zcc, { run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
+    expect((await config(host)).settings.customInstructions).toBe('Be strict');
+  });
+
+  it('starts new installs with the default review instructions and sends them to reviewers', async () => {
+    const { host } = await setup();
+    const snapshot = await config(host);
+    expect(snapshot.settings.customInstructions).toBe(DEFAULT_REVIEW_INSTRUCTIONS);
+    expect(snapshot.defaultInstructions).toBe(DEFAULT_REVIEW_INSTRUCTIONS);
+    expect(snapshot.builtInPrompt).toContain('expert code reviewer');
+
+    await host.callRpc('addRepo', { repo: 'acme/api' });
+    await reviewToCompletion(host);
+    const prompt = String([...host.threads.values()][0].args.prompt);
+    expect(prompt).toContain('## Custom Review Instructions');
+    expect(prompt).toContain('Skip nitpicks');
+  });
+
+  it('omits custom instructions from the prompt once they are cleared', async () => {
+    const { host } = await setup();
+    await host.callRpc('setSettings', { customInstructions: '   ' });
+    await reviewToCompletion(host);
+    expect(String([...host.threads.values()][0].args.prompt)).not.toContain('Custom Review Instructions');
+  });
+
+  it('validates, clamps, and persists updates from the panel', async () => {
+    const { host } = await setup();
+    await expect(host.callRpc('setSettings', { githubHosts: ['bad host!'] })).rejects.toThrow(/Invalid GitHub host/);
+    await expect(host.callRpc('setSettings', { customInstructions: 'x'.repeat(4_001) })).rejects.toThrow(/limited to 4000/);
+
+    const saved = (await host.callRpc('setSettings', {
+      githubHosts: ['https://GHE.example.com/api', 'github.com'],
+      maxConcurrentReviews: 99,
+      reviewTimeoutMinutes: 1,
+      workspaceMode: 'nope',
+      fallbackProjectId: '',
+      unknownKey: true
+    })) as ConfigSnapshot['settings'];
+    expect(saved).toMatchObject({ githubHosts: ['ghe.example.com'], maxConcurrentReviews: 6, reviewTimeoutMinutes: 3, workspaceMode: 'worktree', fallbackProjectId: null });
+    expect(saved).not.toHaveProperty('unknownKey');
+    expect(host.kv.get('settings')).toEqual(saved);
+    expect(host.published.at(-1)).toEqual({ event: 'codenod:changed', payload: { settings: true } });
+
+    const snapshot = await config(host);
+    expect(snapshot.hosts.map((status) => status.host)).toEqual(['github.com', 'ghe.example.com']);
+    const shorthand = await host.callRpc('addRepo', { repo: 'team/app' });
+    expect(shorthand).toMatchObject({ id: 'ghe.example.com/team/app' });
+  });
+
+  it('reports GitHub profiles for signed-in hosts', async () => {
+    const { host } = await setup();
+    const snapshot = await config(host);
+    expect(snapshot.profiles).toEqual([{ host: 'github.com', login: 'me', name: 'Mona Lisa', email: null, avatarUrl: 'https://avatars.example/me' }]);
+    expect(snapshot.projects).toEqual([{ id: 'home', name: 'Home' }]);
+  });
+});

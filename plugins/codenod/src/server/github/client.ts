@@ -18,6 +18,9 @@ export class GitHubError extends Error {
 
 export interface GhUser {
   login: string;
+  name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface GhPull {

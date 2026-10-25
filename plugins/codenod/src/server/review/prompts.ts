@@ -41,7 +41,13 @@ export interface ReviewPromptContext {
 
 const MAX_DESCRIPTION_CHARS = 6_000;
 const MAX_PRIOR_COMMENTS = 40;
-const MAX_CUSTOM_INSTRUCTIONS_CHARS = 4_000;
+export const MAX_CUSTOM_INSTRUCTIONS_CHARS = 4_000;
+
+/** Starter text for the custom review instructions; users can edit or clear it. */
+export const DEFAULT_REVIEW_INSTRUCTIONS = `- Prioritize correctness, security, and breaking changes over style.
+- Flag changed behavior that has no new or updated tests.
+- Call out public API, schema, or configuration changes that need migration notes.
+- Skip nitpicks that a formatter or linter would catch.`;
 
 const ROLE = `You are an expert code reviewer with deep knowledge of:
 - Software design principles and clean code practices

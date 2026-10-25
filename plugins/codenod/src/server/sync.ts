@@ -15,6 +15,14 @@ export interface HostStatus {
   syncedAt: number | null;
 }
 
+export interface ViewerProfile {
+  host: string;
+  login: string;
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+}
+
 export interface SyncResult {
   hosts: HostStatus[];
   changed: PullRequestRow[];
@@ -34,15 +42,26 @@ export function createSyncService(deps: {
 }) {
   const now = deps.now ?? Date.now;
   const statuses = new Map<string, HostStatus>();
-  const logins = new Map<string, string>();
+  const viewers = new Map<string, ViewerProfile>();
   let running: Promise<SyncResult> | null = null;
 
-  async function viewerLogin(host: string): Promise<string> {
-    const cached = logins.get(host);
+  async function viewerProfile(host: string): Promise<ViewerProfile> {
+    const cached = viewers.get(host);
     if (cached) return cached;
     const viewer = await deps.github.viewer(host);
-    logins.set(host, viewer.login);
-    return viewer.login;
+    const profile: ViewerProfile = {
+      host,
+      login: viewer.login,
+      name: viewer.name || null,
+      email: viewer.email || null,
+      avatarUrl: viewer.avatar_url || null
+    };
+    viewers.set(host, profile);
+    return profile;
+  }
+
+  async function viewerLogin(host: string): Promise<string> {
+    return (await viewerProfile(host)).login;
   }
 
   function toRow(host: string, pull: GhPull, ciState: CiState, buckets: PrBucket[]): Omit<PullRequestRow, 'syncedAt'> {
@@ -177,7 +196,7 @@ export function createSyncService(deps: {
           const known = statuses.get(host);
           if (known) return known;
           const token = await deps.tokens.resolve(host);
-          return { host, authSource: token?.source ?? null, login: logins.get(host) ?? null, error: null, pullRequestCount: 0, syncedAt: null };
+          return { host, authSource: token?.source ?? null, login: viewers.get(host)?.login ?? null, error: null, pullRequestCount: 0, syncedAt: null };
         })
       );
     },
@@ -191,6 +210,14 @@ export function createSyncService(deps: {
     },
 
     viewerLogin,
+
+    /** Profiles for signed-in hosts; hosts whose lookup fails are left out. */
+    async viewerProfiles(): Promise<ViewerProfile[]> {
+      const profiles = await Promise.all(
+        (await deps.hosts()).map(async (host) => ((await deps.tokens.resolve(host)) ? viewerProfile(host).catch(() => null) : null))
+      );
+      return profiles.filter((profile): profile is ViewerProfile => profile !== null);
+    },
 
     /** Repositories with recent PR activity involving the viewer that are not watched yet. */
     async discoverActiveRepos(): Promise<Array<{ id: string; host: string; owner: string; name: string; pullRequests: number }>> {

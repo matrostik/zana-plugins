@@ -14,11 +14,12 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 
 1. Install the plugin from the Zana marketplace, or from a local checkout with `zcc plugin install .` in this folder.
 2. Open **CodeNod** from the Zana sidebar.
-3. Click **Settings** in the CodeNod toolbar.
-4. Under **Review models**, tick one or more models and click **Save models**.
-5. Check **GitHub sign-in**. Each host should show "signed in". If not, see Troubleshooting.
-6. Under **Watched repositories**, add at least one repository. Tick **Auto-review** for any that should be reviewed automatically.
-7. Click **Refresh**. Open pull requests in those repositories appear under **Needs my review**, **Mine**, and **Watched**.
+3. Click **Settings** in the CodeNod toolbar. The **Profile** tab opens.
+4. Under **GitHub accounts**, check that each host shows your name and login. If a host says "Not signed in", see Troubleshooting.
+5. Optionally edit **Custom review instructions** and click **Save instructions**. CodeNod starts you off with default instructions; **Reset to default** brings them back.
+6. Open the **AI Model** tab. Under **Review models**, pick one or more models and click **Save models**.
+7. Open the **Organizations & Repos** tab. Add any GitHub Enterprise hosts and click **Save hosts**. Then add at least one repository under **Watched repositories**, and tick **Auto-review** for any that should be reviewed automatically.
+8. Click **Back to pull requests**, then **Refresh**. Open pull requests in those repositories appear under **Needs my review**, **Mine**, and **Watched**.
 
 ## How To Review a Pull Request
 
@@ -61,17 +62,23 @@ Use **Deep Review in thread** to open a normal, visible Zana thread with the pul
 
 ## Settings
 
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| GitHub Enterprise hosts | empty | Extra hosts, comma-separated; github.com is always included |
-| GitHub tokens (fallback) | empty | `host=token` per line, stored as a secret |
-| Sync interval (minutes) | 5 | How often to poll GitHub |
-| Reviews running at once | 2 | Reviews running at the same time |
-| Review timeout per model (minutes) | 20 | Per-model time limit |
-| Review workspace | worktree | Worktree, project checkout, or diff only |
-| Fallback project for review threads | none | Zana project that hosts diff-only reviews |
-| Archive hidden review threads when done | on | Keeps the thread list tidy |
-| Custom review instructions | empty | Extra guidance added to every review |
+CodeNod settings live in the CodeNod panel (**Settings** in the toolbar) and in the CodeNod section of Zana Settings. Both show the same three tabs.
+
+| Tab | Setting | Default | Purpose |
+| --- | --- | --- | --- |
+| Profile | GitHub accounts | read-only | Name, email, and login from each signed-in host |
+| Profile | Custom review instructions | starter text | Extra guidance added to every review; empty means the built-in prompt only |
+| Organizations & Repos | GitHub hosts | github.com | Add GitHub Enterprise hosts; the first one is used for `owner/repo#123` |
+| Organizations & Repos | Sync interval (minutes) | 5 | How often to poll GitHub |
+| Organizations & Repos | Watched repositories | none | Grouped by host and owner, with Auto-review and a spec pattern each |
+| AI Model | Review models | none | Up to 5 models per review |
+| AI Model | Reviews running at once | 2 | Reviews running at the same time |
+| AI Model | Review timeout per model (minutes) | 20 | Per-model time limit |
+| AI Model | Review workspace | worktree | Worktree, project checkout, or diff only |
+| AI Model | Fallback project for review threads | none | Zana project that hosts diff-only reviews |
+| AI Model | Archive hidden review threads when done | on | Keeps the thread list tidy |
+
+**GitHub tokens (fallback)** stays in Zana's plugin settings, where it is stored as a secret. The other entries still listed there were copied into CodeNod once and are no longer read.
 
 ---
 

@@ -3,12 +3,13 @@ import { registerCli, registerTools, type AvailableProvider, type CodenodApp } f
 import { createStore, type Database } from './src/server/db.ts';
 import { createTokenResolver, runCommand, type CommandRunner } from './src/server/github/auth.ts';
 import { createGitHubClient, type FetchLike } from './src/server/github/client.ts';
-import { normalizeHost, parseHostList, parsePrId, parsePrRef, parseRepoRef, prId, repoId } from './src/server/github/refs.ts';
+import { DEFAULT_HOST, parseHostList, parsePrId, parsePrRef, parseRepoRef, prId, repoId } from './src/server/github/refs.ts';
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
-import { getDeepReviewPrompt } from './src/server/review/prompts.ts';
+import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
 import { createThreadWaiter, type ThreadsApi } from './src/server/review/runner.ts';
-import { CHANGED_EVENT, createReviewService, type ReviewConfig, type WorkspaceMode } from './src/server/review/service.ts';
+import { CHANGED_EVENT, createReviewService, type ReviewConfig } from './src/server/review/service.ts';
+import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
 import { createSyncService } from './src/server/sync.ts';
 import type { ModelChoice, PrBucket, ReviewEvent, ReviewRow } from './src/server/types.ts';
 import { mergeCatalogModels } from './src/server/models-catalog.ts';
@@ -24,7 +25,7 @@ export interface CodenodPluginDeps {
 
 const MODELS_KEY = 'reviewModels';
 const SYNC_TICK_CRON = '* * * * *';
-const WORKSPACE_MODES: WorkspaceMode[] = ['worktree', 'project', 'diff-only'];
+const MOVED_SETTING = 'Moved to the CodeNod settings panel; this value is no longer read.';
 const REVIEW_EVENTS: ReviewEvent[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
 const BUCKETS: PrBucket[] = ['needs-review', 'mine', 'watched'];
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
@@ -49,12 +50,6 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   const run = deps.run ?? runCommand;
 
   const settings = zcc.settings.define({
-    githubHosts: {
-      type: 'string',
-      label: 'GitHub Enterprise hosts',
-      description: 'Comma-separated hosts in addition to github.com, e.g. git.example.com. The first one is used for owner/repo#123 shorthand.',
-      default: ''
-    },
     githubTokens: {
       type: 'string',
       label: 'GitHub tokens (fallback)',
@@ -62,32 +57,18 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       secret: true,
       multiline: true
     },
-    syncIntervalMinutes: { type: 'number', label: 'Sync interval (minutes)', default: 5, min: 1, max: 120 },
-    maxConcurrentReviews: { type: 'number', label: 'Reviews running at once', default: 2, min: 1, max: 6 },
-    reviewTimeoutMinutes: { type: 'number', label: 'Review timeout per model (minutes)', default: 20, min: 3, max: 90 },
-    workspaceMode: {
-      type: 'select',
-      label: 'Review workspace',
-      description: 'worktree: a fresh worktree of the matching Zana project; project: the project folder itself; diff-only: never read local code.',
-      options: WORKSPACE_MODES,
-      default: 'worktree'
-    },
-    fallbackProject: {
-      type: 'project',
-      label: 'Fallback project for review threads',
-      description: 'Used when no Zana project matches the pull request repository.'
-    },
-    archiveReviewThreads: { type: 'boolean', label: 'Archive hidden review threads when done', default: true },
-    customInstructions: {
-      type: 'string',
-      label: 'Custom review instructions',
-      description: 'Extra guidance added to every review prompt.',
-      multiline: true,
-      default: ''
-    }
+    githubHosts: { type: 'string', label: 'GitHub Enterprise hosts', description: MOVED_SETTING, default: '' },
+    syncIntervalMinutes: { type: 'number', label: 'Sync interval (minutes)', description: MOVED_SETTING, default: 5, ...SETTING_LIMITS.syncIntervalMinutes },
+    maxConcurrentReviews: { type: 'number', label: 'Reviews running at once', description: MOVED_SETTING, default: 2, ...SETTING_LIMITS.maxConcurrentReviews },
+    reviewTimeoutMinutes: { type: 'number', label: 'Review timeout per model (minutes)', description: MOVED_SETTING, default: 20, ...SETTING_LIMITS.reviewTimeoutMinutes },
+    workspaceMode: { type: 'select', label: 'Review workspace', description: MOVED_SETTING, options: WORKSPACE_MODES, default: 'worktree' },
+    fallbackProject: { type: 'project', label: 'Fallback project for review threads', description: MOVED_SETTING },
+    archiveReviewThreads: { type: 'boolean', label: 'Archive hidden review threads when done', description: MOVED_SETTING, default: true },
+    customInstructions: { type: 'string', label: 'Custom review instructions', description: MOVED_SETTING, multiline: true, default: '' }
   });
 
   const readSettings = () => settings.get();
+  const codenodSettings = createSettingsStore({ kv: zcc.storage.kv, readHostValues: readSettings });
   const db = zcc.storage.database() as unknown as Database;
   const store = createStore(db, now);
   const interrupted = store.failInterruptedReviews();
@@ -96,15 +77,11 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   const tokens = createTokenResolver({ run, readTokenSetting: async () => String((await readSettings()).githubTokens ?? ''), now });
   const github = createGitHubClient(tokens, deps.fetch);
   const configuredHosts = async () => {
-    const values = await readSettings();
-    const hosts = parseHostList(String(values.githubHosts ?? ''));
+    const hosts = parseHostList((await codenodSettings.load()).githubHosts.join(','));
     for (const repo of store.listRepos()) if (!hosts.includes(repo.host)) hosts.push(repo.host);
     return hosts;
   };
-  const defaultHost = async () => {
-    const extra = String((await readSettings()).githubHosts ?? '').split(/[\s,]+/).find(Boolean);
-    return extra ? normalizeHost(extra) : 'github.com';
-  };
+  const defaultHost = async () => (await codenodSettings.load()).githubHosts[0] ?? DEFAULT_HOST;
 
   const projects = createProjectMatcher({ listProjects: () => zcc.sdk.projects.list(), run, now });
   const threads = zcc.sdk.threads as unknown as ThreadsApi;
@@ -117,16 +94,15 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   const poster = createPoster({ store, github });
 
   const reviewConfig = async (): Promise<ReviewConfig> => {
-    const values = await readSettings();
-    const mode = String(values.workspaceMode ?? 'worktree') as WorkspaceMode;
+    const values = await codenodSettings.load();
     return {
       models: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)),
-      customInstructions: String(values.customInstructions ?? '') || null,
-      fallbackProjectId: String(values.fallbackProject ?? '') || null,
-      workspaceMode: WORKSPACE_MODES.includes(mode) ? mode : 'worktree',
-      maxConcurrent: Number(values.maxConcurrentReviews ?? 2),
-      timeoutMs: Number(values.reviewTimeoutMinutes ?? 20) * 60_000,
-      archiveThreads: values.archiveReviewThreads !== false
+      customInstructions: values.customInstructions || null,
+      fallbackProjectId: values.fallbackProjectId,
+      workspaceMode: values.workspaceMode,
+      maxConcurrent: values.maxConcurrentReviews,
+      timeoutMs: values.reviewTimeoutMinutes * 60_000,
+      archiveThreads: values.archiveReviewThreads
     };
   };
 
@@ -164,7 +140,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
 
   let lastSyncAt = (await zcc.storage.kv.get<number>('lastSyncAt')) ?? 0;
   zcc.background.schedule(SYNC_TICK_CRON, async () => {
-    const minutes = Number((await readSettings()).syncIntervalMinutes ?? 5);
+    const minutes = (await codenodSettings.load()).syncIntervalMinutes;
     if (sync.isSyncing() || now() - lastSyncAt < minutes * 60_000) return;
     lastSyncAt = now();
     await runSync().catch((error) => zcc.log.warn(`codenod: sync failed: ${errorMessage(error)}`));
@@ -338,8 +314,22 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   zcc.rpc.method('config', async () => ({
     models: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)),
     repos: store.listRepos(),
-    hosts: await sync.hostStatuses()
+    hosts: await sync.hostStatuses(),
+    profiles: await sync.viewerProfiles(),
+    settings: await codenodSettings.load(),
+    defaultInstructions: DEFAULT_REVIEW_INSTRUCTIONS,
+    builtInPrompt: getSystemPrompt(true),
+    maxInstructionsChars: MAX_CUSTOM_INSTRUCTIONS_CHARS,
+    limits: SETTING_LIMITS,
+    workspaceModes: WORKSPACE_MODES,
+    projects: (await zcc.sdk.projects.list().catch(() => [])).map((project) => ({ id: project.id, name: project.name }))
   }));
+
+  zcc.rpc.method('setSettings', async (args) => {
+    const next = await codenodSettings.update(args);
+    publish(CHANGED_EVENT, { settings: true });
+    return next;
+  });
 
   zcc.rpc.method('availableModels', availableModels);
 

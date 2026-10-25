@@ -111,6 +111,23 @@ export const CODENOD_STYLES = `
 }
 .cn-settings { padding: 16px; overflow: auto; flex: 1; max-width: 900px; }
 .cn-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.cn-settings-tabs { padding: 0; margin-bottom: 16px; }
+.cn-settings-panel[hidden] { display: none; }
+.cn-accounts, .cn-host-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cn-account { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--cn-border); border-radius: 8px; background: var(--cn-card); }
+.cn-account-name { font-weight: 600; }
+.cn-avatar { width: 36px; height: 36px; flex: none; border-radius: 50%; background: var(--cn-hover); object-fit: cover; }
+.cn-instructions { min-height: 140px; font-family: var(--cn-mono); font-size: 12px; margin-bottom: 8px; }
+.cn-prompt { margin-top: 12px; }
+.cn-prompt summary { cursor: pointer; color: var(--cn-accent); }
+.cn-prompt-text { white-space: pre-wrap; font-family: var(--cn-mono); font-size: 12px; max-height: 360px; overflow: auto; padding: 8px 10px; border: 1px solid var(--cn-border); border-radius: 6px; background: var(--cn-card); }
+.cn-org { margin: 8px 0; border: 1px solid var(--cn-border); border-radius: 8px; }
+.cn-org summary { cursor: pointer; padding: 6px 10px; }
+.cn-org .cn-table { border-top: 1px solid var(--cn-border); }
+.cn-fields { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+.cn-field { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.cn-field .cn-select { max-width: 360px; width: 100%; }
+.cn-number { width: 96px; }
 .cn-combobox { position: relative; max-width: 520px; }
 .cn-combobox .cn-input { width: 100%; }
 .cn-combobox-list {
