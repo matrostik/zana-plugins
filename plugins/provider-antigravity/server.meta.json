@@ -1,0 +1,11 @@
+{
+  "sdkMajor": 0,
+  "sdkVersion": "0.1.0",
+  "artifactFormatVersion": 1,
+  "pluginId": "provider-antigravity",
+  "pluginVersion": "0.1.0",
+  "builtWith": {
+    "zccVersion": "0.1.0",
+    "pluginSdkVersion": "0.1.0"
+  }
+}

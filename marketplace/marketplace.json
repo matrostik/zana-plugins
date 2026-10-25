@@ -51,6 +51,31 @@
           "ref": "master"
         }
       }
+    },
+    {
+      "id": "provider-antigravity",
+      "displayName": "Antigravity Provider",
+      "description": "Run Zana threads with your Google Antigravity subscription via the Antigravity CLI (agy).",
+      "icon": {
+        "lucide": "Sparkles"
+      },
+      "tags": [
+        "community",
+        "providers",
+        "ai"
+      ],
+      "author": {
+        "name": "Ros Haitovich",
+        "github": "matrostik",
+        "url": "https://github.com/matrostik"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/matrostik/zana-plugins",
+          "subdir": "plugins/provider-antigravity",
+          "ref": "master"
+        }
+      }
     }
   ]
 }

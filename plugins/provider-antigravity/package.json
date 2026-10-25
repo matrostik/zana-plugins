@@ -1,0 +1,27 @@
+{
+  "name": "@zcc-ext/provider-antigravity",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Run Zana threads with your Google Antigravity subscription via the Antigravity CLI (agy).",
+  "engines": {
+    "zcc": ">=2.2.2",
+    "zccPluginSdk": ">=0.1.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run"
+  },
+  "zcc": {
+    "name": "Antigravity Provider",
+    "description": "Run Zana threads with your Google Antigravity subscription via the Antigravity CLI (agy). Models mirror your active Antigravity subscription.",
+    "branding": {
+      "icon": "./icons/antigravity.svg"
+    },
+    "server": "./server.mjs",
+    "app": "./app.js",
+    "host": "./host.ts",
+    "extra": {
+      "threadProvider": true
+    }
+  }
+}
