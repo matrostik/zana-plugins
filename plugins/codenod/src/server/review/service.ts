@@ -58,8 +58,9 @@ export function createReviewService(deps: ReviewServiceDeps) {
     if (config.workspaceMode !== 'diff-only') {
       const project = await deps.projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
       if (project) {
+        const baseBranch = pr.headRef || pr.headSha || pr.baseRef;
         return config.workspaceMode === 'worktree'
-          ? { projectId: project.id, environment: { kind: 'worktree', baseBranch: pr.baseRef, branchSlug: `codenod-review-${pr.number}` }, hasWorkspace: true }
+          ? { projectId: project.id, environment: { kind: 'worktree', baseBranch, branchSlug: `codenod-review-${pr.number}` }, hasWorkspace: true }
           : { projectId: project.id, environment: { kind: 'unmanaged' }, hasWorkspace: true };
       }
     }

@@ -185,9 +185,10 @@ function agentRules(hasWorkspace: boolean): string {
   const workspace = hasWorkspace
     ? `The current workspace is a checkout of this repository. It may not be at the PR's head commit; treat the diff below as the authoritative change. You may read files to understand surrounding code, callers, and tests.`
     : `There is no checkout of this repository. Review from the diff and context below only; do not search the file system.`;
-  return `You are running as a non-interactive, read-only reviewer inside an automated pipeline. Nobody will answer questions.
+  return `You are running as a non-interactive, read-only reviewer inside an automated pipeline. Nobody will answer questions or approve interactive permissions.
 ${workspace}
-Do NOT modify, create, or delete files. Do NOT run commands that change state (no git commit/push/checkout, no package installs, no network writes).
+Do NOT modify, create, or delete files. Do NOT run commands or shell execution tools (no run_command, no git commit/push/checkout, no package installs, no network writes). Command execution is disabled for automated reviewers.
+Review from the diff and provided context. If a file is not accessible, evaluate based on the provided diff rather than attempting shell commands.
 Your final message must be ONLY the JSON object described below — no preamble, no markdown fences, no trailing commentary.`;
 }
 

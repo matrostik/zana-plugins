@@ -612,7 +612,7 @@ describe('review service', () => {
     expect(spawned.map((thread) => thread.args.projectId)).toEqual(['api-project', 'api-project']);
     expect(spawned.map((thread) => thread.args.environment)).toEqual(
       expect.arrayContaining(
-        runIds.map((runId, index) => ({ kind: 'worktree', baseBranch: 'main', branchSlug: `codenod-review-4-${runId.slice(0, 6)}-${index}` }))
+        runIds.map((runId, index) => ({ kind: 'worktree', baseBranch: 'feat/trim', branchSlug: `codenod-review-4-${runId.slice(0, 6)}-${index}` }))
       )
     );
     expect(String(spawned[0].args.prompt)).toContain('checkout of this repository');
