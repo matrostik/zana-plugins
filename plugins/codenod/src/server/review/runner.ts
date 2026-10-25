@@ -89,6 +89,10 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     const deadline = Date.now() + (args.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const done = new Promise<string>((resolve, reject) => waiters.set(threadId, { baseline, resolve, reject }));
     let finished = false;
+    const stopPolling = new AbortController();
+    const forwardAbort = () => stopPolling.abort();
+    if (args.signal?.aborted) stopPolling.abort();
+    else args.signal?.addEventListener('abort', forwardAbort, { once: true });
     void done.then(
       () => (finished = true),
       () => (finished = true)
@@ -97,9 +101,9 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     const poll = (async () => {
       while (!finished) {
         try {
-          await sleep(pollMs, args.signal);
+          await sleep(pollMs, stopPolling.signal);
         } catch {
-          settle(threadId, { error: new Error('Review cancelled') });
+          if (args.signal?.aborted) settle(threadId, { error: new Error('Review cancelled') });
           return;
         }
         if (finished) return;
@@ -124,6 +128,8 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
       return await done;
     } finally {
       finished = true;
+      args.signal?.removeEventListener('abort', forwardAbort);
+      stopPolling.abort();
       await poll.catch(() => undefined);
     }
   }

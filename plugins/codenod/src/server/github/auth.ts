@@ -98,6 +98,7 @@ export interface TokenResolverOptions {
 }
 
 const DEFAULT_CACHE_TTL_MS = 10 * 60_000;
+const MISSING_TOKEN_TTL_MS = 15_000;
 
 /** Resolves a token per host: gh CLI, then git credential helper, then the pasted setting. */
 export function createTokenResolver(options: TokenResolverOptions) {
@@ -108,7 +109,7 @@ export function createTokenResolver(options: TokenResolverOptions) {
 
   async function resolve(host: string): Promise<ResolvedToken | null> {
     const cached = cache.get(host);
-    if (cached && now() - cached.at < ttl) return cached.value;
+    if (cached && now() - cached.at < (cached.value ? ttl : Math.min(ttl, MISSING_TOKEN_TTL_MS))) return cached.value;
     let value: ResolvedToken | null = null;
     const fromGh = await tokenFromGh(host, run);
     if (fromGh) value = { token: fromGh, source: 'gh' };

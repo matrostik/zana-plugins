@@ -18,7 +18,8 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
   const [error, setError] = useState<string | null>(null);
   const action = useSettingsAction(onSaved);
 
-  useEffect(() => setDraft(models), [models]);
+  const savedKey = JSON.stringify(models);
+  useEffect(() => setDraft(models), [savedKey]);
   useEffect(() => {
     rpc
       .call('availableModels')

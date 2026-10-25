@@ -67,6 +67,8 @@ interface ParsedArgs {
   flags: Map<string, string | true>;
 }
 
+const BOOLEAN_FLAGS = new Set(['json', 'wait', 'yes', 'auto']);
+
 export function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
   const flags = new Map<string, string | true>();
@@ -76,9 +78,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
       continue;
     }
-    const [key, inline] = arg.slice(2).split('=', 2);
-    if (inline !== undefined) flags.set(key, inline);
-    else if (argv[index + 1] && !argv[index + 1].startsWith('--')) flags.set(key, argv[++index]);
+    const body = arg.slice(2);
+    const separator = body.indexOf('=');
+    const key = separator === -1 ? body : body.slice(0, separator);
+    if (separator !== -1) flags.set(key, body.slice(separator + 1));
+    else if (!BOOLEAN_FLAGS.has(key) && argv[index + 1] && !argv[index + 1].startsWith('--')) flags.set(key, argv[++index]);
     else flags.set(key, true);
   }
   return { positional, flags };
@@ -145,7 +149,8 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
             const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
             let review = await app.startReview(ref, { models });
             if (args.flags.has('wait')) review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
-            if (asJson) return json(args.flags.has('wait') ? await app.detail(ref) : review);
+            if (asJson && !args.flags.has('wait')) return json(review);
+            if (asJson) return { ...json(await app.detail(ref)), exitCode: review.status === 'completed' ? 0 : 1 };
             if (!args.flags.has('wait')) return { exitCode: 0, stdout: `Review ${review.id} ${review.status}. Check it with: zcc codenod show ${repoId(ref)}#${ref.number}` };
             return { exitCode: review.status === 'completed' ? 0 : 1, stdout: formatPrDetail(await app.detail(ref)) };
           }

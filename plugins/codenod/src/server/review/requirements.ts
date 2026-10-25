@@ -16,9 +16,8 @@ export interface IssueLink extends RepoRef {
 export function extractLinkedIssues(body: string | null, repo: RepoRef, prNumber: number): IssueLink[] {
   if (!body) return [];
   const links: IssueLink[] = [];
-  const seen = new Set<string>();
+  const seen = new Set<string>([`${repo.owner}/${repo.name}#${prNumber}`.toLowerCase()]);
   const add = (owner: string, name: string, number: number) => {
-    if (owner === repo.owner && name === repo.name && number === prNumber) return;
     const key = `${owner}/${name}#${number}`.toLowerCase();
     if (seen.has(key) || links.length >= MAX_LINKED_ISSUES) return;
     seen.add(key);

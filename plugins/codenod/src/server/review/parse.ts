@@ -113,9 +113,9 @@ export function parseAnalysis(text: string, options: { hasRequirements: boolean 
   if (!text.trim()) return { ok: false, problem: 'the reply was empty' };
   const json = extractJsonObject(text);
   if (!json) return { ok: false, problem: 'the reply did not contain a valid JSON object' };
-  if (startsWithUnclosedObject(text)) return { ok: false, problem: 'the reply was cut off before the JSON object was complete' };
   const data = JSON.parse(json) as Record<string, unknown>;
   const summary = note(data.summary);
+  if (!summary && startsWithUnclosedObject(text)) return { ok: false, problem: 'the reply was cut off before the JSON object was complete' };
   if (!summary) return { ok: false, problem: 'the JSON object has no "summary" string' };
   const riskScore = boundedScore(data.riskScore, 1, 10);
   if (riskScore === null) return { ok: false, problem: 'the JSON object has no numeric "riskScore"' };
