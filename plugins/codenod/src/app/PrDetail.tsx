@@ -2,11 +2,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ChangedFile, FindingRow, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
-import { errorText, relativeTime, scoreTone } from './format.ts';
+import { errorText, formatDuration, relativeTime, scoreTone } from './format.ts';
 import { ProviderModelPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'diff';
+
+const TICK_MS = 1000;
+
+function isActive(status: string | undefined): boolean {
+  return status === 'queued' || status === 'running';
+}
+
+function useNow(ticking: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    if (!ticking) return;
+    const timer = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(timer);
+  }, [ticking]);
+  return now;
+}
 
 const EVENT_LABELS: Record<ReviewEvent, string> = {
   COMMENT: 'Comment',
@@ -179,6 +196,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   }, [reviewId, detail?.findings.length]);
 
   const modelCount = useMemo(() => detail?.runs.filter((run) => run.status === 'completed').length ?? 0, [detail]);
+  const now = useNow(isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
   const act = async (label: string, fn: () => Promise<void>) => {
     setBusy(label);
@@ -195,7 +213,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   if (!detail) return <div className="cn-detail">{notice ? <p className="cn-banner cn-banner-error">{notice.text}</p> : <p className="cn-empty">Loading…</p>}</div>;
 
   const { pr, review, runs, findings } = detail;
-  const reviewing = review?.status === 'queued' || review?.status === 'running';
+  const reviewing = isActive(review?.status);
+  const reviewElapsed = review ? formatDuration(review.createdAt, review.completedAt ?? now) : '';
   const canPost = review?.status === 'completed' && (selected.size > 0 || message.trim().length > 0 || event === 'APPROVE');
 
   const startReview = (models?: ModelChoice[]) =>
@@ -278,10 +297,14 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             {reviewing ? (
               <p className="cn-banner cn-inline" role="status" aria-busy="true">
                 <span className="cn-spinner" aria-hidden="true" />
-                Review {review.status} · {runs.filter((run) => run.status === 'completed').length}/{runs.length} model(s) done
+                Review {review.status} · {runs.filter((run) => run.status === 'completed').length}/{runs.length} model(s) done · {reviewElapsed}
               </p>
             ) : null}
-            {review.status === 'failed' ? <p className="cn-banner cn-banner-error">Review failed: {review.error}</p> : null}
+            {review.status === 'failed' ? (
+              <p className="cn-banner cn-banner-error">
+                Review failed after {reviewElapsed}: {review.error}
+              </p>
+            ) : null}
             {review.status === 'completed' ? (
               <>
                 <div className="cn-scores">
@@ -297,6 +320,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                   <ScoreChip label="Stability" value={review.stabilityScore} kind="quality" note={review.stabilityNote} />
                 </div>
                 <p className="cn-summary">{review.consensusSummary ?? review.summary}</p>
+                <p className="cn-muted cn-small">Reviewed in {reviewElapsed}</p>
               </>
             ) : null}
 
@@ -337,6 +361,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                     <tr>
                       <th scope="col">Model</th>
                       <th scope="col">Status</th>
+                      <th scope="col">Time</th>
                       <th scope="col">Risk</th>
                       <th scope="col">Issues</th>
                       <th scope="col">Notes</th>
@@ -349,6 +374,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                           {run.providerId}/{run.model}
                         </td>
                         <td>{run.status}</td>
+                        <td className="cn-mono">{run.status === 'queued' ? '–' : formatDuration(run.startedAt, run.completedAt ?? now)}</td>
                         <td>{run.riskScore ?? '–'}</td>
                         <td>{run.status === 'completed' ? run.issueCount : '–'}</td>
                         <td>

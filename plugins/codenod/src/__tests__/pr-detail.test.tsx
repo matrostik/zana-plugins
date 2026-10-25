@@ -1,79 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrDetail } from '../app/PrDetail.tsx';
-import type { ReviewScores, ReviewStatus } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
-
-const EMPTY_SCORES: ReviewScores = {
-  riskScore: null,
-  coverageScore: null,
-  coverageNote: null,
-  requirementsScore: null,
-  requirementsNote: null,
-  simplicityScore: null,
-  simplicityNote: null,
-  stabilityScore: null,
-  stabilityNote: null
-};
-
-function detail(status: ReviewStatus): PrDetailData {
-  const completed = status === 'completed';
-  return {
-    pr: {
-      id: 'github.com/acme/api#1',
-      host: 'github.com',
-      owner: 'acme',
-      repo: 'api',
-      number: 1,
-      title: 'Add login',
-      author: 'dev',
-      url: 'https://github.com/acme/api/pull/1',
-      state: 'open',
-      isDraft: false,
-      headSha: 'sha1',
-      headRef: 'feat',
-      baseRef: 'main',
-      ciState: 'success',
-      buckets: ['needs-review'],
-      updatedAt: new Date().toISOString(),
-      syncedAt: 0
-    },
-    review: {
-      ...EMPTY_SCORES,
-      ...(completed ? { riskScore: 2, coverageScore: 8, simplicityScore: 8, stabilityScore: 8 } : {}),
-      id: 'rev',
-      prId: 'github.com/acme/api#1',
-      headSha: 'sha1',
-      status,
-      summary: completed ? 'Looks fine' : null,
-      consensusSummary: null,
-      hasRequirements: false,
-      error: null,
-      trigger: 'manual',
-      createdAt: 0,
-      completedAt: completed ? 1 : null,
-      stale: false
-    },
-    runs: ['a', 'b', 'c'].map((model, index) => ({
-      ...EMPTY_SCORES,
-      id: `run-${model}`,
-      reviewId: 'rev',
-      providerId: 'cursor',
-      model,
-      reasoningLevel: null,
-      threadId: null,
-      status: completed || index === 0 ? 'completed' : 'running',
-      summary: null,
-      error: null,
-      issueCount: 0,
-      startedAt: 0,
-      completedAt: null
-    })),
-    findings: [],
-    posted: []
-  };
-}
+import { detail, NOW } from './pr-fixtures.ts';
 
 function renderDetail(data: PrDetailData) {
   return render(
@@ -81,20 +11,54 @@ function renderDetail(data: PrDetailData) {
   );
 }
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('PrDetail review progress', () => {
-  it('shows a loading ring while the review is running', async () => {
-    renderDetail(detail('running'));
+  it('shows a loading ring and elapsed time while the review is running', async () => {
+    renderDetail(detail('running', { createdAt: NOW - 84_000, completedAt: null }));
     const banner = await screen.findByRole('status');
-    expect(banner.textContent).toContain('Review running · 1/3 model(s) done');
+    expect(banner.textContent).toContain('Review running · 1/3 model(s) done · 1m 24s');
     expect(banner.getAttribute('aria-busy')).toBe('true');
     expect(banner.querySelector('.cn-spinner')).toBeTruthy();
   });
 
-  it('hides the loading ring after the review completes', async () => {
-    const { container } = renderDetail(detail('completed'));
+  it('keeps the elapsed time ticking while the review runs', async () => {
+    renderDetail(detail('running', { createdAt: NOW - 84_000, completedAt: null }));
+    await screen.findByRole('status');
+    vi.setSystemTime(NOW + 5_000);
+    expect(await screen.findByText(/1m 29s/, undefined, { timeout: 2_500 })).toBeTruthy();
+  });
+
+  it('hides the loading ring and shows the total time after the review completes', async () => {
+    const { container } = renderDetail(detail('completed', { createdAt: NOW - 130_000, completedAt: NOW }));
     expect(await screen.findByText('Looks fine')).toBeTruthy();
+    expect(screen.getByText('Reviewed in 2m 10s')).toBeTruthy();
     expect(container.querySelector('.cn-spinner')).toBeNull();
+  });
+
+  it('shows how long a failed review ran', async () => {
+    renderDetail(detail('failed', { createdAt: NOW - 72_000, completedAt: NOW }));
+    expect(await screen.findByText('Review failed after 1m 12s: boom')).toBeTruthy();
+  });
+});
+
+describe('PrDetail model timings', () => {
+  it('shows each model run time in its own column', async () => {
+    renderDetail(detail('running', { createdAt: NOW - 84_000, completedAt: null }));
+    fireEvent.click(await screen.findByRole('tab', { name: /Models/ }));
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'Time' })).toBeTruthy();
+    const [, completedRow, runningRow, queuedRow] = within(table).getAllByRole('row');
+    expect(within(completedRow).getByText('1m 05s')).toBeTruthy();
+    expect(within(runningRow).getByText('1m 24s')).toBeTruthy();
+    expect(within(queuedRow).getAllByText('–').length).toBeGreaterThan(0);
   });
 });

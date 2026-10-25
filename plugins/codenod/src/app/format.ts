@@ -11,6 +11,14 @@ export function relativeTime(iso: string | number | null | undefined, now = Date
   return `${Math.round(hours / 24)}d ago`;
 }
 
+export function formatDuration(startMs: number, endMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m ${String(totalSeconds % 60).padStart(2, '0')}s`;
+  return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, '0')}m`;
+}
+
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
