@@ -97,6 +97,13 @@ export function parseRepoRef(raw: string, defaultHost = DEFAULT_HOST): RepoRef {
   throw new Error(`Cannot parse repository "${raw}". Use owner/repo or host/owner/repo.`);
 }
 
+const GIT_REMOTE_NAME = /^(?!.*\.\.)(?!\/)(?!.*\/$)[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/;
+
+/** Git remote names that are safe to pass as a single `git fetch` argument. */
+export function isGitRemoteName(name: string): boolean {
+  return GIT_REMOTE_NAME.test(name);
+}
+
 /** Maps a git remote URL (https or ssh) to a repository identity, or null. */
 export function repoFromRemoteUrl(remote: string): RepoRef | null {
   const trimmed = remote.trim().replace(/\.git$/, '');

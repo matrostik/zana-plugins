@@ -30,8 +30,8 @@ export interface ReviewServiceDeps {
   projects: ProjectMatcher;
   config: () => Promise<ReviewConfig>;
   providerPermissionModes: (providerId: string) => Promise<string[] | undefined>;
-  /** Fetches the PR head into a matched project and returns that commit when it matches `headSha`. */
-  fetchPullRequestHead?: (projectPath: string, prNumber: number, headSha: string) => Promise<string>;
+  /** Fetches the PR head from the matched remote and returns that commit when it matches `headSha`. */
+  fetchPullRequestHead?: (projectPath: string, remote: string, prNumber: number, headSha: string) => Promise<string>;
   complete?: (args: { instructions: string; prompt: string }) => Promise<{ text: string }>;
   notify?: (args: { projectId: string; text: string }) => Promise<void>;
   syncPullRequest: (ref: PrRef) => Promise<PullRequestRow>;
@@ -66,10 +66,10 @@ export function createReviewService(deps: ReviewServiceDeps) {
       const project = await deps.projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
       if (project) {
         if (config.workspaceMode !== 'worktree') return { projectId: project.id, environment: { kind: 'unmanaged' }, hasWorkspace: true };
-        if (!project.path || !deps.fetchPullRequestHead) {
+        if (!project.path || !project.remote || !deps.fetchPullRequestHead) {
           throw new Error(`Cannot review ${pr.owner}/${pr.repo}#${pr.number} in a worktree: the matched project has no checkout to fetch.`);
         }
-        const baseBranch = await deps.fetchPullRequestHead(project.path, pr.number, headSha);
+        const baseBranch = await deps.fetchPullRequestHead(project.path, project.remote, pr.number, headSha);
         return { projectId: project.id, environment: { kind: 'worktree', baseBranch, branchSlug: `codenod-review-${pr.number}` }, hasWorkspace: true };
       }
     }

@@ -16,6 +16,30 @@ function isBot(comment: GhComment): boolean {
   return login.endsWith('[bot]') || login.endsWith('-bot') || Boolean(comment.performed_via_github_app);
 }
 
+const HEAD_SNAPSHOT_ATTEMPTS = 3;
+
+/** Reads the pull request and its diff only when both describe the same head commit. */
+async function readStableSnapshot(github: GitHubClient, ref: PrRef): Promise<{
+  pull: GhPull;
+  files: ChangedFile[];
+  reviewComments: GhComment[];
+  issueComments: GhComment[];
+}> {
+  let mismatch = '';
+  for (let attempt = 0; attempt < HEAD_SNAPSHOT_ATTEMPTS; attempt++) {
+    const before = await github.getPull(ref);
+    const [files, reviewComments, issueComments] = await Promise.all([
+      github.listFiles(ref),
+      github.listReviewComments(ref).catch(() => [] as GhComment[]),
+      github.listIssueComments(ref).catch(() => [] as GhComment[])
+    ]);
+    const after = await github.getPull(ref);
+    if (before.head.sha === after.head.sha) return { pull: after, files, reviewComments, issueComments };
+    mismatch = `${before.head.sha.slice(0, 12)} -> ${after.head.sha.slice(0, 12)}`;
+  }
+  throw new Error(`Pull request head changed while reading the diff (${mismatch})`);
+}
+
 function toPriorComment(comment: GhComment): PriorComment | null {
   if (!comment.body?.trim()) return null;
   return {
@@ -28,12 +52,7 @@ function toPriorComment(comment: GhComment): PriorComment | null {
 }
 
 export async function gatherReviewContext(github: GitHubClient, ref: PrRef, options: { specGlob: string | null }): Promise<GatheredContext> {
-  const [pull, files, reviewComments, issueComments] = await Promise.all([
-    github.getPull(ref),
-    github.listFiles(ref),
-    github.listReviewComments(ref).catch(() => [] as GhComment[]),
-    github.listIssueComments(ref).catch(() => [] as GhComment[])
-  ]);
+  const { pull, files, reviewComments, issueComments } = await readStableSnapshot(github, ref);
 
   const linkedIssues = (
     await Promise.all(

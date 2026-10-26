@@ -1,3 +1,4 @@
+import { isGitRemoteName } from '../github/refs.ts';
 import type { ChangedFile } from '../types.ts';
 import { annotateDiffWithLineNumbers } from './diff.ts';
 import { MAX_ISSUE_BODY_CHARS, MAX_SPEC_CHARS } from './requirements.ts';
@@ -373,16 +374,21 @@ export interface DeepReviewPromptInput {
   headRef: string;
   baseRef: string;
   headSha: string;
+  /** Remote that matches the reviewed repository. Null when there is no local checkout. */
+  remote: string | null;
   hasWorkspace: boolean;
   reviewSummary: string | null;
   findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string }>;
 }
 
 export function getDeepReviewPrompt(input: DeepReviewPromptInput): string {
-  const checkout = input.hasWorkspace
+  const remote = input.remote && isGitRemoteName(input.remote) ? input.remote : null;
+  const checkout = input.hasWorkspace && remote
     ? `This workspace is a checkout of ${input.repository}. Fetch and check out the PR head before reading code, for example:
-\`git fetch origin pull/${input.prNumber}/head:codenod/pr-${input.prNumber} && git checkout codenod/pr-${input.prNumber}\`
+\`git fetch ${remote} pull/${input.prNumber}/head:codenod/pr-${input.prNumber} && git checkout codenod/pr-${input.prNumber}\`
 Confirm HEAD is ${input.headSha.slice(0, 12)}.`
+    : input.hasWorkspace
+    ? `This workspace is a checkout of ${input.repository}. Confirm HEAD is ${input.headSha.slice(0, 12)} before reading code.`
     : `There is no local checkout of ${input.repository}. Use \`gh pr diff ${input.url}\` and \`gh pr view ${input.url}\` (or the GitHub API) to read the change.`;
   const prior = input.findings.length > 0
     ? `\n\nCodeNod's automated review already reported these findings. Verify each one against the code (confirm, refute, or refine) before adding new ones:\n${input.findings

@@ -86,7 +86,7 @@ export function createPoster(deps: { store: Store; github: GitHubClient }) {
       if (input.event !== 'COMMENT' && pull.head.sha !== review.headSha) throw new StaleReviewError(review.headSha, pull.head.sha);
 
       const wanted = new Set(input.findingIds);
-      const findings = deps.store.listFindings(review.id).filter((finding) => wanted.has(finding.id) && !finding.dismissed);
+      const findings = deps.store.listFindings(review.id).filter((finding) => wanted.has(finding.id) && !finding.dismissed && !finding.postedAt);
       if (findings.length === 0 && input.event === 'COMMENT' && !input.body?.trim()) throw new Error('Select at least one finding or write a message to post');
 
       const files = await deps.github.listFiles(ref);

@@ -1,11 +1,16 @@
 import type { CommandRunner } from './github/auth.ts';
-import { repoFromRemoteUrl, repoId } from './github/refs.ts';
+import { isGitRemoteName, repoFromRemoteUrl, repoId } from './github/refs.ts';
 import type { RepoRef } from './types.ts';
 
 export interface ZanaProject {
   id: string;
   name: string;
   path?: string;
+}
+
+export interface MatchedProject extends ZanaProject {
+  /** Remote whose URL matched the repository, used to fetch that repo's pull requests. */
+  remote: string;
 }
 
 const CACHE_TTL_MS = 5 * 60_000;
@@ -17,20 +22,22 @@ export function createProjectMatcher(deps: {
   now?: () => number;
 }) {
   const now = deps.now ?? Date.now;
-  let cache: { at: number; byRepo: Map<string, ZanaProject>; projects: ZanaProject[] } | null = null;
+  let cache: { at: number; byRepo: Map<string, MatchedProject>; projects: ZanaProject[] } | null = null;
 
   async function load() {
     if (cache && now() - cache.at < CACHE_TTL_MS) return cache;
     const projects = await deps.listProjects().catch(() => [] as ZanaProject[]);
-    const byRepo = new Map<string, ZanaProject>();
+    const byRepo = new Map<string, MatchedProject>();
     for (const project of projects) {
       if (!project.path) continue;
       const remotes = await deps.run('git', ['-C', project.path, 'remote', '-v']);
       if (!remotes) continue;
       for (const line of remotes.split('\n')) {
-        const url = line.split(/\s+/)[1];
-        const repo = url ? repoFromRemoteUrl(url) : null;
-        if (repo && !byRepo.has(repoId(repo).toLowerCase())) byRepo.set(repoId(repo).toLowerCase(), project);
+        const [name, url, direction] = line.trim().split(/\s+/);
+        if (!name || !url || direction === '(push)' || !isGitRemoteName(name)) continue;
+        const repo = repoFromRemoteUrl(url);
+        const key = repo ? repoId(repo).toLowerCase() : '';
+        if (repo && !byRepo.has(key)) byRepo.set(key, { ...project, remote: name });
       }
     }
     cache = { at: now(), byRepo, projects };
@@ -38,7 +45,7 @@ export function createProjectMatcher(deps: {
   }
 
   return {
-    async projectForRepo(repo: RepoRef): Promise<ZanaProject | null> {
+    async projectForRepo(repo: RepoRef): Promise<MatchedProject | null> {
       return (await load()).byRepo.get(repoId(repo).toLowerCase()) ?? null;
     },
     async projects(): Promise<ZanaProject[]> {

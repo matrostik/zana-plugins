@@ -29,12 +29,12 @@ export interface SyncResult {
 }
 
 const OPEN_PR_QUERY = 'is:pr is:open archived:false';
+const GITHUB_SEARCH_QUERY_LIMIT = 256;
 
 function readSearch(result: { items?: GhSearchItem[]; complete?: boolean } | GhSearchItem[]): { items: GhSearchItem[]; complete: boolean } {
   if (Array.isArray(result)) return { items: result, complete: true };
   return { items: result.items ?? [], complete: result.complete !== false };
 }
-const REPOS_PER_QUERY = 5;
 const DETAIL_CONCURRENCY = 4;
 const DISCOVERY_DAYS = 30;
 
@@ -49,9 +49,15 @@ export function createSyncService(deps: {
   const statuses = new Map<string, HostStatus>();
   const viewers = new Map<string, ViewerProfile>();
   let running: Promise<SyncResult> | null = null;
+  const invalidateToken = deps.tokens.invalidate.bind(deps.tokens);
+  deps.tokens.invalidate = (host?: string) => {
+    if (host) viewers.delete(host);
+    else viewers.clear();
+    invalidateToken(host);
+  };
 
-  async function viewerProfile(host: string): Promise<ViewerProfile> {
-    const cached = viewers.get(host);
+  async function viewerProfile(host: string, refresh = false): Promise<ViewerProfile> {
+    const cached = refresh ? undefined : viewers.get(host);
     if (cached) return cached;
     const viewer = await deps.github.viewer(host);
     const profile: ViewerProfile = {
@@ -65,8 +71,8 @@ export function createSyncService(deps: {
     return profile;
   }
 
-  async function viewerLogin(host: string): Promise<string> {
-    return (await viewerProfile(host)).login;
+  async function viewerLogin(host: string, refresh = false): Promise<string> {
+    return (await viewerProfile(host, refresh)).login;
   }
 
   function toRow(host: string, pull: GhPull, ciState: CiState, buckets: PrBucket[]): Omit<PullRequestRow, 'syncedAt'> {
@@ -112,7 +118,7 @@ export function createSyncService(deps: {
       return { status, changed: [] };
     }
     try {
-      status.login = await viewerLogin(host);
+      status.login = await viewerLogin(host, true);
       const found = new Map<string, { item: GhSearchItem; ref: PrRef; buckets: Set<PrBucket> }>();
       let inventoryComplete = true;
       const watched = deps.store.listRepos().filter((repo) => repo.host === host);
@@ -129,16 +135,39 @@ export function createSyncService(deps: {
         }
       };
 
+      let anySearchSucceeded = false;
       const searchWatched = async (extra: string, bucket: PrBucket) => {
-        for (let index = 0; index < watched.length; index += REPOS_PER_QUERY) {
-          const qualifiers = watched
-            .slice(index, index + REPOS_PER_QUERY)
-            .map((repo) => `repo:${repo.owner}/${repo.name}`)
-            .join(' ');
-          const query = extra ? `${OPEN_PR_QUERY} ${extra} ${qualifiers}` : `${OPEN_PR_QUERY} ${qualifiers}`;
-          const page = readSearch(await deps.github.searchPullRequests(host, query));
-          if (!page.complete) inventoryComplete = false;
-          collect(page.items, bucket);
+        const prefix = extra ? `${OPEN_PR_QUERY} ${extra}` : OPEN_PR_QUERY;
+        const queries: string[] = [];
+        let batch: string[] = [];
+        const flush = () => {
+          if (batch.length === 0) return;
+          queries.push(`${prefix} ${batch.join(' ')}`);
+          batch = [];
+        };
+        for (const repo of watched) {
+          const qualifier = `repo:${repo.owner}/${repo.name}`;
+          const alone = `${prefix} ${qualifier}`;
+          if (alone.length > GITHUB_SEARCH_QUERY_LIMIT) {
+            inventoryComplete = false;
+            continue;
+          }
+          const withBatch = batch.length === 0 ? alone : `${prefix} ${batch.join(' ')} ${qualifier}`;
+          if (withBatch.length > GITHUB_SEARCH_QUERY_LIMIT) flush();
+          batch.push(qualifier);
+        }
+        flush();
+        for (const query of queries) {
+          try {
+            const page = readSearch(await deps.github.searchPullRequests(host, query));
+            if (!page.complete) inventoryComplete = false;
+            collect(page.items, bucket);
+            anySearchSucceeded = true;
+            status.error = null;
+          } catch (error) {
+            inventoryComplete = false;
+            if (!anySearchSucceeded) status.error = errorMessage(error);
+          }
         }
       };
 

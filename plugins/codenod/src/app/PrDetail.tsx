@@ -54,7 +54,7 @@ function FindingCard(props: {
     <article className="cn-finding" data-dismissed={finding.dismissed}>
       <div className="cn-finding-head">
         <label className="cn-check">
-          <input type="checkbox" checked={props.selected} disabled={finding.dismissed} onChange={props.onToggle} aria-label={`Select finding in ${location}`} />
+          <input type="checkbox" checked={props.selected} disabled={finding.dismissed || finding.postedAt !== null} onChange={props.onToggle} aria-label={`Select finding in ${location}`} />
           <span className={`cn-sev-${finding.severity}`}>{finding.severity.toUpperCase()}</span>
         </label>
         <span className="cn-badge">{finding.category}</span>
@@ -198,10 +198,34 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   useRealtime('codenod:changed', load);
 
   const reviewId = detail?.review?.id ?? null;
+  const findingIds = detail?.findings.map((finding) => finding.id).join('\0') ?? '';
+  const postableKey = detail?.findings
+    .filter((finding) => !finding.dismissed && finding.postedAt === null)
+    .map((finding) => finding.id)
+    .join('\0') ?? '';
+  const selectionReview = useRef<string | null>(null);
+  const selectionFindings = useRef('');
   useEffect(() => {
-    if (!detail) return;
-    setSelected(new Set(detail.findings.filter((finding) => !finding.dismissed && !finding.postedAt).map((finding) => finding.id)));
-  }, [reviewId, detail?.findings.length]);
+    if (!detail || !reviewId) {
+      selectionReview.current = null;
+      selectionFindings.current = '';
+      return;
+    }
+    const postableIds = postableKey ? postableKey.split('\0') : [];
+    const reviewChanged = selectionReview.current !== reviewId;
+    const findingsChanged = selectionFindings.current !== findingIds;
+    selectionReview.current = reviewId;
+    selectionFindings.current = findingIds;
+    if (reviewChanged || findingsChanged) {
+      setSelected(new Set(postableIds));
+      return;
+    }
+    const allowed = new Set(postableIds);
+    setSelected((current) => {
+      const next = new Set([...current].filter((id) => allowed.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [detail, reviewId, findingIds, postableKey]);
 
   const modelCount = useMemo(() => detail?.runs.filter((run) => run.status === 'completed').length ?? 0, [detail]);
   const now = useNow(isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));

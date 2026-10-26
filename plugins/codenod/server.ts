@@ -116,7 +116,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     config: reviewConfig,
     providerPermissionModes: async (providerId) =>
       (await zcc.sdk.providers.list()).find((provider) => provider.id === providerId)?.capabilities?.permissionModes,
-    fetchPullRequestHead: (projectPath, prNumber, headSha) => fetchPullRequestHead(run, projectPath, prNumber, headSha),
+    fetchPullRequestHead: (projectPath, remote, prNumber, headSha) => fetchPullRequestHead(run, projectPath, remote, prNumber, headSha),
     complete: zcc.sdk.assistant ? (args) => zcc.sdk.assistant.complete(args) : undefined,
     notify: async ({ projectId, text }) => {
       await zcc.sdk.inbox.push({ projectId, comments: text });
@@ -292,7 +292,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     if (!projectId) throw new Error('No Zana project is available for the Deep Review thread');
     const hasWorkspace = Boolean(project?.path) && config.workspaceMode !== 'diff-only';
     const worktree = hasWorkspace && project?.path
-      ? { kind: 'worktree' as const, branchSlug: `codenod-deep-${pr.number}`, baseBranch: await fetchPullRequestHead(run, project.path, pr.number, pr.headSha) }
+      ? { kind: 'worktree' as const, branchSlug: `codenod-deep-${pr.number}`, baseBranch: await fetchPullRequestHead(run, project.path, project.remote, pr.number, pr.headSha) }
       : undefined;
     const spawned = await zcc.sdk.threads.spawn({
       projectId,
@@ -306,6 +306,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
         headRef: pr.headRef,
         baseRef: pr.baseRef,
         headSha: pr.headSha,
+        remote: hasWorkspace ? project?.remote ?? null : null,
         hasWorkspace,
         reviewSummary: review?.consensusSummary ?? review?.summary ?? null,
         findings: findings.filter((finding) => !finding.dismissed)

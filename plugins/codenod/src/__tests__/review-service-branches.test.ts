@@ -349,16 +349,17 @@ describe('fetchPullRequestHead', () => {
       return args.includes('rev-parse') ? `${head}\n` : '';
     };
 
-    await expect(fetchPullRequestHead(run, '/repo', 4, head)).resolves.toBe(head);
-    expect(commands[0]).toEqual(['-C', '/repo', 'fetch', 'origin', 'pull/4/head:refs/codenod/pr-4']);
+    await expect(fetchPullRequestHead(run, '/repo', 'upstream', 4, head)).resolves.toBe(head);
+    expect(commands[0]).toEqual(['-C', '/repo', 'fetch', 'upstream', 'pull/4/head:refs/codenod/pr-4']);
   });
 
   it('rejects a fetch failure or a different commit', async () => {
     const fail: CommandRunner = async () => null;
-    await expect(fetchPullRequestHead(fail, '/repo', 4, head)).rejects.toThrow(/Could not fetch/);
+    await expect(fetchPullRequestHead(fail, '/repo', 'origin', 4, head)).rejects.toThrow(/Could not fetch/);
     const mismatch: CommandRunner = async (_command, args) => (args.includes('rev-parse') ? 'aaaaaaaaaaaaaaa' : '');
-    await expect(fetchPullRequestHead(mismatch, '/repo', 4, head)).rejects.toThrow(/does not match/);
-    await expect(fetchPullRequestHead(async () => '', '/repo', 4, 'sha1')).rejects.toThrow(/Invalid pull request head/);
+    await expect(fetchPullRequestHead(mismatch, '/repo', 'origin', 4, head)).rejects.toThrow(/does not match/);
+    await expect(fetchPullRequestHead(async () => '', '/repo', 'origin', 4, 'sha1')).rejects.toThrow(/Invalid pull request head/);
+    await expect(fetchPullRequestHead(async () => '', '/repo', 'origin;rm', 4, head)).rejects.toThrow(/Invalid git remote/);
   });
 });
 
@@ -472,7 +473,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
     }
   };
   const projects: ProjectMatcher = {
-    projectForRepo: async () => options.repoProject ?? null,
+    projectForRepo: async () => (options.repoProject ? { remote: 'origin', ...options.repoProject } : null),
     projects: async () => options.projects ?? [{ id: 'home', name: 'Home' }],
     invalidate() {}
   };
@@ -671,7 +672,7 @@ describe('review service', () => {
     );
     expect(String(spawned[0].args.prompt)).toContain('checkout of this repository');
     expect(getFileText).toHaveBeenCalledWith(expect.objectContaining({ owner: 'acme', number: 4 }), 'src/a.ts', 'sha1');
-    expect(fetchHead).toHaveBeenCalledWith('/repos/api', 4, 'sha1');
+    expect(fetchHead).toHaveBeenCalledWith('/repos/api', 'origin', 4, 'sha1');
   });
 
   it('fails a worktree review when the pull request head cannot be fetched', async () => {
@@ -1119,12 +1120,22 @@ describe('project matcher', () => {
     const missing = await matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'missing' });
     const projects = await matcher.projects();
 
-    expect(api?.id).toBe('api');
-    expect(web?.id).toBe('fork');
+    expect(api).toMatchObject({ id: 'api', remote: 'origin' });
+    expect(web).toMatchObject({ id: 'fork', remote: 'mirror' });
     expect(missing).toBeNull();
     expect(projects.map((project) => project.id)).toEqual(['scratch', 'empty', 'api', 'fork']);
     expect(run).toHaveBeenCalledTimes(3);
     expect(run).toHaveBeenCalledWith('git', ['-C', '/work/api', 'remote', '-v']);
+  });
+
+  it('uses the remote that points at the reviewed repository', async () => {
+    const matcher = createProjectMatcher({
+      listProjects: async () => [{ id: 'fork', name: 'Fork', path: '/work/fork' }],
+      run: async () => 'origin\tgit@github.com:me/api.git (fetch)\nupstream\tgit@github.com:acme/api.git (fetch)\nupstream\tgit@github.com:acme/api.git (push)'
+    });
+
+    await expect(matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'api' })).resolves.toMatchObject({ id: 'fork', remote: 'upstream' });
+    await expect(matcher.projectForRepo({ host: 'github.com', owner: 'me', name: 'api' })).resolves.toMatchObject({ remote: 'origin' });
   });
 
   it('caches projects for five minutes and reloads after expiry or invalidation', async () => {

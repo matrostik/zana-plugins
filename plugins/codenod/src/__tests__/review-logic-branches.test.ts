@@ -334,6 +334,7 @@ describe('deep review prompt', () => {
     headRef: 'feat',
     baseRef: 'main',
     headSha: '0123456789abcdef0123456789abcdef01234567',
+    remote: null,
     hasWorkspace: false,
     reviewSummary: null,
     findings: [],
@@ -341,8 +342,8 @@ describe('deep review prompt', () => {
   });
 
   it('tells a workspace agent to check out the PR head', () => {
-    const prompt = getDeepReviewPrompt(input({ hasWorkspace: true }));
-    expect(prompt).toContain('git fetch origin pull/4/head:codenod/pr-4 && git checkout codenod/pr-4');
+    const prompt = getDeepReviewPrompt(input({ hasWorkspace: true, remote: 'upstream' }));
+    expect(prompt).toContain('git fetch upstream pull/4/head:codenod/pr-4 && git checkout codenod/pr-4');
     expect(prompt).toContain('Confirm HEAD is 0123456789ab.');
   });
 
@@ -709,6 +710,16 @@ describe('poster', () => {
     const result = await poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' });
     expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 0, bodyFindingCount: 1 });
     expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ commitId: 'abc1234567', comments: [] }));
+  });
+
+  it('does not post findings that were already published', async () => {
+    const { poster, store, github } = posterHarness({
+      findings: [finding('in'), finding('done', { postedAt: 5 })]
+    });
+    const result = await poster.post({ reviewId: 'r', findingIds: ['in', 'done'], event: 'COMMENT' });
+    expect(result.commentCount).toBe(1);
+    expect(store.markFindingsPosted).toHaveBeenCalledWith(['in']);
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ comments: [expect.objectContaining({ path: 'src/a.ts' })] }));
   });
 
   it('posts selected, undismissed findings inline and records the review', async () => {

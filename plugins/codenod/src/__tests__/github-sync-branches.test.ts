@@ -559,7 +559,7 @@ describe('sync service', () => {
     expect(github.getPull).not.toHaveBeenCalled();
     expect(first.changed).toEqual([]);
     expect(store.getPullRequest('github.com/acme/api#1')).toMatchObject({ ciState: 'pending', buckets: ['needs-review', 'mine', 'watched'] });
-    expect(github.viewer).toHaveBeenCalledTimes(1);
+    expect(github.viewer).toHaveBeenCalledTimes(2);
     expect(second.hosts[0].syncedAt).toBe(Date.UTC(2026, 9, 25));
   });
 
@@ -606,18 +606,49 @@ describe('sync service', () => {
     expect(result.changed).toEqual([]);
   });
 
-  it('splits watched repositories into searches of five', async () => {
-    const { github, sync } = syncFixture({ repos: ['r0', 'r1', 'r2', 'r3', 'r4', 'r5'] });
+  it('keeps each search query within 256 characters and continues after a failed query', async () => {
+    const longName = 'n'.repeat(210);
+    const { github, store, sync } = syncFixture({
+      repos: ['short', longName],
+      github: {
+        searchPullRequests: vi.fn(async (_host: string, query: string) => {
+          if (query.includes('review-requested:@me')) throw new Error('query failed');
+          if (query.includes('author:@me') && query.includes('repo:acme/short')) return [searchItem(1, 'acme/short')];
+          return [];
+        }),
+        getPull: vi.fn(async (ref: PrRef) =>
+          ghPull({
+            number: ref.number,
+            head: { sha: 'sha1', ref: 'feat', repo: { full_name: `${ref.owner}/${ref.name}` } },
+            base: { ref: 'main', repo: { full_name: `${ref.owner}/${ref.name}` } }
+          })
+        )
+      }
+    });
+    store.upsertPullRequest(storedPull({ id: 'github.com/acme/other#9', owner: 'acme', repo: 'other', number: 9 }));
 
-    await sync.syncAll();
+    const result = await sync.syncAll();
 
-    const queries = github.searchPullRequests.mock.calls.map((call) => (call as unknown[])[1]);
-    expect(queries).toHaveLength(6);
-    expect(queries).toContain('is:pr is:open archived:false review-requested:@me repo:acme/r5');
-    expect(queries).toContain('is:pr is:open archived:false repo:acme/r5');
-    expect(queries).toContain(
-      'is:pr is:open archived:false author:@me repo:acme/r0 repo:acme/r1 repo:acme/r2 repo:acme/r3 repo:acme/r4'
-    );
+    const queries = github.searchPullRequests.mock.calls.map((call) => String((call as unknown[])[1]));
+    expect(queries.length).toBeGreaterThan(0);
+    expect(queries.every((query) => query.length <= 256)).toBe(true);
+    expect(queries.some((query) => query.includes('review-requested:@me') && query.includes(`repo:acme/${longName}`))).toBe(false);
+    expect(queries.some((query) => !query.includes('review-requested:@me') && !query.includes('author:@me') && query.includes(`repo:acme/${longName}`))).toBe(true);
+    expect(queries.some((query) => query.includes('repo:acme/short') && query.includes(`repo:acme/${longName}`))).toBe(false);
+    expect(result.hosts[0].error).toBeNull();
+    expect(store.getPullRequest('github.com/acme/short#1')).toMatchObject({ buckets: ['mine'] });
+    expect(store.getPullRequest('github.com/acme/other#9')?.state).toBe('open');
+  });
+
+  it('does not close pull requests when a repository cannot fit in a search query', async () => {
+    const { github, store, sync } = syncFixture({ repos: ['n'.repeat(240)] });
+    store.upsertPullRequest(storedPull());
+
+    const result = await sync.syncAll();
+
+    expect(github.searchPullRequests).not.toHaveBeenCalled();
+    expect(result.hosts[0].error).toBeNull();
+    expect(store.getPullRequest('github.com/acme/api#1')?.state).toBe('open');
   });
 
   it('does not close open pull requests when the search inventory is incomplete', async () => {
@@ -729,6 +760,30 @@ describe('sync service', () => {
       { host: 'quiet.host', login: 'q', name: null, email: null, avatarUrl: null }
     ]);
     await expect(sync.viewerLogin('github.com')).resolves.toBe('me');
+  });
+
+  it('refreshes the viewer on each sync and after the token is invalidated', async () => {
+    let login = 'old';
+    const tokens = tokensFor({ 'github.com': 'gh' });
+    const github = githubStub({ viewer: vi.fn(async () => ({ login })) });
+    const store = createStore(createSqliteDatabase(), () => 1_000);
+    store.upsertRepo({ id: 'github.com/acme/api', host: 'github.com', owner: 'acme', name: 'api' });
+    const sync = createSyncService({
+      store,
+      github: github as unknown as GitHubClient,
+      tokens,
+      hosts: async () => ['github.com'],
+      now: () => Date.UTC(2026, 9, 25)
+    });
+
+    await sync.syncAll();
+    login = 'new';
+    await sync.syncAll();
+    expect((await sync.hostStatuses())[0].login).toBe('new');
+
+    login = 'newer';
+    tokens.invalidate('github.com');
+    expect((await sync.viewerProfiles())[0].login).toBe('newer');
   });
 
   it('discovers active unwatched repositories ranked by PR count', async () => {
@@ -850,6 +905,28 @@ describe('review context', () => {
 
     expect(context.prompt.specFiles).toEqual([]);
     expect(github.getFileText).not.toHaveBeenCalled();
+  });
+
+  it('retries until the pull request and its diff describe the same commit', async () => {
+    const heads = ['aaaaaaa11111', 'bbbbbbb22222', 'bbbbbbb22222', 'bbbbbbb22222'];
+    const github = contextGithub({
+      getPull: vi.fn(async () => ghPull({ head: { sha: heads.shift() ?? 'bbbbbbb22222', ref: 'feat', repo: { full_name: 'acme/api' } } }))
+    });
+
+    const context = await gatherReviewContext(github as unknown as GitHubClient, REF, { specGlob: null });
+
+    expect(context.pull.head.sha).toBe('bbbbbbb22222');
+    expect(github.getPull).toHaveBeenCalledTimes(4);
+  });
+
+  it('stops when the head commit keeps changing', async () => {
+    let reads = 0;
+    const github = contextGithub({
+      getPull: vi.fn(async () => ghPull({ head: { sha: `sha${reads++}abcdef`, ref: 'feat', repo: { full_name: 'acme/api' } } }))
+    });
+
+    await expect(gatherReviewContext(github as unknown as GitHubClient, REF, { specGlob: null })).rejects.toThrow(/head changed while reading the diff/);
+    expect(github.getPull).toHaveBeenCalledTimes(6);
   });
 
   it('orders prior comments, flags bots, and drops blank ones', async () => {

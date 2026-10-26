@@ -186,6 +186,28 @@ describe('PrDetail findings and posting', () => {
     expect(await screen.findByText('No issues found.')).toBeTruthy();
   });
 
+  it('drops findings that were posted and keeps findings the payload left out', async () => {
+    const data = detail('completed', { createdAt: NOW - 60_000, completedAt: NOW });
+    data.findings = [finding({ id: 'f1' }), finding({ id: 'f2', line: null, description: 'Still open' })];
+    let posted = false;
+    const call = vi.fn(async (method: string, args?: unknown) => {
+      if (method === 'detail') {
+        if (!posted) return data;
+        return { ...data, findings: data.findings.map((item) => (item.id === 'f1' ? { ...item, postedAt: 5 } : item)) };
+      }
+      if (method === 'post') {
+        posted = true;
+        return { url: 'https://x', commentCount: 1 };
+      }
+      throw new Error(`unexpected rpc ${method} ${JSON.stringify(args)}`);
+    });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Post 2 selected' }));
+    expect(await screen.findByRole('button', { name: 'Post 1 selected' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 selected' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
+  });
+
   it('posts selected findings as a comment with a message', async () => {
     const call = makeRpc(completedWithFindings(), { post: () => ({ url: 'https://x', commentCount: 1 }) });
     renderDetail(call);
