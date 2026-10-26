@@ -155,16 +155,28 @@ describe('host.ts provider bridge and launch helpers', () => {
     );
   });
 
-  it('transformLegacyResumeForNative flags agy-* resume as requiring migration without silent rewrite', () => {
-    const msg = {
+  it('transformLegacyResumeForNative requires handoff or rewrites when handoffContext is provided', () => {
+    const unmigrated = {
       method: 'thread/resume',
       params: { providerThreadId: 'agy-session-999', cwd: '/work' }
     };
-    const res = transformLegacyResumeForNative(msg);
-    expect(res.rewritten).toBe(false);
-    expect(res.migrationRequired).toBe(true);
-    expect(res.legacyProviderThreadId).toBe('agy-session-999');
-    expect(msg.method).toBe('thread/resume');
+    const res1 = transformLegacyResumeForNative(unmigrated);
+    expect(res1.rewritten).toBe(false);
+    expect(res1.migrationRequired).toBe(true);
+    expect(res1.legacyProviderThreadId).toBe('agy-session-999');
+    expect(unmigrated.method).toBe('thread/resume');
+
+    const withHandoff: any = {
+      method: 'thread/resume',
+      params: { providerThreadId: 'agy-session-999', cwd: '/work', handoffContext: 'Prior thread summary' }
+    };
+    const res2 = transformLegacyResumeForNative(withHandoff);
+    expect(res2.rewritten).toBe(true);
+    expect(res2.migrationRequired).toBe(false);
+    expect(res2.handoffContext).toBe('Prior thread summary');
+    expect(withHandoff.method).toBe('thread/start');
+    expect(withHandoff.params.migratedFromProviderThreadId).toBe('agy-session-999');
+    expect(withHandoff.params.providerThreadId).toBeUndefined();
   });
 
   it('handles provider/health when runtime is not installed', () => {
@@ -294,21 +306,24 @@ describe('host.ts provider bridge and launch helpers', () => {
     ensureLaunchSpec({ options: { providerOptions: { acpDialect: 'generic' } } });
     ensureLaunchSpec({ providerOptions: { acpLaunchSpec: { command: 'test.exe', env: {} } } });
 
-    const resumeLine = JSON.stringify({
+    const resumeError = invokeBridgeRpc({
       jsonrpc: '2.0',
       id: 99,
       method: 'thread/resume',
       params: { providerThreadId: 'agy-session-123', options: { providerOptions: {} } }
     });
-    expect(() => experimental_providerBridge.handleLine(resumeLine)).not.toThrow();
+    expect(resumeError.error.data.recovery.action).toBe('resumeWithHandoffContext');
 
-    const otherLine = JSON.stringify({
-      jsonrpc: '2.0',
-      id: 100,
-      method: 'thread/status',
-      params: { options: {} }
-    });
-    expect(() => experimental_providerBridge.handleLine(otherLine)).not.toThrow();
+    const bridgeSpy = vi.spyOn(realAcpBridge, 'handleLine').mockImplementation(() => {});
+    experimental_providerBridge.handleLine(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 101,
+        method: 'thread/resume',
+        params: { providerThreadId: 'agy-session-123', handoffContext: 'Summary', options: {} }
+      })
+    );
+    expect(bridgeSpy).toHaveBeenCalledWith(expect.stringContaining('"method":"thread/start"'));
   });
 
   it('handles invalid lines and lifecycle methods on bridge', () => {

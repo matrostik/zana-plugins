@@ -108,7 +108,7 @@ describe('native-auth.ts unit tests', () => {
     expect(isAuthExplicitlyCleared(env)).toBe(true);
   });
 
-  it('prepareSanitizedGeminiHome sanitizes dead MCP pipes and auto-populates settings when uninitialized', () => {
+  it('prepareSanitizedGeminiHome sanitizes dead MCP pipes in a separate ZCC home without modifying source', () => {
     const home = makeTempDir('gemini-mcp-test-');
     const stateHome = makeTempDir('gemini-state-');
     const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: stateHome };
@@ -130,8 +130,12 @@ describe('native-auth.ts unit tests', () => {
     );
 
     const res = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
+    expect(res.geminiHome).not.toBe(home);
     expect(res.disabledDeadMcpServers).toContain('deadProxy');
-    expect(readConfiguredNativeAuthType(env)).toBe('oauth-personal');
+    expect(readConfiguredNativeAuthType({ ...env, GEMINI_HOME: res.geminiHome })).toBe('oauth-personal');
+
+    const sourceMcp = JSON.parse(readFileSync(join(configDir, 'mcp_config.json'), 'utf8'));
+    expect(sourceMcp.mcpServers.deadProxy).toBeDefined();
   });
 
   it('prepareSanitizedGeminiHome syncs between managed home and user home', () => {
@@ -508,12 +512,12 @@ describe('native-auth.ts unit tests', () => {
     mkdirSync(acpDir, { recursive: true });
     writeFileSync(join(acpDir, 'acp_token.json'), '{"token":"valid-test-token"}');
 
-    const stateDir = join(home, 'state');
-    mkdirSync(stateDir, { recursive: true });
-    const persistPath = join(stateDir, 'antigravity-native-readiness.json');
-    const configuredAuthType = readConfiguredNativeAuthType(env);
+    const sanitized = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
+    const effectiveEnv = { ...env, GEMINI_HOME: sanitized.geminiHome };
+    const persistPath = join(home, 'state', 'antigravity-native-readiness.json');
+    const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
     const key = JSON.stringify({ command: fakeExe, args: [], authMethod: 'oauth-personal', configuredAuthType });
-    const fingerprint = computeCredentialFingerprint(env, 'oauth-personal');
+    const fingerprint = computeCredentialFingerprint(effectiveEnv, 'oauth-personal');
     const writeCache = (checkedAt: number) =>
       writeFileSync(
         persistPath,

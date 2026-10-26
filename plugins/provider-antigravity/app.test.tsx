@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { loadPluginApp, renderSlot } from '@zana-ai/zcc-plugin-sdk/testing/app';
 import type { DoctorStatusResult } from './server.js';
 
@@ -52,6 +52,10 @@ async function renderSettingsSlot(rpcHandlers: Record<string, (input: any) => an
 }
 
 describe('antigravity provider app slots', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
   it('registers settingsSection slot when Native ACP runtime is missing', async () => {
     const { app, slot } = await renderSettingsSlot({
       'doctor:status': () =>
@@ -63,6 +67,20 @@ describe('antigravity provider app slots', () => {
     await slot.findByText('Antigravity Native ACP (Runtime Missing)');
     await slot.findByText('Install Native ACP Runtime (v1.4.3)');
     expect(slot.inspection.rpcCalls).toContainEqual({ method: 'doctor:status', input: null });
+    slot.lifecycle.unmount();
+  });
+
+  it('renders distinct unverified status for authenticated state vs Connected for session_ready', async () => {
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () =>
+        makeDoctorStatus({
+          ready: false,
+          state: 'authenticated'
+        })
+    });
+
+    await slot.findByText('Antigravity Native ACP (Unverified Session — Verify Session & Models)');
+    await slot.findByText(/Local credentials detected, but the Native ACP session has not been verified yet/);
     slot.lifecycle.unmount();
   });
 

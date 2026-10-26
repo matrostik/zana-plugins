@@ -52,6 +52,13 @@ export interface NativeReadinessResult {
   checkedAt: number;
 }
 
+const SANITIZED_HOME_SUFFIXES = ['antigravity-gemini-home', 'antigravity-zcc-home'];
+
+function isSanitizedGeminiHomePath(dirPath: string): boolean {
+  const normalized = dirPath.replace(/\\/g, '/').replace(/\/+$/, '');
+  return SANITIZED_HOME_SUFFIXES.some((suffix) => normalized.endsWith(`/${suffix}`));
+}
+
 export function isValidGoogleAuthMethod(value: unknown): value is GoogleAcpAuthMethod {
   return (
     typeof value === 'string' &&
@@ -65,6 +72,32 @@ export function resolveGeminiHome(env: NodeJS.ProcessEnv = process.env): string 
   }
   const home = env.USERPROFILE || env.HOME || homedir();
   return resolve(home, '.gemini');
+}
+
+export function resolveSourceAndManagedGeminiHome(env: NodeJS.ProcessEnv = process.env): {
+  sourceGeminiHome: string;
+  managedGeminiHome: string;
+} {
+  const configuredHome =
+    env.GEMINI_HOME && env.GEMINI_HOME.trim() ? resolve(env.GEMINI_HOME.trim()) : null;
+  const fallbackUserHome = resolve(env.USERPROFILE || env.HOME || homedir(), '.gemini');
+
+  if (configuredHome && isSanitizedGeminiHomePath(configuredHome)) {
+    const sourceGeminiHome = configuredHome.replace(/\\/g, '/').endsWith('/antigravity-zcc-home')
+      ? dirname(configuredHome)
+      : fallbackUserHome;
+    return { sourceGeminiHome, managedGeminiHome: configuredHome };
+  }
+
+  const sourceGeminiHome = configuredHome ?? fallbackUserHome;
+  const managedGeminiHome =
+    env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim()
+      ? join(getZccDataDir(env), 'state', 'antigravity-gemini-home')
+      : configuredHome
+      ? join(sourceGeminiHome, 'antigravity-zcc-home')
+      : join(getZccDataDir(env), 'state', 'antigravity-gemini-home');
+
+  return { sourceGeminiHome, managedGeminiHome };
 }
 
 export function getNativeAcpSettingsPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -161,13 +194,15 @@ export function writeNativeAcpAuthType(
   const primaryPath = getNativeAcpSettingsPath(env);
   writeSettingsFileAtomically(primaryPath, authType);
 
-  const fallbackHome = env.USERPROFILE || env.HOME || homedir();
-  const fallbackSettings = join(fallbackHome, '.gemini', 'antigravity-acp', 'settings.json');
-  if (fallbackSettings !== primaryPath) {
-    try {
-      writeSettingsFileAtomically(fallbackSettings, authType);
-    } catch {
-      // Best-effort
+  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  for (const dir of [sourceGeminiHome, managedGeminiHome]) {
+    const candidate = join(dir, 'antigravity-acp', 'settings.json');
+    if (candidate !== primaryPath) {
+      try {
+        writeSettingsFileAtomically(candidate, authType);
+      } catch {
+        // Best-effort sync
+      }
     }
   }
 
@@ -216,11 +251,11 @@ function isIdeNamedPipeMcpProxyUnreachable(serverConfig: any): boolean {
 }
 
 function sanitizeMcpConfigFile(
-  userGeminiHome: string,
+  sourceGeminiHome: string,
   managedGeminiHome: string
 ): string[] {
   const disabledDeadMcpServers: string[] = [];
-  const sourceMcpConfigPath = join(userGeminiHome, 'config', 'mcp_config.json');
+  const sourceMcpConfigPath = join(sourceGeminiHome, 'config', 'mcp_config.json');
   const targetMcpConfigDir = join(managedGeminiHome, 'config');
   const targetMcpConfigPath = join(targetMcpConfigDir, 'mcp_config.json');
 
@@ -265,40 +300,33 @@ export function prepareSanitizedGeminiHome(options?: {
   disabledDeadMcpServers: string[];
 } {
   const env = options?.env ?? process.env;
-  const userGeminiHome = resolveGeminiHome(env);
-  const managedGeminiHome =
-    env.GEMINI_HOME && env.GEMINI_HOME.trim()
-      ? userGeminiHome
-      : join(getZccDataDir(env), 'state', 'antigravity-gemini-home');
+  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
 
-  const userAcpDir = join(userGeminiHome, 'antigravity-acp');
+  const sourceAcpDir = join(sourceGeminiHome, 'antigravity-acp');
   const managedAcpDir = join(managedGeminiHome, 'antigravity-acp');
   mkdirSync(managedAcpDir, { recursive: true });
 
-  if (managedGeminiHome !== userGeminiHome) {
-    syncFileNewer(join(userAcpDir, 'acp_token.json'), join(managedAcpDir, 'acp_token.json'));
-    syncFileNewer(join(userAcpDir, 'settings.json'), join(managedAcpDir, 'settings.json'));
+  if (managedGeminiHome !== sourceGeminiHome) {
+    syncFileNewer(join(sourceAcpDir, 'acp_token.json'), join(managedAcpDir, 'acp_token.json'));
+    syncFileNewer(join(sourceAcpDir, 'settings.json'), join(managedAcpDir, 'settings.json'));
   }
 
-  const currentAuthType = readConfiguredNativeAuthType({
-    ...env,
-    GEMINI_HOME: managedGeminiHome
-  });
+  const managedEnv = { ...env, GEMINI_HOME: managedGeminiHome };
+  const currentAuthType = readConfiguredNativeAuthType(managedEnv);
   const settingsFile = join(managedAcpDir, 'settings.json');
-  const explicitlyCleared = isAuthExplicitlyCleared({
-    ...env,
-    GEMINI_HOME: managedGeminiHome
-  });
+  const explicitlyCleared = isAuthExplicitlyCleared(managedEnv);
 
-  if (!currentAuthType && !explicitlyCleared && !existsSync(settingsFile) && existsSync(join(managedAcpDir, 'acp_token.json'))) {
+  if (
+    !currentAuthType &&
+    !explicitlyCleared &&
+    !existsSync(settingsFile) &&
+    existsSync(join(managedAcpDir, 'acp_token.json'))
+  ) {
     const defaultMethod = options?.authMethod ?? 'oauth-personal';
     writeSettingsFileAtomically(settingsFile, defaultMethod);
-    if (managedGeminiHome !== userGeminiHome) {
-      writeSettingsFileAtomically(join(userAcpDir, 'settings.json'), defaultMethod);
-    }
   }
 
-  const disabledDeadMcpServers = sanitizeMcpConfigFile(userGeminiHome, managedGeminiHome);
+  const disabledDeadMcpServers = sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome);
 
   return {
     geminiHome: managedGeminiHome,

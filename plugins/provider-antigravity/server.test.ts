@@ -17,7 +17,6 @@ import {
 } from './src/native-runtime.js';
 import {
   extractModelsFromSessionResult,
-  getFastNativeReadiness,
   prepareSanitizedGeminiHome,
   probeNativeAcpReadiness,
   readConfiguredNativeAuthType,
@@ -271,7 +270,7 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
     expect(rolledBack.previousVersion).toBe('1.4.3');
   });
 
-  it('disables unreachable IDE named-pipe MCP proxies in prepareSanitizedGeminiHome', () => {
+  it('writes sanitized MCP config into a separate ZCC home without mutating source GEMINI_HOME', () => {
     const geminiHome = makeTempDir('gemini-home-');
     const configDir = join(geminiHome, 'config');
     const acpDir = join(geminiHome, 'antigravity-acp');
@@ -294,9 +293,13 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
 
     const env = { ...process.env, GEMINI_HOME: geminiHome };
     const sanitized = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
+    expect(sanitized.geminiHome).not.toBe(geminiHome);
     expect(sanitized.disabledDeadMcpServers).toContain('data-agent-kit');
 
-    const sanitizedMcp = JSON.parse(readFileSync(join(configDir, 'mcp_config.json'), 'utf8'));
+    const originalMcp = JSON.parse(readFileSync(join(configDir, 'mcp_config.json'), 'utf8'));
+    expect(originalMcp.mcpServers['data-agent-kit']).toBeDefined();
+
+    const sanitizedMcp = JSON.parse(readFileSync(join(sanitized.geminiHome, 'config', 'mcp_config.json'), 'utf8'));
     expect(sanitizedMcp.mcpServers['data-agent-kit']).toBeUndefined();
     expect(sanitizedMcp.mcpServers['user-server']).toBeDefined();
   });
@@ -337,7 +340,7 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
     expect(missingProbe.state).toBe('runtime_missing');
   });
 
-  it('detects legacy agy-* thread resume as requiring migration', () => {
+  it('detects legacy agy-* thread resume and supports context-handoff migration', () => {
     const resumeMsg: any = {
       jsonrpc: '2.0',
       id: 10,
@@ -356,5 +359,11 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
     const handoff = transformLegacyResumeForNative(resumeMsg);
     expect(handoff.migrationRequired).toBe(true);
     expect(handoff.legacyProviderThreadId).toBe('agy-12345-abcde');
+
+    resumeMsg.params.handoffContext = 'Context summary from legacy CLI thread';
+    const migrated = transformLegacyResumeForNative(resumeMsg);
+    expect(migrated.rewritten).toBe(true);
+    expect(migrated.migrationRequired).toBe(false);
+    expect(resumeMsg.method).toBe('thread/start');
   });
 });

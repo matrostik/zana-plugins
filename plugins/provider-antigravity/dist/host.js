@@ -41433,6 +41433,11 @@ var GOOGLE_ACP_AUTH_METHODS = [
   "gemini-api-key",
   "agent-platform"
 ];
+var SANITIZED_HOME_SUFFIXES = ["antigravity-gemini-home", "antigravity-zcc-home"];
+function isSanitizedGeminiHomePath(dirPath) {
+  const normalized = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  return SANITIZED_HOME_SUFFIXES.some((suffix) => normalized.endsWith(`/${suffix}`));
+}
 function isValidGoogleAuthMethod(value) {
   return typeof value === "string" && GOOGLE_ACP_AUTH_METHODS.includes(value);
 }
@@ -41442,6 +41447,17 @@ function resolveGeminiHome(env = process.env) {
   }
   const home = env.USERPROFILE || env.HOME || homedir3();
   return resolve5(home, ".gemini");
+}
+function resolveSourceAndManagedGeminiHome(env = process.env) {
+  const configuredHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? resolve5(env.GEMINI_HOME.trim()) : null;
+  const fallbackUserHome = resolve5(env.USERPROFILE || env.HOME || homedir3(), ".gemini");
+  if (configuredHome && isSanitizedGeminiHomePath(configuredHome)) {
+    const sourceGeminiHome2 = configuredHome.replace(/\\/g, "/").endsWith("/antigravity-zcc-home") ? dirname4(configuredHome) : fallbackUserHome;
+    return { sourceGeminiHome: sourceGeminiHome2, managedGeminiHome: configuredHome };
+  }
+  const sourceGeminiHome = configuredHome ?? fallbackUserHome;
+  const managedGeminiHome = env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim() ? join4(getZccDataDir(env), "state", "antigravity-gemini-home") : configuredHome ? join4(sourceGeminiHome, "antigravity-zcc-home") : join4(getZccDataDir(env), "state", "antigravity-gemini-home");
+  return { sourceGeminiHome, managedGeminiHome };
 }
 function getNativeAcpSettingsPath(env = process.env) {
   return join4(resolveGeminiHome(env), "antigravity-acp", "settings.json");
@@ -41547,9 +41563,9 @@ function isIdeNamedPipeMcpProxyUnreachable(serverConfig) {
   }
   return true;
 }
-function sanitizeMcpConfigFile(userGeminiHome, managedGeminiHome) {
+function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
   const disabledDeadMcpServers = [];
-  const sourceMcpConfigPath = join4(userGeminiHome, "config", "mcp_config.json");
+  const sourceMcpConfigPath = join4(sourceGeminiHome, "config", "mcp_config.json");
   const targetMcpConfigDir = join4(managedGeminiHome, "config");
   const targetMcpConfigPath = join4(targetMcpConfigDir, "mcp_config.json");
   mkdirSync3(targetMcpConfigDir, { recursive: true });
@@ -41582,32 +41598,23 @@ function sanitizeMcpConfigFile(userGeminiHome, managedGeminiHome) {
 }
 function prepareSanitizedGeminiHome(options) {
   const env = options?.env ?? process.env;
-  const userGeminiHome = resolveGeminiHome(env);
-  const managedGeminiHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? userGeminiHome : join4(getZccDataDir(env), "state", "antigravity-gemini-home");
-  const userAcpDir = join4(userGeminiHome, "antigravity-acp");
+  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  const sourceAcpDir = join4(sourceGeminiHome, "antigravity-acp");
   const managedAcpDir = join4(managedGeminiHome, "antigravity-acp");
   mkdirSync3(managedAcpDir, { recursive: true });
-  if (managedGeminiHome !== userGeminiHome) {
-    syncFileNewer(join4(userAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
-    syncFileNewer(join4(userAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
+  if (managedGeminiHome !== sourceGeminiHome) {
+    syncFileNewer(join4(sourceAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
+    syncFileNewer(join4(sourceAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
   }
-  const currentAuthType = readConfiguredNativeAuthType({
-    ...env,
-    GEMINI_HOME: managedGeminiHome
-  });
+  const managedEnv = { ...env, GEMINI_HOME: managedGeminiHome };
+  const currentAuthType = readConfiguredNativeAuthType(managedEnv);
   const settingsFile = join4(managedAcpDir, "settings.json");
-  const explicitlyCleared = isAuthExplicitlyCleared({
-    ...env,
-    GEMINI_HOME: managedGeminiHome
-  });
+  const explicitlyCleared = isAuthExplicitlyCleared(managedEnv);
   if (!currentAuthType && !explicitlyCleared && !existsSync3(settingsFile) && existsSync3(join4(managedAcpDir, "acp_token.json"))) {
     const defaultMethod = options?.authMethod ?? "oauth-personal";
     writeSettingsFileAtomically(settingsFile, defaultMethod);
-    if (managedGeminiHome !== userGeminiHome) {
-      writeSettingsFileAtomically(join4(userAcpDir, "settings.json"), defaultMethod);
-    }
   }
-  const disabledDeadMcpServers = sanitizeMcpConfigFile(userGeminiHome, managedGeminiHome);
+  const disabledDeadMcpServers = sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome);
   return {
     geminiHome: managedGeminiHome,
     disabledDeadMcpServers
@@ -41994,10 +42001,35 @@ function isLegacyAgyThreadResume(msg) {
   }
   return null;
 }
+function extractLegacyHandoffContext(params) {
+  if (!params || typeof params !== "object") return void 0;
+  const raw = params.handoffContext ?? params.contextSummary ?? params.initialContext;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : void 0;
+}
+function isExplicitLegacyMigrationAllowed(params, handoffContext) {
+  if (handoffContext) return true;
+  if (!params || typeof params !== "object") return false;
+  return params.allowFreshSession === true || params.migrateLegacySession === true || params.options?.providerOptions?.migrateLegacySession === true;
+}
 function transformLegacyResumeForNative(msg) {
   const legacyId = isLegacyAgyThreadResume(msg);
   if (!legacyId) {
     return { rewritten: false, migrationRequired: false };
+  }
+  const handoffContext = extractLegacyHandoffContext(msg.params);
+  if (isExplicitLegacyMigrationAllowed(msg.params, handoffContext)) {
+    msg.method = "thread/start";
+    msg.params.migratedFromProviderThreadId = legacyId;
+    delete msg.params.providerThreadId;
+    if (handoffContext) {
+      msg.params.handoffContext = handoffContext;
+    }
+    return {
+      rewritten: true,
+      migrationRequired: false,
+      legacyProviderThreadId: legacyId,
+      ...handoffContext ? { handoffContext } : {}
+    };
   }
   return {
     rewritten: false,
@@ -42008,31 +42040,42 @@ function transformLegacyResumeForNative(msg) {
 function dispatchBridgeMessage(msg) {
   if (msg.method === "provider/health" && msg.id !== void 0) {
     handleNativeProviderHealth(msg.id, msg.params);
-    return true;
+    return { handled: true, rewritten: false };
   }
   if (msg.method === "model/list" && msg.id !== void 0) {
     handleNativeModelList(msg.id, msg.params);
-    return true;
+    return { handled: true, rewritten: false };
   }
   if (msg.method === "thread/resume") {
-    const legacyId = isLegacyAgyThreadResume(msg);
-    if (legacyId) {
+    const migration = transformLegacyResumeForNative(msg);
+    if (migration.rewritten) {
+      return { handled: false, rewritten: true };
+    }
+    if (migration.migrationRequired && migration.legacyProviderThreadId) {
+      const legacyId = migration.legacyProviderThreadId;
+      const message = `Resuming legacy Antigravity CLI session "${legacyId}" requires context handoff. Pass handoffContext or migrateLegacySession: true, or start a new thread to continue in Google Antigravity Native ACP.`;
       writeBridgeJsonRpc({
         jsonrpc: "2.0",
         id: msg.id,
         error: {
           code: -32e3,
-          message: `Resuming legacy Antigravity CLI session "${legacyId}" is not supported by Google Antigravity Native ACP. Start a new thread with context handoff to continue in a native session.`,
+          message,
           data: {
             migrationRequired: true,
-            legacyProviderThreadId: legacyId
+            legacyProviderThreadId: legacyId,
+            recovery: {
+              kind: "migrationRequired",
+              action: "resumeWithHandoffContext",
+              message,
+              retryable: true
+            }
           }
         }
       });
-      return true;
+      return { handled: true, rewritten: false };
     }
   }
-  return false;
+  return { handled: false, rewritten: false };
 }
 var realAcpBridge = experimental_providerBridge;
 var experimental_providerBridge2 = experimental_defineProviderBridge2({
@@ -42041,10 +42084,11 @@ var experimental_providerBridge2 = experimental_defineProviderBridge2({
       const msg = JSON.parse(line);
       if (msg && typeof msg === "object") {
         const modifiedLaunch = msg.params ? ensureLaunchSpec(msg.params) : false;
-        if (dispatchBridgeMessage(msg)) {
+        const dispatched = dispatchBridgeMessage(msg);
+        if (dispatched.handled) {
           return;
         }
-        if (modifiedLaunch) {
+        if (modifiedLaunch || dispatched.rewritten) {
           return experimental_providerBridge.handleLine(JSON.stringify(msg));
         }
       }

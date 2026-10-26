@@ -7,7 +7,7 @@ const NATIVE_STATE_LABELS: Record<NativeSetupState, string> = {
   runtime_missing: 'Runtime Missing',
   runtime_launches: 'Runtime Installed',
   sign_in_required: 'Sign-in Required',
-  authenticated: 'Local Credentials Present',
+  authenticated: 'Unverified Credentials',
   session_ready: 'Session Ready'
 };
 
@@ -171,12 +171,14 @@ function StatusHeader({
 }) {
   const nativeState = status?.state ?? 'runtime_missing';
   const isInstalled = status?.installed === true;
-  const isReady = nativeState === 'session_ready' || nativeState === 'authenticated';
+  const isReady = nativeState === 'session_ready';
   const pinnedVersion = status?.pinnedVersion ?? '1.4.3';
   const primaryLabel = loading
     ? 'Checking Antigravity Native ACP...'
     : isReady
     ? 'Antigravity Native ACP Connected'
+    : nativeState === 'authenticated'
+    ? 'Antigravity Native ACP (Unverified Session — Verify Session & Models)'
     : `Antigravity Native ACP (${NATIVE_STATE_LABELS[nativeState]})`;
 
   return (
@@ -232,12 +234,12 @@ function AuthControls({
   onCopy: (text: string, key: string) => void;
 }) {
   if (!status?.installed) return null;
-  const isReady = status.state === 'session_ready' || status.state === 'authenticated';
+  const hasCredentials = status.state === 'session_ready' || status.state === 'authenticated';
   return (
     <>
       <div className="agy-actions-row">
         <button type="button" className="agy-btn agy-btn-primary" onClick={onSignIn} disabled={loading || actionBusy !== null}>
-          {actionBusy === 'login' ? 'Waiting for Google Sign-In in Browser...' : isReady ? 'Re-authenticate with Google' : 'Sign In with Google'}
+          {actionBusy === 'login' ? 'Waiting for Google Sign-In in Browser...' : hasCredentials ? 'Re-authenticate with Google' : 'Sign In with Google'}
         </button>
         <button type="button" className="agy-btn" onClick={onProbe} disabled={loading || actionBusy !== null}>
           {actionBusy === 'probe' ? 'Verifying Session...' : 'Verify Session & Models'}
@@ -284,7 +286,8 @@ function SetupGuide() {
       <ol className="agy-steps-list">
         <li>Click <strong>Install Native ACP Runtime</strong> above to download and verify Google&apos;s official SHA-256 ACP archive.</li>
         <li>Select your <strong>Google ACP authentication method</strong> and click <strong>Sign In with Google</strong>.</li>
-        <li>Start a new thread in Zana and select <strong>Antigravity</strong> as the provider.</li>
+        <li>Run the session verification check above to confirm readiness and load the native model catalog.</li>
+        <li>Start a new thread in Zana and select <strong>Antigravity</strong> as the provider (legacy <code>agy-*</code> CLI threads migrate via context handoff).</li>
       </ol>
     </div>
   );
@@ -311,6 +314,11 @@ export function AntigravitySettingsSection() {
           Runs Zana threads directly over Google&apos;s official Native ACP server (<code>agy_acp_server</code>). Auth method: <code>{act.status?.authMethod ?? 'oauth-personal'}</code>
           {act.status?.configuredAuthType ? ` (configured: ${act.status.configuredAuthType})` : ' (not yet configured)'}
         </p>
+        {nativeState === 'authenticated' && (
+          <p className="agy-desc agy-desc-note">
+            Local credentials detected, but the Native ACP session has not been verified yet. Run the session verification probe below to confirm readiness.
+          </p>
+        )}
         {(act.status?.error || act.actionError) && (
           <p className="agy-desc agy-desc-error">{act.actionError || act.status?.error}</p>
         )}
@@ -365,7 +373,7 @@ function ensureStyles() {
     .agy-backend-badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-weight: 500; }
     .agy-state-pill { font-size: 11px; padding: 1px 7px; border-radius: 4px; font-weight: 500; }
     .agy-state-pill.state-session_ready { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-    .agy-state-pill.state-authenticated { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .agy-state-pill.state-authenticated { background: rgba(234, 179, 8, 0.15); color: #facc15; }
     .agy-state-pill.state-sign_in_required { background: rgba(234, 179, 8, 0.15); color: #facc15; }
     .agy-state-pill.state-runtime_launches { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
     .agy-state-pill.state-runtime_missing { background: rgba(239, 68, 68, 0.15); color: #f87171; }

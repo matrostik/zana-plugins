@@ -320,14 +320,46 @@ export function isLegacyAgyThreadResume(msg: any): string | null {
   return null;
 }
 
+function extractLegacyHandoffContext(params: any): string | undefined {
+  if (!params || typeof params !== 'object') return undefined;
+  const raw = params.handoffContext ?? params.contextSummary ?? params.initialContext;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
+function isExplicitLegacyMigrationAllowed(params: any, handoffContext?: string): boolean {
+  if (handoffContext) return true;
+  if (!params || typeof params !== 'object') return false;
+  return (
+    params.allowFreshSession === true ||
+    params.migrateLegacySession === true ||
+    params.options?.providerOptions?.migrateLegacySession === true
+  );
+}
+
 export function transformLegacyResumeForNative(msg: any): {
   rewritten: boolean;
   migrationRequired: boolean;
   legacyProviderThreadId?: string;
+  handoffContext?: string;
 } {
   const legacyId = isLegacyAgyThreadResume(msg);
   if (!legacyId) {
     return { rewritten: false, migrationRequired: false };
+  }
+  const handoffContext = extractLegacyHandoffContext(msg.params);
+  if (isExplicitLegacyMigrationAllowed(msg.params, handoffContext)) {
+    msg.method = 'thread/start';
+    msg.params.migratedFromProviderThreadId = legacyId;
+    delete msg.params.providerThreadId;
+    if (handoffContext) {
+      msg.params.handoffContext = handoffContext;
+    }
+    return {
+      rewritten: true,
+      migrationRequired: false,
+      legacyProviderThreadId: legacyId,
+      ...(handoffContext ? { handoffContext } : {})
+    };
   }
   return {
     rewritten: false,
@@ -336,34 +368,45 @@ export function transformLegacyResumeForNative(msg: any): {
   };
 }
 
-function dispatchBridgeMessage(msg: any): boolean {
+function dispatchBridgeMessage(msg: any): { handled: boolean; rewritten: boolean } {
   if (msg.method === 'provider/health' && msg.id !== undefined) {
     handleNativeProviderHealth(msg.id, msg.params);
-    return true;
+    return { handled: true, rewritten: false };
   }
   if (msg.method === 'model/list' && msg.id !== undefined) {
     handleNativeModelList(msg.id, msg.params);
-    return true;
+    return { handled: true, rewritten: false };
   }
   if (msg.method === 'thread/resume') {
-    const legacyId = isLegacyAgyThreadResume(msg);
-    if (legacyId) {
+    const migration = transformLegacyResumeForNative(msg);
+    if (migration.rewritten) {
+      return { handled: false, rewritten: true };
+    }
+    if (migration.migrationRequired && migration.legacyProviderThreadId) {
+      const legacyId = migration.legacyProviderThreadId;
+      const message = `Resuming legacy Antigravity CLI session "${legacyId}" requires context handoff. Pass handoffContext or migrateLegacySession: true, or start a new thread to continue in Google Antigravity Native ACP.`;
       writeBridgeJsonRpc({
         jsonrpc: '2.0',
         id: msg.id,
         error: {
           code: -32000,
-          message: `Resuming legacy Antigravity CLI session "${legacyId}" is not supported by Google Antigravity Native ACP. Start a new thread with context handoff to continue in a native session.`,
+          message,
           data: {
             migrationRequired: true,
-            legacyProviderThreadId: legacyId
+            legacyProviderThreadId: legacyId,
+            recovery: {
+              kind: 'migrationRequired',
+              action: 'resumeWithHandoffContext',
+              message,
+              retryable: true
+            }
           }
         }
       });
-      return true;
+      return { handled: true, rewritten: false };
     }
   }
-  return false;
+  return { handled: false, rewritten: false };
 }
 
 export const realAcpBridge = experimental_acpProviderBridge;
@@ -374,10 +417,11 @@ export const experimental_providerBridge = experimental_defineProviderBridge({
       const msg = JSON.parse(line);
       if (msg && typeof msg === 'object') {
         const modifiedLaunch = msg.params ? ensureLaunchSpec(msg.params) : false;
-        if (dispatchBridgeMessage(msg)) {
+        const dispatched = dispatchBridgeMessage(msg);
+        if (dispatched.handled) {
           return;
         }
-        if (modifiedLaunch) {
+        if (modifiedLaunch || dispatched.rewritten) {
           return experimental_acpProviderBridge.handleLine(JSON.stringify(msg));
         }
       }
