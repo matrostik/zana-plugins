@@ -28,6 +28,31 @@
       }
     },
     {
+      "id": "provider-antigravity",
+      "displayName": "Antigravity Provider",
+      "description": "Run Zana threads with your Google Antigravity subscription via Google's official Native ACP server (agy_acp_server).",
+      "icon": {
+        "lucide": "Sparkles"
+      },
+      "tags": [
+        "community",
+        "providers",
+        "ai"
+      ],
+      "author": {
+        "name": "Ros Haitovich",
+        "github": "matrostik",
+        "url": "https://github.com/matrostik"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/matrostik/zana-plugins",
+          "subdir": "plugins/provider-antigravity",
+          "ref": "master"
+        }
+      }
+    },
+    {
       "id": "codenod",
       "displayName": "CodeNod",
       "description": "AI pull request reviews for GitHub and GitHub Enterprise on Zana's providers: review inbox, multi-model consensus, risk and quality scores, Deep Review threads, and posting findings.",
