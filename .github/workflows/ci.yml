@@ -1,8 +1,11 @@
 name: CI
 
 # Gate pull requests before merging into master.
-# Verifies marketplace feed integrity and ensures all plugin manifests
-# and committed bundle artifacts are present and well-formed.
+# Enforces:
+# 1. Marketplace feed integrity and plugin manifest validation
+# 2. Plugin tests with >=80% coverage threshold enforcement
+# 3. Bundle parity check (source code matches committed server.mjs / app.js)
+# 4. Secret & credential scanning
 
 on:
   pull_request:
@@ -14,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Verify PR
+  feed-and-manifests:
+    name: Marketplace Feed & Manifests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -31,3 +34,76 @@ jobs:
 
       - name: Plugin Manifests & Bundles Check
         run: node scripts/check-plugins.mjs
+
+  plugin-tests-coverage:
+    name: Plugin Builds & Coverage Floor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Checkout Zana SDK (types and test harness)
+        uses: actions/checkout@v4
+        with:
+          repository: salesforce/zana
+          path: .zana-sdk
+          sparse-checkout: |
+            packages/plugin-sdk
+
+      - name: Install Vitest & Coverage Tools
+        run: npm install -g vitest@^4.0.0 @vitest/coverage-v8@^4.0.0 esbuild@^0.25.0 typescript@^5.0.0
+
+      - name: Run Plugin Tests, Coverage & Bundle Drift Check
+        env:
+          CI_BASE_REF: ${{ github.base_ref || 'master' }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          NODE_PATH="$(npm root -g):$NODE_PATH" node scripts/ci-plugin-tests.mjs
+
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-coverage-reports
+          path: plugins/*/coverage/
+          if-no-files-found: ignore
+
+  security:
+    name: Secret & Credential Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  verify:
+    name: Verify PR
+    runs-on: ubuntu-latest
+    needs: [feed-and-manifests, plugin-tests-coverage, security]
+    if: always()
+    steps:
+      - name: Require All CI Checks to Pass
+        env:
+          FEED_RESULT: ${{ needs.feed-and-manifests.result }}
+          TESTS_RESULT: ${{ needs.plugin-tests-coverage.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+        run: |
+          echo "Feed & Manifests: $FEED_RESULT"
+          echo "Plugin Tests & Coverage: $TESTS_RESULT"
+          echo "Security Scan: $SECURITY_RESULT"
+          test "$FEED_RESULT" = "success"
+          test "$TESTS_RESULT" = "success"
+          test "$SECURITY_RESULT" = "success"
