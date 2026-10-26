@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { relativeTime } from './format.ts';
 import { useSettingsAction } from './settings-action.ts';
 import type { ConfigSnapshot, Rpc } from './types.ts';
@@ -47,7 +47,14 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
   const [draft, setDraft] = useState(saved);
   const action = useSettingsAction(onChanged);
 
-  useEffect(() => setDraft(saved), [saved]);
+  // Resync the draft only when the saved value actually changes, so a config
+  // reload that leaves it unchanged never clobbers an in-flight edit.
+  const lastSaved = useRef(saved);
+  useEffect(() => {
+    if (lastSaved.current === saved) return;
+    lastSaved.current = saved;
+    setDraft(saved);
+  }, [saved]);
 
   const isDirty = draft.trim() !== saved;
   const maxChars = config.maxInstructionsChars;
