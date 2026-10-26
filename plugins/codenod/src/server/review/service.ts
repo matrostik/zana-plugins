@@ -30,6 +30,8 @@ export interface ReviewServiceDeps {
   projects: ProjectMatcher;
   config: () => Promise<ReviewConfig>;
   providerPermissionModes: (providerId: string) => Promise<string[] | undefined>;
+  /** Fetches the PR head into a matched project and returns that commit when it matches `headSha`. */
+  fetchPullRequestHead?: (projectPath: string, prNumber: number, headSha: string) => Promise<string>;
   complete?: (args: { instructions: string; prompt: string }) => Promise<{ text: string }>;
   notify?: (args: { projectId: string; text: string }) => Promise<void>;
   syncPullRequest: (ref: PrRef) => Promise<PullRequestRow>;
@@ -46,6 +48,7 @@ export function modelLabel(model: ModelChoice): string {
 interface QueuedReview {
   reviewId: string;
   models: ModelChoice[];
+  trigger: 'manual' | 'auto';
 }
 
 export function createReviewService(deps: ReviewServiceDeps) {
@@ -54,14 +57,20 @@ export function createReviewService(deps: ReviewServiceDeps) {
 
   const changed = (payload: Record<string, unknown>) => deps.publish(CHANGED_EVENT, payload);
 
-  async function resolveWorkspace(pr: PullRequestRow, config: ReviewConfig): Promise<{ projectId: string; environment?: SpawnEnvironment; hasWorkspace: boolean }> {
+  async function resolveWorkspace(
+    pr: PullRequestRow,
+    headSha: string,
+    config: ReviewConfig
+  ): Promise<{ projectId: string; environment?: SpawnEnvironment; hasWorkspace: boolean }> {
     if (config.workspaceMode !== 'diff-only') {
       const project = await deps.projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
       if (project) {
-        const baseBranch = pr.headRef || pr.headSha || pr.baseRef;
-        return config.workspaceMode === 'worktree'
-          ? { projectId: project.id, environment: { kind: 'worktree', baseBranch, branchSlug: `codenod-review-${pr.number}` }, hasWorkspace: true }
-          : { projectId: project.id, environment: { kind: 'unmanaged' }, hasWorkspace: true };
+        if (config.workspaceMode !== 'worktree') return { projectId: project.id, environment: { kind: 'unmanaged' }, hasWorkspace: true };
+        if (!project.path || !deps.fetchPullRequestHead) {
+          throw new Error(`Cannot review ${pr.owner}/${pr.repo}#${pr.number} in a worktree: the matched project has no checkout to fetch.`);
+        }
+        const baseBranch = await deps.fetchPullRequestHead(project.path, pr.number, headSha);
+        return { projectId: project.id, environment: { kind: 'worktree', baseBranch, branchSlug: `codenod-review-${pr.number}` }, hasWorkspace: true };
       }
     }
     const fallback = config.fallbackProjectId || (await deps.projects.projects())[0]?.id;
@@ -80,7 +89,18 @@ export function createReviewService(deps: ReviewServiceDeps) {
     const config = await deps.config();
     const repo = deps.store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
     const gathered = await gatherReviewContext(deps.github, parsePrId(pr.id), { specGlob: repo?.specGlob ?? null });
-    const workspace = await resolveWorkspace(pr, config);
+    if (signal.aborted) {
+      deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
+      return;
+    }
+    if (gathered.pull.head.sha !== review.headSha) {
+      deps.store.setReviewStatus(review.id, 'cancelled', `Pull request moved to ${gathered.pull.head.sha.slice(0, 12)} before this review started`);
+      changed({ prId: pr.id, reviewId: review.id });
+      const current = await deps.syncPullRequest(parsePrId(pr.id));
+      if (!signal.aborted && current.headSha !== review.headSha) await startReview(parsePrId(pr.id), { models: item.models, trigger: item.trigger });
+      return;
+    }
+    const workspace = await resolveWorkspace(pr, review.headSha, config);
     const promptContext = { ...gathered.prompt, customInstructions: config.customInstructions, hasWorkspace: workspace.hasWorkspace };
     const hasRequirements = hasRequirementsContext(promptContext);
     const prompt = getFullReviewPrompt(promptContext);
@@ -96,6 +116,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
           : workspace.environment;
         try {
           const permissionMode = pickReadOnlyPermissionMode(await deps.providerPermissionModes(model.providerId).catch(() => undefined));
+          if (!permissionMode) throw new Error(`Provider ${model.providerId} has no read-only permission mode for automated reviews`);
           const result = await runModelInThread(deps.threads, deps.waiter, {
             projectId: workspace.projectId,
             environment,
@@ -213,21 +234,24 @@ export function createReviewService(deps: ReviewServiceDeps) {
     }
   }
 
+  /** Refreshes the PR from GitHub, records a queued review for its head commit, and schedules it. */
+  async function startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto' } = {}): Promise<ReviewRow> {
+    const config = await deps.config();
+    const models = (options.models && options.models.length > 0 ? options.models : config.models).slice(0, 5);
+    if (models.length === 0) throw new Error('No review model is configured. Pick at least one model in CodeNod settings.');
+    const pr = await deps.syncPullRequest(ref);
+    const running = deps.store.latestReview(pr.id);
+    if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) return running;
+    const trigger = options.trigger ?? 'manual';
+    const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger });
+    queue.push({ reviewId: review.id, models, trigger });
+    changed({ prId: pr.id, reviewId: review.id });
+    void pump();
+    return review;
+  }
+
   return {
-    /** Refreshes the PR from GitHub, records a queued review for its head commit, and schedules it. */
-    async startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto' } = {}): Promise<ReviewRow> {
-      const config = await deps.config();
-      const models = (options.models && options.models.length > 0 ? options.models : config.models).slice(0, 5);
-      if (models.length === 0) throw new Error('No review model is configured. Pick at least one model in CodeNod settings.');
-      const pr = await deps.syncPullRequest(ref);
-      const running = deps.store.latestReview(pr.id);
-      if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) return running;
-      const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: options.trigger ?? 'manual' });
-      queue.push({ reviewId: review.id, models });
-      changed({ prId: pr.id, reviewId: review.id });
-      void pump();
-      return review;
-    },
+    startReview,
 
     cancelReview(reviewId: string): boolean {
       const queuedIndex = queue.findIndex((item) => item.reviewId === reviewId);

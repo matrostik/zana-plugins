@@ -15,14 +15,13 @@ export type ParseResult = { ok: true; analysis: ParsedAnalysis } | { ok: false; 
 
 /** Returns the first balanced top-level JSON object in `text`, ignoring braces inside strings. */
 export function extractJsonObject(text: string): string | null {
-  const unfenced = text.replace(/```(?:json)?/gi, '');
-  let start = unfenced.indexOf('{');
+  let start = text.indexOf('{');
   while (start !== -1) {
     let depth = 0;
     let inString = false;
     let escaped = false;
-    for (let index = start; index < unfenced.length; index++) {
-      const char = unfenced[index];
+    for (let index = start; index < text.length; index++) {
+      const char = text[index];
       if (inString) {
         if (escaped) escaped = false;
         else if (char === '\\') escaped = true;
@@ -34,7 +33,7 @@ export function extractJsonObject(text: string): string | null {
       else if (char === '}') {
         depth--;
         if (depth === 0) {
-          const candidate = unfenced.slice(start, index + 1);
+          const candidate = text.slice(start, index + 1);
           try {
             JSON.parse(candidate);
             return candidate;
@@ -44,21 +43,20 @@ export function extractJsonObject(text: string): string | null {
         }
       }
     }
-    start = unfenced.indexOf('{', start + 1);
+    start = text.indexOf('{', start + 1);
   }
   return null;
 }
 
 /** True when the first `{` in `text` is never closed, i.e. the reply was truncated mid-object. */
 function startsWithUnclosedObject(text: string): boolean {
-  const unfenced = text.replace(/```(?:json)?/gi, '');
-  const start = unfenced.indexOf('{');
+  const start = text.indexOf('{');
   if (start === -1) return false;
   let depth = 0;
   let inString = false;
   let escaped = false;
-  for (let index = start; index < unfenced.length; index++) {
-    const char = unfenced[index];
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
     if (inString) {
       if (escaped) escaped = false;
       else if (char === '\\') escaped = true;

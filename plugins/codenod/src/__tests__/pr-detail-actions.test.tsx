@@ -77,6 +77,32 @@ describe('PrDetail loading and setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Choose models' }));
     expect(onOpenSettings).toHaveBeenCalled();
   });
+
+  it('ignores a detail response for a pull request that is no longer selected', async () => {
+    let resolveFirst: (value: PrDetailData) => void = () => undefined;
+    const first = new Promise<PrDetailData>((resolve) => (resolveFirst = resolve));
+    const second = detail('completed');
+    second.pr = { ...second.pr, id: 'github.com/acme/api#2', number: 2, title: 'Second change' };
+    const call = vi.fn(async (method: string, args?: unknown) => {
+      if (method !== 'detail') throw new Error(`unexpected rpc ${method}`);
+      return String((args as { prId?: string }).prId).endsWith('#1') ? first : second;
+    });
+    const view = render(
+      <PrDetail rpc={{ call }} pluginId="codenod" prId="github.com/acme/api#1" defaultModels={[]} hasModels onOpenSettings={() => undefined} />
+    );
+    view.rerender(
+      <PrDetail rpc={{ call }} pluginId="codenod" prId="github.com/acme/api#2" defaultModels={[]} hasModels onOpenSettings={() => undefined} />
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Second change' })).toBeTruthy();
+    const stale = detail('completed');
+    stale.pr = { ...stale.pr, title: 'First wins' };
+    resolveFirst(stale);
+    await Promise.resolve();
+
+    expect(screen.queryByRole('heading', { name: 'First wins' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Second change' })).toBeTruthy();
+  });
 });
 
 describe('PrDetail review actions', () => {

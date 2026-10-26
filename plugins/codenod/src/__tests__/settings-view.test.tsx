@@ -152,6 +152,15 @@ describe('Organizations & Repos tab', () => {
     fireEvent.blur(field);
     await waitFor(() => expect(settingsCalls()).toEqual([{ syncIntervalMinutes: 15 }]));
   });
+
+  it('clamps an out-of-range sync interval before saving', async () => {
+    const { settingsCalls } = await renderView();
+    const field = screen.getByLabelText('Sync interval (minutes)') as HTMLInputElement;
+    fireEvent.change(field, { target: { value: '999' } });
+    fireEvent.blur(field);
+    expect(field.value).toBe('120');
+    await waitFor(() => expect(settingsCalls()).toEqual([{ syncIntervalMinutes: 120 }]));
+  });
 });
 
 describe('AI Model tab', () => {

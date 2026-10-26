@@ -27,7 +27,9 @@ export function NumberSetting(props: {
             event.target.value = String(props.value);
             return;
           }
-          if (next !== props.value) props.onSave(next);
+          const clamped = Math.min(props.limits.max, Math.max(props.limits.min, Math.round(next)));
+          event.target.value = String(clamped);
+          if (clamped !== props.value) props.onSave(clamped);
         }}
       />
       <span className="cn-muted cn-small">

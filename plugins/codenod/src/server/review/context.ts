@@ -35,31 +35,40 @@ export async function gatherReviewContext(github: GitHubClient, ref: PrRef, opti
     github.listIssueComments(ref).catch(() => [] as GhComment[])
   ]);
 
-  const linkedIssues: LinkedIssueContext[] = [];
-  for (const link of extractLinkedIssues(pull.body, ref, ref.number)) {
-    try {
-      const issue = await github.getIssue(link, link.number);
-      if (issue.pull_request) continue;
-      linkedIssues.push({
-        reference: `${link.owner}/${link.name}#${link.number}`,
-        title: issue.title,
-        body: issue.body,
-        labels: issue.labels.map((label) => (typeof label === 'string' ? label : label.name)).filter(Boolean)
-      });
-    } catch {
-      // Missing or inaccessible issues are skipped; the review continues without them.
-    }
-  }
+  const linkedIssues = (
+    await Promise.all(
+      extractLinkedIssues(pull.body, ref, ref.number).map(async (link): Promise<LinkedIssueContext | null> => {
+        try {
+          const issue = await github.getIssue(link, link.number);
+          if (issue.pull_request) return null;
+          return {
+            reference: `${link.owner}/${link.name}#${link.number}`,
+            title: issue.title,
+            body: issue.body,
+            labels: issue.labels.map((label) => (typeof label === 'string' ? label : label.name)).filter(Boolean)
+          };
+        } catch {
+          // Missing or inaccessible issues are skipped; the review continues without them.
+          return null;
+        }
+      })
+    )
+  ).filter((issue): issue is LinkedIssueContext => issue !== null);
 
-  const specFiles: SpecFileContext[] = [];
+  let specFiles: SpecFileContext[] = [];
   if (options.specGlob?.trim()) {
     const matches = globMatcher(options.specGlob);
     const changed = files.filter((file) => file.status !== 'removed' && matches(file.path)).map((file) => file.path);
     const referenced = referencedSpecPaths(pull.body, matches);
-    for (const path of [...new Set([...changed, ...referenced])].slice(0, MAX_SPEC_FILES)) {
-      const content = await github.getFileText(ref, path, pull.head.sha).catch(() => null);
-      if (content?.trim()) specFiles.push({ path, content });
-    }
+    const paths = [...new Set([...changed, ...referenced])].slice(0, MAX_SPEC_FILES);
+    specFiles = (
+      await Promise.all(
+        paths.map(async (path) => {
+          const content = await github.getFileText(ref, path, pull.head.sha).catch(() => null);
+          return content?.trim() ? { path, content } : null;
+        })
+      )
+    ).filter((spec): spec is SpecFileContext => spec !== null);
   }
 
   const prepared = prepareDiff(files);

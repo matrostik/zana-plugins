@@ -75,28 +75,37 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
       settle(event.threadId, { error: new Error(`Review thread failed: ${errorMessage(event.error ?? 'unknown error')}`) });
       return;
     }
-    if (event.name === 'thread.idle') {
-      // The host truncates lifecycle `lastAssistantText` (4096 chars), so prefer the full thread output.
-      const output = await currentOutput(event.threadId);
-      const text = output.trim() ? output : event.lastAssistantText ?? '';
-      if (text.trim() && text !== waiter.baseline) settle(event.threadId, { text });
-    }
+    if (event.name !== 'thread.idle') return;
+    // The host truncates lifecycle `lastAssistantText` (4096 chars), so prefer the full thread output.
+    // A repair turn can register a new waiter for this thread while the output read is in flight.
+    const output = await currentOutput(event.threadId);
+    if (waiters.get(event.threadId) !== waiter) return;
+    const text = output.trim() ? output : event.lastAssistantText ?? '';
+    if (text.trim() && text !== waiter.baseline) settle(event.threadId, { text });
   }
 
   /** Resolves with the thread's next new final output; rejects on failure, stop, timeout, or abort. */
   async function waitForOutput(threadId: string, args: { baseline?: string; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<string> {
     const baseline = args.baseline ?? '';
     const deadline = Date.now() + (args.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    const done = new Promise<string>((resolve, reject) => waiters.set(threadId, { baseline, resolve, reject }));
     let finished = false;
+    const done = new Promise<string>((resolve, reject) => {
+      waiters.set(threadId, {
+        baseline,
+        resolve: (text) => {
+          finished = true;
+          resolve(text);
+        },
+        reject: (error) => {
+          finished = true;
+          reject(error);
+        }
+      });
+    });
     const stopPolling = new AbortController();
     const forwardAbort = () => stopPolling.abort();
     if (args.signal?.aborted) stopPolling.abort();
     else args.signal?.addEventListener('abort', forwardAbort, { once: true });
-    void done.then(
-      () => (finished = true),
-      () => (finished = true)
-    );
 
     const poll = (async () => {
       while (!finished) {
@@ -118,7 +127,9 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
         } else if (STOPPED_STATUSES.has(status)) {
           settle(threadId, { error: new Error('Review thread was stopped') });
         } else if (DONE_STATUSES.has(status)) {
+          const waiter = waiters.get(threadId);
           const text = await currentOutput(threadId);
+          if (finished || waiters.get(threadId) !== waiter) return;
           if (text.trim() && text !== baseline) settle(threadId, { text });
         }
       }
@@ -188,9 +199,14 @@ export async function runModelInThread(threads: ThreadsApi, waiter: ThreadWaiter
   }
 }
 
-const READ_ONLY_PERMISSION_PREFERENCE = ['read-only', 'readonly', 'readOnly', 'plan', 'default', 'ask', 'auto'];
+export const FULL_ACCESS_PERMISSION_MODE = 'full';
 
-/** Picks the most restrictive permission mode a provider advertises, or undefined to use its default. */
+const READ_ONLY_PERMISSION_PREFERENCE = ['read-only', 'readonly', 'readOnly', 'plan'];
+
+/**
+ * Returns an enforceable read-only permission mode.
+ * Undefined means the provider cannot prove the thread is read-only; callers must not fall back to a default.
+ */
 export function pickReadOnlyPermissionMode(modes: readonly string[] | undefined): string | undefined {
   if (!modes || modes.length === 0) return undefined;
   for (const preferred of READ_ONLY_PERMISSION_PREFERENCE) {

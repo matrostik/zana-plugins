@@ -148,7 +148,7 @@ export function createFakeHost(options: FakeHostOptions = {}) {
         }
       },
       providers: {
-        list: async () => [{ id: 'claude-code', available: true, displayName: 'Claude Code', capabilities: { permissionModes: ['default', 'plan', 'bypass'] } }],
+        list: async () => [{ id: 'claude-code', available: true, displayName: 'Claude Code', capabilities: { permissionModes: ['read-only', 'accept-edits', 'auto', 'full'] } }],
         models: async () => ({
           models: [{ id: 'opus', model: 'Opus', supportedReasoningEfforts: [{ reasoningEffort: 'high' }] }],
           selectedOnlyModels: [],

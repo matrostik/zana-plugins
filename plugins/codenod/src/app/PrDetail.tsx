@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ChangedFile, FindingRow, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
@@ -174,11 +174,19 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     navigate = null;
   }
 
+  const requestSeq = useRef(0);
   const load = useCallback(() => {
+    const requestId = ++requestSeq.current;
     rpc
       .call('detail', { prId })
-      .then((value) => setDetail(value as PrDetailData))
-      .catch((cause) => setNotice({ kind: 'error', text: errorText(cause) }));
+      .then((value) => {
+        if (requestSeq.current !== requestId) return;
+        setDetail(value as PrDetailData);
+      })
+      .catch((cause) => {
+        if (requestSeq.current !== requestId) return;
+        setNotice({ kind: 'error', text: errorText(cause) });
+      });
   }, [rpc, prId]);
 
   useEffect(() => {

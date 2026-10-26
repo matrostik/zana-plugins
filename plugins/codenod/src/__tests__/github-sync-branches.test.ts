@@ -233,8 +233,8 @@ describe('GitHub client pagination and endpoints', () => {
     const capped = await client.searchPullRequests('github.com', 'is:pr author:@me', 20);
     const defaulted = await client.searchPullRequests('github.com', 'is:pr', 500);
 
-    expect(capped).toEqual([]);
-    expect(defaulted).toEqual([{ number: 1 }]);
+    expect(capped).toEqual({ items: [], complete: true });
+    expect(defaulted).toEqual({ items: [{ number: 1 }], complete: true });
     expect(new URL(calls[0].url).searchParams.get('q')).toBe('is:pr author:@me');
     expect(new URL(calls[1].url).searchParams.get('per_page')).toBe('100');
   });
@@ -268,14 +268,37 @@ describe('GitHub client pagination and endpoints', () => {
     await expect(client.getFileText(REF, 'docs/spec.md', 'main')).rejects.toMatchObject({ status: 500 });
   });
 
-  it('treats failing CI endpoints as no CI and missing check runs as empty', async () => {
+  it('propagates CI request failures and treats missing check runs as empty', async () => {
     const failing = clientFor(() => jsonResponse({ message: 'nope' }, 500));
     const partial = clientFor((url) =>
-      url.pathname.endsWith('/status') ? jsonResponse({ state: 'success', total_count: 1 }) : jsonResponse({ total_count: 0 })
+      url.pathname.endsWith('/status') ? jsonResponse({ state: 'success', total_count: 1 }) : jsonResponse({ total_count: 0, check_runs: [] })
     );
 
-    await expect(failing.client.ciState(REF, 'sha1')).resolves.toBe('none');
+    await expect(failing.client.ciState(REF, 'sha1')).rejects.toMatchObject({ status: 500 });
     await expect(partial.client.ciState(REF, 'sha1')).resolves.toBe('success');
+  });
+
+  it('pages check runs and does not report success when a later page cannot be read', async () => {
+    const { client, calls } = clientFor((url) => {
+      if (url.pathname.endsWith('/status')) return jsonResponse({ state: 'success', total_count: 0 });
+      const page = Number(url.searchParams.get('page'));
+      if (page < 10) return jsonResponse({ total_count: 1001, check_runs: Array.from({ length: 100 }, () => ({ status: 'completed', conclusion: 'success' })) });
+      return jsonResponse({ message: 'nope' }, 500);
+    });
+
+    await expect(client.ciState(REF, 'sha1')).rejects.toMatchObject({ status: 500 });
+    expect(calls.filter((call) => call.url.includes('/check-runs'))).toHaveLength(10);
+  });
+
+  it('reads the next check-run page when total_count is omitted', async () => {
+    const { client } = clientFor((url) => {
+      if (url.pathname.endsWith('/status')) return jsonResponse({ state: 'success', total_count: 0 });
+      const page = Number(url.searchParams.get('page'));
+      if (page === 1) return jsonResponse({ check_runs: Array.from({ length: 100 }, () => ({ status: 'completed', conclusion: 'success' })) });
+      return jsonResponse({ check_runs: [{ status: 'completed', conclusion: 'failure' }] });
+    });
+
+    await expect(client.ciState(REF, 'sha1')).resolves.toBe('failure');
   });
 
   it('builds enterprise API URLs for issues', async () => {
@@ -595,6 +618,15 @@ describe('sync service', () => {
     expect(queries).toContain(
       'is:pr is:open archived:false author:@me repo:acme/r0 repo:acme/r1 repo:acme/r2 repo:acme/r3 repo:acme/r4'
     );
+  });
+
+  it('does not close open pull requests when the search inventory is incomplete', async () => {
+    const { store, sync } = syncFixture({ github: { searchPullRequests: vi.fn(async () => ({ items: [], complete: false })) } });
+    store.upsertPullRequest(storedPull());
+
+    await sync.syncAll();
+
+    expect(store.getPullRequest('github.com/acme/api#1')?.state).toBe('open');
   });
 
   it('closes stored PRs without searching when nothing is watched', async () => {

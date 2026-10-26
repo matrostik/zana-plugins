@@ -636,6 +636,18 @@ describe('post formatting', () => {
     expect(buildReviewPayload({ findings: [], files, modelCount: 1, summary: 'x'.repeat(70_000) }).body).toHaveLength(60_000);
   });
 
+  it('marks only body findings that fit in the review body', () => {
+    const payload = buildReviewPayload({
+      findings: [finding('small', { file: 'src/other.ts', description: 'kept' }), finding('huge', { file: 'src/other.ts', description: 'x'.repeat(60_000) })],
+      files,
+      modelCount: 1,
+      summary: null
+    });
+    expect(payload.bodyIds).toEqual(['small']);
+    expect(payload.body).toContain('kept');
+    expect(payload.body).not.toContain('x'.repeat(100));
+  });
+
   it('names the stale review error and both commits', () => {
     const error = new StaleReviewError('aaaaaaa111', 'bbbbbbb222');
     expect(error.name).toBe('StaleReviewError');

@@ -7,7 +7,8 @@ import { DEFAULT_HOST, parseHostList, parsePrId, parsePrRef, parseRepoRef, prId,
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
-import { createThreadWaiter, type ThreadsApi } from './src/server/review/runner.ts';
+import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, type ThreadsApi } from './src/server/review/runner.ts';
+import { fetchPullRequestHead } from './src/server/review/workspace.ts';
 import { CHANGED_EVENT, createReviewService, type ReviewConfig } from './src/server/review/service.ts';
 import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
 import { createSyncService } from './src/server/sync.ts';
@@ -115,6 +116,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     config: reviewConfig,
     providerPermissionModes: async (providerId) =>
       (await zcc.sdk.providers.list()).find((provider) => provider.id === providerId)?.capabilities?.permissionModes,
+    fetchPullRequestHead: (projectPath, prNumber, headSha) => fetchPullRequestHead(run, projectPath, prNumber, headSha),
     complete: zcc.sdk.assistant ? (args) => zcc.sdk.assistant.complete(args) : undefined,
     notify: async ({ projectId, text }) => {
       await zcc.sdk.inbox.push({ projectId, comments: text });
@@ -288,7 +290,10 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const project = await projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
     const projectId = project?.id ?? config.fallbackProjectId ?? (await projects.projects())[0]?.id;
     if (!projectId) throw new Error('No Zana project is available for the Deep Review thread');
-    const hasWorkspace = Boolean(project) && config.workspaceMode !== 'diff-only';
+    const hasWorkspace = Boolean(project?.path) && config.workspaceMode !== 'diff-only';
+    const worktree = hasWorkspace && project?.path
+      ? { kind: 'worktree' as const, branchSlug: `codenod-deep-${pr.number}`, baseBranch: await fetchPullRequestHead(run, project.path, pr.number, pr.headSha) }
+      : undefined;
     const spawned = await zcc.sdk.threads.spawn({
       projectId,
       title: `Deep Review: ${pr.owner}/${pr.repo}#${pr.number}`,
@@ -305,8 +310,9 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
         reviewSummary: review?.consensusSummary ?? review?.summary ?? null,
         findings: findings.filter((finding) => !finding.dismissed)
       }),
+      permissionMode: FULL_ACCESS_PERMISSION_MODE,
       visibility: 'visible',
-      ...(hasWorkspace ? { environment: { kind: 'worktree' as const, branchSlug: `codenod-deep-${pr.number}` } } : {})
+      ...(worktree ? { environment: worktree } : {})
     });
     return { threadId: spawned.id, projectId };
   });

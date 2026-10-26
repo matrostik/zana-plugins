@@ -13,6 +13,7 @@ import {
   type ThreadsApi,
   type ThreadWaiter
 } from '../server/review/runner.ts';
+import { fetchPullRequestHead } from '../server/review/workspace.ts';
 import { CHANGED_EVENT, createReviewService, type ReviewConfig, type ReviewServiceDeps } from '../server/review/service.ts';
 import type { ModelChoice, PrRef, PullRequestRow, ReviewScores } from '../server/types.ts';
 import { createSqliteDatabase } from './fake-host.ts';
@@ -64,6 +65,28 @@ describe('thread waiter', () => {
     await expect(result).resolves.toBe('full reply');
     expect(waiter.pending()).toBe(0);
     expect(threads.get).not.toHaveBeenCalled();
+  });
+
+  it('does not deliver an in-flight idle event to a waiter registered later', async () => {
+    useFakeClock();
+    const { threads } = createFakeThreads();
+    let release: (value: { output: string }) => void = () => undefined;
+    threads.output.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const waiter = createThreadWaiter(threads, { pollMs: POLL_MS });
+    const first = waiter.waitForOutput('thread-1');
+    const event = waiter.onEvent({ name: 'thread.idle', threadId: 'thread-1', lastAssistantText: 'stale event' });
+    await Promise.resolve();
+    let settled = false;
+    const second = waiter.waitForOutput('thread-1', { baseline: 'other' }).finally(() => (settled = true));
+
+    release({ output: '' });
+    await event;
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    expect(waiter.pending()).toBe(1);
+    void first.catch(() => undefined);
+    void second.catch(() => undefined);
   });
 
   it('returns as soon as the idle event arrives without waiting for the next poll', async () => {
@@ -307,12 +330,35 @@ describe('runModelInThread', () => {
 });
 
 describe('pickReadOnlyPermissionMode', () => {
-  it('prefers the most restrictive advertised mode and otherwise uses the provider default', () => {
+  it('picks an enforceable read-only mode and refuses permissive fallbacks', () => {
     expect(pickReadOnlyPermissionMode(undefined)).toBeUndefined();
     expect(pickReadOnlyPermissionMode([])).toBeUndefined();
-    expect(pickReadOnlyPermissionMode(['bypass', 'plan', 'READ-ONLY'])).toBe('READ-ONLY');
-    expect(pickReadOnlyPermissionMode(['auto', 'default'])).toBe('default');
-    expect(pickReadOnlyPermissionMode(['bypass'])).toBeUndefined();
+    expect(pickReadOnlyPermissionMode(['accept-edits', 'auto', 'full'])).toBeUndefined();
+    expect(pickReadOnlyPermissionMode(['accept-edits', 'Read-Only', 'full'])).toBe('Read-Only');
+    expect(pickReadOnlyPermissionMode(['auto', 'plan'])).toBe('plan');
+  });
+});
+
+describe('fetchPullRequestHead', () => {
+  const head = '0123456789abcdef';
+
+  it('returns the head only when the fetched ref matches it', async () => {
+    const commands: string[][] = [];
+    const run: CommandRunner = async (_command, args) => {
+      commands.push(args);
+      return args.includes('rev-parse') ? `${head}\n` : '';
+    };
+
+    await expect(fetchPullRequestHead(run, '/repo', 4, head)).resolves.toBe(head);
+    expect(commands[0]).toEqual(['-C', '/repo', 'fetch', 'origin', 'pull/4/head:refs/codenod/pr-4']);
+  });
+
+  it('rejects a fetch failure or a different commit', async () => {
+    const fail: CommandRunner = async () => null;
+    await expect(fetchPullRequestHead(fail, '/repo', 4, head)).rejects.toThrow(/Could not fetch/);
+    const mismatch: CommandRunner = async (_command, args) => (args.includes('rev-parse') ? 'aaaaaaaaaaaaaaa' : '');
+    await expect(fetchPullRequestHead(mismatch, '/repo', 4, head)).rejects.toThrow(/does not match/);
+    await expect(fetchPullRequestHead(async () => '', '/repo', 4, 'sha1')).rejects.toThrow(/Invalid pull request head/);
   });
 });
 
@@ -380,6 +426,8 @@ interface HarnessOptions {
   repoProject?: ZanaProject;
   projects?: ZanaProject[];
   permissionModes?: ReviewServiceDeps['providerPermissionModes'];
+  fetchPullRequestHead?: ReviewServiceDeps['fetchPullRequestHead'];
+  headShaForPull?: (number: number, read: number) => string;
   complete?: ReviewServiceDeps['complete'];
   notify?: ReviewServiceDeps['notify'];
 }
@@ -390,9 +438,11 @@ function createServiceHarness(options: HarnessOptions = {}) {
   const store = createStore(db, () => ++clock);
   const heads = new Map<number, string>();
   const headFor = (number: number) => heads.get(number) ?? 'sha1';
+  const headShaForPull = options.headShaForPull ?? ((number: number) => headFor(number));
+  let pullReads = 0;
   const getFileText = vi.fn(async (_repo: PrRef, _path: string, _gitRef: string): Promise<string | null> => null);
   const github = {
-    getPull: async (ref: PrRef) => fakePull(ref, headFor(ref.number)),
+    getPull: async (ref: PrRef) => fakePull(ref, headShaForPull(ref.number, ++pullReads)),
     listFiles: async () => [{ path: 'src/a.ts', status: 'modified', additions: 2, deletions: 0, patch: PATCH }],
     listReviewComments: async () => [],
     listIssueComments: async () => [],
@@ -446,10 +496,12 @@ function createServiceHarness(options: HarnessOptions = {}) {
     waiter,
     projects,
     config: async () => config,
-    providerPermissionModes: options.permissionModes ?? (async () => ['default', 'plan']),
+    providerPermissionModes: options.permissionModes ?? (async () => ['read-only', 'accept-edits', 'auto', 'full']),
+    fetchPullRequestHead: options.fetchPullRequestHead,
     complete: options.complete,
     notify: options.notify,
     syncPullRequest: async (ref) => {
+      const pull = await github.getPull(ref);
       const id = prId(ref);
       store.upsertPullRequest({
         id,
@@ -457,17 +509,17 @@ function createServiceHarness(options: HarnessOptions = {}) {
         owner: ref.owner,
         repo: ref.name,
         number: ref.number,
-        title: 'Trim user names',
-        author: 'teammate',
-        url: `https://github.com/acme/api/pull/${ref.number}`,
+        title: pull.title,
+        author: pull.user?.login ?? 'unknown',
+        url: pull.html_url,
         state: 'open',
         isDraft: false,
-        headSha: headFor(ref.number),
-        headRef: 'feat/trim',
-        baseRef: 'main',
+        headSha: pull.head.sha,
+        headRef: pull.head.ref,
+        baseRef: pull.base.ref,
         ciState: 'none',
         buckets: ['needs-review'],
-        updatedAt: '2026-10-25T10:00:00Z'
+        updatedAt: pull.updated_at
       });
       return store.getPullRequest(id)!;
     },
@@ -487,9 +539,7 @@ describe('review service', () => {
         if (model === 'gpt') throw new Error('provider crashed');
         return VALID_REPLY;
       },
-      permissionModes: async () => {
-        throw new Error('provider offline');
-      },
+      permissionModes: async (providerId) => (providerId === 'codex' ? ['full'] : ['read-only', 'full']),
       notify
     });
 
@@ -499,10 +549,12 @@ describe('review service', () => {
     expect(store.getReview(review.id)).toMatchObject({ status: 'completed', summary: 'Review by risk 7', consensusSummary: null, riskScore: 7 });
     expect(store.listRuns(review.id).map((run) => [run.model, run.status, run.error])).toEqual([
       ['opus', 'completed', null],
-      ['gpt', 'failed', 'provider crashed']
+      ['gpt', 'failed', 'Provider codex has no read-only permission mode for automated reviews']
     ]);
-    expect(spawned.map((thread) => thread.args.permissionMode)).toEqual([undefined, undefined]);
-    expect(log.warn).toHaveBeenCalledWith('codenod: codex/gpt failed on github.com/acme/api#4: provider crashed');
+    expect(spawned.map((thread) => thread.args.permissionMode)).toEqual(['read-only']);
+    expect(log.warn).toHaveBeenCalledWith(
+      'codenod: codex/gpt failed on github.com/acme/api#4: Provider codex has no read-only permission mode for automated reviews'
+    );
     expect(notify).toHaveBeenCalledWith({ projectId: 'home', text: expect.stringContaining('1 finding(s), 1 high or critical · 1/2 model(s) succeeded') });
   });
 
@@ -541,7 +593,7 @@ describe('review service', () => {
     expect(threads.send).toHaveBeenCalledTimes(1);
     expect(threads.send.mock.calls[0][0].prompt).toContain('could not be used');
     expect(store.getReview(review.id)).toMatchObject({ status: 'failed', error: 'Model reply was not usable: the reply did not contain a valid JSON object' });
-    expect(spawned[0].args.permissionMode).toBe('plan');
+    expect(spawned[0].args.permissionMode).toBe('read-only');
   });
 
   it('summarizes agreement when several models succeed', async () => {
@@ -599,9 +651,11 @@ describe('review service', () => {
   });
 
   it('reviews each model in its own worktree when a project matches the repository', async () => {
+    const fetchHead = vi.fn(async () => 'sha1');
     const { store, service, spawned, getFileText, settled } = createServiceHarness({
       config: { models: SERVICE_MODELS, workspaceMode: 'worktree' },
-      repoProject: { id: 'api-project', name: 'API' }
+      repoProject: { id: 'api-project', name: 'API', path: '/repos/api' },
+      fetchPullRequestHead: fetchHead
     });
     store.upsertRepo({ id: 'github.com/acme/api', host: 'github.com', owner: 'acme', name: 'api', specGlob: 'src/**/*.ts' });
 
@@ -612,11 +666,37 @@ describe('review service', () => {
     expect(spawned.map((thread) => thread.args.projectId)).toEqual(['api-project', 'api-project']);
     expect(spawned.map((thread) => thread.args.environment)).toEqual(
       expect.arrayContaining(
-        runIds.map((runId, index) => ({ kind: 'worktree', baseBranch: 'feat/trim', branchSlug: `codenod-review-4-${runId.slice(0, 6)}-${index}` }))
+        runIds.map((runId, index) => ({ kind: 'worktree', baseBranch: 'sha1', branchSlug: `codenod-review-4-${runId.slice(0, 6)}-${index}` }))
       )
     );
     expect(String(spawned[0].args.prompt)).toContain('checkout of this repository');
     expect(getFileText).toHaveBeenCalledWith(expect.objectContaining({ owner: 'acme', number: 4 }), 'src/a.ts', 'sha1');
+    expect(fetchHead).toHaveBeenCalledWith('/repos/api', 4, 'sha1');
+  });
+
+  it('fails a worktree review when the pull request head cannot be fetched', async () => {
+    const { store, service, settled } = createServiceHarness({
+      config: { workspaceMode: 'worktree' },
+      repoProject: { id: 'api-project', name: 'API', path: '/repos/api' }
+    });
+
+    const review = await service.startReview(prRef());
+    await settled();
+
+    expect(store.getReview(review.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('no checkout to fetch') });
+  });
+
+  it('cancels a queued review whose head moved and reviews the new commit', async () => {
+    const { store, service, spawned, settled } = createServiceHarness({
+      headShaForPull: (_number, read) => (read === 1 ? 'sha1' : 'sha2')
+    });
+
+    await service.startReview(prRef());
+    await settled();
+
+    expect(store.latestReview(prId(prRef()))).toMatchObject({ status: 'completed', headSha: 'sha2' });
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0].args.permissionMode).toBe('read-only');
   });
 
   it('uses the matched project checkout directly in project mode', async () => {
@@ -662,6 +742,7 @@ describe('review service', () => {
 
     const first = await service.startReview(prRef());
     const again = await service.startReview(prRef(), { models: [SERVICE_MODELS[1]] });
+    await until(() => gate.waiting() === 1);
     heads.set(4, 'sha2');
     const next = await service.startReview(prRef(), { trigger: 'auto' });
     await until(() => gate.waiting() === 2);

@@ -29,6 +29,11 @@ export interface SyncResult {
 }
 
 const OPEN_PR_QUERY = 'is:pr is:open archived:false';
+
+function readSearch(result: { items?: GhSearchItem[]; complete?: boolean } | GhSearchItem[]): { items: GhSearchItem[]; complete: boolean } {
+  if (Array.isArray(result)) return { items: result, complete: true };
+  return { items: result.items ?? [], complete: result.complete !== false };
+}
 const REPOS_PER_QUERY = 5;
 const DETAIL_CONCURRENCY = 4;
 const DISCOVERY_DAYS = 30;
@@ -109,6 +114,7 @@ export function createSyncService(deps: {
     try {
       status.login = await viewerLogin(host);
       const found = new Map<string, { item: GhSearchItem; ref: PrRef; buckets: Set<PrBucket> }>();
+      let inventoryComplete = true;
       const watched = deps.store.listRepos().filter((repo) => repo.host === host);
       const watchedKeys = new Set(watched.map((repo) => `${repo.owner}/${repo.name}`.toLowerCase()));
       const collect = (items: GhSearchItem[], bucket: PrBucket) => {
@@ -130,7 +136,9 @@ export function createSyncService(deps: {
             .map((repo) => `repo:${repo.owner}/${repo.name}`)
             .join(' ');
           const query = extra ? `${OPEN_PR_QUERY} ${extra} ${qualifiers}` : `${OPEN_PR_QUERY} ${qualifiers}`;
-          collect(await deps.github.searchPullRequests(host, query), bucket);
+          const page = readSearch(await deps.github.searchPullRequests(host, query));
+          if (!page.complete) inventoryComplete = false;
+          collect(page.items, bucket);
         }
       };
 
@@ -159,7 +167,7 @@ export function createSyncService(deps: {
         }
       });
 
-      deps.store.closeMissingPullRequests(host, new Set(found.keys()));
+      if (inventoryComplete) deps.store.closeMissingPullRequests(host, new Set(found.keys()));
       status.pullRequestCount = found.size;
       status.syncedAt = now();
       return { status, changed };
@@ -226,7 +234,7 @@ export function createSyncService(deps: {
       const counts = new Map<string, { id: string; host: string; owner: string; name: string; pullRequests: number }>();
       for (const host of await deps.hosts()) {
         if (!(await deps.tokens.resolve(host))) continue;
-        const items = await deps.github.searchPullRequests(host, `is:pr involves:@me updated:>=${since}`).catch(() => []);
+        const items = readSearch(await deps.github.searchPullRequests(host, `is:pr involves:@me updated:>=${since}`).catch(() => [])).items;
         for (const item of items) {
           const repo = repoFromRepositoryUrl(item.repository_url);
           if (!repo) continue;

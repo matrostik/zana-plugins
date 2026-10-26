@@ -476,6 +476,15 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return (db.prepare('SELECT * FROM findings WHERE review_id = ?').all(reviewId) as Row[]).map(toFinding);
     },
 
+    countUndismissedFindings(reviewIds: readonly string[]): Map<string, number> {
+      const counts = new Map<string, number>();
+      if (reviewIds.length === 0) return counts;
+      const placeholders = reviewIds.map(() => '?').join(', ');
+      const rows = db.prepare(`SELECT review_id, COUNT(*) AS n FROM findings WHERE dismissed = 0 AND review_id IN (${placeholders}) GROUP BY review_id`).all(...reviewIds) as Row[];
+      for (const row of rows) counts.set(String(row.review_id), Number(row.n));
+      return counts;
+    },
+
     setFindingDismissed(id: string, dismissed: boolean): void {
       db.prepare('UPDATE findings SET dismissed = ? WHERE id = ?').run(dismissed ? 1 : 0, id);
     },

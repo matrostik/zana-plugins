@@ -27,26 +27,29 @@ export function sortFindings(findings: FindingRow[]): FindingRow[] {
 
 export function listPullRequests(store: Store, bucket?: PrBucket): PrListItem[] {
   const reviews = store.latestReviewsByPr();
-  return store
-    .listPullRequests()
-    .filter((pr) => !bucket || pr.buckets.includes(bucket))
-    .map((pr) => {
-      const review = reviews.get(pr.id);
-      return {
-        ...pr,
-        review: review
-          ? {
-              id: review.id,
-              status: review.status,
-              riskScore: review.riskScore,
-              headSha: review.headSha,
-              createdAt: review.createdAt,
-              stale: review.headSha !== pr.headSha,
-              findingCount: review.status === 'completed' ? store.listFindings(review.id).filter((finding) => !finding.dismissed).length : 0
-            }
-          : null
-      };
-    });
+  const pullRequests = store.listPullRequests().filter((pr) => !bucket || pr.buckets.includes(bucket));
+  const completedIds = pullRequests.flatMap((pr) => {
+    const review = reviews.get(pr.id);
+    return review?.status === 'completed' ? [review.id] : [];
+  });
+  const findingCounts = store.countUndismissedFindings(completedIds);
+  return pullRequests.map((pr) => {
+    const review = reviews.get(pr.id);
+    return {
+      ...pr,
+      review: review
+        ? {
+            id: review.id,
+            status: review.status,
+            riskScore: review.riskScore,
+            headSha: review.headSha,
+            createdAt: review.createdAt,
+            stale: review.headSha !== pr.headSha,
+            findingCount: review.status === 'completed' ? findingCounts.get(review.id) ?? 0 : 0
+          }
+        : null
+    };
+  });
 }
 
 export function getPrDetail(store: Store, prId: string): PrDetail | null {

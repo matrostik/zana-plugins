@@ -160,7 +160,7 @@ describe('codenod server', () => {
 
     const threads = [...host.threads.values()];
     expect(threads).toHaveLength(2);
-    expect(threads.every((thread) => thread.args.visibility === 'hidden' && thread.args.permissionMode === 'plan' && thread.archived)).toBe(true);
+    expect(threads.every((thread) => thread.args.visibility === 'hidden' && thread.args.permissionMode === 'read-only' && thread.archived)).toBe(true);
     expect(threads[1].args.reasoningLevel).toBe('high');
     expect(threads[1].sent[0]).toContain('could not be used');
     const prompt = String(threads[0].args.prompt);
@@ -169,6 +169,15 @@ describe('codenod server', () => {
     expect(prompt).toContain('There is no checkout');
     expect(host.inbox[0]).toMatchObject({ projectId: 'home' });
     expect(host.inbox[0].comments).toContain('acme/api#4');
+  });
+
+  it('opens Deep Review in a visible full-access thread', async () => {
+    const { host } = await setup();
+    await reviewToCompletion(host);
+
+    const { threadId } = (await host.callRpc('deepReview', { prId: PR_ID })) as { threadId: string };
+
+    expect(host.threads.get(threadId)?.args).toMatchObject({ visibility: 'visible', permissionMode: 'full' });
   });
 
   it('reads long replies from the thread output instead of the truncated idle event text', async () => {

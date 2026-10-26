@@ -137,18 +137,46 @@ export function createGitHubClient(tokens: TokenResolver, fetchImpl: FetchLike =
 
   const repoPath = (ref: RepoRef) => `/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.name)}`;
 
+  async function listCheckRuns(ref: PrRef, sha: string): Promise<{ runs: Array<{ status: string; conclusion: string | null }>; truncated: boolean }> {
+    const runs: Array<{ status: string; conclusion: string | null }> = [];
+    for (let page = 1; page <= 10; page++) {
+      const result = await request<{ total_count?: number; check_runs?: Array<{ status: string; conclusion: string | null }> }>(
+        ref.host,
+        'GET',
+        `${repoPath(ref)}/commits/${encodeURIComponent(sha)}/check-runs?per_page=${PAGE_SIZE}&page=${page}`
+      );
+      const batch = result.check_runs ?? [];
+      runs.push(...batch);
+      if (batch.length < PAGE_SIZE) return { runs, truncated: false };
+      if (typeof result.total_count === 'number' && runs.length >= result.total_count) return { runs, truncated: false };
+    }
+    return { runs, truncated: true };
+  }
+
   return {
     async viewer(host: string): Promise<GhUser> {
       return request<GhUser>(host, 'GET', '/user');
     },
 
-    async searchPullRequests(host: string, query: string, maxResults = 100): Promise<GhSearchItem[]> {
-      const result = await request<{ items: GhSearchItem[] }>(
-        host,
-        'GET',
-        `/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${Math.min(maxResults, PAGE_SIZE)}`
-      );
-      return result.items ?? [];
+    async searchPullRequests(host: string, query: string, maxResults = 1000): Promise<{ items: GhSearchItem[]; complete: boolean }> {
+      const items: GhSearchItem[] = [];
+      let complete = true;
+      const pageSize = Math.min(Math.max(1, maxResults), PAGE_SIZE);
+      const maxPages = Math.min(10, Math.ceil(maxResults / pageSize));
+      for (let page = 1; page <= maxPages; page++) {
+        const perPage = Math.min(pageSize, maxResults - items.length);
+        const result = await request<{ items?: GhSearchItem[]; incomplete_results?: boolean; total_count?: number }>(
+          host,
+          'GET',
+          `/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`
+        );
+        const batch = result.items ?? [];
+        items.push(...batch);
+        if (result.incomplete_results) complete = false;
+        const reachedEnd = batch.length < perPage || (typeof result.total_count === 'number' && items.length >= result.total_count);
+        if (reachedEnd || items.length >= maxResults) return { items: items.slice(0, maxResults), complete: complete && reachedEnd };
+      }
+      return { items: items.slice(0, maxResults), complete: false };
     },
 
     async getPull(ref: PrRef): Promise<GhPull> {
@@ -199,17 +227,13 @@ export function createGitHubClient(tokens: TokenResolver, fetchImpl: FetchLike =
     },
 
     async ciState(ref: PrRef, sha: string): Promise<CiState> {
-      const [checks, status] = await Promise.all([
-        request<{ check_runs: Array<{ status: string; conclusion: string | null }> }>(
-          ref.host,
-          'GET',
-          `${repoPath(ref)}/commits/${sha}/check-runs?per_page=100`
-        ).catch(() => ({ check_runs: [] })),
-        request<{ state: string; total_count: number }>(ref.host, 'GET', `${repoPath(ref)}/commits/${sha}/status`).catch(
-          () => ({ state: 'pending', total_count: 0 })
-        )
-      ]);
-      return combineCiState(checks.check_runs ?? [], status);
+      const checks = await listCheckRuns(ref, sha);
+      const status = await request<{ state: string; total_count: number }>(ref.host, 'GET', `${repoPath(ref)}/commits/${encodeURIComponent(sha)}/status`);
+      if (checks.truncated) {
+        const partial = combineCiState(checks.runs, status);
+        return partial === 'failure' ? 'failure' : 'pending';
+      }
+      return combineCiState(checks.runs, status);
     },
 
     async createReview(

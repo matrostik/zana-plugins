@@ -110,6 +110,7 @@ export function settingsFromHostValues(values: HostSettingValues): CodenodSettin
 
 export function createSettingsStore(deps: { kv: KvLike; readHostValues: () => Promise<HostSettingValues> }) {
   let cached: CodenodSettings | null = null;
+  let writeChain: Promise<void> = Promise.resolve();
 
   async function load(): Promise<CodenodSettings> {
     if (cached) return cached;
@@ -127,10 +128,17 @@ export function createSettingsStore(deps: { kv: KvLike; readHostValues: () => Pr
   return {
     load,
     async update(patch: unknown): Promise<CodenodSettings> {
-      const next = applySettingsPatch(await load(), patch);
-      await deps.kv.set(SETTINGS_KEY, next);
-      cached = next;
-      return next;
+      const run = writeChain.then(async () => {
+        const next = applySettingsPatch(await load(), patch);
+        await deps.kv.set(SETTINGS_KEY, next);
+        cached = next;
+        return next;
+      });
+      writeChain = run.then(
+        () => undefined,
+        () => undefined
+      );
+      return run;
     }
   };
 }

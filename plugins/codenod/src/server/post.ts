@@ -46,12 +46,22 @@ export function buildReviewPayload(input: {
       bodyIds.push(finding.id);
     }
   }
-  const sections: string[] = [];
-  if (input.extraBody?.trim()) sections.push(input.extraBody.trim());
-  if (input.summary) sections.push(`**CodeNod summary:** ${input.summary}`);
-  if (bodyEntries.length > 0) sections.push(`**Findings outside the diff:**\n${bodyEntries.join('\n')}`);
-  const body = sections.join('\n\n').slice(0, MAX_BODY_CHARS);
-  return { comments, body, inlineIds, bodyIds };
+  const prefixParts: string[] = [];
+  if (input.extraBody?.trim()) prefixParts.push(input.extraBody.trim());
+  if (input.summary) prefixParts.push(`**CodeNod summary:** ${input.summary}`);
+  const prefix = prefixParts.join('\n\n');
+  if (prefix.length > MAX_BODY_CHARS) return { comments, body: prefix.slice(0, MAX_BODY_CHARS), inlineIds, bodyIds: [] };
+  const includedLines: string[] = [];
+  const includedIds: string[] = [];
+  for (let index = 0; index < bodyEntries.length; index++) {
+    const findingsBlock = `**Findings outside the diff:**\n${[...includedLines, bodyEntries[index]].join('\n')}`;
+    const candidate = prefix ? `${prefix}\n\n${findingsBlock}` : findingsBlock;
+    if (candidate.length > MAX_BODY_CHARS) break;
+    includedLines.push(bodyEntries[index]);
+    includedIds.push(bodyIds[index]);
+  }
+  const body = includedLines.length === 0 ? prefix : prefix ? `${prefix}\n\n**Findings outside the diff:**\n${includedLines.join('\n')}` : `**Findings outside the diff:**\n${includedLines.join('\n')}`;
+  return { comments, body, inlineIds, bodyIds: includedIds };
 }
 
 export class StaleReviewError extends Error {
@@ -94,7 +104,7 @@ export function createPoster(deps: { store: Store; github: GitHubClient }) {
         body: payload.body || (input.event === 'APPROVE' ? 'Approved after CodeNod review.' : 'CodeNod review'),
         comments: payload.comments
       });
-      deps.store.markFindingsPosted(findings.map((finding) => finding.id));
+      deps.store.markFindingsPosted([...payload.inlineIds, ...payload.bodyIds]);
       deps.store.recordPostedReview({
         reviewId: review.id,
         event: input.event,

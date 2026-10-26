@@ -101,8 +101,9 @@ export function parseRepoRef(raw: string, defaultHost = DEFAULT_HOST): RepoRef {
 export function repoFromRemoteUrl(remote: string): RepoRef | null {
   const trimmed = remote.trim().replace(/\.git$/, '');
   const https = trimmed.match(/^https?:\/\/(?:[^@/]+@)?([^/]+)\/([^/]+)\/([^/]+)$/);
-  const ssh = trimmed.match(/^(?:ssh:\/\/)?(?:[^@]+@)?([^:/]+)[:/]([^/]+)\/([^/]+)$/);
-  const match = https ?? ssh;
+  const sshUrl = trimmed.match(/^ssh:\/\/(?:[^@/]+@)?([^/]+)\/([^/]+)\/([^/]+)$/);
+  const scp = trimmed.match(/^[^@/]+@([^:/]+):([^/]+)\/([^/]+)$/);
+  const match = https ?? sshUrl ?? scp;
   if (!match) return null;
   try {
     return { host: normalizeHost(match[1]), owner: match[2], name: match[3] };

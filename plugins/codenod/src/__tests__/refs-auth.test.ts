@@ -20,8 +20,10 @@ describe('refs', () => {
     expect(parseRepoRef('acme/api')).toEqual({ host: 'github.com', owner: 'acme', name: 'api' });
     expect(parseRepoRef('https://git.example.com/acme/api.git')).toEqual({ host: 'git.example.com', owner: 'acme', name: 'api' });
     expect(repoFromRemoteUrl('git@git.example.com:acme/api.git')).toEqual({ host: 'git.example.com', owner: 'acme', name: 'api' });
+    expect(repoFromRemoteUrl('ssh://git@github.com/acme/api.git')).toEqual({ host: 'github.com', owner: 'acme', name: 'api' });
     expect(repoFromRemoteUrl('https://user@github.com/acme/api')).toEqual({ host: 'github.com', owner: 'acme', name: 'api' });
     expect(repoFromRemoteUrl('/local/path')).toBeNull();
+    expect(repoFromRemoteUrl('a/b/c')).toBeNull();
   });
 
   it('builds API base URLs for github.com and enterprise hosts', () => {

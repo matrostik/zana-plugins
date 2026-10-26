@@ -525,6 +525,14 @@ describe('views', () => {
       latestReviewsByPr: () => new Map(reviews.map((row) => [row.prId, row])),
       listRuns: (reviewId: string) => (data.runs ?? []).filter((row) => row.reviewId === reviewId),
       listFindings: (reviewId: string) => (data.findings ?? []).filter((row) => row.reviewId === reviewId),
+      countUndismissedFindings: (reviewIds: readonly string[]) => {
+        const counts = new Map<string, number>();
+        for (const reviewId of reviewIds) {
+          const count = (data.findings ?? []).filter((row) => row.reviewId === reviewId && !row.dismissed).length;
+          if (count > 0) counts.set(reviewId, count);
+        }
+        return counts;
+      },
       listPostedReviews: () => data.posted ?? []
     } as unknown as Store;
   }
