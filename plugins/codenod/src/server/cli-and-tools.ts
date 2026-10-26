@@ -263,7 +263,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
   agents.registerTool({
     name: 'codenod_review_pr',
     description:
-      'Start a CodeNod AI review of a pull request using the configured (or given) Zana models. Reviews are read-only; this tool never posts to GitHub. Returns the review id and status; use codenod_get_review to read results.',
+      'Start a CodeNod AI review of a pull request using the configured (or given) Zana models. This tool never posts to GitHub. Returns the review id and status; use codenod_get_review to read results.',
     parameters: {
       type: 'object',
       properties: {

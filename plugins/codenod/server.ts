@@ -7,7 +7,7 @@ import { DEFAULT_HOST, parseHostList, parsePrId, parsePrRef, parseRepoRef, prId,
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
-import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, type ThreadsApi } from './src/server/review/runner.ts';
+import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, type ThreadsApi } from './src/server/review/runner.ts';
 import { fetchPullRequestHead } from './src/server/review/workspace.ts';
 import { CHANGED_EVENT, createReviewService, type ReviewConfig } from './src/server/review/service.ts';
 import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
@@ -343,6 +343,14 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const providers = (await zcc.sdk.providers.list()).filter((provider) => provider.available);
     return Promise.all(
       providers.map(async (provider) => {
+        if (!pickReviewPermissionMode(provider.capabilities?.permissionModes)) {
+          return {
+            providerId: provider.id,
+            displayName: provider.displayName ?? provider.id,
+            error: 'Unavailable for reviews: this provider has no full-access permission mode.',
+            models: []
+          };
+        }
         const catalog = await zcc.sdk.providers.models({ providerId: provider.id }).catch((error) => ({
           models: [],
           selectedOnlyModels: [],

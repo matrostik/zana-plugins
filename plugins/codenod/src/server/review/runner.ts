@@ -201,17 +201,10 @@ export async function runModelInThread(threads: ThreadsApi, waiter: ThreadWaiter
 
 export const FULL_ACCESS_PERMISSION_MODE = 'full';
 
-const READ_ONLY_PERMISSION_PREFERENCE = ['read-only', 'readonly', 'readOnly', 'plan'];
-
 /**
- * Returns an enforceable read-only permission mode.
- * Undefined means the provider cannot prove the thread is read-only; callers must not fall back to a default.
+ * Returns the provider's full-access permission mode so automated reviews never stop on an approval prompt.
+ * Undefined means the provider cannot run unattended; callers must not fall back to a default.
  */
-export function pickReadOnlyPermissionMode(modes: readonly string[] | undefined): string | undefined {
-  if (!modes || modes.length === 0) return undefined;
-  for (const preferred of READ_ONLY_PERMISSION_PREFERENCE) {
-    const match = modes.find((mode) => mode.toLowerCase() === preferred.toLowerCase());
-    if (match) return match;
-  }
-  return undefined;
+export function pickReviewPermissionMode(modes: readonly string[] | undefined): string | undefined {
+  return modes?.find((mode) => mode.toLowerCase() === FULL_ACCESS_PERMISSION_MODE);
 }

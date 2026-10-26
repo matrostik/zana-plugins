@@ -5,7 +5,7 @@ Triage and AI-review GitHub pull requests in Zana Command Center using the AI pr
 ## What you get
 
 - **Review Inbox**: A sidebar page with three lists — **Needs my review**, **Mine**, and **Watched** — showing CI state and the latest review for each pull request in repositories you watch. Works with github.com and GitHub Enterprise hosts at the same time.
-- **Multi-Model AI Review**: Each selected model reviews the pull request in its own hidden, read-only Zana thread. When the repository is a Zana project, the review runs in a fresh worktree so the model can read surrounding code; otherwise it reviews the diff alone.
+- **Multi-Model AI Review**: Each selected model reviews the pull request in its own hidden, full-access Zana thread, so reviews run without approval prompts. When the repository is a Zana project, the review runs in a fresh worktree so the model can read surrounding code; otherwise it reviews the diff alone.
 - **Scores and Findings**: Risk, test coverage, requirements, simplicity, and stability scores, plus security, performance, logic, and style findings. Findings that several models agree on are merged and ranked higher.
 - **Requirements from GitHub**: Requirements come from the pull request title and description, up to three linked issues, and an optional spec file pattern per repository.
 - **Post to GitHub**: Post selected findings as inline review comments. Approving or requesting changes asks for your explicit sign-off and is refused once new commits arrive.

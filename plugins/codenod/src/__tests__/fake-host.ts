@@ -50,6 +50,7 @@ export interface FakeHostOptions {
   /** Produces the assistant reply for a spawned or follow-up prompt. */
   reply?: (thread: FakeThread, prompt: string) => string;
   projects?: Array<{ id: string; name: string; path?: string }>;
+  providers?: Array<{ id: string; available: boolean; displayName?: string; capabilities?: { permissionModes?: string[] } }>;
   consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>;
 }
 
@@ -148,7 +149,8 @@ export function createFakeHost(options: FakeHostOptions = {}) {
         }
       },
       providers: {
-        list: async () => [{ id: 'claude-code', available: true, displayName: 'Claude Code', capabilities: { permissionModes: ['read-only', 'accept-edits', 'auto', 'full'] } }],
+        list: async () =>
+          options.providers ?? [{ id: 'claude-code', available: true, displayName: 'Claude Code', capabilities: { permissionModes: ['read-only', 'accept-edits', 'auto', 'full'] } }],
         models: async () => ({
           models: [{ id: 'opus', model: 'Opus', supportedReasoningEfforts: [{ reasoningEffort: 'high' }] }],
           selectedOnlyModels: [],

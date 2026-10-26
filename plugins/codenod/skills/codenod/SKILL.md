@@ -32,7 +32,7 @@ Run `zcc codenod models` to see the `provider:model` ids accepted by `--models`.
 
 - `codenod_list_prs` — open pull requests with CI state and latest review status; optional `tab`.
 - `codenod_get_review` — scores (risk, coverage, requirements, simplicity, stability), summary, per-model runs, and findings for `pr`.
-- `codenod_review_pr` — start a read-only review of `pr`; optional `models` and `wait`. It never posts to GitHub.
+- `codenod_review_pr` — start an unattended AI review of `pr`; optional `models` and `wait`. It never posts to GitHub.
 
 ## Reading Results
 

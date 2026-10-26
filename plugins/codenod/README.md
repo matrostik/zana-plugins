@@ -46,7 +46,7 @@ Use **Deep Review in thread** to open a normal, visible Zana thread with the pul
 
 ## Safety
 
-- Reviews run in hidden Zana threads using the most read-only permission mode each provider offers. When the repository is a Zana project, the review gets its own fresh worktree, so your working copy is never touched. Otherwise the model reviews the diff only.
+- Reviews run unattended in hidden Zana threads with each provider's full-access permission mode, so they never stop on an approval prompt. Providers without a full-access mode can't be used for reviews. When the repository is a Zana project, the review gets its own fresh worktree, so your working copy is never touched. Otherwise the model reviews the diff only.
 - Pull request text, comments, and linked issues are treated as untrusted input and sanitized before they reach the model.
 - Posting comments takes an explicit click (or `--yes` on the command line).
 - Approve and Request changes need a Zana-signed confirmation tied to the exact commit you reviewed. They are refused if new commits arrived since the review. Agents and the command line cannot approve.

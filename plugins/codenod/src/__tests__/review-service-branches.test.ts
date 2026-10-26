@@ -7,7 +7,7 @@ import { createProjectMatcher, type ProjectMatcher, type ZanaProject } from '../
 import {
   createThreadWaiter,
   DEFAULT_POLL_MS,
-  pickReadOnlyPermissionMode,
+  pickReviewPermissionMode,
   runModelInThread,
   type RunModelInput,
   type ThreadsApi,
@@ -329,13 +329,13 @@ describe('runModelInThread', () => {
   });
 });
 
-describe('pickReadOnlyPermissionMode', () => {
-  it('picks an enforceable read-only mode and refuses permissive fallbacks', () => {
-    expect(pickReadOnlyPermissionMode(undefined)).toBeUndefined();
-    expect(pickReadOnlyPermissionMode([])).toBeUndefined();
-    expect(pickReadOnlyPermissionMode(['accept-edits', 'auto', 'full'])).toBeUndefined();
-    expect(pickReadOnlyPermissionMode(['accept-edits', 'Read-Only', 'full'])).toBe('Read-Only');
-    expect(pickReadOnlyPermissionMode(['auto', 'plan'])).toBe('plan');
+describe('pickReviewPermissionMode', () => {
+  it('picks the full-access mode and refuses anything that could prompt for approval', () => {
+    expect(pickReviewPermissionMode(undefined)).toBeUndefined();
+    expect(pickReviewPermissionMode([])).toBeUndefined();
+    expect(pickReviewPermissionMode(['read-only', 'accept-edits', 'auto'])).toBeUndefined();
+    expect(pickReviewPermissionMode(['read-only', 'accept-edits', 'full'])).toBe('full');
+    expect(pickReviewPermissionMode(['accept-edits', 'Full'])).toBe('Full');
   });
 });
 
@@ -539,7 +539,7 @@ describe('review service', () => {
         if (model === 'gpt') throw new Error('provider crashed');
         return VALID_REPLY;
       },
-      permissionModes: async (providerId) => (providerId === 'codex' ? ['full'] : ['read-only', 'full']),
+      permissionModes: async (providerId) => (providerId === 'codex' ? ['read-only', 'accept-edits'] : ['read-only', 'full']),
       notify
     });
 
@@ -549,11 +549,11 @@ describe('review service', () => {
     expect(store.getReview(review.id)).toMatchObject({ status: 'completed', summary: 'Review by risk 7', consensusSummary: null, riskScore: 7 });
     expect(store.listRuns(review.id).map((run) => [run.model, run.status, run.error])).toEqual([
       ['opus', 'completed', null],
-      ['gpt', 'failed', 'Provider codex has no read-only permission mode for automated reviews']
+      ['gpt', 'failed', 'Provider codex has no full-access permission mode for automated reviews']
     ]);
-    expect(spawned.map((thread) => thread.args.permissionMode)).toEqual(['read-only']);
+    expect(spawned.map((thread) => thread.args.permissionMode)).toEqual(['full']);
     expect(log.warn).toHaveBeenCalledWith(
-      'codenod: codex/gpt failed on github.com/acme/api#4: Provider codex has no read-only permission mode for automated reviews'
+      'codenod: codex/gpt failed on github.com/acme/api#4: Provider codex has no full-access permission mode for automated reviews'
     );
     expect(notify).toHaveBeenCalledWith({ projectId: 'home', text: expect.stringContaining('1 finding(s), 1 high or critical · 1/2 model(s) succeeded') });
   });
@@ -593,7 +593,7 @@ describe('review service', () => {
     expect(threads.send).toHaveBeenCalledTimes(1);
     expect(threads.send.mock.calls[0][0].prompt).toContain('could not be used');
     expect(store.getReview(review.id)).toMatchObject({ status: 'failed', error: 'Model reply was not usable: the reply did not contain a valid JSON object' });
-    expect(spawned[0].args.permissionMode).toBe('read-only');
+    expect(spawned[0].args.permissionMode).toBe('full');
   });
 
   it('summarizes agreement when several models succeed', async () => {
@@ -696,7 +696,7 @@ describe('review service', () => {
 
     expect(store.latestReview(prId(prRef()))).toMatchObject({ status: 'completed', headSha: 'sha2' });
     expect(spawned).toHaveLength(1);
-    expect(spawned[0].args.permissionMode).toBe('read-only');
+    expect(spawned[0].args.permissionMode).toBe('full');
   });
 
   it('uses the matched project checkout directly in project mode', async () => {

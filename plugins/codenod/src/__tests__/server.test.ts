@@ -160,7 +160,7 @@ describe('codenod server', () => {
 
     const threads = [...host.threads.values()];
     expect(threads).toHaveLength(2);
-    expect(threads.every((thread) => thread.args.visibility === 'hidden' && thread.args.permissionMode === 'read-only' && thread.archived)).toBe(true);
+    expect(threads.every((thread) => thread.args.visibility === 'hidden' && thread.args.permissionMode === 'full' && thread.archived)).toBe(true);
     expect(threads[1].args.reasoningLevel).toBe('high');
     expect(threads[1].sent[0]).toContain('could not be used');
     const prompt = String(threads[0].args.prompt);
@@ -256,6 +256,21 @@ describe('codenod server', () => {
     const second = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (detail) => detail.review?.headSha === 'sha2' && detail.review.status === 'completed');
     expect(second.review?.trigger).toBe('auto');
     expect(host.threads.size).toBe(2);
+  });
+
+  it('offers no models from providers that cannot run with full access', async () => {
+    const host = createFakeHost({
+      providers: [
+        { id: 'claude-code', available: true, displayName: 'Claude Code', capabilities: { permissionModes: ['read-only', 'full'] } },
+        { id: 'restricted', available: true, displayName: 'Restricted', capabilities: { permissionModes: ['read-only', 'accept-edits'] } }
+      ]
+    });
+    await createCodenodPlugin(host.zcc, { run, fetch: githubFixture({ headSha: 'sha1' }).fetch as unknown as FetchLike, pollMs: 10 });
+
+    const providers = (await host.callRpc('availableModels')) as Array<{ providerId: string; error: string | null; models: unknown[] }>;
+
+    expect(providers.find((provider) => provider.providerId === 'claude-code')).toMatchObject({ error: null, models: [{ id: 'opus' }] });
+    expect(providers.find((provider) => provider.providerId === 'restricted')).toMatchObject({ error: expect.stringMatching(/full-access/), models: [] });
   });
 
   it('exposes CLI commands and read-only agent tools', async () => {

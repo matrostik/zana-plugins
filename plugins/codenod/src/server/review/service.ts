@@ -8,7 +8,7 @@ import { aggregateScores, clusterIssues, dedupeIssues, type TaggedIssue } from '
 import { gatherReviewContext } from './context.ts';
 import { parseAnalysis } from './parse.ts';
 import { getConsensusPrompt, getFullReviewPrompt, getRepairPrompt, hasRequirementsContext } from './prompts.ts';
-import { pickReadOnlyPermissionMode, runModelInThread, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from './runner.ts';
+import { pickReviewPermissionMode, runModelInThread, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from './runner.ts';
 
 export type WorkspaceMode = 'worktree' | 'project' | 'diff-only';
 
@@ -115,8 +115,8 @@ export function createReviewService(deps: ReviewServiceDeps) {
           ? { ...workspace.environment, branchSlug: `${workspace.environment.branchSlug}-${run.id.slice(0, 6)}-${index}` }
           : workspace.environment;
         try {
-          const permissionMode = pickReadOnlyPermissionMode(await deps.providerPermissionModes(model.providerId).catch(() => undefined));
-          if (!permissionMode) throw new Error(`Provider ${model.providerId} has no read-only permission mode for automated reviews`);
+          const permissionMode = pickReviewPermissionMode(await deps.providerPermissionModes(model.providerId).catch(() => undefined));
+          if (!permissionMode) throw new Error(`Provider ${model.providerId} has no full-access permission mode for automated reviews`);
           const result = await runModelInThread(deps.threads, deps.waiter, {
             projectId: workspace.projectId,
             environment,
