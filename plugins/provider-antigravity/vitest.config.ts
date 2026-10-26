@@ -1,4 +1,4 @@
-import { defineConfig } from '../../../zana/node_modules/vitest/dist/config.js';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {

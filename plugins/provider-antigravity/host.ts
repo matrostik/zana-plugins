@@ -1,15 +1,17 @@
 import { experimental_acpProviderBridge } from '@zana-ai/zcc-plugin-sdk/provider-bridge/acp';
 import { experimental_defineProviderBridge } from '@zana-ai/zcc-plugin-sdk/provider-bridge';
 import {
-  DEFAULT_NATIVE_MODELS,
   getFastNativeReadiness,
   isValidGoogleAuthMethod,
   prepareSanitizedGeminiHome,
-  type GoogleAcpAuthMethod
+  type DiscoveredNativeModel,
+  type GoogleAcpAuthMethod,
+  type NativeReadinessResult
 } from './src/native-auth.js';
 import {
   PINNED_NATIVE_ACP_VERSION,
-  resolveNativeAcpRuntime
+  resolveNativeAcpRuntime,
+  type ResolvedNativeRuntime
 } from './src/native-runtime.js';
 
 function buildDefaultNativeLaunchSpec(authMethod: GoogleAcpAuthMethod = 'oauth-personal') {
@@ -63,61 +65,80 @@ function enrichLaunchSpecEnv(spec: Record<string, any>, authMethod: GoogleAcpAut
   }
 }
 
+function resolveAuthMethod(providerOptions?: Record<string, any>): GoogleAcpAuthMethod {
+  return isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod)
+    ? providerOptions.antigravityAuthMethod
+    : 'oauth-personal';
+}
+
+function normalizeLaunchInOptionsContainer(
+  container: Record<string, any>,
+  authMethod: GoogleAcpAuthMethod
+): boolean {
+  if (!container.providerOptions) {
+    container.providerOptions = {
+      acpDialect: 'generic',
+      parameterizedModelPicker: true,
+      acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
+    };
+    return true;
+  }
+  const po = container.providerOptions;
+  if (!po.acpLaunchSpec) {
+    po.acpDialect = po.acpDialect || 'generic';
+    po.parameterizedModelPicker = true;
+    po.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
+    return true;
+  }
+  enrichLaunchSpecEnv(po.acpLaunchSpec, authMethod);
+  return true;
+}
+
 export function ensureLaunchSpec(params: any): boolean {
   if (!params || typeof params !== 'object') return false;
   let modified = false;
 
-  const resolveAuthMethod = (providerOptions?: Record<string, any>): GoogleAcpAuthMethod =>
-    isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod)
-      ? providerOptions.antigravityAuthMethod
-      : 'oauth-personal';
-
   if (params.options && typeof params.options === 'object') {
     const authMethod = resolveAuthMethod(params.options.providerOptions);
-    if (!params.options.providerOptions) {
-      params.options.providerOptions = {
-        acpDialect: 'generic',
-        parameterizedModelPicker: true,
-        acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
-      };
-      modified = true;
-    } else if (!params.options.providerOptions.acpLaunchSpec) {
-      params.options.providerOptions.acpDialect =
-        params.options.providerOptions.acpDialect || 'generic';
-      params.options.providerOptions.parameterizedModelPicker = true;
-      params.options.providerOptions.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
-      modified = true;
-    } else {
-      enrichLaunchSpecEnv(params.options.providerOptions.acpLaunchSpec, authMethod);
-      modified = true;
-    }
+    modified = normalizeLaunchInOptionsContainer(params.options, authMethod) || modified;
   }
 
   const rootAuthMethod = resolveAuthMethod(
     params.providerOptions ?? params.options?.providerOptions
   );
-  if (!params.providerOptions) {
-    params.providerOptions = {
-      acpDialect: 'generic',
-      parameterizedModelPicker: true,
-      acpLaunchSpec: buildDefaultNativeLaunchSpec(rootAuthMethod)
-    };
-    modified = true;
-  } else if (!params.providerOptions.acpLaunchSpec) {
-    params.providerOptions.acpDialect = params.providerOptions.acpDialect || 'generic';
-    params.providerOptions.parameterizedModelPicker = true;
-    params.providerOptions.acpLaunchSpec = buildDefaultNativeLaunchSpec(rootAuthMethod);
-    modified = true;
-  } else {
-    enrichLaunchSpecEnv(params.providerOptions.acpLaunchSpec, rootAuthMethod);
-    modified = true;
-  }
-
+  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod) || modified;
   return modified;
 }
 
 function writeBridgeJsonRpc(payload: Record<string, unknown>): void {
   process.stdout.write(JSON.stringify(payload) + '\n');
+}
+
+function sendHealthResponse(
+  id: string | number,
+  status: 'not_installed' | 'unauthenticated' | 'ready',
+  statusMessage: string | null,
+  planLabel: string | null,
+  version: string | null
+): void {
+  writeBridgeJsonRpc({
+    jsonrpc: '2.0',
+    id,
+    result: {
+      supported: true,
+      health: {
+        status,
+        statusMessage,
+        accountEmail: null,
+        planLabel,
+        installedVersion: version,
+        minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
+        canInstall: false,
+        canUpdate: false,
+        loginCommand: null
+      }
+    }
+  });
 }
 
 function handleNativeProviderHealth(id: string | number, params: any): void {
@@ -128,36 +149,14 @@ function handleNativeProviderHealth(id: string | number, params: any): void {
   });
 
   if (!runtime.installed) {
-    writeBridgeJsonRpc({
-      jsonrpc: '2.0',
-      id,
-      result: {
-        supported: true,
-        health: {
-          status: 'not_installed',
-          statusMessage:
-            !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0
-              ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(', ')}`
-              : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
-          accountEmail: null,
-          planLabel: null,
-          installedVersion: null,
-          minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
-          canInstall: false,
-          canUpdate: false,
-          loginCommand: null
-        }
-      }
-    });
+    const msg = !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0
+      ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(', ')}`
+      : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
+    sendHealthResponse(id, 'not_installed', msg, null, null);
     return;
   }
 
-  const authMethod: GoogleAcpAuthMethod = isValidGoogleAuthMethod(
-    providerOptions?.antigravityAuthMethod
-  )
-    ? providerOptions.antigravityAuthMethod
-    : 'oauth-personal';
-
+  const authMethod = resolveAuthMethod(providerOptions);
   const readiness = getFastNativeReadiness({
     command: runtime.executable,
     args: runtime.args,
@@ -165,44 +164,67 @@ function handleNativeProviderHealth(id: string | number, params: any): void {
   });
 
   if (readiness.state === 'sign_in_required') {
+    const msg = 'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.';
+    sendHealthResponse(id, 'unauthenticated', msg, null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+    return;
+  }
+
+  sendHealthResponse(id, 'ready', null, readiness.tierName ?? null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+}
+
+function mapDiscoveredModels(models: DiscoveredNativeModel[]) {
+  return models.map((m, idx) => {
+    const isSingleMedium = m.id.startsWith('gpt-oss-120b');
+    return {
+      id: m.id,
+      model: m.id,
+      displayName: m.name,
+      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
+      supportedReasoningEfforts: isSingleMedium
+        ? [{ reasoningEffort: 'medium', description: 'Default reasoning effort' }]
+        : [
+            { reasoningEffort: 'low', description: 'Low reasoning effort' },
+            { reasoningEffort: 'medium', description: 'Medium reasoning effort' },
+            { reasoningEffort: 'high', description: 'High reasoning effort' }
+          ],
+      defaultReasoningEffort: 'medium',
+      isDefault: idx === 0
+    };
+  });
+}
+
+function sendModelListError(
+  id: string | number,
+  readiness: NativeReadinessResult
+): void {
+  if (readiness.state === 'sign_in_required') {
+    const authMessage =
+      readiness.error ||
+      'Google Antigravity Native ACP is not authenticated. Open Settings → Antigravity Provider to sign in.';
     writeBridgeJsonRpc({
       jsonrpc: '2.0',
       id,
-      result: {
-        supported: true,
-        health: {
-          status: 'unauthenticated',
-          statusMessage:
-            'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.',
-          accountEmail: null,
-          planLabel: null,
-          installedVersion: runtime.version ?? PINNED_NATIVE_ACP_VERSION,
-          minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
-          canInstall: false,
-          canUpdate: false,
-          loginCommand: null
+      error: {
+        code: -32000,
+        message: authMessage,
+        data: {
+          recovery: {
+            kind: 'authRequired',
+            message: authMessage,
+            retryable: false
+          }
         }
       }
     });
     return;
   }
-
   writeBridgeJsonRpc({
     jsonrpc: '2.0',
     id,
-    result: {
-      supported: true,
-      health: {
-        status: 'ready',
-        statusMessage: null,
-        accountEmail: null,
-        planLabel: readiness.tierName ?? null,
-        installedVersion: runtime.version ?? PINNED_NATIVE_ACP_VERSION,
-        minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
-        canInstall: false,
-        canUpdate: false,
-        loginCommand: null
-      }
+    error: {
+      code: -32000,
+      message:
+        'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings → Antigravity Provider.'
     }
   });
 }
@@ -226,88 +248,84 @@ function handleNativeModelList(id: string | number, params: any): void {
     return;
   }
 
-  const authMethod: GoogleAcpAuthMethod = isValidGoogleAuthMethod(
-    providerOptions?.antigravityAuthMethod
-  )
-    ? providerOptions.antigravityAuthMethod
-    : 'oauth-personal';
-
+  const authMethod = resolveAuthMethod(providerOptions);
   const readiness = getFastNativeReadiness({
     command: runtime.executable,
     args: runtime.args,
     authMethod
   });
 
-  if (readiness.state === 'sign_in_required') {
-    const authMessage =
-      readiness.error ||
-      'Google Antigravity Native ACP is not authenticated. Open Settings → Antigravity Provider to sign in.';
-    writeBridgeJsonRpc({
-      jsonrpc: '2.0',
-      id,
-      error: {
-        code: -32000,
-        message: authMessage,
-        data: {
-          recovery: {
-            kind: 'authRequired',
-            message: authMessage,
-            retryable: false
-          }
-        }
-      }
-    });
+  if (readiness.state === 'sign_in_required' || readiness.models.length === 0) {
+    sendModelListError(id, readiness);
     return;
   }
-
-  const modelsToUse =
-    readiness.models.length > 0 ? readiness.models : DEFAULT_NATIVE_MODELS;
-
-  const mappedModels = modelsToUse.map((m, idx) => {
-    const isSingleMedium = m.id.startsWith('gpt-oss-120b');
-    return {
-      id: m.id,
-      model: m.id,
-      displayName: m.name,
-      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts: isSingleMedium
-        ? [{ reasoningEffort: 'medium', description: 'Default reasoning effort' }]
-        : [
-            { reasoningEffort: 'low', description: 'Low reasoning effort' },
-            { reasoningEffort: 'medium', description: 'Medium reasoning effort' },
-            { reasoningEffort: 'high', description: 'High reasoning effort' }
-          ],
-      defaultReasoningEffort: 'medium',
-      isDefault: idx === 0
-    };
-  });
 
   writeBridgeJsonRpc({
     jsonrpc: '2.0',
     id,
     result: {
-      models: mappedModels,
+      models: mapDiscoveredModels(readiness.models),
       selectedOnlyModels: []
     }
   });
 }
 
+export function isLegacyAgyThreadResume(msg: any): string | null {
+  if (!msg || msg.method !== 'thread/resume' || !msg.params) return null;
+  const providerThreadId = msg.params.providerThreadId;
+  if (typeof providerThreadId === 'string' && providerThreadId.startsWith('agy-')) {
+    return providerThreadId;
+  }
+  return null;
+}
+
 export function transformLegacyResumeForNative(msg: any): {
   rewritten: boolean;
+  migrationRequired: boolean;
+  legacyProviderThreadId?: string;
 } {
-  if (!msg || msg.method !== 'thread/resume' || !msg.params) {
-    return { rewritten: false };
+  const legacyId = isLegacyAgyThreadResume(msg);
+  if (!legacyId) {
+    return { rewritten: false, migrationRequired: false };
   }
-  const providerThreadId = msg.params.providerThreadId;
-  if (typeof providerThreadId !== 'string' || !providerThreadId.startsWith('agy-')) {
-    return { rewritten: false };
-  }
-
-  // Convert legacy synthetic CLI session resume into a fresh native session start
-  delete msg.params.providerThreadId;
-  msg.method = 'thread/start';
-  return { rewritten: true };
+  return {
+    rewritten: false,
+    migrationRequired: true,
+    legacyProviderThreadId: legacyId
+  };
 }
+
+function dispatchBridgeMessage(msg: any): boolean {
+  if (msg.method === 'provider/health' && msg.id !== undefined) {
+    handleNativeProviderHealth(msg.id, msg.params);
+    return true;
+  }
+  if (msg.method === 'model/list' && msg.id !== undefined) {
+    handleNativeModelList(msg.id, msg.params);
+    return true;
+  }
+  if (msg.method === 'thread/resume') {
+    const legacyId = isLegacyAgyThreadResume(msg);
+    if (legacyId) {
+      writeBridgeJsonRpc({
+        jsonrpc: '2.0',
+        id: msg.id,
+        error: {
+          code: -32000,
+          message: `Resuming legacy Antigravity CLI session "${legacyId}" is not supported by Google Antigravity Native ACP. Start a new thread with context handoff to continue in a native session.`,
+          data: {
+            migrationRequired: true,
+            legacyProviderThreadId: legacyId
+          }
+        }
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+export const realAcpBridge = experimental_acpProviderBridge;
 
 export const experimental_providerBridge = experimental_defineProviderBridge({
   handleLine: (line: string) => {
@@ -315,24 +333,9 @@ export const experimental_providerBridge = experimental_defineProviderBridge({
       const msg = JSON.parse(line);
       if (msg && msg.params) {
         const modifiedLaunch = ensureLaunchSpec(msg.params);
-
-        if (msg.method === 'provider/health' && msg.id !== undefined) {
-          handleNativeProviderHealth(msg.id, msg.params);
+        if (dispatchBridgeMessage(msg)) {
           return;
         }
-
-        if (msg.method === 'model/list' && msg.id !== undefined) {
-          handleNativeModelList(msg.id, msg.params);
-          return;
-        }
-
-        if (msg.method === 'thread/resume') {
-          const handoff = transformLegacyResumeForNative(msg);
-          if (handoff.rewritten) {
-            return experimental_acpProviderBridge.handleLine(JSON.stringify(msg));
-          }
-        }
-
         if (modifiedLaunch) {
           return experimental_acpProviderBridge.handleLine(JSON.stringify(msg));
         }

@@ -1,275 +1,37 @@
-function z(){return globalThis.__ZCC_PLUGIN_RUNTIME__??{}}function M(a){throw new Error(`${a} is not available until the host plugin runtime is installed`)}function _(a){return{__zccPluginApp:!0,setup:a}}function C(){return z().useRpc?.()??M("useRpc")}var t=globalThis.__ZCC_HOST_REACT__;var B=t.Children,J=t.Component,K=t.Fragment,W=t.StrictMode,Q=t.Suspense,Y=t.cloneElement,X=t.createContext,ee=t.createElement,te=t.createRef,ne=t.forwardRef,oe=t.isValidElement,re=t.lazy,ae=t.memo,se=t.startTransition,E=t.useCallback,ie=t.useContext,ce=t.useDebugValue,le=t.useDeferredValue,v=t.useEffect,de=t.useId,ue=t.useImperativeHandle,pe=t.useInsertionEffect,me=t.useLayoutEffect,fe=t.useMemo,he=t.useReducer,ge=t.useRef,m=t.useState,be=t.useSyncExternalStore,ye=t.useTransition,ve=t.version;var P=`.agy-settings-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  padding: 1rem 0;
-  max-width: 680px;
-  color: var(--text-normal);
-}
-
-.agy-status-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-  padding: 1.25rem;
-  background-color: var(--background-card, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-md, 8px);
-}
-
-.agy-status-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.agy-status-title-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.agy-actions-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.agy-status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.agy-status-indicator.ready {
-  background-color: #22c55e;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-}
-
-.agy-status-indicator.warning {
-  background-color: #eab308;
-  box-shadow: 0 0 8px rgba(234, 179, 8, 0.4);
-}
-
-.agy-status-indicator.checking {
-  background-color: #60a5fa;
-  animation: agy-pulse 1.5s infinite;
-}
-
-.agy-status-label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-normal);
-}
-
-.agy-version-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
-  font-family: monospace;
-  background-color: var(--background-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: var(--radius-sm, 4px);
-  color: var(--text-muted);
-}
-
-.agy-backend-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  background-color: rgba(96, 165, 250, 0.15);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  border-radius: var(--radius-sm, 4px);
-  color: #93c5fd;
-}
-
-.agy-state-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: var(--radius-sm, 4px);
-  background-color: var(--background-subtle, rgba(255, 255, 255, 0.08));
-  color: var(--text-muted);
-}
-
-.agy-state-pill.state-session_ready,
-.agy-state-pill.state-authenticated {
-  background-color: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-}
-
-.agy-state-pill.state-sign_in_required,
-.agy-state-pill.state-runtime_launches {
-  background-color: rgba(234, 179, 8, 0.15);
-  color: #facc15;
-}
-
-.agy-state-pill.state-runtime_missing {
-  background-color: rgba(248, 113, 113, 0.15);
-  color: #f87171;
-}
-
-.agy-readiness-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-
-.agy-readiness-step {
-  font-size: 0.72rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-sm, 4px);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  color: var(--text-muted);
-  opacity: 0.65;
-}
-
-.agy-readiness-step.passed {
-  border-color: rgba(34, 197, 94, 0.35);
-  color: #86efac;
-  opacity: 0.9;
-}
-
-.agy-readiness-step.active {
-  border-color: rgba(96, 165, 250, 0.5);
-  background-color: rgba(96, 165, 250, 0.12);
-  color: var(--text-normal);
-  font-weight: 600;
-  opacity: 1;
-}
-
-.agy-models-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.375rem;
-}
-
-.agy-desc {
-  margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--text-muted);
-}
-
-.agy-desc-error {
-  color: #f87171;
-}
-
-.agy-desc-note {
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm, 6px);
-  background-color: rgba(234, 179, 8, 0.08);
-  border: 1px solid rgba(234, 179, 8, 0.25);
-  color: #fde047;
-}
-
-.agy-command-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.625rem 0.875rem;
-  background-color: var(--background-inset, rgba(0, 0, 0, 0.3));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: var(--radius-sm, 6px);
-  margin-top: 0.5rem;
-}
-
-.agy-command-text {
-  font-family: monospace;
-  font-size: 0.825rem;
-  color: var(--text-accent, #93c5fd);
-  word-break: break-all;
-}
-
-.agy-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  border-radius: var(--radius-sm, 5px);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
-  background-color: var(--background-button, rgba(255, 255, 255, 0.08));
-  color: var(--text-normal);
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-}
-
-.agy-btn-primary {
-  background-color: rgba(59, 130, 246, 0.22);
-  border-color: rgba(96, 165, 250, 0.45);
-}
-
-.agy-btn:hover:not(:disabled) {
-  background-color: var(--background-button-hover, rgba(255, 255, 255, 0.14));
-  border-color: var(--border-hover, rgba(255, 255, 255, 0.25));
-}
-
-.agy-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.agy-steps-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.25rem;
-  background-color: var(--background-card, rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
-  border-radius: var(--radius-md, 8px);
-}
-
-.agy-steps-title {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-normal);
-}
-
-.agy-steps-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: var(--text-muted);
-}
-
-.agy-steps-list li {
-  margin-bottom: 0.375rem;
-}
-
-.agy-steps-list code {
-  font-family: monospace;
-  font-size: 0.8rem;
-  padding: 0.1rem 0.3rem;
-  background-color: var(--background-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: var(--radius-sm, 3px);
-  color: var(--text-normal);
-}
-
-@keyframes agy-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(0.9);
-  }
-}
-`;var k=globalThis.__ZCC_HOST_REACT__,xe=k.Fragment;function e(a,s,f){return k.createElement(a,f===void 0?s:{...s,key:f})}var r=e;var N="provider-antigravity-styles";function H(){if(typeof document>"u"||document.getElementById(N))return;let a=document.createElement("style");a.id=N,a.textContent=P,document.head.appendChild(a)}var w={runtime_missing:"Runtime Missing",runtime_launches:"Runtime Launches",sign_in_required:"Sign-In Required",authenticated:"Authenticated",session_ready:"Session Ready"},A=["runtime_missing","runtime_launches","sign_in_required","authenticated","session_ready"];function U(){let a=C(),[s,f]=m(!1),[i,c]=m(null),[x,l]=m(null),[o,p]=m(null),[R,S]=m(null);v(()=>{H()},[]);let g=E(async(n=!1)=>{f(!0),l(null);try{let u=await a.call("doctor:status",n?{probeNative:!0,forceRefresh:!0}:null);p(u)}catch(u){p({installed:!1,authenticated:!1,ready:!1,version:null,pinnedVersion:"1.4.3",previousVersion:null,source:"uninstalled",executable:"agy_acp_server",companionFilesPresent:!1,missingCompanionFiles:[],state:"runtime_missing",authMethod:"oauth-personal",configuredAuthType:null,pendingAuthUrl:null,models:[],modes:[],tierName:null,disabledDeadMcpServers:[],error:u?.message||"Failed to communicate with plugin server."})}finally{f(!1)}},[a]);v(()=>{g(!1)},[g]);let T=async()=>{c("install"),l(null);try{let n=await a.call("runtime:install");p(n)}catch(n){l(n?.message||"Failed to install Google Native ACP runtime.")}finally{c(null)}},I=async()=>{c("rollback"),l(null);try{let n=await a.call("runtime:rollback");p(n)}catch(n){l(n?.message||"Failed to roll back Native ACP runtime.")}finally{c(null)}},$=async()=>{c("login"),l(null);try{let n=await a.call("auth:login");p(n)}catch(n){l(n?.message||"Interactive Google sign-in failed.")}finally{c(null)}},j=async()=>{c("logout"),l(null);try{let n=await a.call("auth:logout");p(n)}catch(n){l(n?.message||"Failed to clear native ACP authentication.")}finally{c(null)}},L=async()=>{c("probe"),await g(!0),c(null)},D=(n,u)=>{typeof navigator<"u"&&navigator.clipboard&&(navigator.clipboard.writeText(n),S(u),setTimeout(()=>S(null),2e3))},d=o?.state??"runtime_missing",b=o?.installed===!0,y=d==="session_ready"||d==="authenticated",h=o?.pinnedVersion??"1.4.3",F=s?"Checking Antigravity Native ACP...":y?"Antigravity Native ACP Connected":`Antigravity Native ACP (${w[d]})`;return r("div",{className:"agy-settings-panel",children:[r("div",{className:"agy-status-card",children:[r("div",{className:"agy-status-header",children:[r("div",{className:"agy-status-title-row",children:[e("span",{className:`agy-status-indicator ${s||i?"checking":y?"ready":"warning"}`}),e("span",{className:"agy-status-label",children:F}),e("span",{className:"agy-version-tag",children:b?`v${o?.version??h}`:`Pinned v${h}`}),o?.tierName&&e("span",{className:"agy-backend-badge",children:o.tierName}),e("span",{className:`agy-state-pill state-${d}`,children:w[d]})]}),r("div",{className:"agy-actions-row",children:[e("button",{type:"button",className:"agy-btn",onClick:T,disabled:s||i!==null,children:i==="install"?"Installing...":b?`Reinstall Runtime (v${h})`:`Install Native ACP Runtime (v${h})`}),o?.previousVersion&&e("button",{type:"button",className:"agy-btn",onClick:I,disabled:s||i!==null,children:i==="rollback"?"Rolling back...":`Rollback to v${o.previousVersion}`})]})]}),e("div",{className:"agy-readiness-steps",children:A.map(n=>{let u=A.indexOf(d),O=A.indexOf(n),V=n===d,q=O<u&&d!=="runtime_missing";return e("span",{className:`agy-readiness-step ${V?"active":q?"passed":""}`,children:w[n]},n)})}),r("p",{className:"agy-desc",children:["Runs Zana threads directly over Google's official Native ACP server (",e("code",{children:"agy_acp_server"})," + ",e("code",{children:"localharness_external"}),"). Auth method:"," ",e("code",{children:o?.authMethod??"oauth-personal"}),o?.configuredAuthType?` (configured: ${o.configuredAuthType})`:" (not yet configured)"]}),(o?.error||x)&&e("p",{className:"agy-desc agy-desc-error",children:x||o?.error}),b&&r("div",{className:"agy-actions-row",children:[e("button",{type:"button",className:"agy-btn agy-btn-primary",onClick:$,disabled:s||i!==null,children:i==="login"?"Waiting for Google Sign-In in Browser...":y?"Re-authenticate with Google":"Sign In with Google"}),e("button",{type:"button",className:"agy-btn",onClick:L,disabled:s||i!==null,children:i==="probe"?"Verifying Session...":"Verify Session & Models"}),o?.configuredAuthType&&e("button",{type:"button",className:"agy-btn",onClick:j,disabled:s||i!==null,children:"Clear Auth Selection"})]}),o?.pendingAuthUrl&&r("div",{children:[e("p",{className:"agy-desc",children:"If your browser did not open automatically, copy this OAuth link:"}),r("div",{className:"agy-command-box",children:[e("span",{className:"agy-command-text",children:o.pendingAuthUrl}),e("button",{type:"button",className:"agy-btn",onClick:()=>D(o.pendingAuthUrl,"oauth"),children:R==="oauth"?"Copied!":"Copy URL"})]})]}),o&&o.models.length>0&&r("div",{children:[r("p",{className:"agy-desc",children:["Available Native ACP models (",o.models.length,"):"]}),e("div",{className:"agy-models-list",children:o.models.map(n=>r("span",{className:"agy-version-tag",children:[n.name," (",n.id,")"]},n.id))})]}),o&&o.disabledDeadMcpServers.length>0&&r("p",{className:"agy-desc agy-desc-note",children:["Automatically bypassed unreachable IDE named-pipe MCP proxies (",e("code",{children:o.disabledDeadMcpServers.join(", ")}),") to prevent 38s prompt stalls."]})]}),r("div",{className:"agy-steps-card",children:[e("h4",{className:"agy-steps-title",children:"Quick Setup Guide"}),r("ol",{className:"agy-steps-list",children:[r("li",{children:["Click ",e("strong",{children:"Install Native ACP Runtime"})," above to download and verify Google's official SHA-256 ACP archive (",e("code",{children:"agy_acp_server"})," +"," ",e("code",{children:"localharness_external"}),")."]}),r("li",{children:["Select your ",e("strong",{children:"Google ACP authentication method"})," above (default:"," ",e("code",{children:"oauth-personal"}),") and click ",e("strong",{children:"Sign In with Google"}),"."]}),r("li",{children:["Start a new thread in Zana and select ",e("strong",{children:"Antigravity"})," as the provider."]})]})]})]})}var ke=_(a=>{a.slots.settingsSection({id:"antigravity-provider",title:"Antigravity Provider",description:"Configure Google Antigravity via Google Native ACP server (agy_acp_server)",component:U})});export{U as AntigravitySettingsSection,ke as default};
+function I(){return globalThis.__ZCC_PLUGIN_RUNTIME__??{}}function T(t){throw new Error(`${t} is not available until the host plugin runtime is installed`)}function g(t){return{__zccPluginApp:!0,setup:t}}function b(){return I().useRpc?.()??T("useRpc")}var a=globalThis.__ZCC_HOST_REACT__;var K=a.Children,B=a.Component,W=a.Fragment,Q=a.StrictMode,X=a.Suspense,Y=a.cloneElement,ee=a.createContext,te=a.createElement,ne=a.createRef,oe=a.forwardRef,ae=a.isValidElement,se=a.lazy,ie=a.memo,re=a.startTransition,v=a.useCallback,ce=a.useContext,le=a.useDebugValue,ue=a.useDeferredValue,f=a.useEffect,de=a.useId,pe=a.useImperativeHandle,me=a.useInsertionEffect,fe=a.useLayoutEffect,he=a.useMemo,ye=a.useReducer,w=a.useRef,m=a.useState,ge=a.useSyncExternalStore,be=a.useTransition,ve=a.version;var x=globalThis.__ZCC_HOST_REACT__,S=x.Fragment;function o(t,e,n){return x.createElement(t,n===void 0?e:{...e,key:n})}var i=o;var h={runtime_missing:"Runtime Missing",runtime_launches:"Runtime Installed",sign_in_required:"Sign-in Required",authenticated:"Local Credentials Present",session_ready:"Session Ready"},A=["runtime_missing","runtime_launches","sign_in_required","authenticated","session_ready"];function $(t,e,n,r){return{handleInstallRuntime:async()=>{n("install"),r(null);try{let c=await t.call("runtime:install");e(c)}catch(c){r(c?.message||"Failed to install Google Native ACP runtime.")}finally{n(null)}},handleRollbackRuntime:async()=>{n("rollback"),r(null);try{let c=await t.call("runtime:rollback");e(c)}catch(c){r(c?.message||"Failed to roll back Native ACP runtime.")}finally{n(null)}}}}function j(t,e,n,r,l){return{handleSignIn:async()=>{n("login"),r(null),l.current=setInterval(async()=>{try{let s=await t.call("doctor:status");s.pendingAuthUrl&&e(s)}catch{}},1200);try{let s=await t.call("auth:login");e(s)}catch(s){r(s?.message||"Interactive Google sign-in failed.")}finally{l.current&&clearInterval(l.current),n(null)}},handleSignOut:async()=>{n("logout"),r(null);try{let s=await t.call("auth:logout");e(s)}catch(s){r(s?.message||"Failed to clear native ACP authentication.")}finally{n(null)}}}}function L(t){let[e,n]=m(!1),[r,l]=m(null),[u,c]=m(null),s=v(async(d=!1)=>{n(!0),l(null);try{let p=await t.call("doctor:status",d?{probeNative:!0,forceRefresh:!0}:null);c(p)}catch(p){l(p?.message||"Failed to communicate with plugin server.")}finally{n(!1)}},[t]);return f(()=>{s(!1)},[s]),{loading:e,actionError:r,setActionError:l,status:u,setStatus:c,checkHealth:s}}function D(t,e,n){typeof navigator<"u"&&navigator.clipboard&&(navigator.clipboard.writeText(t),n(e),setTimeout(()=>n(null),2e3))}function O(t){let[e,n]=m(null),[r,l]=m(null),u=w(null),{loading:c,actionError:s,setActionError:d,status:p,setStatus:y,checkHealth:_}=L(t),{handleInstallRuntime:R,handleRollbackRuntime:C}=$(t,y,n,d),{handleSignIn:P,handleSignOut:E}=j(t,y,n,d,u);return{loading:c,actionBusy:e,actionError:s,status:p,copiedKey:r,handleInstallRuntime:R,handleRollbackRuntime:C,handleSignIn:P,handleSignOut:E,handleProbeNative:async()=>{n("probe"),await _(!0),n(null)},copyToClipboard:(k,N)=>D(k,N,l)}}function F({status:t,loading:e,actionBusy:n,onInstall:r,onRollback:l}){let u=t?.state??"runtime_missing",c=t?.installed===!0,s=u==="session_ready"||u==="authenticated",d=t?.pinnedVersion??"1.4.3",p=e?"Checking Antigravity Native ACP...":s?"Antigravity Native ACP Connected":`Antigravity Native ACP (${h[u]})`;return i("div",{className:"agy-status-header",children:[i("div",{className:"agy-status-title-row",children:[o("span",{className:`agy-status-indicator ${e||n?"checking":s?"ready":"warning"}`}),o("span",{className:"agy-status-label",children:p}),o("span",{className:"agy-version-tag",children:c?`v${t?.version??d}`:`Pinned v${d}`}),t?.tierName&&o("span",{className:"agy-backend-badge",children:t.tierName}),o("span",{className:`agy-state-pill state-${u}`,children:h[u]})]}),i("div",{className:"agy-actions-row",children:[o("button",{type:"button",className:"agy-btn",onClick:r,disabled:e||n!==null,children:n==="install"?"Installing...":c?`Reinstall Runtime (v${d})`:`Install Native ACP Runtime (v${d})`}),t?.previousVersion&&o("button",{type:"button",className:"agy-btn",onClick:l,disabled:e||n!==null,children:n==="rollback"?"Rolling back...":`Rollback to v${t.previousVersion}`})]})]})}function q({nativeState:t}){let e=A.indexOf(t);return o("div",{className:"agy-readiness-steps",children:A.map((n,r)=>{let l=n===t,u=r<e&&t!=="runtime_missing";return o("span",{className:`agy-readiness-step ${l?"active":u?"passed":""}`,children:h[n]},n)})})}function z({status:t,actionBusy:e,loading:n,copiedKey:r,onSignIn:l,onProbe:u,onSignOut:c,onCopy:s}){if(!t?.installed)return null;let d=t.state==="session_ready"||t.state==="authenticated";return i(S,{children:[i("div",{className:"agy-actions-row",children:[o("button",{type:"button",className:"agy-btn agy-btn-primary",onClick:l,disabled:n||e!==null,children:e==="login"?"Waiting for Google Sign-In in Browser...":d?"Re-authenticate with Google":"Sign In with Google"}),o("button",{type:"button",className:"agy-btn",onClick:u,disabled:n||e!==null,children:e==="probe"?"Verifying Session...":"Verify Session & Models"}),t.configuredAuthType&&o("button",{type:"button",className:"agy-btn",onClick:c,disabled:n||e!==null,children:"Clear Auth Selection"})]}),t.pendingAuthUrl&&i("div",{children:[o("p",{className:"agy-desc",children:"If your browser did not open automatically, copy this OAuth link:"}),i("div",{className:"agy-command-box",children:[o("span",{className:"agy-command-text",children:t.pendingAuthUrl}),o("button",{type:"button",className:"agy-btn",onClick:()=>s(t.pendingAuthUrl,"oauth"),children:r==="oauth"?"Copied!":"Copy URL"})]})]})]})}function V({status:t}){return!t||t.models.length===0?null:i("div",{children:[i("p",{className:"agy-desc",children:["Available Native ACP models (",t.models.length,"):"]}),o("div",{className:"agy-models-list",children:t.models.map(e=>i("span",{className:"agy-version-tag",children:[e.name," (",e.id,")"]},e.id))})]})}function G(){return i("div",{className:"agy-steps-card",children:[o("h4",{className:"agy-steps-title",children:"Quick Setup Guide"}),i("ol",{className:"agy-steps-list",children:[i("li",{children:["Click ",o("strong",{children:"Install Native ACP Runtime"})," above to download and verify Google's official SHA-256 ACP archive."]}),i("li",{children:["Select your ",o("strong",{children:"Google ACP authentication method"})," and click ",o("strong",{children:"Sign In with Google"}),"."]}),i("li",{children:["Start a new thread in Zana and select ",o("strong",{children:"Antigravity"})," as the provider."]})]})]})}function M(){let t=b(),e=O(t);f(()=>{H()},[]);let n=e.status?.state??"runtime_missing";return i("div",{className:"agy-settings-panel",children:[i("div",{className:"agy-status-card",children:[o(F,{status:e.status,loading:e.loading,actionBusy:e.actionBusy,onInstall:e.handleInstallRuntime,onRollback:e.handleRollbackRuntime}),o(q,{nativeState:n}),i("p",{className:"agy-desc",children:["Runs Zana threads directly over Google's official Native ACP server (",o("code",{children:"agy_acp_server"}),"). Auth method: ",o("code",{children:e.status?.authMethod??"oauth-personal"}),e.status?.configuredAuthType?` (configured: ${e.status.configuredAuthType})`:" (not yet configured)"]}),(e.status?.error||e.actionError)&&o("p",{className:"agy-desc agy-desc-error",children:e.actionError||e.status?.error}),o(z,{status:e.status,actionBusy:e.actionBusy,loading:e.loading,copiedKey:e.copiedKey,onSignIn:e.handleSignIn,onProbe:e.handleProbeNative,onSignOut:e.handleSignOut,onCopy:e.copyToClipboard}),o(V,{status:e.status}),e.status&&e.status.disabledDeadMcpServers.length>0&&i("p",{className:"agy-desc agy-desc-note",children:["Automatically bypassed unreachable IDE named-pipe MCP proxies (",o("code",{children:e.status.disabledDeadMcpServers.join(", ")}),") to prevent prompt stalls."]})]}),o(G,{})]})}var Re=g(t=>{t.slots.settingsSection({id:"antigravity-provider",title:"Antigravity Provider",description:"Configure Google Antigravity via Google Native ACP server (agy_acp_server)",component:M})});function H(){if(typeof document>"u")return;let t="antigravity-provider-styles";if(document.getElementById(t))return;let e=document.createElement("style");e.id=t,e.textContent=`
+    .agy-settings-panel { display: flex; flex-direction: column; gap: 16px; max-width: 680px; }
+    .agy-status-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-default, #2a2a2a); background: var(--bg-surface, #141414); }
+    .agy-status-header { display: flex; flex-direction: column; gap: 10px; }
+    .agy-status-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .agy-status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .agy-status-indicator.ready { background: var(--success, #22c55e); }
+    .agy-status-indicator.warning { background: var(--warning, #eab308); }
+    .agy-status-indicator.checking { background: var(--accent, #3b82f6); animation: agy-pulse 1s infinite alternate; }
+    .agy-status-label { font-weight: 600; font-size: 14px; }
+    .agy-version-tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--bg-subtle, #222); color: var(--fg-muted, #888); }
+    .agy-backend-badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-weight: 500; }
+    .agy-state-pill { font-size: 11px; padding: 1px 7px; border-radius: 4px; font-weight: 500; }
+    .agy-state-pill.state-session_ready { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+    .agy-state-pill.state-authenticated { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .agy-state-pill.state-sign_in_required { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+    .agy-state-pill.state-runtime_launches { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+    .agy-state-pill.state-runtime_missing { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .agy-actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .agy-btn { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border-default, #333); background: var(--bg-subtle, #1f1f1f); color: var(--fg-default, #eee); cursor: pointer; }
+    .agy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .agy-btn-primary { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: #fff; }
+    .agy-readiness-steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+    .agy-readiness-step { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--bg-subtle, #1a1a1a); color: var(--fg-muted, #666); border: 1px solid transparent; }
+    .agy-readiness-step.passed { color: var(--fg-muted, #888); border-color: var(--border-subtle, #2a2a2a); }
+    .agy-readiness-step.active { color: #fff; background: var(--border-default, #333); font-weight: 600; border-color: var(--accent, #3b82f6); }
+    .agy-desc { font-size: 12px; color: var(--fg-muted, #999); margin: 0; line-height: 1.5; }
+    .agy-desc-error { color: var(--error, #f87171); }
+    .agy-desc-note { color: var(--accent, #60a5fa); font-size: 11px; }
+    .agy-command-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 6px; background: var(--bg-input, #0d0d0d); border: 1px solid var(--border-subtle, #222); font-family: monospace; font-size: 11px; margin-top: 6px; }
+    .agy-command-text { word-break: break-all; }
+    .agy-models-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .agy-steps-card { padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-subtle, #222); background: var(--bg-card, #111); }
+    .agy-steps-title { font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: var(--fg-default, #ddd); }
+    .agy-steps-list { margin: 0; padding-left: 18px; font-size: 12px; color: var(--fg-muted, #888); line-height: 1.6; }
+    @keyframes agy-pulse { 0% { opacity: 0.4; } 100% { opacity: 1; } }
+  `,document.head.appendChild(e)}export{M as AntigravitySettingsSection,Re as default};

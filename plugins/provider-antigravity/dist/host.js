@@ -31159,7 +31159,7 @@ async function loadSessionDiscoveredModels(agent, reasoningProbePriorityModelIds
           method: "initialize",
           params: {
             protocolVersion: ACP_PROTOCOL_VERSION,
-            clientInfo: { name: "zed", title: "Zana Command Center (zcc)", version: "1.0.0" },
+            clientInfo: { name: "zcc", version: "1.0.0" },
             clientCapabilities: acpClientCapabilities(parameterizedModelPicker)
           },
           resultSchema: acpInitializeResultSchema
@@ -31882,7 +31882,7 @@ async function startAgentSession(request) {
       method: "initialize",
       params: {
         protocolVersion: ACP_PROTOCOL_VERSION,
-        clientInfo: { name: "zed", title: "Zana Command Center (zcc)", version: "1.0.0" },
+        clientInfo: { name: "zcc", version: "1.0.0" },
         clientCapabilities: acpClientCapabilities(
           params.parameterizedModelPicker,
           true
@@ -41276,6 +41276,7 @@ import {
   existsSync as existsSync2,
   mkdirSync as mkdirSync2,
   readFileSync as readFileSync2,
+  renameSync,
   rmSync,
   writeFileSync
 } from "node:fs";
@@ -41330,22 +41331,16 @@ var NATIVE_ACP_DISTRIBUTIONS = {
 };
 function resolvePlatformKey(platform = process.platform, arch = process.arch) {
   const normalizedArch = arch === "x64" ? "x86_64" : arch === "arm64" ? "aarch64" : arch;
-  if (platform === "win32") {
-    return `windows-${normalizedArch}`;
-  }
-  if (platform === "darwin") {
-    return `darwin-${normalizedArch}`;
-  }
-  if (platform === "linux") {
-    return `linux-${normalizedArch}`;
-  }
+  if (platform === "win32") return `windows-${normalizedArch}`;
+  if (platform === "darwin") return `darwin-${normalizedArch}`;
+  if (platform === "linux") return `linux-${normalizedArch}`;
   return null;
 }
-function getZccDataDir() {
-  if (process.env.ZCC_DATA_DIR && process.env.ZCC_DATA_DIR.trim()) {
-    return resolve4(process.env.ZCC_DATA_DIR.trim());
+function getZccDataDir(env = process.env) {
+  if (env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim()) {
+    return resolve4(env.ZCC_DATA_DIR.trim());
   }
-  const home = process.env.USERPROFILE || process.env.HOME || homedir2();
+  const home = env.USERPROFILE || env.HOME || homedir2();
   return resolve4(home, ".zcc");
 }
 function getManagedRuntimesRoot(baseDir) {
@@ -41353,9 +41348,7 @@ function getManagedRuntimesRoot(baseDir) {
 }
 function readManagedRuntimePointer(baseDir) {
   const pointerPath = join3(getManagedRuntimesRoot(baseDir), "current.json");
-  if (!existsSync2(pointerPath)) {
-    return null;
-  }
+  if (!existsSync2(pointerPath)) return null;
   try {
     const parsed = JSON.parse(readFileSync2(pointerPath, "utf8"));
     if (parsed && typeof parsed.version === "string") {
@@ -41378,9 +41371,22 @@ function checkCompanionFiles(executablePath, platformKey = resolvePlatformKey())
   }
   const dir = dirname3(executablePath);
   const missing = dist.companionFiles.filter((file2) => !existsSync2(join3(dir, file2)));
+  return { ok: missing.length === 0, missing };
+}
+function resolveCustomRuntime(custom2, defaultArgs, platformKey, dist, pointer) {
+  const resolvedCustom = resolve4(custom2);
+  const exists = existsSync2(resolvedCustom);
+  const companions = exists ? checkCompanionFiles(resolvedCustom, platformKey) : { ok: false, missing: dist?.companionFiles ?? [] };
   return {
-    ok: missing.length === 0,
-    missing
+    installed: exists && companions.ok,
+    executable: exists ? resolvedCustom : custom2,
+    args: defaultArgs,
+    version: exists ? pointer?.version ?? PINNED_NATIVE_ACP_VERSION : null,
+    previousVersion: pointer?.previousVersion ?? null,
+    source: "custom",
+    companionFilesPresent: companions.ok,
+    missingCompanionFiles: companions.missing,
+    platformKey
   };
 }
 function resolveNativeAcpRuntime(options) {
@@ -41391,20 +41397,7 @@ function resolveNativeAcpRuntime(options) {
   const pointer = readManagedRuntimePointer(options?.baseDir);
   const custom2 = options?.customExecutable?.trim();
   if (custom2) {
-    const resolvedCustom = resolve4(custom2);
-    const exists = existsSync2(resolvedCustom);
-    const companions = exists ? checkCompanionFiles(resolvedCustom, platformKey) : { ok: false, missing: dist?.companionFiles ?? [] };
-    return {
-      installed: exists && companions.ok,
-      executable: exists ? resolvedCustom : custom2,
-      args: defaultArgs,
-      version: exists ? pointer?.version ?? PINNED_NATIVE_ACP_VERSION : null,
-      previousVersion: pointer?.previousVersion ?? null,
-      source: "custom",
-      companionFilesPresent: companions.ok,
-      missingCompanionFiles: companions.missing,
-      platformKey
-    };
+    return resolveCustomRuntime(custom2, defaultArgs, platformKey, dist, pointer);
   }
   const root = getManagedRuntimesRoot(options?.baseDir);
   const activeVersion = pointer?.version ?? PINNED_NATIVE_ACP_VERSION;
@@ -41443,33 +41436,6 @@ var GOOGLE_ACP_AUTH_METHODS = [
   "gemini-api-key",
   "agent-platform"
 ];
-var DEFAULT_NATIVE_MODELS = [
-  {
-    id: "gemini-4-argon",
-    name: "Gemini 4 Argon",
-    description: "Google Gemini 4 Argon flagship model with deep reasoning"
-  },
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    description: "Google Gemini 3.8 Flash high-efficiency multimodal model"
-  },
-  {
-    id: "claude-opus-5-5",
-    name: "Claude Opus 5.5",
-    description: "Anthropic Claude Opus 5.5 deep architecture & reasoning"
-  },
-  {
-    id: "claude-sonnet-5-5",
-    name: "Claude Sonnet 5.5",
-    description: "Anthropic Claude Sonnet 5.5 balanced reasoning & coding"
-  },
-  {
-    id: "gpt-oss-120b-medium",
-    name: "GPT-OSS 120B (Medium)",
-    description: "Open source 120B weights model"
-  }
-];
 function isValidGoogleAuthMethod(value) {
   return typeof value === "string" && GOOGLE_ACP_AUTH_METHODS.includes(value);
 }
@@ -41507,8 +41473,15 @@ function readNativeAcpSettings(env = process.env) {
     return null;
   }
 }
+function isAuthExplicitlyCleared(env = process.env) {
+  const settings = readNativeAcpSettings(env);
+  return settings?.auth?.cleared === true;
+}
 function readConfiguredNativeAuthType(env = process.env) {
   const settings = readNativeAcpSettings(env);
+  if (settings?.auth?.cleared === true) {
+    return null;
+  }
   const authType = settings?.auth?.type;
   return typeof authType === "string" && authType.trim() ? authType.trim() : null;
 }
@@ -41526,18 +41499,12 @@ function writeSettingsFileAtomically(settingsPath, authType) {
   }
   const next = { ...existing };
   if (authType === null) {
-    if (next.auth && typeof next.auth === "object") {
-      const { type: _removed, ...restAuth } = next.auth;
-      if (Object.keys(restAuth).length > 0) {
-        next.auth = restAuth;
-      } else {
-        delete next.auth;
-      }
-    }
+    next.auth = { cleared: true };
   } else {
     next.auth = {
       ...next.auth && typeof next.auth === "object" ? next.auth : {},
-      type: authType
+      type: authType,
+      cleared: false
     };
   }
   mkdirSync3(dirname4(settingsPath), { recursive: true });
@@ -41549,76 +41516,41 @@ function writeSettingsFileAtomically(settingsPath, authType) {
   } catch {
   }
 }
-function syncFileNewer(fileA, fileB) {
-  const hasA = existsSync3(fileA);
-  const hasB = existsSync3(fileB);
-  if (!hasA && !hasB) return;
+function syncFileNewer(src, dest) {
+  if (!existsSync3(src)) return;
   try {
-    if (hasA && !hasB) {
-      mkdirSync3(dirname4(fileB), { recursive: true });
-      copyFileSync(fileA, fileB);
-      return;
+    if (existsSync3(dest)) {
+      const srcStat = statSync(src);
+      const destStat = statSync(dest);
+      if (srcStat.mtimeMs <= destStat.mtimeMs && destStat.size > 0) {
+        return;
+      }
     }
-    if (!hasA && hasB) {
-      mkdirSync3(dirname4(fileA), { recursive: true });
-      copyFileSync(fileB, fileA);
-      return;
-    }
-    const statA = statSync(fileA);
-    const statB = statSync(fileB);
-    if (statA.mtimeMs >= statB.mtimeMs) {
-      copyFileSync(fileA, fileB);
-    } else {
-      copyFileSync(fileB, fileA);
-    }
+    mkdirSync3(dirname4(dest), { recursive: true });
+    copyFileSync(src, dest);
   } catch {
   }
 }
 function isIdeNamedPipeMcpProxyUnreachable(serverConfig) {
-  if (!serverConfig || typeof serverConfig !== "object" || serverConfig.disabled === true) {
+  if (!serverConfig || typeof serverConfig !== "object") {
     return false;
   }
   const args = Array.isArray(serverConfig.args) ? serverConfig.args : [];
   const usesIdeProxy = args.some(
     (arg) => typeof arg === "string" && (arg.includes("mcp_proxy_bundle.js") || arg.endsWith("-antigravityide"))
   );
-  if (!usesIdeProxy) {
-    return false;
-  }
+  if (!usesIdeProxy) return false;
   const pipeId = args.find(
     (arg) => typeof arg === "string" && arg.endsWith("-antigravityide")
   );
-  if (!pipeId) {
-    return true;
-  }
+  if (!pipeId) return true;
   if (process.platform === "win32") {
     const pipePath = `\\\\.\\pipe\\datacloud-mcp-${pipeId}`;
     return !existsSync3(pipePath);
   }
   return true;
 }
-function prepareSanitizedGeminiHome(options) {
-  const env = options?.env ?? process.env;
-  const userGeminiHome = resolveGeminiHome(env);
-  const managedGeminiHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? userGeminiHome : join4(getZccDataDir(), "state", "antigravity-gemini-home");
-  const userAcpDir = join4(userGeminiHome, "antigravity-acp");
-  const managedAcpDir = join4(managedGeminiHome, "antigravity-acp");
-  mkdirSync3(managedAcpDir, { recursive: true });
-  if (managedGeminiHome !== userGeminiHome) {
-    syncFileNewer(join4(userAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
-    syncFileNewer(join4(userAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
-  }
-  const currentAuthType = readConfiguredNativeAuthType({
-    ...env,
-    GEMINI_HOME: managedGeminiHome
-  });
-  if (!currentAuthType && existsSync3(join4(managedAcpDir, "acp_token.json"))) {
-    const defaultMethod = options?.authMethod ?? "oauth-personal";
-    writeSettingsFileAtomically(join4(managedAcpDir, "settings.json"), defaultMethod);
-    if (managedGeminiHome !== userGeminiHome) {
-      writeSettingsFileAtomically(join4(userAcpDir, "settings.json"), defaultMethod);
-    }
-  }
+function sanitizeMcpConfigFile(userGeminiHome, managedGeminiHome) {
   const disabledDeadMcpServers = [];
   const sourceMcpConfigPath = join4(userGeminiHome, "config", "mcp_config.json");
   const targetMcpConfigDir = join4(managedGeminiHome, "config");
@@ -41630,12 +41562,8 @@ function prepareSanitizedGeminiHome(options) {
       const sourceServers = raw && typeof raw.mcpServers === "object" && raw.mcpServers !== null ? raw.mcpServers : {};
       const sanitizedServers = {};
       for (const [serverName, serverCfg] of Object.entries(sourceServers)) {
-        if (!serverCfg || typeof serverCfg !== "object") {
-          continue;
-        }
-        if (serverCfg.disabled === true) {
-          continue;
-        }
+        if (!serverCfg || typeof serverCfg !== "object") continue;
+        if (serverCfg.disabled === true) continue;
         if (isIdeNamedPipeMcpProxyUnreachable(serverCfg)) {
           disabledDeadMcpServers.push(serverName);
           continue;
@@ -41653,57 +41581,144 @@ function prepareSanitizedGeminiHome(options) {
   } else if (!existsSync3(targetMcpConfigPath)) {
     writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
   }
+  return disabledDeadMcpServers;
+}
+function prepareSanitizedGeminiHome(options) {
+  const env = options?.env ?? process.env;
+  const userGeminiHome = resolveGeminiHome(env);
+  const managedGeminiHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? userGeminiHome : join4(getZccDataDir(env), "state", "antigravity-gemini-home");
+  const userAcpDir = join4(userGeminiHome, "antigravity-acp");
+  const managedAcpDir = join4(managedGeminiHome, "antigravity-acp");
+  mkdirSync3(managedAcpDir, { recursive: true });
+  if (managedGeminiHome !== userGeminiHome) {
+    syncFileNewer(join4(userAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
+    syncFileNewer(join4(userAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
+  }
+  const currentAuthType = readConfiguredNativeAuthType({
+    ...env,
+    GEMINI_HOME: managedGeminiHome
+  });
+  const settingsFile = join4(managedAcpDir, "settings.json");
+  const explicitlyCleared = isAuthExplicitlyCleared({
+    ...env,
+    GEMINI_HOME: managedGeminiHome
+  });
+  if (!currentAuthType && !explicitlyCleared && !existsSync3(settingsFile) && existsSync3(join4(managedAcpDir, "acp_token.json"))) {
+    const defaultMethod = options?.authMethod ?? "oauth-personal";
+    writeSettingsFileAtomically(settingsFile, defaultMethod);
+    if (managedGeminiHome !== userGeminiHome) {
+      writeSettingsFileAtomically(join4(userAcpDir, "settings.json"), defaultMethod);
+    }
+  }
+  const disabledDeadMcpServers = sanitizeMcpConfigFile(userGeminiHome, managedGeminiHome);
   return {
     geminiHome: managedGeminiHome,
     disabledDeadMcpServers
   };
 }
-function getPersistedReadinessPath() {
-  return join4(getZccDataDir(), "state", "antigravity-native-readiness.json");
+function getPersistedReadinessPath(env = process.env) {
+  return join4(getZccDataDir(env), "state", "antigravity-native-readiness.json");
 }
-function readPersistedReadiness(key) {
-  const filePath = getPersistedReadinessPath();
+function readPersistedReadiness(key, env = process.env) {
+  const filePath = getPersistedReadinessPath(env);
   if (!existsSync3(filePath)) return null;
   try {
     const raw = JSON.parse(readFileSync3(filePath, "utf8"));
     if (raw && raw.key === key && raw.result && typeof raw.result === "object") {
-      return raw.result;
+      return { result: raw.result, fingerprint: raw.fingerprint || "" };
     }
   } catch {
   }
   return null;
 }
+function computeCredentialFingerprint(env, authMethod) {
+  const tokenPath = getNativeAcpTokenPath(env);
+  let tokenInfo = "no-token";
+  if (existsSync3(tokenPath)) {
+    try {
+      const stat2 = statSync(tokenPath);
+      tokenInfo = `${stat2.size}:${stat2.mtimeMs}`;
+    } catch {
+      tokenInfo = "err";
+    }
+  }
+  const configured = readConfiguredNativeAuthType(env) ?? "none";
+  const apiKey = env.GEMINI_API_KEY ? `key:${env.GEMINI_API_KEY.length}` : "no-key";
+  const appCreds = env.GOOGLE_APPLICATION_CREDENTIALS ? "gac" : "no-gac";
+  const cleared = isAuthExplicitlyCleared(env) ? "cleared" : "uncleared";
+  return `${authMethod}:${configured}:${cleared}:${tokenInfo}:${apiKey}:${appCreds}`;
+}
 var cachedReadiness = null;
 var READINESS_CACHE_TTL_MS = 10 * 60 * 1e3;
-function getFastNativeReadiness(options) {
-  const sanitized = prepareSanitizedGeminiHome({
-    env: options.env,
-    authMethod: options.authMethod
-  });
-  const effectiveEnv = {
-    ...options.env ?? process.env,
-    GEMINI_HOME: sanitized.geminiHome
+function checkLocalCredentialPresence(authMethod, effectiveEnv, configuredAuthType) {
+  if (authMethod === "gemini-api-key") {
+    return Boolean(effectiveEnv.GEMINI_API_KEY) ? { authenticated: true, note: "API key detected in environment (unverified session)" } : { authenticated: false };
+  }
+  if (authMethod === "agent-platform") {
+    const hasPlatformCreds = Boolean(
+      effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS || effectiveEnv.CLOUD_ML_PROJECT_ID || effectiveEnv.GOOGLE_CLOUD_PROJECT
+    );
+    return hasPlatformCreds ? { authenticated: true, note: "Platform credentials detected (unverified session)" } : { authenticated: false };
+  }
+  if (!isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && configuredAuthType) {
+    return { authenticated: true, note: "Local credentials present (unverified session)" };
+  }
+  return { authenticated: false };
+}
+function checkCachedReadiness(cacheKey, fingerprint, effectiveEnv) {
+  if (cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS) {
+    return cachedReadiness.result;
+  }
+  const persisted = readPersistedReadiness(cacheKey, effectiveEnv);
+  if (persisted && persisted.fingerprint === fingerprint && Date.now() - persisted.result.checkedAt < READINESS_CACHE_TTL_MS) {
+    cachedReadiness = { key: cacheKey, fingerprint, result: persisted.result };
+    return persisted.result;
+  }
+  return null;
+}
+function buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized) {
+  return {
+    state: "authenticated",
+    agentVersion: null,
+    protocolVersion: 1,
+    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
+    selectedAuthMethod: options.authMethod,
+    configuredAuthType: configuredAuthType ?? options.authMethod,
+    models: [],
+    modes: ["default", "auto_edit", "yolo"],
+    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+    checkedAt: Date.now()
   };
+}
+function buildSignInRequiredFastReadiness(options, sanitized) {
+  return {
+    state: "sign_in_required",
+    agentVersion: null,
+    protocolVersion: 1,
+    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
+    selectedAuthMethod: options.authMethod,
+    configuredAuthType: null,
+    models: [],
+    modes: [],
+    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+    error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.',
+    checkedAt: Date.now()
+  };
+}
+function getFastNativeReadiness(options) {
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
   const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
+  const fingerprint = computeCredentialFingerprint(effectiveEnv, options.authMethod);
   const cacheKey = JSON.stringify({
     command: options.command,
     args: options.args,
     authMethod: options.authMethod,
     configuredAuthType
   });
-  if (cachedReadiness && cachedReadiness.key === cacheKey) {
-    return {
-      ...cachedReadiness.result,
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers
-    };
-  }
-  const persisted = readPersistedReadiness(cacheKey);
-  if (persisted && persisted.state === "session_ready") {
-    cachedReadiness = { key: cacheKey, result: persisted };
-    return {
-      ...persisted,
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers
-    };
+  const cached2 = checkCachedReadiness(cacheKey, fingerprint, effectiveEnv);
+  if (cached2) {
+    return { ...cached2, disabledDeadMcpServers: sanitized.disabledDeadMcpServers };
   }
   if (!existsSync3(options.command)) {
     return {
@@ -41720,35 +41735,11 @@ function getFastNativeReadiness(options) {
       checkedAt: Date.now()
     };
   }
-  const hasToken = hasNativeAcpToken(effectiveEnv);
-  const hasHeadlessAuth = options.authMethod === "gemini-api-key" && Boolean(effectiveEnv.GEMINI_API_KEY) || options.authMethod === "agent-platform";
-  if (hasToken || configuredAuthType || hasHeadlessAuth) {
-    return {
-      state: hasToken ? "session_ready" : "authenticated",
-      agentVersion: null,
-      protocolVersion: 1,
-      advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType: configuredAuthType ?? options.authMethod,
-      models: DEFAULT_NATIVE_MODELS,
-      modes: ["default", "auto_edit", "yolo"],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      checkedAt: Date.now()
-    };
+  const credCheck = checkLocalCredentialPresence(options.authMethod, effectiveEnv, configuredAuthType);
+  if (credCheck.authenticated) {
+    return buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized);
   }
-  return {
-    state: "sign_in_required",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: null,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.',
-    checkedAt: Date.now()
-  };
+  return buildSignInRequiredFastReadiness(options, sanitized);
 }
 
 // host.ts
@@ -41800,52 +41791,63 @@ function enrichLaunchSpecEnv(spec, authMethod) {
     };
   }
 }
+function resolveAuthMethod(providerOptions) {
+  return isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod) ? providerOptions.antigravityAuthMethod : "oauth-personal";
+}
+function normalizeLaunchInOptionsContainer(container, authMethod) {
+  if (!container.providerOptions) {
+    container.providerOptions = {
+      acpDialect: "generic",
+      parameterizedModelPicker: true,
+      acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
+    };
+    return true;
+  }
+  const po = container.providerOptions;
+  if (!po.acpLaunchSpec) {
+    po.acpDialect = po.acpDialect || "generic";
+    po.parameterizedModelPicker = true;
+    po.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
+    return true;
+  }
+  enrichLaunchSpecEnv(po.acpLaunchSpec, authMethod);
+  return true;
+}
 function ensureLaunchSpec(params) {
   if (!params || typeof params !== "object") return false;
   let modified = false;
-  const resolveAuthMethod = (providerOptions) => isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod) ? providerOptions.antigravityAuthMethod : "oauth-personal";
   if (params.options && typeof params.options === "object") {
     const authMethod = resolveAuthMethod(params.options.providerOptions);
-    if (!params.options.providerOptions) {
-      params.options.providerOptions = {
-        acpDialect: "generic",
-        parameterizedModelPicker: true,
-        acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
-      };
-      modified = true;
-    } else if (!params.options.providerOptions.acpLaunchSpec) {
-      params.options.providerOptions.acpDialect = params.options.providerOptions.acpDialect || "generic";
-      params.options.providerOptions.parameterizedModelPicker = true;
-      params.options.providerOptions.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
-      modified = true;
-    } else {
-      enrichLaunchSpecEnv(params.options.providerOptions.acpLaunchSpec, authMethod);
-      modified = true;
-    }
+    modified = normalizeLaunchInOptionsContainer(params.options, authMethod) || modified;
   }
   const rootAuthMethod = resolveAuthMethod(
     params.providerOptions ?? params.options?.providerOptions
   );
-  if (!params.providerOptions) {
-    params.providerOptions = {
-      acpDialect: "generic",
-      parameterizedModelPicker: true,
-      acpLaunchSpec: buildDefaultNativeLaunchSpec(rootAuthMethod)
-    };
-    modified = true;
-  } else if (!params.providerOptions.acpLaunchSpec) {
-    params.providerOptions.acpDialect = params.providerOptions.acpDialect || "generic";
-    params.providerOptions.parameterizedModelPicker = true;
-    params.providerOptions.acpLaunchSpec = buildDefaultNativeLaunchSpec(rootAuthMethod);
-    modified = true;
-  } else {
-    enrichLaunchSpecEnv(params.providerOptions.acpLaunchSpec, rootAuthMethod);
-    modified = true;
-  }
+  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod) || modified;
   return modified;
 }
 function writeBridgeJsonRpc(payload) {
   process.stdout.write(JSON.stringify(payload) + "\n");
+}
+function sendHealthResponse(id2, status, statusMessage, planLabel, version2) {
+  writeBridgeJsonRpc({
+    jsonrpc: "2.0",
+    id: id2,
+    result: {
+      supported: true,
+      health: {
+        status,
+        statusMessage,
+        accountEmail: null,
+        planLabel,
+        installedVersion: version2,
+        minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
+        canInstall: false,
+        canUpdate: false,
+        loginCommand: null
+      }
+    }
+  });
 }
 function handleNativeProviderHealth(id2, params) {
   const providerOptions = getProviderOptionsFromParams(params);
@@ -41854,50 +41856,56 @@ function handleNativeProviderHealth(id2, params) {
     customExecutable: typeof customCommand === "string" ? customCommand : void 0
   });
   if (!runtime.installed) {
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      result: {
-        supported: true,
-        health: {
-          status: "not_installed",
-          statusMessage: !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
-          accountEmail: null,
-          planLabel: null,
-          installedVersion: null,
-          minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
-          canInstall: false,
-          canUpdate: false,
-          loginCommand: null
-        }
-      }
-    });
+    const msg = !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
+    sendHealthResponse(id2, "not_installed", msg, null, null);
     return;
   }
-  const authMethod = isValidGoogleAuthMethod(
-    providerOptions?.antigravityAuthMethod
-  ) ? providerOptions.antigravityAuthMethod : "oauth-personal";
+  const authMethod = resolveAuthMethod(providerOptions);
   const readiness = getFastNativeReadiness({
     command: runtime.executable,
     args: runtime.args,
     authMethod
   });
   if (readiness.state === "sign_in_required") {
+    const msg = "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google.";
+    sendHealthResponse(id2, "unauthenticated", msg, null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+    return;
+  }
+  sendHealthResponse(id2, "ready", null, readiness.tierName ?? null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+}
+function mapDiscoveredModels(models) {
+  return models.map((m, idx) => {
+    const isSingleMedium = m.id.startsWith("gpt-oss-120b");
+    return {
+      id: m.id,
+      model: m.id,
+      displayName: m.name,
+      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
+      supportedReasoningEfforts: isSingleMedium ? [{ reasoningEffort: "medium", description: "Default reasoning effort" }] : [
+        { reasoningEffort: "low", description: "Low reasoning effort" },
+        { reasoningEffort: "medium", description: "Medium reasoning effort" },
+        { reasoningEffort: "high", description: "High reasoning effort" }
+      ],
+      defaultReasoningEffort: "medium",
+      isDefault: idx === 0
+    };
+  });
+}
+function sendModelListError(id2, readiness) {
+  if (readiness.state === "sign_in_required") {
+    const authMessage = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
     writeBridgeJsonRpc({
       jsonrpc: "2.0",
       id: id2,
-      result: {
-        supported: true,
-        health: {
-          status: "unauthenticated",
-          statusMessage: "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google.",
-          accountEmail: null,
-          planLabel: null,
-          installedVersion: runtime.version ?? PINNED_NATIVE_ACP_VERSION,
-          minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
-          canInstall: false,
-          canUpdate: false,
-          loginCommand: null
+      error: {
+        code: -32e3,
+        message: authMessage,
+        data: {
+          recovery: {
+            kind: "authRequired",
+            message: authMessage,
+            retryable: false
+          }
         }
       }
     });
@@ -41906,19 +41914,9 @@ function handleNativeProviderHealth(id2, params) {
   writeBridgeJsonRpc({
     jsonrpc: "2.0",
     id: id2,
-    result: {
-      supported: true,
-      health: {
-        status: "ready",
-        statusMessage: null,
-        accountEmail: null,
-        planLabel: readiness.tierName ?? null,
-        installedVersion: runtime.version ?? PINNED_NATIVE_ACP_VERSION,
-        minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
-        canInstall: false,
-        canUpdate: false,
-        loginCommand: null
-      }
+    error: {
+      code: -32e3,
+      message: 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.'
     }
   });
 }
@@ -41939,90 +41937,82 @@ function handleNativeModelList(id2, params) {
     });
     return;
   }
-  const authMethod = isValidGoogleAuthMethod(
-    providerOptions?.antigravityAuthMethod
-  ) ? providerOptions.antigravityAuthMethod : "oauth-personal";
+  const authMethod = resolveAuthMethod(providerOptions);
   const readiness = getFastNativeReadiness({
     command: runtime.executable,
     args: runtime.args,
     authMethod
   });
-  if (readiness.state === "sign_in_required") {
-    const authMessage = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      error: {
-        code: -32e3,
-        message: authMessage,
-        data: {
-          recovery: {
-            kind: "authRequired",
-            message: authMessage,
-            retryable: false
-          }
-        }
-      }
-    });
+  if (readiness.state === "sign_in_required" || readiness.models.length === 0) {
+    sendModelListError(id2, readiness);
     return;
   }
-  const modelsToUse = readiness.models.length > 0 ? readiness.models : DEFAULT_NATIVE_MODELS;
-  const mappedModels = modelsToUse.map((m, idx) => {
-    const isSingleMedium = m.id.startsWith("gpt-oss-120b");
-    return {
-      id: m.id,
-      model: m.id,
-      displayName: m.name,
-      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts: isSingleMedium ? [{ reasoningEffort: "medium", description: "Default reasoning effort" }] : [
-        { reasoningEffort: "low", description: "Low reasoning effort" },
-        { reasoningEffort: "medium", description: "Medium reasoning effort" },
-        { reasoningEffort: "high", description: "High reasoning effort" }
-      ],
-      defaultReasoningEffort: "medium",
-      isDefault: idx === 0
-    };
-  });
   writeBridgeJsonRpc({
     jsonrpc: "2.0",
     id: id2,
     result: {
-      models: mappedModels,
+      models: mapDiscoveredModels(readiness.models),
       selectedOnlyModels: []
     }
   });
 }
-function transformLegacyResumeForNative(msg) {
-  if (!msg || msg.method !== "thread/resume" || !msg.params) {
-    return { rewritten: false };
-  }
+function isLegacyAgyThreadResume(msg) {
+  if (!msg || msg.method !== "thread/resume" || !msg.params) return null;
   const providerThreadId = msg.params.providerThreadId;
-  if (typeof providerThreadId !== "string" || !providerThreadId.startsWith("agy-")) {
-    return { rewritten: false };
+  if (typeof providerThreadId === "string" && providerThreadId.startsWith("agy-")) {
+    return providerThreadId;
   }
-  delete msg.params.providerThreadId;
-  msg.method = "thread/start";
-  return { rewritten: true };
+  return null;
 }
+function transformLegacyResumeForNative(msg) {
+  const legacyId = isLegacyAgyThreadResume(msg);
+  if (!legacyId) {
+    return { rewritten: false, migrationRequired: false };
+  }
+  return {
+    rewritten: false,
+    migrationRequired: true,
+    legacyProviderThreadId: legacyId
+  };
+}
+function dispatchBridgeMessage(msg) {
+  if (msg.method === "provider/health" && msg.id !== void 0) {
+    handleNativeProviderHealth(msg.id, msg.params);
+    return true;
+  }
+  if (msg.method === "model/list" && msg.id !== void 0) {
+    handleNativeModelList(msg.id, msg.params);
+    return true;
+  }
+  if (msg.method === "thread/resume") {
+    const legacyId = isLegacyAgyThreadResume(msg);
+    if (legacyId) {
+      writeBridgeJsonRpc({
+        jsonrpc: "2.0",
+        id: msg.id,
+        error: {
+          code: -32e3,
+          message: `Resuming legacy Antigravity CLI session "${legacyId}" is not supported by Google Antigravity Native ACP. Start a new thread with context handoff to continue in a native session.`,
+          data: {
+            migrationRequired: true,
+            legacyProviderThreadId: legacyId
+          }
+        }
+      });
+      return true;
+    }
+  }
+  return false;
+}
+var realAcpBridge = experimental_providerBridge;
 var experimental_providerBridge2 = experimental_defineProviderBridge2({
   handleLine: (line) => {
     try {
       const msg = JSON.parse(line);
       if (msg && msg.params) {
         const modifiedLaunch = ensureLaunchSpec(msg.params);
-        if (msg.method === "provider/health" && msg.id !== void 0) {
-          handleNativeProviderHealth(msg.id, msg.params);
+        if (dispatchBridgeMessage(msg)) {
           return;
-        }
-        if (msg.method === "model/list" && msg.id !== void 0) {
-          handleNativeModelList(msg.id, msg.params);
-          return;
-        }
-        if (msg.method === "thread/resume") {
-          const handoff2 = transformLegacyResumeForNative(msg);
-          if (handoff2.rewritten) {
-            return experimental_providerBridge.handleLine(JSON.stringify(msg));
-          }
         }
         if (modifiedLaunch) {
           return experimental_providerBridge.handleLine(JSON.stringify(msg));
@@ -42040,6 +42030,8 @@ var experimental_providerBridge2 = experimental_defineProviderBridge2({
 export {
   ensureLaunchSpec,
   experimental_providerBridge2 as experimental_providerBridge,
+  isLegacyAgyThreadResume,
+  realAcpBridge,
   transformLegacyResumeForNative
 };
 //# sourceMappingURL=host.js.map

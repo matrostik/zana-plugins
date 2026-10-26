@@ -1,35 +1,33 @@
+import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { experimental_acpProviderBridge as realAcpBridge } from '@zana-ai/zcc-plugin-sdk/provider-bridge/acp';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ensureLaunchSpec,
   experimental_providerBridge,
+  isLegacyAgyThreadResume,
+  realAcpBridge,
   transformLegacyResumeForNative
 } from './host.js';
-import * as nativeRuntime from './src/native-runtime.js';
 import * as nativeAuth from './src/native-auth.js';
+import * as nativeRuntime from './src/native-runtime.js';
 
 describe('host.ts provider bridge and launch helpers', () => {
   let tempGemini: string;
-  const origGemini = process.env.GEMINI_HOME;
 
-  beforeAll(() => {
-    tempGemini = mkdtempSync(join(tmpdir(), 'host-gemini-'));
+  beforeEach(() => {
+    tempGemini = mkdtempSync(join(tmpdir(), 'agy-host-test-'));
     process.env.GEMINI_HOME = tempGemini;
   });
 
-  afterAll(() => {
-    if (origGemini === undefined) {
-      delete process.env.GEMINI_HOME;
-    } else {
-      process.env.GEMINI_HOME = origGemini;
-    }
+  afterEach(() => {
+    delete process.env.GEMINI_HOME;
     try {
       rmSync(tempGemini, { recursive: true, force: true });
     } catch {}
   });
+
   it('ensureLaunchSpec handles null, undefined, and non-object inputs', () => {
     expect(ensureLaunchSpec(null)).toBe(false);
     expect(ensureLaunchSpec(undefined)).toBe(false);
@@ -65,6 +63,22 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(params.providerOptions.acpLaunchSpec.env.AGY_ACP_AUTH_METHOD).toBe('gemini-api-key');
   });
 
+  it('ensureLaunchSpec handles params with only root providerOptions', () => {
+    const params: any = {
+      providerOptions: {
+        antigravityAuthMethod: 'gemini-api-key',
+        acpLaunchSpec: {
+          env: { GEMINI_HOME: '' },
+          nativeReasoning: { configId: 'custom' }
+        }
+      }
+    };
+    const modified = ensureLaunchSpec(params);
+    expect(modified).toBe(true);
+    expect(params.providerOptions.acpLaunchSpec.env.GEMINI_HOME).toBeTruthy();
+    expect(params.providerOptions.acpLaunchSpec.nativeReasoning.configId).toBe('custom');
+  });
+
   it('ensureLaunchSpec enriches existing acpLaunchSpec env and reasoning', () => {
     const params: any = {
       options: {
@@ -93,31 +107,36 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(params.providerOptions.acpLaunchSpec.nativeReasoning.defaultLevel).toBe('medium');
   });
 
-  it('transformLegacyResumeForNative guards against invalid messages and non-agy threads', () => {
-    expect(transformLegacyResumeForNative(null).rewritten).toBe(false);
-    expect(transformLegacyResumeForNative({}).rewritten).toBe(false);
-    expect(transformLegacyResumeForNative({ method: 'thread/start', params: {} }).rewritten).toBe(false);
+  it('transformLegacyResumeForNative and isLegacyAgyThreadResume guard against invalid messages', () => {
+    expect(transformLegacyResumeForNative(null).migrationRequired).toBe(false);
+    expect(transformLegacyResumeForNative({}).migrationRequired).toBe(false);
+    expect(transformLegacyResumeForNative({ method: 'thread/start', params: {} }).migrationRequired).toBe(false);
     expect(
       transformLegacyResumeForNative({
         method: 'thread/resume',
         params: { providerThreadId: 12345 }
-      }).rewritten).toBe(false);
+      }).migrationRequired
+    ).toBe(false);
     expect(
       transformLegacyResumeForNative({
         method: 'thread/resume',
         params: { providerThreadId: 'claude-12345' }
-      }).rewritten).toBe(false);
+      }).migrationRequired
+    ).toBe(false);
+    expect(isLegacyAgyThreadResume(null)).toBeNull();
+    expect(isLegacyAgyThreadResume({ method: 'thread/resume', params: { providerThreadId: 'agy-123' } })).toBe('agy-123');
   });
 
-  it('transformLegacyResumeForNative rewrites agy-* resume to thread/start', () => {
+  it('transformLegacyResumeForNative flags agy-* resume as requiring migration without silent rewrite', () => {
     const msg = {
       method: 'thread/resume',
       params: { providerThreadId: 'agy-session-999', cwd: '/work' }
     };
     const res = transformLegacyResumeForNative(msg);
-    expect(res.rewritten).toBe(true);
-    expect(msg.method).toBe('thread/start');
-    expect((msg.params as any).providerThreadId).toBeUndefined();
+    expect(res.rewritten).toBe(false);
+    expect(res.migrationRequired).toBe(true);
+    expect(res.legacyProviderThreadId).toBe('agy-session-999');
+    expect(msg.method).toBe('thread/resume');
   });
 
   it('handles provider/health when runtime is not installed', () => {
@@ -130,22 +149,23 @@ describe('host.ts provider bridge and launch helpers', () => {
       previousVersion: null,
       source: 'uninstalled',
       companionFilesPresent: false,
-      missingCompanionFiles: ['localharness_external.exe'],
+      missingCompanionFiles: [],
       platformKey: 'windows-x86_64'
     });
 
-    const msg = {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'provider/health',
-      params: { providerOptions: {} }
-    };
-    experimental_providerBridge.handleLine(JSON.stringify(msg));
+    experimental_providerBridge.handleLine(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'provider/health',
+        params: { providerOptions: {} }
+      })
+    );
 
-    expect(stdoutSpy).toHaveBeenCalled();
     const output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
     expect(output.result.health.status).toBe('not_installed');
-    expect(output.result.health.statusMessage).toContain('Missing companion file(s)');
+    expect(output.result.health.statusMessage).toContain('not installed');
+
     stdoutSpy.mockRestore();
     vi.restoreAllMocks();
   });
@@ -164,7 +184,7 @@ describe('host.ts provider bridge and launch helpers', () => {
       platformKey: 'windows-x86_64'
     });
 
-    // Unauthenticated
+    // 1. Sign in required
     vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue({
       state: 'sign_in_required',
       agentVersion: null,
@@ -174,6 +194,7 @@ describe('host.ts provider bridge and launch helpers', () => {
       configuredAuthType: null,
       models: [],
       modes: [],
+      error: 'Please sign in',
       checkedAt: Date.now()
     });
 
@@ -188,8 +209,9 @@ describe('host.ts provider bridge and launch helpers', () => {
 
     let output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
     expect(output.result.health.status).toBe('unauthenticated');
+    expect(output.result.health.statusMessage).toContain('Sign in required');
 
-    // Ready
+    // 2. Ready
     stdoutSpy.mockClear();
     vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue({
       state: 'session_ready',

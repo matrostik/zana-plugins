@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync
 } from 'node:fs';
@@ -98,23 +99,17 @@ export function resolvePlatformKey(
   arch: string = process.arch
 ): string | null {
   const normalizedArch = arch === 'x64' ? 'x86_64' : arch === 'arm64' ? 'aarch64' : arch;
-  if (platform === 'win32') {
-    return `windows-${normalizedArch}`;
-  }
-  if (platform === 'darwin') {
-    return `darwin-${normalizedArch}`;
-  }
-  if (platform === 'linux') {
-    return `linux-${normalizedArch}`;
-  }
+  if (platform === 'win32') return `windows-${normalizedArch}`;
+  if (platform === 'darwin') return `darwin-${normalizedArch}`;
+  if (platform === 'linux') return `linux-${normalizedArch}`;
   return null;
 }
 
-export function getZccDataDir(): string {
-  if (process.env.ZCC_DATA_DIR && process.env.ZCC_DATA_DIR.trim()) {
-    return resolve(process.env.ZCC_DATA_DIR.trim());
+export function getZccDataDir(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim()) {
+    return resolve(env.ZCC_DATA_DIR.trim());
   }
-  const home = process.env.USERPROFILE || process.env.HOME || homedir();
+  const home = env.USERPROFILE || env.HOME || homedir();
   return resolve(home, '.zcc');
 }
 
@@ -124,9 +119,7 @@ export function getManagedRuntimesRoot(baseDir?: string): string {
 
 export function readManagedRuntimePointer(baseDir?: string): ManagedRuntimePointer | null {
   const pointerPath = join(getManagedRuntimesRoot(baseDir), 'current.json');
-  if (!existsSync(pointerPath)) {
-    return null;
-  }
+  if (!existsSync(pointerPath)) return null;
   try {
     const parsed = JSON.parse(readFileSync(pointerPath, 'utf8'));
     if (parsed && typeof parsed.version === 'string') {
@@ -168,9 +161,31 @@ export function checkCompanionFiles(
   }
   const dir = dirname(executablePath);
   const missing = dist.companionFiles.filter((file) => !existsSync(join(dir, file)));
+  return { ok: missing.length === 0, missing };
+}
+
+function resolveCustomRuntime(
+  custom: string,
+  defaultArgs: string[],
+  platformKey: string | null,
+  dist?: NativeBinaryDistribution,
+  pointer?: ManagedRuntimePointer | null
+): ResolvedNativeRuntime {
+  const resolvedCustom = resolve(custom);
+  const exists = existsSync(resolvedCustom);
+  const companions = exists
+    ? checkCompanionFiles(resolvedCustom, platformKey)
+    : { ok: false, missing: dist?.companionFiles ?? [] };
   return {
-    ok: missing.length === 0,
-    missing
+    installed: exists && companions.ok,
+    executable: exists ? resolvedCustom : custom,
+    args: defaultArgs,
+    version: exists ? pointer?.version ?? PINNED_NATIVE_ACP_VERSION : null,
+    previousVersion: pointer?.previousVersion ?? null,
+    source: 'custom',
+    companionFilesPresent: companions.ok,
+    missingCompanionFiles: companions.missing,
+    platformKey
   };
 }
 
@@ -188,22 +203,7 @@ export function resolveNativeAcpRuntime(options?: {
 
   const custom = options?.customExecutable?.trim();
   if (custom) {
-    const resolvedCustom = resolve(custom);
-    const exists = existsSync(resolvedCustom);
-    const companions = exists
-      ? checkCompanionFiles(resolvedCustom, platformKey)
-      : { ok: false, missing: dist?.companionFiles ?? [] };
-    return {
-      installed: exists && companions.ok,
-      executable: exists ? resolvedCustom : custom,
-      args: defaultArgs,
-      version: exists ? pointer?.version ?? PINNED_NATIVE_ACP_VERSION : null,
-      previousVersion: pointer?.previousVersion ?? null,
-      source: 'custom',
-      companionFilesPresent: companions.ok,
-      missingCompanionFiles: companions.missing,
-      platformKey
-    };
+    return resolveCustomRuntime(custom, defaultArgs, platformKey, dist, pointer);
   }
 
   const root = getManagedRuntimesRoot(options?.baseDir);
@@ -277,6 +277,116 @@ export interface InstallNativeRuntimeOptions {
   extractImpl?: (zipPath: string, destinationDir: string) => Promise<void>;
 }
 
+async function downloadAndVerifyArchive(
+  dist: NativeBinaryDistribution,
+  stagingDir: string,
+  fetchFn: typeof fetch
+): Promise<{ archivePath: string; actualSha256: string }> {
+  const archivePath = join(stagingDir, `agy-acp-server-${PINNED_NATIVE_ACP_VERSION}.zip`);
+  const response = await fetchFn(dist.archive);
+  if (!response.ok) {
+    throw new Error(`Failed to download native ACP archive (${response.status} ${response.statusText})`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const actualSha256 = computeSha256Hex(bytes);
+  if (actualSha256.toLowerCase() !== dist.sha256.toLowerCase()) {
+    throw new Error(
+      `SHA-256 checksum mismatch for native ACP archive: expected ${dist.sha256}, got ${actualSha256}`
+    );
+  }
+  writeFileSync(archivePath, bytes);
+  return { archivePath, actualSha256 };
+}
+
+function stageRuntimeFiles(
+  extractDir: string,
+  stagingVersionDir: string,
+  dist: NativeBinaryDistribution,
+  platformKey: string,
+  isWin32: boolean
+): void {
+  mkdirSync(stagingVersionDir, { recursive: true });
+  for (const file of [dist.cmd, ...dist.companionFiles]) {
+    const srcFile = join(extractDir, file);
+    const destFile = join(stagingVersionDir, file);
+    writeFileSync(destFile, readFileSync(srcFile));
+    if (!isWin32) {
+      try {
+        chmodSync(destFile, 0o755);
+      } catch {
+        // Ignore chmod error on non-POSIX filesystems
+      }
+    }
+  }
+}
+
+function swapVersionDirectory(stagingVersionDir: string, versionDir: string, root: string): void {
+  mkdirSync(dirname(versionDir), { recursive: true });
+  const backupDir = join(root, `.backup-${PINNED_NATIVE_ACP_VERSION}-${Date.now()}`);
+  const hasExisting = existsSync(versionDir);
+
+  if (hasExisting) {
+    renameSync(versionDir, backupDir);
+  }
+
+  try {
+    renameSync(stagingVersionDir, versionDir);
+    if (hasExisting) {
+      rmSync(backupDir, { recursive: true, force: true });
+    }
+  } catch (swapErr) {
+    if (hasExisting && existsSync(backupDir)) {
+      try {
+        renameSync(backupDir, versionDir);
+      } catch {
+        // Ignore fallback restore errors
+      }
+    }
+    throw swapErr;
+  }
+}
+
+function verifyExtractedArchive(
+  extractDir: string,
+  dist: NativeBinaryDistribution,
+  platformKey: string
+): void {
+  const extractedExe = join(extractDir, dist.cmd);
+  if (!existsSync(extractedExe)) {
+    throw new Error(`Archive extraction did not produce expected executable "${dist.cmd}"`);
+  }
+  const companions = checkCompanionFiles(extractedExe, platformKey);
+  if (!companions.ok) {
+    throw new Error(
+      `Archive extraction is missing required companion files: ${companions.missing.join(', ')}`
+    );
+  }
+}
+
+function updatePointerAfterInstall(
+  baseDir: string | undefined,
+  version: string,
+  actualSha256: string,
+  platformKey: string
+): void {
+  const existingPointer = readManagedRuntimePointer(baseDir);
+  const previousVersion =
+    existingPointer && existingPointer.version !== version
+      ? existingPointer.version
+      : existingPointer?.previousVersion ?? null;
+
+  writeManagedRuntimePointer(
+    {
+      version,
+      previousVersion,
+      installedAt: new Date().toISOString(),
+      sha256: actualSha256,
+      platformKey
+    },
+    baseDir
+  );
+}
+
 export async function installNativeAcpRuntime(
   options?: InstallNativeRuntimeOptions
 ): Promise<ResolvedNativeRuntime> {
@@ -292,74 +402,24 @@ export async function installNativeAcpRuntime(
   const root = getManagedRuntimesRoot(options?.baseDir);
   const versionDir = join(root, version);
   const stagingDir = join(root, `.staging-${version}-${Date.now()}`);
-  const archivePath = join(stagingDir, `agy-acp-server-${version}.zip`);
-
   mkdirSync(stagingDir, { recursive: true });
 
   try {
     const fetchFn = options?.fetchImpl ?? globalThis.fetch;
-    const response = await fetchFn(dist.archive);
-    if (!response.ok) {
-      throw new Error(`Failed to download native ACP archive (${response.status} ${response.statusText})`);
-    }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const actualSha256 = computeSha256Hex(bytes);
-    if (actualSha256.toLowerCase() !== dist.sha256.toLowerCase()) {
-      throw new Error(
-        `SHA-256 checksum mismatch for native ACP archive: expected ${dist.sha256}, got ${actualSha256}`
-      );
-    }
+    const { archivePath, actualSha256 } = await downloadAndVerifyArchive(dist, stagingDir, fetchFn);
 
-    writeFileSync(archivePath, bytes);
     const extractDir = join(stagingDir, 'unpacked');
     const extractFn = options?.extractImpl ?? extractZipArchive;
     await extractFn(archivePath, extractDir);
 
-    const extractedExe = join(extractDir, dist.cmd);
-    if (!existsSync(extractedExe)) {
-      throw new Error(`Archive extraction did not produce expected executable "${dist.cmd}"`);
-    }
+    verifyExtractedArchive(extractDir, dist, platformKey);
 
-    const companions = checkCompanionFiles(extractedExe, platformKey);
-    if (!companions.ok) {
-      throw new Error(
-        `Archive extraction is missing required companion files: ${companions.missing.join(', ')}`
-      );
-    }
+    const stagingVersionDir = join(stagingDir, 'staged-version');
+    const isWin32 = (options?.platform ?? process.platform) === 'win32';
+    stageRuntimeFiles(extractDir, stagingVersionDir, dist, platformKey, isWin32);
+    swapVersionDirectory(stagingVersionDir, versionDir, root);
 
-    rmSync(versionDir, { recursive: true, force: true });
-    mkdirSync(dirname(versionDir), { recursive: true });
-    // Move unpacked directory into versionDir
-    mkdirSync(versionDir, { recursive: true });
-    for (const file of [dist.cmd, ...dist.companionFiles]) {
-      const srcFile = join(extractDir, file);
-      const destFile = join(versionDir, file);
-      writeFileSync(destFile, readFileSync(srcFile));
-      if ((options?.platform ?? process.platform) !== 'win32') {
-        try {
-          chmodSync(destFile, 0o755);
-        } catch {
-          // Ignore chmod error on non-POSIX filesystems
-        }
-      }
-    }
-
-    const existingPointer = readManagedRuntimePointer(options?.baseDir);
-    const previousVersion =
-      existingPointer && existingPointer.version !== version
-        ? existingPointer.version
-        : existingPointer?.previousVersion ?? null;
-
-    writeManagedRuntimePointer(
-      {
-        version,
-        previousVersion,
-        installedAt: new Date().toISOString(),
-        sha256: actualSha256,
-        platformKey
-      },
-      options?.baseDir
-    );
+    updatePointerAfterInstall(options?.baseDir, version, actualSha256, platformKey);
 
     return resolveNativeAcpRuntime({
       baseDir: options?.baseDir,
@@ -424,17 +484,16 @@ export function killProcessTree(child: ChildProcess | null | undefined): void {
     try {
       execFileSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], {
         stdio: 'ignore',
-        windowsHide: true,
-        timeout: 4_000
+        windowsHide: true
       });
       return;
     } catch {
-      // Fall back to standard kill if taskkill fails
+      // Best-effort process tree kill
     }
   }
   try {
-    child.kill('SIGKILL');
+    child.kill('SIGTERM');
   } catch {
-    // Ignore if already exited
+    // Best effort
   }
 }
