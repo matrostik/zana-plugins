@@ -84,6 +84,22 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     if (text.trim() && text !== waiter.baseline) settle(event.threadId, { text });
   }
 
+  /** Reads the thread status once and settles the waiter when the thread has failed, stopped, or finished. */
+  async function checkThread(threadId: string, baseline: string, isFinished: () => boolean): Promise<void> {
+    const thread = await threads.get({ threadId }).catch(() => null);
+    const status = thread?.status?.toLowerCase() ?? '';
+    if (FAILED_STATUSES.has(status)) {
+      settle(threadId, { error: new Error(`Review thread ended with status "${status}"`) });
+    } else if (STOPPED_STATUSES.has(status)) {
+      settle(threadId, { error: new Error('Review thread was stopped') });
+    } else if (DONE_STATUSES.has(status)) {
+      const waiter = waiters.get(threadId);
+      const text = await currentOutput(threadId);
+      if (isFinished() || waiters.get(threadId) !== waiter) return;
+      if (text.trim() && text !== baseline) settle(threadId, { text });
+    }
+  }
+
   /** Resolves with the thread's next new final output; rejects on failure, stop, timeout, or abort. */
   async function waitForOutput(threadId: string, args: { baseline?: string; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<string> {
     const baseline = args.baseline ?? '';
@@ -120,18 +136,7 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
           settle(threadId, { error: new Error('Review thread timed out') });
           return;
         }
-        const thread = await threads.get({ threadId }).catch(() => null);
-        const status = thread?.status?.toLowerCase() ?? '';
-        if (FAILED_STATUSES.has(status)) {
-          settle(threadId, { error: new Error(`Review thread ended with status "${status}"`) });
-        } else if (STOPPED_STATUSES.has(status)) {
-          settle(threadId, { error: new Error('Review thread was stopped') });
-        } else if (DONE_STATUSES.has(status)) {
-          const waiter = waiters.get(threadId);
-          const text = await currentOutput(threadId);
-          if (finished || waiters.get(threadId) !== waiter) return;
-          if (text.trim() && text !== baseline) settle(threadId, { text });
-        }
+        await checkThread(threadId, baseline, () => finished);
       }
     })();
 

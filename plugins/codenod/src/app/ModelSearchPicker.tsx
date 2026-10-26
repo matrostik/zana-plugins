@@ -110,65 +110,109 @@ export function ProviderModelPicker(props: { provider: AvailableProvider; value:
             onKeyDown={onKeyDown}
           />
           {open ? (
-            <ul id={listId} className="cn-combobox-list" role="listbox">
-              {atCap ? (
-                <li className="cn-combobox-empty">You already picked {MAX_REVIEW_MODELS} models.</li>
-              ) : options.length === 0 ? (
-                <li className="cn-combobox-empty">{query.trim() ? 'No matching models' : selectedHere.length === provider.models.length ? 'All models from this provider are selected' : 'No models'}</li>
-              ) : (
-                options.map((model, index) => (
-                  <li key={model.id} role="presentation">
-                    <button
-                      type="button"
-                      className="cn-combobox-option"
-                      role="option"
-                      aria-selected={index === highlight}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setHighlight(index)}
-                      onClick={() => add(model.id)}
-                    >
-                      <span>{model.label}</span>
-                      {model.label !== model.id ? <span className="cn-muted cn-small">{model.id}</span> : null}
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
+            <ModelOptionList
+              id={listId}
+              atCap={atCap}
+              options={options}
+              highlight={highlight}
+              query={query}
+              allSelected={selectedHere.length === provider.models.length}
+              onHighlight={setHighlight}
+              onSelect={add}
+            />
           ) : null}
         </div>
       ) : null}
       {selectedHere.length > 0 ? (
         <ul className="cn-selected-models">
-          {selectedHere.map((item) => {
-            const catalog = catalogById.get(item.model);
-            const label = catalog?.label ?? item.model;
-            const reasoningLevels = catalog?.reasoningLevels ?? [];
-            return (
-              <li key={modelKey(item.providerId, item.model)} className="cn-selected-model">
-                <span>{label}</span>
-                {showReasoning && reasoningLevels.length > 0 ? (
-                  <select
-                    className="cn-select cn-small"
-                    aria-label={`Reasoning level for ${label}`}
-                    value={item.reasoningLevel ?? ''}
-                    onChange={(event) => onChange(setModelReasoning(value, item.providerId, item.model, event.target.value))}
-                  >
-                    <option value="">Default reasoning</option>
-                    {reasoningLevels.map((level) => (
-                      <option key={level} value={level}>
-                        {level}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-                <button type="button" className="cn-btn cn-small" onClick={() => onChange(removeModelChoice(value, item.providerId, item.model))}>
-                  Remove
-                </button>
-              </li>
-            );
-          })}
+          {selectedHere.map((item) => (
+            <SelectedModelItem
+              key={modelKey(item.providerId, item.model)}
+              item={item}
+              label={catalogById.get(item.model)?.label ?? item.model}
+              reasoningLevels={catalogById.get(item.model)?.reasoningLevels ?? []}
+              showReasoning={showReasoning}
+              onChange={(next) => onChange(next(value))}
+            />
+          ))}
         </ul>
       ) : null}
     </fieldset>
   );
 }
+
+function ModelOptionList(props: {
+  id: string;
+  atCap: boolean;
+  options: AvailableProvider['models'];
+  highlight: number;
+  query: string;
+  allSelected: boolean;
+  onHighlight(index: number): void;
+  onSelect(modelId: string): void;
+}) {
+  const { id, atCap, options, highlight, query, allSelected, onHighlight, onSelect } = props;
+  let emptyText = 'No models';
+  if (query.trim()) emptyText = 'No matching models';
+  else if (allSelected) emptyText = 'All models from this provider are selected';
+  return (
+    <ul id={id} className="cn-combobox-list" role="listbox">
+      {atCap ? (
+        <li className="cn-combobox-empty">You already picked {MAX_REVIEW_MODELS} models.</li>
+      ) : options.length === 0 ? (
+        <li className="cn-combobox-empty">{emptyText}</li>
+      ) : (
+        options.map((model, index) => (
+          <li key={model.id} role="presentation">
+            <button
+              type="button"
+              className="cn-combobox-option"
+              role="option"
+              aria-selected={index === highlight}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => onHighlight(index)}
+              onClick={() => onSelect(model.id)}
+            >
+              <span>{model.label}</span>
+              {model.label !== model.id ? <span className="cn-muted cn-small">{model.id}</span> : null}
+            </button>
+          </li>
+        ))
+      )}
+    </ul>
+  );
+}
+
+function SelectedModelItem(props: {
+  item: ModelChoice;
+  label: string;
+  reasoningLevels: string[];
+  showReasoning?: boolean;
+  onChange(update: (current: ModelChoice[]) => ModelChoice[]): void;
+}) {
+  const { item, label, reasoningLevels, showReasoning, onChange } = props;
+  return (
+    <li className="cn-selected-model">
+      <span>{label}</span>
+      {showReasoning && reasoningLevels.length > 0 ? (
+        <select
+          className="cn-select cn-small"
+          aria-label={`Reasoning level for ${label}`}
+          value={item.reasoningLevel ?? ''}
+          onChange={(event) => onChange((current) => setModelReasoning(current, item.providerId, item.model, event.target.value))}
+        >
+          <option value="">Default reasoning</option>
+          {reasoningLevels.map((level) => (
+            <option key={level} value={level}>
+              {level}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      <button type="button" className="cn-btn cn-small" onClick={() => onChange((current) => removeModelChoice(current, item.providerId, item.model))}>
+        Remove
+      </button>
+    </li>
+  );
+}
+
