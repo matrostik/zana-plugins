@@ -72,48 +72,71 @@ export class StaleReviewError extends Error {
 }
 
 export function createPoster(deps: { store: Store; github: GitHubClient }) {
+  const inFlight = new Map<string, Promise<unknown>>();
+  type PostInput = { reviewId: string; findingIds: string[]; event: ReviewEvent; body?: string };
+  type PostResult = { url: string | null; commentCount: number; bodyFindingCount: number; publishedCount: number };
+
+  async function postOnce(input: PostInput): Promise<PostResult> {
+    const review = deps.store.getReview(input.reviewId);
+    if (!review) throw new Error(`Review ${input.reviewId} not found`);
+    if (review.status !== 'completed') throw new Error('Only completed reviews can be posted');
+    const ref = parsePrId(review.prId);
+    const pull = await deps.github.getPull(ref);
+    if (input.event !== 'COMMENT' && pull.head.sha !== review.headSha) throw new StaleReviewError(review.headSha, pull.head.sha);
+
+    const wanted = new Set(input.findingIds);
+    const findings = deps.store.listFindings(review.id).filter((finding) => wanted.has(finding.id) && !finding.dismissed && !finding.postedAt);
+    if (findings.length === 0 && input.event === 'COMMENT' && !input.body?.trim()) throw new Error('Select at least one finding or write a message to post');
+
+    const files = await deps.github.listFiles(ref);
+    const modelCount = deps.store.listRuns(review.id).filter((run) => run.status === 'completed').length;
+    const payload = buildReviewPayload({
+      findings,
+      files: pull.head.sha === review.headSha ? files : [],
+      modelCount,
+      summary: findings.length > 0 ? review.consensusSummary ?? review.summary : null,
+      extraBody: input.body
+    });
+    const created = await deps.github.createReview(ref, {
+      commitId: review.headSha,
+      event: input.event,
+      body: payload.body || (input.event === 'APPROVE' ? 'Approved after CodeNod review.' : 'CodeNod review'),
+      comments: payload.comments
+    });
+    const publishedIds = [...payload.inlineIds, ...payload.bodyIds];
+    deps.store.markFindingsPosted(publishedIds);
+    deps.store.recordPostedReview({
+      reviewId: review.id,
+      event: input.event,
+      githubReviewId: typeof created?.id === 'number' ? created.id : null,
+      url: created?.html_url ?? null,
+      commentCount: payload.comments.length
+    });
+    return {
+      url: created?.html_url ?? null,
+      commentCount: payload.comments.length,
+      bodyFindingCount: payload.bodyIds.length,
+      publishedCount: publishedIds.length
+    };
+  }
+
+  /** Runs posts for one review one at a time so overlapping submissions re-read the posted state. */
+  function postSerialized(input: PostInput): Promise<PostResult> {
+    const previous = inFlight.get(input.reviewId) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(() => postOnce(input));
+    const tail = run.catch(() => undefined);
+    inFlight.set(input.reviewId, tail);
+    return run.finally(() => {
+      if (inFlight.get(input.reviewId) === tail) inFlight.delete(input.reviewId);
+    });
+  }
+
   return {
     async currentHeadSha(prId: string): Promise<string> {
       return (await deps.github.getPull(parsePrId(prId))).head.sha;
     },
 
-    async post(input: { reviewId: string; findingIds: string[]; event: ReviewEvent; body?: string }): Promise<{ url: string | null; commentCount: number; bodyFindingCount: number }> {
-      const review = deps.store.getReview(input.reviewId);
-      if (!review) throw new Error(`Review ${input.reviewId} not found`);
-      if (review.status !== 'completed') throw new Error('Only completed reviews can be posted');
-      const ref = parsePrId(review.prId);
-      const pull = await deps.github.getPull(ref);
-      if (input.event !== 'COMMENT' && pull.head.sha !== review.headSha) throw new StaleReviewError(review.headSha, pull.head.sha);
-
-      const wanted = new Set(input.findingIds);
-      const findings = deps.store.listFindings(review.id).filter((finding) => wanted.has(finding.id) && !finding.dismissed && !finding.postedAt);
-      if (findings.length === 0 && input.event === 'COMMENT' && !input.body?.trim()) throw new Error('Select at least one finding or write a message to post');
-
-      const files = await deps.github.listFiles(ref);
-      const modelCount = deps.store.listRuns(review.id).filter((run) => run.status === 'completed').length;
-      const payload = buildReviewPayload({
-        findings,
-        files: pull.head.sha === review.headSha ? files : [],
-        modelCount,
-        summary: findings.length > 0 ? review.consensusSummary ?? review.summary : null,
-        extraBody: input.body
-      });
-      const created = await deps.github.createReview(ref, {
-        commitId: review.headSha,
-        event: input.event,
-        body: payload.body || (input.event === 'APPROVE' ? 'Approved after CodeNod review.' : 'CodeNod review'),
-        comments: payload.comments
-      });
-      deps.store.markFindingsPosted([...payload.inlineIds, ...payload.bodyIds]);
-      deps.store.recordPostedReview({
-        reviewId: review.id,
-        event: input.event,
-        githubReviewId: typeof created?.id === 'number' ? created.id : null,
-        url: created?.html_url ?? null,
-        commentCount: payload.comments.length
-      });
-      return { url: created?.html_url ?? null, commentCount: payload.comments.length, bodyFindingCount: payload.bodyIds.length };
-    }
+    post: postSerialized
   };
 }
 

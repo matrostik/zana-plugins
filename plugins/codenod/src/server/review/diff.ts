@@ -47,7 +47,7 @@ export function annotateDiffWithLineNumbers(patch: string): string {
       annotated.push(raw);
     } else if (raw.startsWith('-')) {
       annotated.push(`      ${raw}`);
-    } else if (raw.startsWith('+') || raw.startsWith(' ') || raw.length > 0) {
+    } else if (raw.startsWith('+') || raw.startsWith(' ')) {
       annotated.push(`L${newLine}: ${raw}`);
       newLine++;
     } else {

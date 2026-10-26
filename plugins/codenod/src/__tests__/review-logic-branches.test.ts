@@ -408,7 +408,7 @@ describe('diff line numbers', () => {
   });
 
   it('handles hunks without counts, no-newline markers, blank and unprefixed lines', () => {
-    expect(annotateDiffWithLineNumbers(patch).split('\n')).toEqual(['@@ -1 +1 @@', '      -old', 'L1: +new', '\\ No newline at end of file', '', 'L2: bare']);
+    expect(annotateDiffWithLineNumbers(patch).split('\n')).toEqual(['@@ -1 +1 @@', '      -old', 'L1: +new', '\\ No newline at end of file', '', 'bare']);
   });
 
   it('only counts added and context lines as commentable', () => {
@@ -457,7 +457,7 @@ describe('parse analysis', () => {
     };
     expect(risk(0)).toBe(1);
     expect(risk(15)).toBe(10);
-    expect(risk('4.26')).toBe(4.3);
+    expect(risk('4.26')).toBe(4);
   });
 
   it('parses summaries containing escaped quotes and backslashes', () => {
@@ -681,6 +681,35 @@ function posterHarness(
 }
 
 describe('poster', () => {
+  it('does not double-post findings when two submissions overlap', async () => {
+    const posted = new Set<string>();
+    const findings = [finding('in')];
+    const store = {
+      getReview: vi.fn(() => ({ id: 'r', prId: 'github.com/acme/api#4', headSha: 'abc1234567', status: 'completed', summary: 'S', consensusSummary: null })),
+      listFindings: vi.fn(() => findings.map((item) => ({ ...item, postedAt: posted.has(item.id) ? 1 : null }))),
+      listRuns: vi.fn(() => [{ status: 'completed' }]),
+      markFindingsPosted: vi.fn((ids: string[]) => ids.forEach((id) => posted.add(id))),
+      recordPostedReview: vi.fn()
+    };
+    const github = {
+      getPull: vi.fn(async () => ({ head: { sha: 'abc1234567' } })),
+      listFiles: vi.fn(async (): Promise<ChangedFile[]> => [{ path: 'src/a.ts', status: 'modified', additions: 1, deletions: 1, patch: PATCH }]),
+      createReview: vi.fn(async (_ref: unknown, _input: { comments: unknown[] }) => {
+        return { id: 1, html_url: 'https://github.com/acme/api/pull/4#r1' };
+      })
+    };
+    const poster = createPoster({ store: store as unknown as Store, github: github as unknown as GitHubClient });
+    const [first, second] = await Promise.all([
+      poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' }),
+      poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT', body: 'follow-up' })
+    ]);
+    expect(first.publishedCount).toBe(1);
+    expect(second.publishedCount).toBe(0);
+    expect(second.commentCount).toBe(0);
+    expect(github.createReview).toHaveBeenCalledTimes(2);
+    expect(github.createReview.mock.calls[1]?.[1]).toMatchObject({ comments: [] });
+  });
+
   it('reads the current head commit', async () => {
     const { poster, github } = posterHarness({ headSha: 'fff0000' });
     await expect(poster.currentHeadSha('github.com/acme/api#4')).resolves.toBe('fff0000');
@@ -708,7 +737,7 @@ describe('poster', () => {
   it('posts stale comments without inline positions', async () => {
     const { poster, github } = posterHarness({ headSha: 'def4567890', findings: [finding('in')] });
     const result = await poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' });
-    expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 0, bodyFindingCount: 1 });
+    expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 0, bodyFindingCount: 1, publishedCount: 1 });
     expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ commitId: 'abc1234567', comments: [] }));
   });
 
@@ -728,7 +757,7 @@ describe('poster', () => {
       findings: [finding('in'), finding('gone', { dismissed: true }), finding('unselected')]
     });
     const result = await poster.post({ reviewId: 'r', findingIds: ['in', 'gone'], event: 'APPROVE' });
-    expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1, bodyFindingCount: 0 });
+    expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1, bodyFindingCount: 0, publishedCount: 1 });
     expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ event: 'APPROVE', body: '**CodeNod summary:** Consensus view' }));
     expect(store.markFindingsPosted).toHaveBeenCalledWith(['in']);
     expect(store.recordPostedReview).toHaveBeenCalledWith({ reviewId: 'r', event: 'APPROVE', githubReviewId: 7, url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1 });

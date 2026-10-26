@@ -199,11 +199,11 @@ export function createGitHubClient(tokens: TokenResolver, fetchImpl: FetchLike =
     },
 
     async listReviewComments(ref: PrRef): Promise<GhComment[]> {
-      return paginate<GhComment>(ref.host, `${repoPath(ref)}/pulls/${ref.number}/comments`, MAX_COMMENT_PAGES);
+      return paginate<GhComment>(ref.host, `${repoPath(ref)}/pulls/${ref.number}/comments?sort=created&direction=desc`, MAX_COMMENT_PAGES);
     },
 
     async listIssueComments(ref: PrRef): Promise<GhComment[]> {
-      return paginate<GhComment>(ref.host, `${repoPath(ref)}/issues/${ref.number}/comments`, MAX_COMMENT_PAGES);
+      return paginate<GhComment>(ref.host, `${repoPath(ref)}/issues/${ref.number}/comments?sort=created&direction=desc`, MAX_COMMENT_PAGES);
     },
 
     async getIssue(repo: RepoRef, issueNumber: number): Promise<GhIssue> {

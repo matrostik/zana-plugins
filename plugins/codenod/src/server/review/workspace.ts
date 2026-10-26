@@ -12,6 +12,6 @@ export async function fetchPullRequestHead(run: CommandRunner, projectPath: stri
   const fetched = await run('git', ['-C', projectPath, 'fetch', remote, `pull/${prNumber}/head:${ref}`], { timeoutMs: FETCH_TIMEOUT_MS });
   if (fetched === null) throw new Error(`Could not fetch pull/${prNumber}/head from ${remote} into the project checkout`);
   const resolved = (await run('git', ['-C', projectPath, 'rev-parse', ref]))?.trim();
-  if (resolved !== headSha) throw new Error(`Fetched pull/${prNumber}/head (${resolved ?? 'missing'}) does not match ${headSha}`);
+  if (resolved?.toLowerCase() !== headSha.toLowerCase()) throw new Error(`Fetched pull/${prNumber}/head (${resolved ?? 'missing'}) does not match ${headSha}`);
   return headSha;
 }

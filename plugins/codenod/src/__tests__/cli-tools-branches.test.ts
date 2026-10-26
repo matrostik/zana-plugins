@@ -43,7 +43,7 @@ function createApp(overrides: Partial<CodenodApp> = {}) {
     detail: async (...args) => (record('detail', args), detailFixture('completed')),
     startReview: async (...args) => (record('startReview', args), review({ id: 'rev-new', status: 'queued' })),
     waitForReview: async (...args) => (record('waitForReview', args), review({ id: 'rev-new', status: 'completed' })),
-    post: async (...args) => (record('post', args), { url: null, commentCount: 0 }),
+    post: async (...args) => (record('post', args), { url: null, commentCount: 0, publishedCount: 0 }),
     syncAll: async () => ({ hosts: [], changed: [] }),
     hostStatuses: async () => [],
     configuredModels: async () => [],
@@ -289,7 +289,7 @@ describe('codenod cli', () => {
     });
 
     it('posts every unposted, undismissed finding by default', async () => {
-      const { cli, calls } = createCli({ detail: async () => withFindings(), post: async (input) => (calls.push({ method: 'post', args: [input] }), { url: null, commentCount: 2 }) });
+      const { cli, calls } = createCli({ detail: async () => withFindings(), post: async (input) => (calls.push({ method: 'post', args: [input] }), { url: null, commentCount: 2, publishedCount: 2 }) });
       const result = await cli(['post', 'acme/api#1', '--yes']);
       expect(result).toEqual({ exitCode: 0, stdout: 'Posted 2 finding(s), 2 inline.' });
       expect(calls[0].args[0]).toEqual({ reviewId: 'rev', findingIds: ['aaaa1111', 'dddd4444'], event: 'COMMENT', body: undefined });
@@ -298,7 +298,7 @@ describe('codenod cli', () => {
     it('posts findings selected by id prefix with a message and prints the review URL', async () => {
       const { cli, calls } = createCli({
         detail: async () => withFindings(),
-        post: async (input) => (calls.push({ method: 'post', args: [input] }), { url: 'https://github.com/acme/api/pull/1#review', commentCount: 1 })
+        post: async (input) => (calls.push({ method: 'post', args: [input] }), { url: 'https://github.com/acme/api/pull/1#review', commentCount: 1, publishedCount: 2 })
       });
       const result = await cli(['post', 'acme/api#1', '--yes', '--findings', 'dddd, aaaa', '--message', 'Please fix']);
       expect(result).toEqual({ exitCode: 0, stdout: 'Posted 2 finding(s), 1 inline.\nhttps://github.com/acme/api/pull/1#review' });
@@ -306,7 +306,7 @@ describe('codenod cli', () => {
     });
 
     it('posts when --yes comes before the pull request', async () => {
-      const { cli } = createCli({ detail: async () => withFindings(), post: async () => ({ url: null, commentCount: 2 }) });
+      const { cli } = createCli({ detail: async () => withFindings(), post: async () => ({ url: null, commentCount: 2, publishedCount: 2 }) });
       const result = await cli(['post', '--yes', 'acme/api#1']);
       expect(result).toEqual({ exitCode: 0, stdout: 'Posted 2 finding(s), 2 inline.' });
     });

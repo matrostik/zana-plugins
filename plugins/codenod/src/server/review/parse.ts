@@ -73,7 +73,7 @@ function startsWithUnclosedObject(text: string): boolean {
 function boundedScore(value: unknown, min: number, max: number): number | null {
   const numeric = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (typeof numeric !== 'number' || !Number.isFinite(numeric)) return null;
-  return Math.min(max, Math.max(min, Math.round(numeric * 10) / 10));
+  return Math.min(max, Math.max(min, Math.round(numeric)));
 }
 
 function note(value: unknown): string | null {

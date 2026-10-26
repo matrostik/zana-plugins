@@ -221,8 +221,8 @@ describe('GitHub client pagination and endpoints', () => {
     expect(reviewComments).toHaveLength(300);
     expect(issueComments).toHaveLength(300);
     expect(calls).toHaveLength(6);
-    expect(calls[2].url).toBe('https://api.github.com/repos/acme/api/pulls/7/comments?per_page=100&page=3');
-    expect(calls[5].url).toBe('https://api.github.com/repos/acme/api/issues/7/comments?per_page=100&page=3');
+    expect(calls[2].url).toBe('https://api.github.com/repos/acme/api/pulls/7/comments?sort=created&direction=desc&per_page=100&page=3');
+    expect(calls[5].url).toBe('https://api.github.com/repos/acme/api/issues/7/comments?sort=created&direction=desc&per_page=100&page=3');
   });
 
   it('caps search page size and tolerates a missing items field', async () => {

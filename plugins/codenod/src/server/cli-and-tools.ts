@@ -10,7 +10,7 @@ export interface CodenodApp {
   detail(ref: PrRef): Promise<PrDetail>;
   startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto' }): Promise<ReviewRow>;
   waitForReview(reviewId: string, timeoutMs: number): Promise<ReviewRow>;
-  post(input: { reviewId: string; findingIds: string[]; event: ReviewEvent; body?: string }): Promise<{ url: string | null; commentCount: number }>;
+  post(input: { reviewId: string; findingIds: string[]; event: ReviewEvent; body?: string }): Promise<{ url: string | null; commentCount: number; publishedCount: number }>;
   syncAll(): Promise<SyncResult>;
   hostStatuses(): Promise<HostStatus[]>;
   configuredModels(): Promise<ModelChoice[]>;
@@ -172,7 +172,8 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
                   return match.id;
                 });
             const result = await app.post({ reviewId: detail.review.id, findingIds, event: 'COMMENT', body: flagString(args, 'message') });
-            return { exitCode: 0, stdout: `Posted ${findingIds.length} finding(s), ${result.commentCount} inline.${result.url ? `\n${result.url}` : ''}` };
+            const skipped = findingIds.length - result.publishedCount;
+            return { exitCode: 0, stdout: `Posted ${result.publishedCount} finding(s), ${result.commentCount} inline.${skipped > 0 ? ` ${skipped} selected finding(s) were left unposted (GitHub review body size limit).` : ''}${result.url ? `\n${result.url}` : ''}` };
           }
           case 'repos': {
             const [sub = 'list', target] = args.positional;
