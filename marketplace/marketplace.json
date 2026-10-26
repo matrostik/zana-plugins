@@ -51,6 +51,29 @@
           "ref": "master"
         }
       }
+    },
+    {
+      "id": "codenod",
+      "displayName": "CodeNod",
+      "description": "AI pull request reviews for GitHub and GitHub Enterprise on Zana's providers: review inbox, multi-model consensus, risk and quality scores, Deep Review threads, and posting findings.",
+      "icon": {
+        "lucide": "GitPullRequest"
+      },
+      "tags": [
+        "community"
+      ],
+      "author": {
+        "name": "Ros Haitovich",
+        "github": "matrostik",
+        "url": "https://github.com/matrostik"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/matrostik/zana-plugins",
+          "subdir": "plugins/codenod",
+          "ref": "master"
+        }
+      }
     }
   ]
 }
