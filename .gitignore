@@ -17,6 +17,7 @@ vendor/
 
 # Build output
 dist/
+!plugins/*/dist/
 build/
 out/
 target/

@@ -1,0 +1,39 @@
+{
+  "name": "@zcc-ext/provider-antigravity",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Run Zana threads with your Google Antigravity subscription via Google's official Native ACP server (agy_acp_server).",
+  "engines": {
+    "zcc": ">=2.2.2",
+    "zccPluginSdk": ">=0.1.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run"
+  },
+  "zcc": {
+    "name": "Antigravity Provider",
+    "description": "Run Zana threads with your Google Antigravity subscription via Google's official Native ACP server (agy_acp_server).",
+    "branding": {
+      "icon": "./icons/antigravity.svg"
+    },
+    "server": "./server.mjs",
+    "app": "./app.js",
+    "host": "./dist/host.js",
+    "extra": {
+      "threadProvider": true
+    }
+  },
+  "dependencies": {
+    "@zana-ai/zcc-plugin-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "esbuild": "^0.25.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vitest": "^4.0.0"
+  }
+}
