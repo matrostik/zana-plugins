@@ -93,40 +93,13 @@ const ANTIGRAVITY_CAPABILITIES = {
   reasoningLevels: ['low', 'medium', 'high']
 };
 
-const DEFAULT_ANTIGRAVITY_MODELS_FALLBACK = [
-  {
-    id: 'gemini-4-argon',
-    displayName: 'Gemini 4 Argon',
-    description: 'Google Gemini 4 Argon flagship model with deep reasoning',
-    supportedReasoningEfforts: [
-      { reasoningEffort: 'low', description: 'Low reasoning effort' },
-      { reasoningEffort: 'medium', description: 'Medium reasoning effort' },
-      { reasoningEffort: 'high', description: 'High reasoning effort' }
-    ],
-    defaultReasoningEffort: 'medium',
-    isDefault: true
-  },
-  {
-    id: 'gemini-3.8-flash',
-    displayName: 'Gemini 3.8 Flash',
-    description: 'Google Gemini 3.8 Flash high-efficiency multimodal model',
-    supportedReasoningEfforts: [
-      { reasoningEffort: 'low', description: 'Low reasoning effort' },
-      { reasoningEffort: 'medium', description: 'Medium reasoning effort' },
-      { reasoningEffort: 'high', description: 'High reasoning effort' }
-    ],
-    defaultReasoningEffort: 'medium',
-    isDefault: false
-  }
-];
-
 function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buildNativeLaunchSpec>) {
   return {
     id: 'antigravity',
     displayName: 'Antigravity',
     icon: ICON,
     family: 'acp',
-    experimental_visibility: 'installed',
+    experimental_visibility: 'installed' as const,
     experimental_bridgeOptions: {
       acpDialect: 'generic',
       parameterizedModelPicker: true,
@@ -146,8 +119,7 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
     ],
     composerActions: [],
     models: {
-      scope: 'host',
-      fallback: DEFAULT_ANTIGRAVITY_MODELS_FALLBACK
+      scope: 'host' as const
     },
     env: { passthrough: ['GEMINI_API_KEY'] }
   };

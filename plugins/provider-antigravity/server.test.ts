@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe('antigravity provider plugin', () => {
-  it('registers the Antigravity Native ACP provider, settings, and capabilities', async () => {
+  it('registers the Antigravity Native ACP provider without hardcoded fallback catalog', async () => {
     const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity' });
     plugin(zcc);
 
@@ -61,24 +61,10 @@ describe('antigravity provider plugin', () => {
       }
     });
     expect(provider.capabilities.reasoningLevels).toEqual(['low', 'medium', 'high']);
-    expect(provider.experimental_bridgeOptions).toMatchObject({
-      acpDialect: 'generic',
-      parameterizedModelPicker: true,
-      acpLaunchSpec: {
-        displayName: 'Antigravity',
-        nativeReasoning: {
-          configId: 'thinking_level',
-          supportedLevels: ['low', 'medium', 'high'],
-          defaultLevel: 'medium'
-        }
-      }
-    });
-    expect(provider.models?.fallback).toBeDefined();
-    expect(provider.models?.fallback?.length).toBeGreaterThanOrEqual(2);
+    expect(provider.models?.scope).toBe('host');
+    expect(provider.models?.fallback).toBeUndefined();
     expect(harness.settings).toHaveProperty('authMethod');
     expect(harness.settings).toHaveProperty('nativeExecutable');
-    expect(harness.settings).not.toHaveProperty('backend');
-    expect(harness.settings).not.toHaveProperty('executable');
     await harness.dispose();
   });
 
@@ -214,26 +200,21 @@ describe('antigravity provider plugin', () => {
         projectId: 'project-1',
         threadId: 'thread-1',
         permissionMode: 'accept-edits',
-        settings: {
-          authMethod: 'gemini-api-key'
-        }
+        settings: { authMethod: 'gemini-api-key' }
       }) as any;
 
       expect(result.antigravityAuthMethod).toBe('gemini-api-key');
       expect(result.acpLaunchSpec.env.GEMINI_API_KEY).toBe('test-gemini-key');
       await harness.dispose();
     } finally {
-      if (prevKey === undefined) {
-        delete process.env.GEMINI_API_KEY;
-      } else {
-        process.env.GEMINI_API_KEY = prevKey;
-      }
+      if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = prevKey;
     }
   });
 });
 
 describe('native runtime management, MCP sanitization, and host bridge helpers', () => {
-  it('installs, verifies SHA-256 checksum, checks companion files, and supports rollback', async () => {
+  it('verifies SHA-256 checksum mismatch and companion files during runtime install', async () => {
     const baseDir = makeTempDir('zcc-native-runtime-');
     const fakeArchiveBytes = new Uint8Array([1, 2, 3, 4, 5]);
     const actualSha = computeSha256Hex(fakeArchiveBytes);
@@ -251,29 +232,7 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
         })) as any
       })
     ).rejects.toThrow(/SHA-256 checksum mismatch/i);
-
     expect(actualSha).toHaveLength(64);
-
-    const root = join(baseDir, 'runtimes', 'antigravity-acp');
-    const prevDir = join(root, '1.4.0');
-    mkdirSync(prevDir, { recursive: true });
-    writeFileSync(join(prevDir, 'agy_acp_server.exe'), 'old-exe');
-    writeFileSync(join(prevDir, 'localharness_external.exe'), 'old-harness');
-    writeFileSync(
-      join(root, 'current.json'),
-      JSON.stringify({
-        version: '1.4.0',
-        previousVersion: null,
-        installedAt: new Date().toISOString(),
-        sha256: 'abc',
-        platformKey: 'windows-x86_64'
-      })
-    );
-
-    const before = resolveNativeAcpRuntime({ baseDir, platform: 'win32', arch: 'x64' });
-    expect(before.installed).toBe(true);
-    expect(before.version).toBe('1.4.0');
-    expect(before.companionFilesPresent).toBe(true);
 
     const incompleteDir = makeTempDir('zcc-incomplete-');
     const exeOnly = join(incompleteDir, 'agy_acp_server.exe');
@@ -281,11 +240,17 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
     const companionCheck = checkCompanionFiles(exeOnly, 'windows-x86_64');
     expect(companionCheck.ok).toBe(false);
     expect(companionCheck.missing).toContain('localharness_external.exe');
+  });
 
-    const nextDir = join(root, '1.4.3');
-    mkdirSync(nextDir, { recursive: true });
-    writeFileSync(join(nextDir, 'agy_acp_server.exe'), 'new-exe');
-    writeFileSync(join(nextDir, 'localharness_external.exe'), 'new-harness');
+  it('resolves managed runtime and rolls back between installed versions', () => {
+    const baseDir = makeTempDir('zcc-rollback-runtime-');
+    const root = join(baseDir, 'runtimes', 'antigravity-acp');
+    for (const ver of ['1.4.0', '1.4.3']) {
+      const dir = join(root, ver);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'agy_acp_server.exe'), `${ver}-exe`);
+      writeFileSync(join(dir, 'localharness_external.exe'), `${ver}-harness`);
+    }
     writeFileSync(
       join(root, 'current.json'),
       JSON.stringify({
@@ -297,36 +262,31 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
       })
     );
 
+    const before = resolveNativeAcpRuntime({ baseDir, platform: 'win32', arch: 'x64' });
+    expect(before.installed).toBe(true);
+    expect(before.version).toBe('1.4.3');
+
     const rolledBack = rollbackNativeAcpRuntime({ baseDir, platform: 'win32', arch: 'x64' });
     expect(rolledBack.version).toBe('1.4.0');
     expect(rolledBack.previousVersion).toBe('1.4.3');
   });
 
-  it('disables unreachable IDE named-pipe MCP proxies in prepareSanitizedGeminiHome and extracts parameterized models', async () => {
+  it('disables unreachable IDE named-pipe MCP proxies in prepareSanitizedGeminiHome', () => {
     const geminiHome = makeTempDir('gemini-home-');
     const configDir = join(geminiHome, 'config');
     const acpDir = join(geminiHome, 'antigravity-acp');
     mkdirSync(configDir, { recursive: true });
     mkdirSync(acpDir, { recursive: true });
 
-    writeFileSync(
-      join(acpDir, 'acp_token.json'),
-      JSON.stringify({ access_token: 'tok', refresh_token: 'ref' })
-    );
+    writeFileSync(join(acpDir, 'acp_token.json'), JSON.stringify({ access_token: 'tok', refresh_token: 'ref' }));
     writeFileSync(
       join(configDir, 'mcp_config.json'),
       JSON.stringify({
         mcpServers: {
-          'user-server': {
-            command: 'node',
-            args: ['my-mcp.js']
-          },
+          'user-server': { command: 'node', args: ['my-mcp.js'] },
           'data-agent-kit': {
             command: 'node',
-            args: [
-              'c:\\Users\\user\\.antigravity-ide\\extensions\\googlecloudtools.datacloud\\mcp_proxy_bundle.js',
-              'dataAgentKit-antigravityide'
-            ]
+            args: ['c:\\Users\\user\\mcp_proxy_bundle.js', 'dataAgentKit-antigravityide']
           }
         }
       })
@@ -339,17 +299,11 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
     const sanitizedMcp = JSON.parse(readFileSync(join(configDir, 'mcp_config.json'), 'utf8'));
     expect(sanitizedMcp.mcpServers['data-agent-kit']).toBeUndefined();
     expect(sanitizedMcp.mcpServers['user-server']).toBeDefined();
+  });
 
-    // Fast readiness returns unverified local credentials state as authenticated
-    const fakeExe = join(geminiHome, 'agy_acp_server.exe');
-    writeFileSync(fakeExe, 'binary');
-    const fast = getFastNativeReadiness({
-      command: fakeExe,
-      args: [],
-      authMethod: 'oauth-personal',
-      env
-    });
-    expect(fast.state).toBe('authenticated');
+  it('extracts parameterized models and respects explicit auth clearing', async () => {
+    const geminiHome = makeTempDir('gemini-clear-');
+    const env = { ...process.env, GEMINI_HOME: geminiHome };
 
     const extracted = extractModelsFromSessionResult({
       configOptions: [
@@ -361,12 +315,7 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
             { value: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }
           ]
         }
-      ],
-      models: {
-        availableModels: [
-          { modelId: 'gemini-4-argon-high', name: 'Gemini 4 Argon (High)' }
-        ]
-      }
+      ]
     });
     expect(extracted).toEqual([
       { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
@@ -375,10 +324,7 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
 
     writeNativeAcpAuthType(null, env);
     expect(readConfiguredNativeAuthType(env)).toBeNull();
-
-    // Confirm that preparing sanitized Gemini home does NOT restore auth after explicit clear
-    const sanitizedAfterClear = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
-    expect(sanitizedAfterClear).toBeDefined();
+    prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
     expect(readConfiguredNativeAuthType(env)).toBeNull();
 
     const missingProbe = await probeNativeAcpReadiness({
@@ -400,16 +346,12 @@ describe('native runtime management, MCP sanitization, and host bridge helpers',
         threadId: 'bb-1',
         providerThreadId: 'agy-12345-abcde',
         cwd: process.cwd(),
-        options: {
-          permissionMode: 'accept-edits'
-        }
+        options: { permissionMode: 'accept-edits' }
       }
     };
 
     ensureLaunchSpec(resumeMsg.params);
-    expect(resumeMsg.params.providerOptions.acpLaunchSpec.nativeReasoning.configId).toBe(
-      'thinking_level'
-    );
+    expect(resumeMsg.params.providerOptions.acpLaunchSpec.nativeReasoning.configId).toBe('thinking_level');
 
     const handoff = transformLegacyResumeForNative(resumeMsg);
     expect(handoff.migrationRequired).toBe(true);

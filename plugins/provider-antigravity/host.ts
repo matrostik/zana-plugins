@@ -10,8 +10,7 @@ import {
 } from './src/native-auth.js';
 import {
   PINNED_NATIVE_ACP_VERSION,
-  resolveNativeAcpRuntime,
-  type ResolvedNativeRuntime
+  resolveNativeAcpRuntime
 } from './src/native-runtime.js';
 
 function buildDefaultNativeLaunchSpec(authMethod: GoogleAcpAuthMethod = 'oauth-personal') {
@@ -141,6 +140,19 @@ function sendHealthResponse(
   });
 }
 
+function formatNonReadyHealthMessage(readiness: NativeReadinessResult): string {
+  if (readiness.error) {
+    return readiness.error;
+  }
+  if (readiness.state === 'sign_in_required') {
+    return 'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.';
+  }
+  if (readiness.state === 'authenticated') {
+    return 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.';
+  }
+  return 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.';
+}
+
 function handleNativeProviderHealth(id: string | number, params: any): void {
   const providerOptions = getProviderOptionsFromParams(params);
   const customCommand = providerOptions?.acpLaunchSpec?.command;
@@ -163,31 +175,59 @@ function handleNativeProviderHealth(id: string | number, params: any): void {
     authMethod
   });
 
-  if (readiness.state === 'sign_in_required') {
-    const msg = 'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.';
-    sendHealthResponse(id, 'unauthenticated', msg, null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+  if (readiness.state === 'runtime_missing') {
+    sendHealthResponse(
+      id,
+      'not_installed',
+      readiness.error || `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
+      null,
+      null
+    );
     return;
   }
 
-  sendHealthResponse(id, 'ready', null, readiness.tierName ?? null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+  const reportedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
+  if (readiness.state !== 'session_ready') {
+    sendHealthResponse(
+      id,
+      'unauthenticated',
+      formatNonReadyHealthMessage(readiness),
+      null,
+      reportedVersion
+    );
+    return;
+  }
+
+  sendHealthResponse(id, 'ready', null, readiness.tierName ?? null, reportedVersion);
+}
+
+function formatEffortDescription(level: string): string {
+  const capitalized = level.charAt(0).toUpperCase() + level.slice(1);
+  return `${capitalized} reasoning effort`;
 }
 
 function mapDiscoveredModels(models: DiscoveredNativeModel[]) {
   return models.map((m, idx) => {
-    const isSingleMedium = m.id.startsWith('gpt-oss-120b');
+    const levels = Array.isArray(m.supportedReasoningEfforts)
+      ? m.supportedReasoningEfforts.filter((l): l is string => typeof l === 'string' && l.length > 0)
+      : [];
+    const supportedReasoningEfforts = levels.map((level) => ({
+      reasoningEffort: level,
+      description: formatEffortDescription(level)
+    }));
+    const defaultReasoningEffort =
+      levels.length > 0
+        ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort)
+          ? m.defaultReasoningEffort
+          : levels[0]
+        : undefined;
     return {
       id: m.id,
       model: m.id,
       displayName: m.name,
       description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts: isSingleMedium
-        ? [{ reasoningEffort: 'medium', description: 'Default reasoning effort' }]
-        : [
-            { reasoningEffort: 'low', description: 'Low reasoning effort' },
-            { reasoningEffort: 'medium', description: 'Medium reasoning effort' },
-            { reasoningEffort: 'high', description: 'High reasoning effort' }
-          ],
-      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts,
+      ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
       isDefault: idx === 0
     };
   });
@@ -224,6 +264,7 @@ function sendModelListError(
     error: {
       code: -32000,
       message:
+        readiness.error ||
         'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings → Antigravity Provider.'
     }
   });
@@ -255,7 +296,7 @@ function handleNativeModelList(id: string | number, params: any): void {
     authMethod
   });
 
-  if (readiness.state === 'sign_in_required' || readiness.models.length === 0) {
+  if (readiness.state !== 'session_ready' || readiness.models.length === 0) {
     sendModelListError(id, readiness);
     return;
   }
@@ -331,8 +372,8 @@ export const experimental_providerBridge = experimental_defineProviderBridge({
   handleLine: (line: string) => {
     try {
       const msg = JSON.parse(line);
-      if (msg && msg.params) {
-        const modifiedLaunch = ensureLaunchSpec(msg.params);
+      if (msg && typeof msg === 'object') {
+        const modifiedLaunch = msg.params ? ensureLaunchSpec(msg.params) : false;
         if (dispatchBridgeMessage(msg)) {
           return;
         }

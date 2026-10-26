@@ -17,11 +17,7 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
 var __commonJS = (cb, mod) => function __require3() {
-  try {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  } catch (e) {
-    throw mod = 0, e;
-  }
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target2, all) => {
   for (var name in all)
@@ -13443,8 +13439,8 @@ function registry() {
 var globalRegistry = globalThis.__zod_globalRegistry;
 
 // ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/compile.js
-var INVALID = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
-var FALLBACK_FLAG = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
+var INVALID = Symbol.for("zod.compile.invalid");
+var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
   constructor(message = "z.compile does not support async refinements, transforms, or checks") {
     super(message);
@@ -17224,7 +17220,7 @@ var nonoptionalProcessor = (schema, ctx, _json, params) => {
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
-var UNREPRESENTABLE_DEFAULT = /* @__PURE__ */ Symbol();
+var UNREPRESENTABLE_DEFAULT = Symbol();
 function serializeDefaultValue(value, schema, ctx, json2, params) {
   let unrepresentable = false;
   const serialized = JSON.stringify(value, (_, val) => {
@@ -19988,7 +19984,7 @@ function fromJSONSchema(schema, params) {
 }
 
 // ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/visit.js
-var RESOLVING = /* @__PURE__ */ Symbol("z.visit/resolving");
+var RESOLVING = Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
     const h = fnOrHandlers[node2._zod.def.type];
@@ -26304,7 +26300,7 @@ function createBridgeRecorder(args) {
     }
   };
 }
-var RECORDER_GLOBAL_KEY = /* @__PURE__ */ Symbol.for("zcc.providerBridgeRecorder");
+var RECORDER_GLOBAL_KEY = Symbol.for("zcc.providerBridgeRecorder");
 function globalSlot() {
   const holder = globalThis;
   const existing = holder[RECORDER_GLOBAL_KEY];
@@ -37789,6 +37785,7 @@ var contentWrapperSchema2 = external_exports.object({
 }).passthrough();
 var shellEnvironmentVariableKeySchema2 = external_exports.string().regex(/^[A-Z_][A-Z0-9_]*$/i);
 var MAX_JSON_RPC_LINE_BYTES2 = 64 * 1024 * 1024;
+var RECORDER_GLOBAL_KEY2 = Symbol.for("zcc.providerBridgeRecorder");
 var providerToolCallResponseSchema2 = external_exports.object({
   success: external_exports.boolean(),
   contentItems: external_exports.array(
@@ -41849,6 +41846,18 @@ function sendHealthResponse(id2, status, statusMessage, planLabel, version2) {
     }
   });
 }
+function formatNonReadyHealthMessage(readiness) {
+  if (readiness.error) {
+    return readiness.error;
+  }
+  if (readiness.state === "sign_in_required") {
+    return "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google.";
+  }
+  if (readiness.state === "authenticated") {
+    return 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.';
+  }
+  return 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.';
+}
 function handleNativeProviderHealth(id2, params) {
   const providerOptions = getProviderOptionsFromParams(params);
   const customCommand = providerOptions?.acpLaunchSpec?.command;
@@ -41866,27 +41875,48 @@ function handleNativeProviderHealth(id2, params) {
     args: runtime.args,
     authMethod
   });
-  if (readiness.state === "sign_in_required") {
-    const msg = "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google.";
-    sendHealthResponse(id2, "unauthenticated", msg, null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+  if (readiness.state === "runtime_missing") {
+    sendHealthResponse(
+      id2,
+      "not_installed",
+      readiness.error || `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
+      null,
+      null
+    );
     return;
   }
-  sendHealthResponse(id2, "ready", null, readiness.tierName ?? null, runtime.version ?? PINNED_NATIVE_ACP_VERSION);
+  const reportedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
+  if (readiness.state !== "session_ready") {
+    sendHealthResponse(
+      id2,
+      "unauthenticated",
+      formatNonReadyHealthMessage(readiness),
+      null,
+      reportedVersion
+    );
+    return;
+  }
+  sendHealthResponse(id2, "ready", null, readiness.tierName ?? null, reportedVersion);
+}
+function formatEffortDescription(level) {
+  const capitalized = level.charAt(0).toUpperCase() + level.slice(1);
+  return `${capitalized} reasoning effort`;
 }
 function mapDiscoveredModels(models) {
   return models.map((m, idx) => {
-    const isSingleMedium = m.id.startsWith("gpt-oss-120b");
+    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
+    const supportedReasoningEfforts = levels.map((level) => ({
+      reasoningEffort: level,
+      description: formatEffortDescription(level)
+    }));
+    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
     return {
       id: m.id,
       model: m.id,
       displayName: m.name,
       description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts: isSingleMedium ? [{ reasoningEffort: "medium", description: "Default reasoning effort" }] : [
-        { reasoningEffort: "low", description: "Low reasoning effort" },
-        { reasoningEffort: "medium", description: "Medium reasoning effort" },
-        { reasoningEffort: "high", description: "High reasoning effort" }
-      ],
-      defaultReasoningEffort: "medium",
+      supportedReasoningEfforts,
+      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
       isDefault: idx === 0
     };
   });
@@ -41916,7 +41946,7 @@ function sendModelListError(id2, readiness) {
     id: id2,
     error: {
       code: -32e3,
-      message: 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.'
+      message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.'
     }
   });
 }
@@ -41943,7 +41973,7 @@ function handleNativeModelList(id2, params) {
     args: runtime.args,
     authMethod
   });
-  if (readiness.state === "sign_in_required" || readiness.models.length === 0) {
+  if (readiness.state !== "session_ready" || readiness.models.length === 0) {
     sendModelListError(id2, readiness);
     return;
   }
@@ -42009,8 +42039,8 @@ var experimental_providerBridge2 = experimental_defineProviderBridge2({
   handleLine: (line) => {
     try {
       const msg = JSON.parse(line);
-      if (msg && msg.params) {
-        const modifiedLaunch = ensureLaunchSpec(msg.params);
+      if (msg && typeof msg === "object") {
+        const modifiedLaunch = msg.params ? ensureLaunchSpec(msg.params) : false;
         if (dispatchBridgeMessage(msg)) {
           return;
         }

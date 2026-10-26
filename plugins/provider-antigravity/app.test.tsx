@@ -1,42 +1,65 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { loadPluginApp, renderSlot } from '@zana-ai/zcc-plugin-sdk/testing/app';
+import type { DoctorStatusResult } from './server.js';
+
+function makeDoctorStatus(overrides: Partial<DoctorStatusResult> = {}): DoctorStatusResult {
+  return {
+    installed: true,
+    authenticated: true,
+    ready: true,
+    version: '1.4.3',
+    pinnedVersion: '1.4.3',
+    previousVersion: null,
+    source: 'managed',
+    executable: 'agy_acp_server.exe',
+    companionFilesPresent: true,
+    missingCompanionFiles: [],
+    state: 'session_ready',
+    authMethod: 'oauth-personal',
+    configuredAuthType: 'oauth-personal',
+    pendingAuthUrl: null,
+    models: [],
+    modes: [],
+    tierName: null,
+    disabledDeadMcpServers: [],
+    ...overrides
+  };
+}
+
+function makeUninstalledStatus(overrides: Partial<DoctorStatusResult> = {}): DoctorStatusResult {
+  return makeDoctorStatus({
+    installed: false,
+    authenticated: false,
+    ready: false,
+    version: null,
+    source: 'uninstalled',
+    companionFilesPresent: false,
+    state: 'runtime_missing',
+    configuredAuthType: null,
+    ...overrides
+  });
+}
+
+async function renderSettingsSlot(rpcHandlers: Record<string, (input: any) => any>) {
+  const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+  const slot = renderSlot(
+    app.settingsSections[0]!,
+    { pluginId: 'provider-antigravity' },
+    { rpc: rpcHandlers }
+  );
+  return { app, slot };
+}
 
 describe('antigravity provider app slots', () => {
   it('registers settingsSection slot when Native ACP runtime is missing', async () => {
-    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+    const { app, slot } = await renderSettingsSlot({
+      'doctor:status': () =>
+        makeUninstalledStatus({ missingCompanionFiles: ['localharness_external.exe'] })
+    });
+
     expect(app.settingsSections).toHaveLength(1);
     expect(app.settingsSections[0]!.title).toBe('Antigravity Provider');
-
-    const slot = renderSlot(
-      app.settingsSections[0]!,
-      { pluginId: 'provider-antigravity' },
-      {
-        rpc: {
-          'doctor:status': () => ({
-            installed: false,
-            authenticated: false,
-            ready: false,
-            version: null,
-            pinnedVersion: '1.4.3',
-            previousVersion: null,
-            source: 'uninstalled',
-            executable: 'agy_acp_server.exe',
-            companionFilesPresent: false,
-            missingCompanionFiles: ['localharness_external.exe'],
-            state: 'runtime_missing',
-            authMethod: 'oauth-personal',
-            configuredAuthType: null,
-            pendingAuthUrl: null,
-            models: [],
-            modes: [],
-            tierName: null,
-            disabledDeadMcpServers: []
-          })
-        }
-      }
-    );
-
     await slot.findByText('Antigravity Native ACP (Runtime Missing)');
     await slot.findByText('Install Native ACP Runtime (v1.4.3)');
     expect(slot.inspection.rpcCalls).toContainEqual({ method: 'doctor:status', input: null });
@@ -44,38 +67,20 @@ describe('antigravity provider app slots', () => {
   });
 
   it('renders Native ACP session_ready state, tier badge, models, and dead MCP bypass note', async () => {
-    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
-    const slot = renderSlot(
-      app.settingsSections[0]!,
-      { pluginId: 'provider-antigravity' },
-      {
-        rpc: {
-          'doctor:status': () => ({
-            installed: true,
-            authenticated: true,
-            ready: true,
-            version: '1.4.3',
-            pinnedVersion: '1.4.3',
-            previousVersion: '1.4.0',
-            source: 'managed',
-            executable: 'C:/runtimes/agy_acp_server.exe',
-            companionFilesPresent: true,
-            missingCompanionFiles: [],
-            state: 'session_ready',
-            authMethod: 'oauth-personal',
-            configuredAuthType: 'oauth-personal',
-            pendingAuthUrl: null,
-            models: [
-              { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
-              { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }
-            ],
-            modes: ['default', 'auto_edit', 'yolo'],
-            tierName: 'Google AI Pro',
-            disabledDeadMcpServers: ['data-agent-kit']
-          })
-        }
-      }
-    );
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () =>
+        makeDoctorStatus({
+          previousVersion: '1.4.0',
+          executable: 'C:/runtimes/agy_acp_server.exe',
+          models: [
+            { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+            { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }
+          ],
+          modes: ['default', 'auto_edit', 'yolo'],
+          tierName: 'Google AI Pro',
+          disabledDeadMcpServers: ['data-agent-kit']
+        })
+    });
 
     await slot.findByText('Antigravity Native ACP Connected');
     await slot.findByText('Google AI Pro');
@@ -85,63 +90,22 @@ describe('antigravity provider app slots', () => {
     slot.lifecycle.unmount();
   });
 
-  it('triggers runtime:install on button click and handles install errors', async () => {
-    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+  it('triggers runtime:install on button click and transitions to sign_in_required', async () => {
     let installedCalled = false;
-
-    const slot = renderSlot(
-      app.settingsSections[0]!,
-      { pluginId: 'provider-antigravity' },
-      {
-        rpc: {
-          'doctor:status': () => ({
-            installed: false,
-            authenticated: false,
-            ready: false,
-            version: null,
-            pinnedVersion: '1.4.3',
-            previousVersion: null,
-            source: 'uninstalled',
-            executable: 'agy_acp_server.exe',
-            companionFilesPresent: false,
-            missingCompanionFiles: [],
-            state: 'runtime_missing',
-            authMethod: 'oauth-personal',
-            configuredAuthType: null,
-            pendingAuthUrl: null,
-            models: [],
-            modes: [],
-            tierName: null,
-            disabledDeadMcpServers: []
-          }),
-          'runtime:install': () => {
-            installedCalled = true;
-            return {
-              installed: true,
-              authenticated: false,
-              ready: false,
-              version: '1.4.3',
-              pinnedVersion: '1.4.3',
-              previousVersion: null,
-              source: 'managed',
-              executable: 'agy_acp_server.exe',
-              companionFilesPresent: true,
-              missingCompanionFiles: [],
-              state: 'sign_in_required',
-              authMethod: 'oauth-personal',
-              configuredAuthType: null,
-              pendingAuthUrl: null,
-              models: [],
-              modes: [],
-              tierName: null,
-              disabledDeadMcpServers: []
-            };
-          }
-        }
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => makeUninstalledStatus(),
+      'runtime:install': () => {
+        installedCalled = true;
+        return makeDoctorStatus({
+          authenticated: false,
+          ready: false,
+          state: 'sign_in_required',
+          configuredAuthType: null
+        });
       }
-    );
+    });
 
-    const installBtn = await slot.findByText('Install Native ACP Runtime (v1.4.3)');
+    const installBtn = (await slot.findByText('Install Native ACP Runtime (v1.4.3)')) as HTMLElement;
     installBtn.click();
 
     await slot.findByText('Sign In with Google');
@@ -149,159 +113,75 @@ describe('antigravity provider app slots', () => {
     slot.lifecycle.unmount();
   });
 
-  it('triggers rollback, sign-in, verify session, clear auth, and copy URL', async () => {
-    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+  it('triggers rollback, sign-in, and verify session actions', async () => {
     let rollbackCalled = false;
     let loginCalled = false;
-    let logoutCalled = false;
     let probeCalled = false;
 
-    // Mock clipboard
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: () => Promise.resolve()
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': (args: any) => {
+        if (args?.probeNative) probeCalled = true;
+        return makeDoctorStatus({ previousVersion: '1.4.0', tierName: 'Ultra' });
+      },
+      'runtime:rollback': () => {
+        rollbackCalled = true;
+        return makeDoctorStatus({ version: '1.4.0', previousVersion: '1.4.3' });
+      },
+      'auth:login': () => {
+        loginCalled = true;
+        return makeDoctorStatus();
       }
     });
 
-    const slot = renderSlot(
-      app.settingsSections[0]!,
-      { pluginId: 'provider-antigravity' },
-      {
-        rpc: {
-          'doctor:status': (args: any) => {
-            if (args?.probeNative) {
-              probeCalled = true;
-            }
-            return {
-              installed: true,
-              authenticated: true,
-              ready: true,
-              version: '1.4.3',
-              pinnedVersion: '1.4.3',
-              previousVersion: '1.4.0',
-              source: 'managed',
-              executable: 'agy_acp_server.exe',
-              companionFilesPresent: true,
-              missingCompanionFiles: [],
-              state: 'session_ready',
-              authMethod: 'oauth-personal',
-              configuredAuthType: 'oauth-personal',
-              pendingAuthUrl: 'https://accounts.google.com/o/oauth2/test',
-              models: [{ id: 'gemini-4-argon', name: 'Gemini 4 Argon' }],
-              modes: ['default'],
-              tierName: 'Ultra',
-              disabledDeadMcpServers: []
-            };
-          },
-          'runtime:rollback': () => {
-            rollbackCalled = true;
-            return {
-              installed: true,
-              authenticated: true,
-              ready: true,
-              version: '1.4.0',
-              pinnedVersion: '1.4.3',
-              previousVersion: '1.4.3',
-              source: 'managed',
-              executable: 'agy_acp_server.exe',
-              companionFilesPresent: true,
-              missingCompanionFiles: [],
-              state: 'session_ready',
-              authMethod: 'oauth-personal',
-              configuredAuthType: 'oauth-personal',
-              pendingAuthUrl: null,
-              models: [],
-              modes: [],
-              tierName: null,
-              disabledDeadMcpServers: []
-            };
-          },
-          'auth:login': () => {
-            loginCalled = true;
-            return {
-              installed: true,
-              authenticated: true,
-              ready: true,
-              version: '1.4.3',
-              pinnedVersion: '1.4.3',
-              previousVersion: null,
-              source: 'managed',
-              executable: 'agy_acp_server.exe',
-              companionFilesPresent: true,
-              missingCompanionFiles: [],
-              state: 'session_ready',
-              authMethod: 'oauth-personal',
-              configuredAuthType: 'oauth-personal',
-              pendingAuthUrl: null,
-              models: [],
-              modes: [],
-              tierName: null,
-              disabledDeadMcpServers: []
-            };
-          },
-          'auth:logout': () => {
-            logoutCalled = true;
-            return {
-              installed: true,
-              authenticated: false,
-              ready: false,
-              version: '1.4.3',
-              pinnedVersion: '1.4.3',
-              previousVersion: null,
-              source: 'managed',
-              executable: 'agy_acp_server.exe',
-              companionFilesPresent: true,
-              missingCompanionFiles: [],
-              state: 'sign_in_required',
-              authMethod: 'oauth-personal',
-              configuredAuthType: null,
-              pendingAuthUrl: null,
-              models: [],
-              modes: [],
-              tierName: null,
-              disabledDeadMcpServers: []
-            };
-          }
-        }
-      }
-    );
-
-    const rollbackBtn = await slot.findByText('Rollback to v1.4.0');
-    rollbackBtn.click();
+    ((await slot.findByText('Rollback to v1.4.0')) as HTMLElement).click();
     expect(rollbackCalled).toBe(true);
 
-    const reauthBtn = await slot.findByText('Re-authenticate with Google');
-    reauthBtn.click();
+    ((await slot.findByText('Re-authenticate with Google')) as HTMLElement).click();
     expect(loginCalled).toBe(true);
 
-    const probeBtn = await slot.findByText('Verify Session & Models');
-    probeBtn.click();
+    ((await slot.findByText('Verify Session & Models')) as HTMLElement).click();
     expect(probeCalled).toBe(true);
 
-    const copyBtn = await slot.findByText('Copy URL');
-    copyBtn.click();
+    slot.lifecycle.unmount();
+  });
+
+  it('triggers copy OAuth URL and clear auth selection actions', async () => {
+    let logoutCalled = false;
+    Object.assign(navigator, {
+      clipboard: { writeText: () => Promise.resolve() }
+    });
+
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () =>
+        makeDoctorStatus({
+          pendingAuthUrl: 'https://accounts.google.com/o/oauth2/test'
+        }),
+      'auth:logout': () => {
+        logoutCalled = true;
+        return makeDoctorStatus({
+          authenticated: false,
+          ready: false,
+          state: 'sign_in_required',
+          configuredAuthType: null
+        });
+      }
+    });
+
+    ((await slot.findByText('Copy URL')) as HTMLElement).click();
     await slot.findByText('Copied!');
 
-    const clearAuthBtn = await slot.findByText('Clear Auth Selection');
-    clearAuthBtn.click();
+    ((await slot.findByText('Clear Auth Selection')) as HTMLElement).click();
     expect(logoutCalled).toBe(true);
 
     slot.lifecycle.unmount();
   });
 
   it('renders communication error fallback when doctor:status throws', async () => {
-    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
-    const slot = renderSlot(
-      app.settingsSections[0]!,
-      { pluginId: 'provider-antigravity' },
-      {
-        rpc: {
-          'doctor:status': () => {
-            throw new Error('Connection refused by host daemon');
-          }
-        }
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => {
+        throw new Error('Connection refused by host daemon');
       }
-    );
+    });
 
     await slot.findByText(/Connection refused by host daemon/);
     slot.lifecycle.unmount();

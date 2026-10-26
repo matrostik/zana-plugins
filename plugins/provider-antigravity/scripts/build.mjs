@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,20 +9,17 @@ const __filename = fileURLToPath(import.meta.url);
 const pluginRoot = join(dirname(__filename), '..');
 
 function resolveEsbuild() {
-  const candidates = [
-    'esbuild',
-    resolve(pluginRoot, 'node_modules/esbuild'),
-    resolve(pluginRoot, '../../node_modules/esbuild'),
-    resolve(pluginRoot, '../../../zana/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild')
-  ];
-  for (const candidate of candidates) {
-    try {
-      return require(candidate);
-    } catch {
-      // Try next candidate
-    }
+  const searchPaths = [pluginRoot];
+  try {
+    searchPaths.push(realpathSync(resolve(pluginRoot, 'node_modules/@zana-ai/zcc-plugin-sdk')));
+  } catch {
+    // Ignore when @zana-ai/zcc-plugin-sdk is not linked locally
   }
-  throw new Error('Could not resolve "esbuild". Ensure esbuild is installed.');
+  try {
+    return require(require.resolve('esbuild', { paths: searchPaths }));
+  } catch {
+    throw new Error('Could not resolve "esbuild". Ensure dependencies are installed.');
+  }
 }
 
 const esbuild = resolveEsbuild();

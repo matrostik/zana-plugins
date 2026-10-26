@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -55,11 +55,8 @@ describe('native-runtime.ts unit tests', () => {
       delete process.env.ZCC_DATA_DIR;
       expect(getZccDataDir()).toContain('.zcc');
     } finally {
-      if (prev === undefined) {
-        delete process.env.ZCC_DATA_DIR;
-      } else {
-        process.env.ZCC_DATA_DIR = prev;
-      }
+      if (prev === undefined) delete process.env.ZCC_DATA_DIR;
+      else process.env.ZCC_DATA_DIR = prev;
     }
   });
 
@@ -74,14 +71,8 @@ describe('native-runtime.ts unit tests', () => {
   });
 
   it('checkCompanionFiles returns ok for platforms without companion requirements', () => {
-    expect(checkCompanionFiles('/dummy/path', 'darwin-aarch64')).toEqual({
-      ok: true,
-      missing: []
-    });
-    expect(checkCompanionFiles('/dummy/path', null)).toEqual({
-      ok: true,
-      missing: []
-    });
+    expect(checkCompanionFiles('/dummy/path', 'darwin-aarch64')).toEqual({ ok: true, missing: [] });
+    expect(checkCompanionFiles('/dummy/path', null)).toEqual({ ok: true, missing: [] });
   });
 
   it('checkCompanionFiles verifies windows companion files correctly', () => {
@@ -102,7 +93,6 @@ describe('native-runtime.ts unit tests', () => {
   it('resolveNativeAcpRuntime handles custom, managed, and uninstalled paths', () => {
     const baseDir = makeTempDir('resolve-runtime-');
 
-    // Custom non-existent
     const missingCustom = resolveNativeAcpRuntime({
       baseDir,
       customExecutable: 'C:/fake/path/agy.exe',
@@ -112,7 +102,6 @@ describe('native-runtime.ts unit tests', () => {
     expect(missingCustom.installed).toBe(false);
     expect(missingCustom.source).toBe('custom');
 
-    // Custom existent
     const customDir = makeTempDir('custom-exe-dir-');
     const customExe = join(customDir, 'agy_acp_server.par');
     writeFileSync(customExe, 'dummy-binary');
@@ -125,17 +114,12 @@ describe('native-runtime.ts unit tests', () => {
     expect(existentCustom.installed).toBe(true);
     expect(existentCustom.source).toBe('custom');
 
-    // Managed existent
     const root = getManagedRuntimesRoot(baseDir);
     const versionDir = join(root, PINNED_NATIVE_ACP_VERSION);
     mkdirSync(versionDir, { recursive: true });
     writeFileSync(join(versionDir, 'agy_acp_server.par'), 'dummy-managed');
 
-    const existentManaged = resolveNativeAcpRuntime({
-      baseDir,
-      platform: 'linux',
-      arch: 'x64'
-    });
+    const existentManaged = resolveNativeAcpRuntime({ baseDir, platform: 'linux', arch: 'x64' });
     expect(existentManaged.installed).toBe(true);
     expect(existentManaged.source).toBe('managed');
   });
@@ -143,11 +127,7 @@ describe('native-runtime.ts unit tests', () => {
   it('installNativeAcpRuntime handles unsupported platform and download failure', async () => {
     const baseDir = makeTempDir('install-fail-');
     await expect(
-      installNativeAcpRuntime({
-        baseDir,
-        platform: 'freebsd' as any,
-        arch: 'x64'
-      })
+      installNativeAcpRuntime({ baseDir, platform: 'freebsd' as any, arch: 'x64' })
     ).rejects.toThrow(/Unsupported platform\/architecture/i);
 
     await expect(
@@ -155,11 +135,7 @@ describe('native-runtime.ts unit tests', () => {
         baseDir,
         platform: 'linux',
         arch: 'x64',
-        fetchImpl: (async () => ({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found'
-        })) as any
+        fetchImpl: (async () => ({ ok: false, status: 404, statusText: 'Not Found' })) as any
       })
     ).rejects.toThrow(/Failed to download native ACP archive/i);
   });
@@ -172,10 +148,7 @@ describe('native-runtime.ts unit tests', () => {
         baseDir,
         platform: 'linux',
         arch: 'x64',
-        fetchImpl: (async () => ({
-          ok: true,
-          arrayBuffer: async () => badBytes.buffer
-        })) as any
+        fetchImpl: (async () => ({ ok: true, arrayBuffer: async () => badBytes.buffer })) as any
       })
     ).rejects.toThrow(/SHA-256 checksum mismatch/i);
   });
@@ -184,21 +157,17 @@ describe('native-runtime.ts unit tests', () => {
     const baseDir = makeTempDir('install-missing-exe-');
     const dist = NATIVE_ACP_DISTRIBUTIONS['windows-x86_64']!;
     const fakeData = new Uint8Array([1, 2, 3]);
-    const computedSha = computeSha256Hex(fakeData);
-
     const origSha = dist.sha256;
-    (dist as any).sha256 = computedSha;
+    (dist as any).sha256 = computeSha256Hex(fakeData);
 
     try {
+      const fetchImpl = (async () => ({ ok: true, arrayBuffer: async () => fakeData.buffer })) as any;
       await expect(
         installNativeAcpRuntime({
           baseDir,
           platform: 'win32',
           arch: 'x64',
-          fetchImpl: (async () => ({
-            ok: true,
-            arrayBuffer: async () => fakeData.buffer
-          })) as any,
+          fetchImpl,
           extractImpl: async (_zip, destDir) => {
             mkdirSync(destDir, { recursive: true });
           }
@@ -210,10 +179,7 @@ describe('native-runtime.ts unit tests', () => {
           baseDir,
           platform: 'win32',
           arch: 'x64',
-          fetchImpl: (async () => ({
-            ok: true,
-            arrayBuffer: async () => fakeData.buffer
-          })) as any,
+          fetchImpl,
           extractImpl: async (_zip, destDir) => {
             mkdirSync(destDir, { recursive: true });
             writeFileSync(join(destDir, dist.cmd), 'fake-exe');
@@ -229,47 +195,29 @@ describe('native-runtime.ts unit tests', () => {
     const baseDir = makeTempDir('install-success-');
     const dist = NATIVE_ACP_DISTRIBUTIONS['linux-x86_64']!;
     const fakeData = new Uint8Array([99, 88, 77]);
-    const computedSha = computeSha256Hex(fakeData);
-
     const origSha = dist.sha256;
-    (dist as any).sha256 = computedSha;
+    (dist as any).sha256 = computeSha256Hex(fakeData);
 
     try {
-      const installed1 = await installNativeAcpRuntime({
-        baseDir,
-        platform: 'linux',
-        arch: 'x64',
-        fetchImpl: (async () => ({
-          ok: true,
-          arrayBuffer: async () => fakeData.buffer
-        })) as any,
-        extractImpl: async (_zip, destDir) => {
-          mkdirSync(destDir, { recursive: true });
-          writeFileSync(join(destDir, dist.cmd), 'binary-content-1');
-        }
-      });
+      const runInstall = (content: string) =>
+        installNativeAcpRuntime({
+          baseDir,
+          platform: 'linux',
+          arch: 'x64',
+          fetchImpl: (async () => ({ ok: true, arrayBuffer: async () => fakeData.buffer })) as any,
+          extractImpl: async (_zip, destDir) => {
+            mkdirSync(destDir, { recursive: true });
+            writeFileSync(join(destDir, dist.cmd), content);
+          }
+        });
 
+      const installed1 = await runInstall('binary-content-1');
       expect(installed1.installed).toBe(true);
       expect(installed1.version).toBe(PINNED_NATIVE_ACP_VERSION);
 
-      // Reinstall to test swap over existing version directory
-      const installed2 = await installNativeAcpRuntime({
-        baseDir,
-        platform: 'linux',
-        arch: 'x64',
-        fetchImpl: (async () => ({
-          ok: true,
-          arrayBuffer: async () => fakeData.buffer
-        })) as any,
-        extractImpl: async (_zip, destDir) => {
-          mkdirSync(destDir, { recursive: true });
-          writeFileSync(join(destDir, dist.cmd), 'binary-content-2');
-        }
-      });
-
+      const installed2 = await runInstall('binary-content-2');
       expect(installed2.installed).toBe(true);
-      const pointer = readManagedRuntimePointer(baseDir);
-      expect(pointer?.version).toBe(PINNED_NATIVE_ACP_VERSION);
+      expect(readManagedRuntimePointer(baseDir)?.version).toBe(PINNED_NATIVE_ACP_VERSION);
     } finally {
       (dist as any).sha256 = origSha;
     }
@@ -283,25 +231,18 @@ describe('native-runtime.ts unit tests', () => {
 
     const root = getManagedRuntimesRoot(baseDir);
     mkdirSync(root, { recursive: true });
-    writeFileSync(
-      join(root, 'current.json'),
-      JSON.stringify({ version: '1.4.3', previousVersion: null })
-    );
+    writeFileSync(join(root, 'current.json'), JSON.stringify({ version: '1.4.3', previousVersion: null }));
     expect(() => rollbackNativeAcpRuntime({ baseDir })).toThrow(
       /No previous Native ACP runtime version is available/i
     );
 
     writeFileSync(
       join(root, 'current.json'),
-      JSON.stringify({
-        version: '1.4.3',
-        previousVersion: '1.4.0',
-        platformKey: 'linux-x86_64'
-      })
+      JSON.stringify({ version: '1.4.3', previousVersion: '1.4.0', platformKey: 'linux-x86_64' })
     );
-    expect(() =>
-      rollbackNativeAcpRuntime({ baseDir, platform: 'linux', arch: 'x64' })
-    ).toThrow(/is no longer present on disk/i);
+    expect(() => rollbackNativeAcpRuntime({ baseDir, platform: 'linux', arch: 'x64' })).toThrow(
+      /is no longer present on disk/i
+    );
   });
 
   it('rolls back successfully to a valid previous version on disk', () => {
@@ -310,38 +251,22 @@ describe('native-runtime.ts unit tests', () => {
     const prevDir = join(root, '1.4.0');
     mkdirSync(prevDir, { recursive: true });
     writeFileSync(join(prevDir, 'agy_acp_server.par'), 'prev-binary');
-
     writeFileSync(
       join(root, 'current.json'),
-      JSON.stringify({
-        version: '1.4.3',
-        previousVersion: '1.4.0',
-        platformKey: 'linux-x86_64'
-      })
+      JSON.stringify({ version: '1.4.3', previousVersion: '1.4.0', platformKey: 'linux-x86_64' })
     );
 
-    const rolledBack = rollbackNativeAcpRuntime({
-      baseDir,
-      platform: 'linux',
-      arch: 'x64'
-    });
+    const rolledBack = rollbackNativeAcpRuntime({ baseDir, platform: 'linux', arch: 'x64' });
     expect(rolledBack.installed).toBe(true);
     expect(rolledBack.version).toBe('1.4.0');
-    const pointer = readManagedRuntimePointer(baseDir);
-    expect(pointer?.version).toBe('1.4.0');
+    expect(readManagedRuntimePointer(baseDir)?.version).toBe('1.4.0');
   });
 
   it('killProcessTree handles null, closed stdin, and process killing', () => {
     expect(() => killProcessTree(null)).not.toThrow();
     expect(() => killProcessTree(undefined)).not.toThrow();
 
-    const fakeChild: any = {
-      pid: 99999999,
-      stdin: {
-        end: () => {}
-      },
-      kill: vi.fn()
-    };
+    const fakeChild: any = { pid: 99999999, stdin: { end: () => {} }, kill: vi.fn() };
     killProcessTree(fakeChild);
   });
 });

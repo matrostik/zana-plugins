@@ -33,35 +33,9 @@ export interface DiscoveredNativeModel {
   id: string;
   name: string;
   description?: string;
+  supportedReasoningEfforts?: string[];
+  defaultReasoningEffort?: string;
 }
-
-export const DEFAULT_NATIVE_MODELS: DiscoveredNativeModel[] = [
-  {
-    id: 'gemini-4-argon',
-    name: 'Gemini 4 Argon',
-    description: 'Google Gemini 4 Argon flagship model with deep reasoning'
-  },
-  {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    description: 'Google Gemini 3.8 Flash high-efficiency multimodal model'
-  },
-  {
-    id: 'claude-opus-5-5',
-    name: 'Claude Opus 5.5',
-    description: 'Anthropic Claude Opus 5.5 deep architecture & reasoning'
-  },
-  {
-    id: 'claude-sonnet-5-5',
-    name: 'Claude Sonnet 5.5',
-    description: 'Anthropic Claude Sonnet 5.5 balanced reasoning & coding'
-  },
-  {
-    id: 'gpt-oss-120b-medium',
-    name: 'GPT-OSS 120B (Medium)',
-    description: 'Open source 120B weights model'
-  }
-];
 
 export interface NativeReadinessResult {
   state: NativeSetupState;
@@ -217,16 +191,6 @@ function syncFileNewer(src: string, dest: string): void {
   }
 }
 
-function readJsonConfigFile(path: string): Record<string, any> | null {
-  if (!existsSync(path)) return null;
-  try {
-    const raw = JSON.parse(readFileSync(path, 'utf8'));
-    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
-  } catch {
-    return null;
-  }
-}
-
 function isIdeNamedPipeMcpProxyUnreachable(serverConfig: any): boolean {
   if (!serverConfig || typeof serverConfig !== 'object') {
     return false;
@@ -342,9 +306,66 @@ export function prepareSanitizedGeminiHome(options?: {
   };
 }
 
+function extractSessionReasoningMetadata(sessionResult: any): {
+  supportedReasoningEfforts?: string[];
+  defaultReasoningEffort?: string;
+} {
+  const configOptions = sessionResult?.configOptions;
+  if (!Array.isArray(configOptions)) return {};
+  const reasoningOpt = configOptions.find(
+    (opt: any) =>
+      opt?.id === 'thinking_level' ||
+      opt?.id === 'reasoning_effort' ||
+      opt?.category === 'reasoning' ||
+      opt?.category === 'thinking_level'
+  );
+  if (!reasoningOpt || !Array.isArray(reasoningOpt.options)) return {};
+  const levels = reasoningOpt.options
+    .map((o: any) => (typeof o?.value === 'string' ? o.value : typeof o?.id === 'string' ? o.id : null))
+    .filter((v: string | null): v is string => Boolean(v));
+  if (levels.length === 0) return {};
+  const rawDefault = reasoningOpt.currentValue ?? reasoningOpt.defaultValue;
+  const defaultLevel =
+    typeof rawDefault === 'string' && levels.includes(rawDefault) ? rawDefault : levels[0];
+  return {
+    supportedReasoningEfforts: levels,
+    ...(defaultLevel ? { defaultReasoningEffort: defaultLevel } : {})
+  };
+}
+
+function extractModelReasoningMetadata(
+  item: any,
+  sessionReasoning: { supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }
+): { supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string } {
+  const rawEfforts = item?.supportedReasoningEfforts ?? item?.reasoningLevels ?? item?.thinkingLevels;
+  if (Array.isArray(rawEfforts)) {
+    const levels = rawEfforts
+      .map((e: any) =>
+        typeof e === 'string'
+          ? e
+          : typeof e?.reasoningEffort === 'string'
+          ? e.reasoningEffort
+          : typeof e?.value === 'string'
+          ? e.value
+          : null
+      )
+      .filter((v: string | null): v is string => Boolean(v));
+    if (levels.length === 0) return {};
+    const rawDefault = item?.defaultReasoningEffort ?? item?.defaultThinkingLevel;
+    const defaultLevel =
+      typeof rawDefault === 'string' && levels.includes(rawDefault) ? rawDefault : levels[0];
+    return {
+      supportedReasoningEfforts: levels,
+      ...(defaultLevel ? { defaultReasoningEffort: defaultLevel } : {})
+    };
+  }
+  return sessionReasoning;
+}
+
 export function extractModelsFromSessionResult(sessionResult: any): DiscoveredNativeModel[] {
   const models: DiscoveredNativeModel[] = [];
   const seen = new Set<string>();
+  const sessionReasoning = extractSessionReasoningMetadata(sessionResult);
 
   const configOptions = sessionResult?.configOptions;
   if (Array.isArray(configOptions)) {
@@ -359,7 +380,8 @@ export function extractModelsFromSessionResult(sessionResult: any): DiscoveredNa
           models.push({
             id,
             name: typeof opt?.name === 'string' && opt.name ? opt.name : id,
-            ...(typeof opt?.description === 'string' ? { description: opt.description } : {})
+            ...(typeof opt?.description === 'string' ? { description: opt.description } : {}),
+            ...extractModelReasoningMetadata(opt, sessionReasoning)
           });
         }
       }
@@ -376,7 +398,8 @@ export function extractModelsFromSessionResult(sessionResult: any): DiscoveredNa
           models.push({
             id,
             name: typeof item?.name === 'string' && item.name ? item.name : id,
-            ...(typeof item?.description === 'string' ? { description: item.description } : {})
+            ...(typeof item?.description === 'string' ? { description: item.description } : {}),
+            ...extractModelReasoningMetadata(item, sessionReasoning)
           });
         }
       }

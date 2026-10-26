@@ -1,4 +1,3 @@
-import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,7 +10,50 @@ import {
   transformLegacyResumeForNative
 } from './host.js';
 import * as nativeAuth from './src/native-auth.js';
+import type { NativeReadinessResult } from './src/native-auth.js';
 import * as nativeRuntime from './src/native-runtime.js';
+import type { ResolvedNativeRuntime } from './src/native-runtime.js';
+
+function makeRuntimeFixture(overrides: Partial<ResolvedNativeRuntime> = {}): ResolvedNativeRuntime {
+  return {
+    installed: true,
+    executable: 'agy_acp_server.exe',
+    args: [],
+    version: '1.4.3',
+    previousVersion: null,
+    source: 'managed',
+    companionFilesPresent: true,
+    missingCompanionFiles: [],
+    platformKey: 'windows-x86_64',
+    ...overrides
+  };
+}
+
+function makeReadinessFixture(overrides: Partial<NativeReadinessResult> = {}): NativeReadinessResult {
+  return {
+    state: 'session_ready',
+    agentVersion: '1.4.3',
+    protocolVersion: 1,
+    advertisedAuthMethods: ['oauth-personal'],
+    selectedAuthMethod: 'oauth-personal',
+    configuredAuthType: 'oauth-personal',
+    models: [],
+    modes: [],
+    checkedAt: Date.now(),
+    ...overrides
+  };
+}
+
+function invokeBridgeRpc(request: Record<string, unknown>): any {
+  const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  try {
+    experimental_providerBridge.handleLine(JSON.stringify(request));
+    expect(stdoutSpy).toHaveBeenCalled();
+    return JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
+  } finally {
+    stdoutSpy.mockRestore();
+  }
+}
 
 describe('host.ts provider bridge and launch helpers', () => {
   let tempGemini: string;
@@ -26,6 +68,7 @@ describe('host.ts provider bridge and launch helpers', () => {
     try {
       rmSync(tempGemini, { recursive: true, force: true });
     } catch {}
+    vi.restoreAllMocks();
   });
 
   it('ensureLaunchSpec handles null, undefined, and non-object inputs', () => {
@@ -48,14 +91,8 @@ describe('host.ts provider bridge and launch helpers', () => {
 
   it('ensureLaunchSpec populates acpLaunchSpec when providerOptions exists without it', () => {
     const params: any = {
-      options: {
-        providerOptions: {
-          antigravityAuthMethod: 'gemini-api-key'
-        }
-      },
-      providerOptions: {
-        antigravityAuthMethod: 'gemini-api-key'
-      }
+      options: { providerOptions: { antigravityAuthMethod: 'gemini-api-key' } },
+      providerOptions: { antigravityAuthMethod: 'gemini-api-key' }
     };
     const modified = ensureLaunchSpec(params);
     expect(modified).toBe(true);
@@ -84,19 +121,12 @@ describe('host.ts provider bridge and launch helpers', () => {
       options: {
         providerOptions: {
           acpDialect: 'generic',
-          acpLaunchSpec: {
-            command: 'custom.exe',
-            args: ['--test'],
-            env: { CUSTOM_VAR: 'value' }
-          }
+          acpLaunchSpec: { command: 'custom.exe', args: ['--test'], env: { CUSTOM_VAR: 'value' } }
         }
       },
       providerOptions: {
         acpDialect: 'generic',
-        acpLaunchSpec: {
-          command: 'custom.exe',
-          args: ['--test']
-        }
+        acpLaunchSpec: { command: 'custom.exe', args: ['--test'] }
       }
     };
     const modified = ensureLaunchSpec(params);
@@ -112,19 +142,17 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(transformLegacyResumeForNative({}).migrationRequired).toBe(false);
     expect(transformLegacyResumeForNative({ method: 'thread/start', params: {} }).migrationRequired).toBe(false);
     expect(
-      transformLegacyResumeForNative({
-        method: 'thread/resume',
-        params: { providerThreadId: 12345 }
-      }).migrationRequired
+      transformLegacyResumeForNative({ method: 'thread/resume', params: { providerThreadId: 12345 } })
+        .migrationRequired
     ).toBe(false);
     expect(
-      transformLegacyResumeForNative({
-        method: 'thread/resume',
-        params: { providerThreadId: 'claude-12345' }
-      }).migrationRequired
+      transformLegacyResumeForNative({ method: 'thread/resume', params: { providerThreadId: 'claude-12345' } })
+        .migrationRequired
     ).toBe(false);
     expect(isLegacyAgyThreadResume(null)).toBeNull();
-    expect(isLegacyAgyThreadResume({ method: 'thread/resume', params: { providerThreadId: 'agy-123' } })).toBe('agy-123');
+    expect(isLegacyAgyThreadResume({ method: 'thread/resume', params: { providerThreadId: 'agy-123' } })).toBe(
+      'agy-123'
+    );
   });
 
   it('transformLegacyResumeForNative flags agy-* resume as requiring migration without silent rewrite', () => {
@@ -140,223 +168,137 @@ describe('host.ts provider bridge and launch helpers', () => {
   });
 
   it('handles provider/health when runtime is not installed', () => {
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue({
-      installed: false,
-      executable: 'agy_acp_server.exe',
-      args: [],
-      version: null,
-      previousVersion: null,
-      source: 'uninstalled',
-      companionFilesPresent: false,
-      missingCompanionFiles: [],
-      platformKey: 'windows-x86_64'
-    });
-
-    experimental_providerBridge.handleLine(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'provider/health',
-        params: { providerOptions: {} }
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(
+      makeRuntimeFixture({
+        installed: false,
+        version: null,
+        source: 'uninstalled',
+        companionFilesPresent: false
       })
     );
 
-    const output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
+    const output = invokeBridgeRpc({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'provider/health',
+      params: { providerOptions: {} }
+    });
     expect(output.result.health.status).toBe('not_installed');
     expect(output.result.health.statusMessage).toContain('not installed');
-
-    stdoutSpy.mockRestore();
-    vi.restoreAllMocks();
   });
 
-  it('handles provider/health when sign_in_required vs ready', () => {
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue({
-      installed: true,
-      executable: 'agy_acp_server.exe',
-      args: [],
-      version: '1.4.3',
-      previousVersion: null,
-      source: 'managed',
-      companionFilesPresent: true,
-      missingCompanionFiles: [],
-      platformKey: 'windows-x86_64'
-    });
-
-    // 1. Sign in required
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue({
-      state: 'sign_in_required',
-      agentVersion: null,
-      protocolVersion: 1,
-      advertisedAuthMethods: ['oauth-personal'],
-      selectedAuthMethod: 'oauth-personal',
-      configuredAuthType: null,
-      models: [],
-      modes: [],
-      error: 'Please sign in',
-      checkedAt: Date.now()
-    });
-
-    experimental_providerBridge.handleLine(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'provider/health',
-        params: { providerOptions: {} }
-      })
+  it('handles parameterless provider/health and maps non-session_ready states to non-ready', () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+      makeReadinessFixture({ state: 'authenticated', agentVersion: null })
     );
 
-    let output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
-    expect(output.result.health.status).toBe('unauthenticated');
-    expect(output.result.health.statusMessage).toContain('Sign in required');
+    const authOutput = invokeBridgeRpc({ jsonrpc: '2.0', id: 2, method: 'provider/health' });
+    expect(authOutput.result.health.status).toBe('unauthenticated');
+    expect(authOutput.result.health.statusMessage).toContain('not verified');
 
-    // 2. Ready
-    stdoutSpy.mockClear();
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue({
-      state: 'session_ready',
-      agentVersion: '1.4.3',
-      protocolVersion: 1,
-      advertisedAuthMethods: ['oauth-personal'],
-      selectedAuthMethod: 'oauth-personal',
-      configuredAuthType: 'oauth-personal',
-      models: [],
-      modes: [],
-      tierName: 'Google Ultra Tier',
-      checkedAt: Date.now()
-    });
-
-    experimental_providerBridge.handleLine(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 3,
-        method: 'provider/health',
-        params: { providerOptions: { antigravityAuthMethod: 'oauth-personal' } }
-      })
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+      makeReadinessFixture({ state: 'runtime_launches', error: 'Handshake incomplete' })
     );
-
-    output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
-    expect(output.result.health.status).toBe('ready');
-    expect(output.result.health.planLabel).toBe('Google Ultra Tier');
-
-    stdoutSpy.mockRestore();
-    vi.restoreAllMocks();
+    const launchOutput = invokeBridgeRpc({ jsonrpc: '2.0', id: 3, method: 'provider/health' });
+    expect(launchOutput.result.health.status).toBe('unauthenticated');
+    expect(launchOutput.result.health.statusMessage).toBe('Handshake incomplete');
   });
 
-  it('handles model/list for uninstalled, unauthenticated, and ready states', () => {
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  it('handles provider/health when sign_in_required vs session_ready', () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+      makeReadinessFixture({ state: 'sign_in_required', configuredAuthType: null })
+    );
 
-    // Uninstalled
-    experimental_providerBridge.handleLine(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 4,
-        method: 'model/list',
-        params: {
-          options: {
-            providerOptions: {
-              acpLaunchSpec: { command: 'C:/nonexistent/agy_acp_server.exe' }
-            }
-          }
+    const unauth = invokeBridgeRpc({
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'provider/health',
+      params: { providerOptions: {} }
+    });
+    expect(unauth.result.health.status).toBe('unauthenticated');
+    expect(unauth.result.health.statusMessage).toContain('Sign in required');
+
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+      makeReadinessFixture({ state: 'session_ready', tierName: 'Google Ultra Tier' })
+    );
+    const ready = invokeBridgeRpc({
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'provider/health',
+      params: { providerOptions: { antigravityAuthMethod: 'oauth-personal' } }
+    });
+    expect(ready.result.health.status).toBe('ready');
+    expect(ready.result.health.planLabel).toBe('Google Ultra Tier');
+  });
+
+  it('handles model/list errors when runtime is uninstalled or sign_in_required', () => {
+    const uninstalled = invokeBridgeRpc({
+      jsonrpc: '2.0',
+      id: 6,
+      method: 'model/list',
+      params: {
+        options: {
+          providerOptions: { acpLaunchSpec: { command: 'C:/nonexistent/agy_acp_server.exe' } }
         }
+      }
+    });
+    expect(uninstalled.error.code).toBe(-32000);
+    expect(uninstalled.error.message).toContain('not installed');
+
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+      makeReadinessFixture({ state: 'sign_in_required', configuredAuthType: null, error: 'Expired token' })
+    );
+    const signIn = invokeBridgeRpc({ jsonrpc: '2.0', id: 7, method: 'model/list' });
+    expect(signIn.error.data.recovery.kind).toBe('authRequired');
+  });
+
+  it('maps model/list reasoning efforts from session metadata and omits when unadvertised', () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+      makeReadinessFixture({
+        state: 'session_ready',
+        models: [
+          {
+            id: 'gemini-custom',
+            name: 'Gemini Custom',
+            description: 'desc',
+            supportedReasoningEfforts: ['low', 'medium', 'high'],
+            defaultReasoningEffort: 'medium'
+          },
+          {
+            id: 'model-without-reasoning',
+            name: 'No Reasoning Metadata'
+          }
+        ]
       })
     );
-    let output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
-    expect(output.error.code).toBe(-32000);
-    expect(output.error.message).toContain('not installed');
 
-    // Sign in required
-    stdoutSpy.mockClear();
-    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue({
-      installed: true,
-      executable: 'agy_acp_server.exe',
-      args: [],
-      version: '1.4.3',
-      previousVersion: null,
-      source: 'managed',
-      companionFilesPresent: true,
-      missingCompanionFiles: [],
-      platformKey: 'windows-x86_64'
+    const output = invokeBridgeRpc({
+      jsonrpc: '2.0',
+      id: 8,
+      method: 'model/list',
+      params: { providerOptions: {} }
     });
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue({
-      state: 'sign_in_required',
-      agentVersion: null,
-      protocolVersion: 1,
-      advertisedAuthMethods: ['oauth-personal'],
-      selectedAuthMethod: 'oauth-personal',
-      configuredAuthType: null,
-      models: [],
-      modes: [],
-      error: 'Expired token',
-      checkedAt: Date.now()
-    });
-
-    experimental_providerBridge.handleLine(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 5,
-        method: 'model/list',
-        params: { providerOptions: {} }
-      })
-    );
-    output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
-    expect(output.error.data.recovery.kind).toBe('authRequired');
-
-    // Success with custom and default models
-    stdoutSpy.mockClear();
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue({
-      state: 'session_ready',
-      agentVersion: '1.4.3',
-      protocolVersion: 1,
-      advertisedAuthMethods: ['oauth-personal'],
-      selectedAuthMethod: 'oauth-personal',
-      configuredAuthType: 'oauth-personal',
-      models: [
-        { id: 'gemini-custom', name: 'Gemini Custom', description: 'desc' },
-        { id: 'gpt-oss-120b-custom', name: 'GPT OSS 120B' }
-      ],
-      modes: [],
-      checkedAt: Date.now()
-    });
-
-    experimental_providerBridge.handleLine(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        id: 6,
-        method: 'model/list',
-        params: { providerOptions: {} }
-      })
-    );
-    output = JSON.parse(stdoutSpy.mock.calls[0]![0] as string);
     expect(output.result.models).toHaveLength(2);
     expect(output.result.models[0].supportedReasoningEfforts).toHaveLength(3);
-    expect(output.result.models[1].supportedReasoningEfforts).toHaveLength(1);
-
-    stdoutSpy.mockRestore();
-    vi.restoreAllMocks();
+    expect(output.result.models[0].defaultReasoningEffort).toBe('medium');
+    expect(output.result.models[1].supportedReasoningEfforts).toEqual([]);
+    expect(output.result.models[1].defaultReasoningEffort).toBeUndefined();
   });
 
   it('covers remaining branches in ensureLaunchSpec and providerBridge message forwarding', () => {
-    // line 38 / 43 branch
-    const params1: any = { options: { providerOptions: { acpLaunchSpec: { command: 'test.exe' } } } };
-    ensureLaunchSpec(params1);
+    ensureLaunchSpec({ options: { providerOptions: { acpLaunchSpec: { command: 'test.exe' } } } });
+    ensureLaunchSpec({ options: { providerOptions: { acpDialect: 'generic' } } });
+    ensureLaunchSpec({ providerOptions: { acpLaunchSpec: { command: 'test.exe', env: {} } } });
 
-    const params2: any = { options: { providerOptions: { acpDialect: 'generic' } } };
-    ensureLaunchSpec(params2);
-
-    // line 55 branch: spec.env without GEMINI_HOME
-    const params3: any = { providerOptions: { acpLaunchSpec: { command: 'test.exe', env: {} } } };
-    ensureLaunchSpec(params3);
-
-    // lines 329-337: thread/resume handoff and modified launch forwarding
     const resumeLine = JSON.stringify({
       jsonrpc: '2.0',
       id: 99,
       method: 'thread/resume',
-      params: {
-        providerThreadId: 'agy-session-123',
-        options: { providerOptions: {} }
-      }
+      params: { providerThreadId: 'agy-session-123', options: { providerOptions: {} } }
     });
     expect(() => experimental_providerBridge.handleLine(resumeLine)).not.toThrow();
 
@@ -373,10 +315,7 @@ describe('host.ts provider bridge and launch helpers', () => {
     const origClose = realAcpBridge.onClose;
     (realAcpBridge as any).onClose = () => {};
 
-    // Non-JSON line falls through cleanly
     expect(() => experimental_providerBridge.handleLine('INVALID-JSON-LINE')).not.toThrow();
-
-    // Lifecycle delegates
     expect(() => experimental_providerBridge.start?.({} as any)).not.toThrow();
     expect(() => experimental_providerBridge.onClose?.()).not.toThrow();
     expect(() => experimental_providerBridge.onSigterm?.()).not.toThrow();
