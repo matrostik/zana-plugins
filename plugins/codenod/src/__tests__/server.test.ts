@@ -113,6 +113,38 @@ async function reviewToCompletion(host: Awaited<ReturnType<typeof setup>>['host'
 }
 
 describe('codenod server', () => {
+  it('refuses code context from a different PR head than the reviewed commit', async () => {
+    const { host, state } = await setup();
+    await reviewToCompletion(host);
+    state.headSha = 'sha2';
+    await expect(host.callRpc('diff', { prId: PR_ID, headSha: 'sha1' })).rejects.toThrow();
+  });
+  it('persists finding edits and posts the edited text, then rejects further edits', async () => {
+    const { host, github } = await setup();
+    const data = await reviewToCompletion(host);
+    const input = { reviewId: data.review!.id, findingId: data.findings[0].id, description: 'Revised issue', suggestion: '  if (user) {\n    trim();\n  }' };
+    await host.callRpc('editFinding', input);
+    const edited = await host.callRpc('detail', { prId: PR_ID }) as PrDetail;
+    expect(edited.findings[0]).toMatchObject({ description: input.description, suggestion: input.suggestion });
+    await expect(host.callRpc('editFinding', { ...input, description: '  ' })).rejects.toThrow('Issue text is required');
+    await expect(host.callRpc('editFinding', { ...input, reviewId: 'wrong' })).rejects.toThrow();
+    await host.callRpc('post', { reviewId: input.reviewId, findingIds: [input.findingId], event: 'COMMENT' });
+    expect(JSON.stringify(github.calls.find((call) => call.method === 'POST')?.body)).toContain('Revised issue');
+    await expect(host.callRpc('editFinding', input)).rejects.toThrow('Posted findings cannot be edited');
+  });
+
+  it('bulk dismisses and restores only supplied findings, rejecting IDs from another review atomically', async () => {
+    const { host } = await setup();
+    const data = await reviewToCompletion(host);
+    const input = { reviewId: data.review!.id, findingIds: [data.findings[0].id], dismissed: true };
+    await expect(host.callRpc('setFindingsDismissed', { ...input, findingIds: [...input.findingIds, 'missing'] })).rejects.toThrow();
+    expect(((await host.callRpc('detail', { prId: PR_ID })) as PrDetail).findings[0].dismissed).toBe(false);
+    await host.callRpc('setFindingsDismissed', input);
+    expect(((await host.callRpc('detail', { prId: PR_ID })) as PrDetail).findings[0].dismissed).toBe(true);
+    await host.callRpc('setFindingsDismissed', { ...input, dismissed: false });
+    expect(((await host.callRpc('detail', { prId: PR_ID })) as PrDetail).findings[0].dismissed).toBe(false);
+  });
+
   it('syncs the inbox from GitHub search', async () => {
     const { host } = await setup();
     await host.callRpc('addRepo', { repo: 'acme/api' });
@@ -239,6 +271,79 @@ describe('codenod server', () => {
     await expect(host.callRpc('post', { reviewId: detail.review!.id, findingIds: [], event: 'APPROVE', approvalToken: 'x' })).rejects.toThrow(/unavailable/);
   });
 
+  it('keeps completed findings while a rerun is queued and after cancellation', async () => {
+    const { host, state } = await setup();
+    const first = await reviewToCompletion(host);
+    state.headSha = 'sha2';
+    const next = await host.callRpc('startReview', { prId: PR_ID }) as { id: string };
+    const during = await host.callRpc('detail', { prId: PR_ID }) as PrDetail;
+    expect(during.review?.id).toBe(first.review!.id);
+    expect(during.review?.stale).toBe(true);
+    expect(during.findings).toEqual(first.findings);
+    expect(during.latestAttempt?.id).toBe(next.id);
+    await host.callRpc('cancelReview', { reviewId: next.id });
+    const after = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.latestAttempt?.status === 'cancelled');
+    expect(after.review?.id).toBe(first.review!.id);
+    expect(after.findings).toEqual(first.findings);
+  });
+
+  it('detects commits pushed while a review is running without another manual sync', async () => {
+    const { host, state } = await setup({ reply: (thread, prompt) => {
+      state.headSha = 'sha2';
+      return reply(thread, prompt);
+    } });
+    await reviewToCompletion(host);
+    const current = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.pr.headSha === 'sha2');
+    expect(current.review?.headSha).toBe('sha1');
+    expect(current.review?.stale).toBe(true);
+    expect(host.inbox.some((entry) => entry.comments.includes('Review outdated'))).toBe(true);
+  });
+
+  it('notifies once per updated head, including after restart', async () => {
+    const { host, state, github } = await setup();
+    await host.callRpc('addRepo', { repo: 'acme/api' });
+    await reviewToCompletion(host);
+    const alerts = () => host.inbox.filter((entry) => entry.comments.includes('Review outdated'));
+    await host.callRpc('refresh');
+    expect(alerts()).toHaveLength(0);
+    state.headSha = 'sha2';
+    await Promise.all([host.callRpc('refresh'), host.callRpc('refresh')]);
+    expect(alerts()).toHaveLength(1);
+    expect(alerts()[0]).toMatchObject({ projectId: 'home' });
+    expect(alerts()[0].comments).toContain('sha1');
+    expect(alerts()[0].comments).toContain('sha2');
+    await createCodenodPlugin(host.zcc, { run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
+    await host.callRpc('refresh');
+    expect(alerts()).toHaveLength(1);
+    state.headSha = 'sha3';
+    await host.callRpc('refresh');
+    expect(alerts()).toHaveLength(2);
+  });
+
+  it('retries outdated alerts after inbox delivery fails without requiring another commit', async () => {
+    const { host, state } = await setup();
+    await host.callRpc('addRepo', { repo: 'acme/api' });
+    await reviewToCompletion(host);
+    const push = host.zcc.sdk.inbox.push;
+    host.zcc.sdk.inbox.push = async () => { throw new Error('offline'); };
+    state.headSha = 'sha2';
+    await host.callRpc('refresh');
+    expect(host.inbox.filter((entry) => entry.comments.includes('Review outdated'))).toHaveLength(0);
+    host.zcc.sdk.inbox.push = push;
+    await host.callRpc('refresh');
+    expect(host.inbox.filter((entry) => entry.comments.includes('Review outdated'))).toHaveLength(1);
+  });
+
+  it('refreshes a selected PR and detects an outdated review', async () => {
+    const { host, state } = await setup();
+    await reviewToCompletion(host);
+    state.headSha = 'sha2';
+    await host.callRpc('refreshPullRequest', { prId: PR_ID });
+    const data = await host.callRpc('detail', { prId: PR_ID }) as PrDetail;
+    expect(data.review?.stale).toBe(true);
+    expect(host.inbox.some((entry) => entry.comments.includes('Review outdated'))).toBe(true);
+  });
+
   it('auto-reviews new commits on opted-in repositories once per head', async () => {
     const { host, state } = await setup();
     await host.callRpc('setModels', { models: [MODELS[0]] });
@@ -256,6 +361,20 @@ describe('codenod server', () => {
     const second = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (detail) => detail.review?.headSha === 'sha2' && detail.review.status === 'completed');
     expect(second.review?.trigger).toBe('auto');
     expect(host.threads.size).toBe(2);
+  });
+
+  it('still auto-reviews a head first discovered when opening its detail', async () => {
+    const { host, state } = await setup();
+    await host.callRpc('setModels', { models: [MODELS[0]] });
+    await host.callRpc('addRepo', { repo: 'acme/api', autoReview: true });
+    await host.callRpc('refresh');
+    await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.review?.status === 'completed');
+    state.headSha = 'sha2';
+    await host.callRpc('refreshPullRequest', { prId: PR_ID });
+    await host.callRpc('refresh');
+    const next = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.review?.headSha === 'sha2');
+    expect(next.review?.stale).toBe(false);
+    expect(next.latestAttempt).toBeUndefined();
   });
 
   it('offers no models from providers that cannot run with full access', async () => {
@@ -312,6 +431,11 @@ describe('codenod server', () => {
 
 describe('codenod settings', () => {
   const config = (host: Awaited<ReturnType<typeof setup>>['host']) => host.callRpc('config') as Promise<ConfigSnapshot>;
+
+  it('does not register settings already managed by the CodeNod panel', async () => {
+    const { host } = await setup();
+    expect(Object.keys(host.settingDescriptors)).toEqual(['githubTokens']);
+  });
 
   it('copies legacy plugin settings once and then ignores them', async () => {
     const { host, github } = await setup({

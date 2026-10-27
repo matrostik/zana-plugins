@@ -27,8 +27,10 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 2. Click **Review** (or **Models…** to pick different models for this one review).
 3. Wait for the review to finish. You get a Zana inbox notification when it does.
 4. Read the scores and the **Findings** tab. Findings that several models agreed on are listed with all of their names.
-5. Tick the findings you want to share, choose **Comment**, and click **Post N selected**. They appear as inline comments on GitHub.
-6. To approve or request changes, choose that option instead. Zana asks you to confirm in a dialog first.
+5. Filter findings by severity and category, expand file groups, and read the highlighted code context. Use **Edit** to revise an issue or its suggested fix before posting. Posted findings are read-only.
+6. Dismiss findings you want to exclude. Bulk dismiss affects only findings matching the current filters; **Undo** and **Restore** bring them back.
+7. Choose **Comment**, then click **Post N findings to GitHub**. This posts all active, unposted findings matching the filters, including those in collapsed file groups. Findings outside the diff appear in the review body.
+8. To approve or request changes, choose that option instead. Zana asks you to confirm in a dialog first.
 
 Use **Deep Review in thread** to open a normal, visible Zana thread with the pull request loaded, when you want to dig in interactively.
 
@@ -62,7 +64,7 @@ Use **Deep Review in thread** to open a normal, visible Zana thread with the pul
 
 ## Settings
 
-CodeNod settings live in the CodeNod panel (**Settings** in the toolbar) and in the CodeNod section of Zana Settings. Both show the same three tabs.
+CodeNod review settings live in the CodeNod panel (**Settings** in the toolbar). The plugin settings page only contains the optional GitHub token fallback, used when `gh auth token` and `git credential fill` are unavailable.
 
 | Tab | Setting | Default | Purpose |
 | --- | --- | --- | --- |
@@ -78,7 +80,7 @@ CodeNod settings live in the CodeNod panel (**Settings** in the toolbar) and in 
 | AI Model | Fallback project for review threads | none | Zana project that hosts diff-only reviews |
 | AI Model | Archive hidden review threads when done | on | Keeps the thread list tidy |
 
-**GitHub tokens (fallback)** stays in Zana's plugin settings, where it is stored as a secret. The other entries still listed there were copied into CodeNod once and are no longer read.
+**GitHub tokens (fallback)** stays in Zana's plugin settings, where it is stored as a secret. On upgrade, CodeNod copies existing review settings into its own settings store once.
 
 ---
 

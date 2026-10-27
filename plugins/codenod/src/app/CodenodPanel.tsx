@@ -47,6 +47,23 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
   useEffect(load, [load]);
   useRealtime('codenod:changed', load);
 
+  useEffect(() => {
+    let lastCheckedAt = 0;
+    let inFlight = false;
+    const resume = () => {
+      if (document.visibilityState === 'hidden' || inFlight || Date.now() - lastCheckedAt < 60_000) return;
+      lastCheckedAt = Date.now();
+      inFlight = true;
+      void rpc.call('refresh').then(load).catch((cause) => setError(errorText(cause))).finally(() => { inFlight = false; });
+    };
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => {
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [rpc, load]);
+
   const changeTab = (next: PrBucket) => {
     setTab(next);
     try {

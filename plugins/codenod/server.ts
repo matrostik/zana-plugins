@@ -4,6 +4,7 @@ import { createStore, type Database } from './src/server/db.ts';
 import { createTokenResolver, runCommand, type CommandRunner } from './src/server/github/auth.ts';
 import { createGitHubClient, type FetchLike } from './src/server/github/client.ts';
 import { DEFAULT_HOST, parseHostList, parsePrId, parsePrRef, parseRepoRef, prId, repoId } from './src/server/github/refs.ts';
+import { createOutdatedNotifier } from './src/server/outdated.ts';
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
@@ -26,7 +27,6 @@ export interface CodenodPluginDeps {
 
 const MODELS_KEY = 'reviewModels';
 const SYNC_TICK_CRON = '* * * * *';
-const MOVED_SETTING = 'Moved to the CodeNod settings panel; this value is no longer read.';
 const REVIEW_EVENTS: ReviewEvent[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
 const BUCKETS: PrBucket[] = ['needs-review', 'mine', 'watched'];
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
@@ -57,15 +57,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       description: 'Only needed when neither `gh auth token` nor `git credential fill` works. One `host=token` per line.',
       secret: true,
       multiline: true
-    },
-    githubHosts: { type: 'string', label: 'GitHub Enterprise hosts', description: MOVED_SETTING, default: '' },
-    syncIntervalMinutes: { type: 'number', label: 'Sync interval (minutes)', description: MOVED_SETTING, default: 5, ...SETTING_LIMITS.syncIntervalMinutes },
-    maxConcurrentReviews: { type: 'number', label: 'Reviews running at once', description: MOVED_SETTING, default: 2, ...SETTING_LIMITS.maxConcurrentReviews },
-    reviewTimeoutMinutes: { type: 'number', label: 'Review timeout per model (minutes)', description: MOVED_SETTING, default: 20, ...SETTING_LIMITS.reviewTimeoutMinutes },
-    workspaceMode: { type: 'select', label: 'Review workspace', description: MOVED_SETTING, options: WORKSPACE_MODES, default: 'worktree' },
-    fallbackProject: { type: 'project', label: 'Fallback project for review threads', description: MOVED_SETTING },
-    archiveReviewThreads: { type: 'boolean', label: 'Archive hidden review threads when done', description: MOVED_SETTING, default: true },
-    customInstructions: { type: 'string', label: 'Custom review instructions', description: MOVED_SETTING, multiline: true, default: '' }
+    }
   });
 
   const readSettings = () => settings.get();
@@ -107,6 +99,23 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     };
   };
 
+  const notifyOutdated = createOutdatedNotifier({
+    store,
+    projectForPr: async (pr) => {
+      const project = await projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
+      return project?.id ?? (await codenodSettings.load()).fallbackProjectId ?? (await projects.projects())[0]?.id ?? null;
+    },
+    push: (input) => zcc.sdk.inbox.push(input),
+    warn: (message) => zcc.log.warn(message)
+  });
+
+  async function refreshPullRequest(ref: ReturnType<typeof parsePrId>) {
+    const pr = await sync.syncPullRequest(ref);
+    await notifyOutdated([pr.id]);
+    publish(CHANGED_EVENT, { prId: pr.id });
+    return pr;
+  }
+
   const reviews = createReviewService({
     store,
     github,
@@ -121,16 +130,20 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     notify: async ({ projectId, text }) => {
       await zcc.sdk.inbox.push({ projectId, comments: text });
     },
-    syncPullRequest: (ref) => sync.syncPullRequest(ref),
+    syncPullRequest: refreshPullRequest,
     publish,
     log: zcc.log
   });
 
   async function runSync() {
     const result = await sync.syncAll();
-    for (const pr of result.changed) {
+    await notifyOutdated();
+    // A detail refresh can discover a head before the background sync does.
+    for (const pr of store.listPullRequests()) {
       const repo = store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
-      const login = result.hosts.find((host) => host.host === pr.host)?.login;
+      const host = result.hosts.find((host) => host.host === pr.host);
+      if (!host?.login || host.error) continue;
+      const login = host.login;
       if (!repo?.autoReview || pr.isDraft || !pr.buckets.includes('needs-review') || pr.author === login) continue;
       if (store.hasReviewForHead(pr.id, pr.headSha)) continue;
       await reviews.startReview(parsePrId(pr.id), { trigger: 'auto' }).catch((error) => zcc.log.warn(`codenod: auto-review of ${pr.id} failed: ${errorMessage(error)}`));
@@ -226,6 +239,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     return runSync();
   });
 
+  zcc.rpc.method('refreshPullRequest', (args) => refreshPullRequest(parsePrId(asString(asRecord(args), 'prId'))));
+
   zcc.rpc.method('startReview', async (args) => {
     const record = asRecord(args);
     const models = sanitizeModels(record.models);
@@ -235,14 +250,40 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   zcc.rpc.method('cancelReview', (args) => ({ cancelled: reviews.cancelReview(asString(asRecord(args), 'reviewId')) }));
 
   zcc.rpc.method('diff', async (args) => {
-    const pr = store.getPullRequest(asString(asRecord(args), 'prId'));
+    const record = asRecord(args);
+    const pr = store.getPullRequest(asString(record, 'prId'));
     if (!pr) throw new Error('Pull request not found');
-    return github.listFiles(parsePrId(pr.id));
+    const ref = parsePrId(pr.id);
+    const expectedHead = asString(record, 'headSha');
+    const checkHead = async () => {
+      if (!expectedHead) return;
+      const currentHead = (await github.getPull(ref)).head.sha;
+      if (currentHead !== expectedHead) throw new StaleReviewError(expectedHead, currentHead);
+    };
+    await checkHead();
+    const files = await github.listFiles(ref);
+    await checkHead();
+    return files;
   });
 
   zcc.rpc.method('dismissFinding', (args) => {
     const record = asRecord(args);
     store.setFindingDismissed(asString(record, 'findingId'), record.dismissed !== false);
+    publish(CHANGED_EVENT, { finding: true });
+    return { ok: true };
+  });
+
+  zcc.rpc.method('editFinding', (args) => {
+    const record = asRecord(args);
+    store.editFinding(asString(record, 'reviewId'), asString(record, 'findingId'), asString(record, 'description'),
+      typeof record.suggestion === 'string' ? record.suggestion : null);
+    publish(CHANGED_EVENT, { finding: true });
+    return { ok: true };
+  });
+
+  zcc.rpc.method('setFindingsDismissed', (args) => {
+    const record = asRecord(args);
+    store.setFindingsDismissed(asString(record, 'reviewId'), asStringArray(record, 'findingIds'), record.dismissed !== false);
     publish(CHANGED_EVENT, { finding: true });
     return { ok: true };
   });

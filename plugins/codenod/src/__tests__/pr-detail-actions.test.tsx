@@ -24,6 +24,7 @@ function makeRpc(data: PrDetailData | Error, handlers: Record<string, Handler> =
       if (data instanceof Error) throw data;
       return data;
     }
+    if (method === 'refreshPullRequest' && !handlers[method]) return null;
     const handler = handlers[method];
     if (!handler) throw new Error(`unexpected rpc ${method}`);
     return handler((args ?? {}) as Record<string, unknown>);
@@ -106,6 +107,50 @@ describe('PrDetail loading and setup', () => {
 });
 
 describe('PrDetail review actions', () => {
+  it('checks the selected PR for new commits once on opening', async () => {
+    const call = makeRpc(detail('completed'), { refreshPullRequest: () => null });
+    renderDetail(call);
+    await screen.findByText('Looks fine');
+    await waitFor(() => expect(call).toHaveBeenCalledWith('refreshPullRequest', { prId: 'github.com/acme/api#1' }));
+    expect(call.mock.calls.filter(([method]) => method === 'refreshPullRequest')).toHaveLength(1);
+  });
+
+  it('shows one cancellation notice while retaining the completed findings', async () => {
+    const data = completedWithFindings();
+    data.latestAttempt = { ...detail('cancelled').review!, id: 'rerun' };
+    renderDetail(makeRpc(data));
+    await screen.findByText('Null token crashes login');
+    expect(screen.getAllByText('Rerun cancelled. Showing the previous completed review.')).toHaveLength(1);
+  });
+
+  it('shows previous findings and cancels the active rerun instead of the completed review', async () => {
+    const data = completedWithFindings();
+    data.review!.stale = true;
+    data.latestAttempt = { ...detail('running').review!, id: 'rerun', headSha: 'sha2' };
+    data.latestRuns = detail('running').runs;
+    const call = makeRpc(data, { cancelReview: () => null });
+    renderDetail(call);
+    expect(await screen.findByText('Null token crashes login')).toBeTruthy();
+    expect(screen.getByText(/Review running/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel review' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('cancelReview', { reviewId: 'rerun' }));
+  });
+
+  it('shows both commits and reruns an outdated review', async () => {
+    const data = completedWithFindings();
+    data.pr.headSha = '8e87eeb123456';
+    data.review!.headSha = '7fd6f06123456';
+    data.review!.stale = true;
+    const call = makeRpc(data, { startReview: () => null });
+    renderDetail(call);
+    const banner = await screen.findByRole('status', { name: 'Review outdated' });
+    expect(banner.textContent).toContain('7fd6f06');
+    expect(banner.textContent).toContain('8e87eeb');
+    fireEvent.click(screen.getByRole('button', { name: 'Review outdated — Rerun' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('startReview', { prId: data.pr.id }));
+
+  });
+
   it('starts a review with the default models', async () => {
     const data = detail('completed');
     data.review = null;
@@ -164,21 +209,70 @@ describe('PrDetail review actions', () => {
 });
 
 describe('PrDetail findings and posting', () => {
-  it('lists findings, toggles selection, and dismisses', async () => {
+  it('lists findings without checkboxes and dismisses', async () => {
     const call = makeRpc(completedWithFindings(), { dismissFinding: () => null });
     renderDetail(call);
     expect(await screen.findByText('Null token crashes login')).toBeTruthy();
-    expect(screen.getByText('src/login.ts:12')).toBeTruthy();
+    expect(screen.getByText('Line 12')).toBeTruthy();
     expect(screen.getByText('Posted')).toBeTruthy();
-    expect(await screen.findByRole('button', { name: 'Post 1 selected' })).toBeTruthy();
-
-    fireEvent.click(screen.getByLabelText('Select finding in src/login.ts:12'));
-    expect(screen.getByRole('button', { name: 'Post 0 selected' })).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Select finding in src/login.ts:12'));
-    expect(screen.getByRole('button', { name: 'Post 1 selected' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
+    expect(screen.queryByRole('checkbox')).toBeNull();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dismiss' })[0]);
     await waitFor(() => expect(call).toHaveBeenCalledWith('dismissFinding', { findingId: 'f1', dismissed: true }));
+  });
+
+  it('posts only unposted findings matching both filters, even inside collapsed files', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', severity: 'medium', category: 'security', file: 'src/auth.ts', description: 'Unsafe redirect' }));
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 1 }) });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Warning (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Security (1)' }));
+    expect(screen.queryByText('Null token crashes login')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f3'] })));
+  });
+
+  it('dismisses only filtered findings and offers undo for the same IDs', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', severity: 'medium', description: 'Warning finding' }));
+    const call = makeRpc(data, { setFindingsDismissed: () => null });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Warning (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss 1 filtered finding' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('setFindingsDismissed', { reviewId: 'rev', findingIds: ['f3'], dismissed: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('setFindingsDismissed', { reviewId: 'rev', findingIds: ['f3'], dismissed: false }));
+  });
+
+  it('saves issue and suggestion edits, keeps errors visible, and leaves posted findings read-only', async () => {
+    const data = completedWithFindings();
+    const call = makeRpc(data, { editFinding: () => { throw new Error('Save failed'); } });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit finding in src/login.ts:12' }));
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Revised issue' } });
+    fireEvent.change(screen.getByLabelText('Suggestion (optional)'), { target: { value: 'Revised fix' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Save failed')).toBeTruthy();
+    expect(call).toHaveBeenCalledWith('editFinding', { reviewId: 'rev', findingId: 'f1', description: 'Revised issue', suggestion: 'Revised fix' });
+    expect(screen.getByLabelText('Issue')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('button', { name: 'Edit finding in src/login.ts' })).toBeNull();
+  });
+
+  it('expands the first three files and shows numbered context with the target highlighted', async () => {
+    const data = detail('completed');
+    data.findings = [0, 1, 2, 3].map((i) => finding({ id: `f${i}`, file: `src/${i}.ts`, line: 12, description: `Issue ${i}` }));
+    renderDetail(makeRpc(data, { diff: () => [{ path: 'src/0.ts', patch: '@@ -10,3 +10,3 @@\n before\n-old\n+new\n after' }] }));
+    expect(await screen.findByText('Issue 0')).toBeTruthy();
+    expect(screen.getByText('Issue 2')).toBeTruthy();
+    expect(screen.queryByText('Issue 3')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Expand src\/3.ts/ }));
+    expect(screen.getByText('Issue 3')).toBeTruthy();
+    const target = await screen.findByText('after');
+    expect(target.closest('[data-target="true"]')?.textContent).toContain('12');
   });
 
   it('shows the empty findings message for a clean review', async () => {
@@ -202,9 +296,9 @@ describe('PrDetail findings and posting', () => {
       throw new Error(`unexpected rpc ${method} ${JSON.stringify(args)}`);
     });
     renderDetail(call);
-    fireEvent.click(await screen.findByRole('button', { name: 'Post 2 selected' }));
-    expect(await screen.findByRole('button', { name: 'Post 1 selected' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Post 1 selected' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Post 2 findings to GitHub' }));
+    expect(await screen.findByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
   });
 
@@ -212,7 +306,7 @@ describe('PrDetail findings and posting', () => {
     const call = makeRpc(completedWithFindings(), { post: () => ({ url: 'https://x', commentCount: 1 }) });
     renderDetail(call);
     fireEvent.change(await screen.findByLabelText('Message (optional)'), { target: { value: 'Nice work' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Post 1 selected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
     expect(await screen.findByText('Posted to GitHub (1 inline comment).')).toBeTruthy();
     expect(call).toHaveBeenCalledWith('post', { reviewId: 'rev', findingIds: ['f1'], event: 'COMMENT', body: 'Nice work', approvalToken: undefined });
   });
@@ -225,7 +319,7 @@ describe('PrDetail findings and posting', () => {
     });
     renderDetail(call);
     fireEvent.change(await screen.findByLabelText('Post as'), { target: { value: 'APPROVE' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Post 1 selected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
     expect(await screen.findByText('Posted to GitHub (2 inline comments).')).toBeTruthy();
     expect(sdk.requestApproval).toHaveBeenCalledWith('codenod', expect.objectContaining({ confirmLabel: 'Approve', tone: 'default' }));
     expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ event: 'APPROVE', approvalToken: 'tok' }));
@@ -236,9 +330,9 @@ describe('PrDetail findings and posting', () => {
     const call = makeRpc(completedWithFindings(), { approvalBinding: () => ({}) });
     renderDetail(call);
     fireEvent.change(await screen.findByLabelText('Post as'), { target: { value: 'REQUEST_CHANGES' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Post 1 selected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
     expect(await screen.findByText('Signed confirmation is only available in the Zana desktop app.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Post 1 selected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
     expect(await screen.findByText('Not posted.')).toBeTruthy();
     expect(call).not.toHaveBeenCalledWith('post', expect.anything());
   });
@@ -247,9 +341,9 @@ describe('PrDetail findings and posting', () => {
     const data = completedWithFindings();
     data.review!.stale = true;
     renderDetail(makeRpc(data));
-    expect(await screen.findByText('New commits were pushed after this review. Re-review before approving.')).toBeTruthy();
+    expect(await screen.findByRole('status', { name: 'Review outdated' })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Post as'), { target: { value: 'APPROVE' } });
-    expect((screen.getByRole('button', { name: 'Post 1 selected' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Post 1 finding to GitHub' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

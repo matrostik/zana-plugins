@@ -1,6 +1,6 @@
 {
   "name": "@zcc-ext/codenod",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Ros Haitovich <rhaitovich@salesforce.com>",
   "type": "module",
   "description": "AI pull request review for GitHub and GitHub Enterprise, powered by the AI providers configured in Zana.",
