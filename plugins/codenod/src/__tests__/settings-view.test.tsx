@@ -32,6 +32,7 @@ function snapshot(overrides: Partial<ConfigSnapshot['settings']> = {}): ConfigSn
       workspaceMode: 'worktree',
       fallbackProjectId: null,
       archiveReviewThreads: true,
+      autoSyncEnabled: true,
       ...overrides
     },
     defaultInstructions: DEFAULT_INSTRUCTIONS,
@@ -152,6 +153,30 @@ describe('Organizations & Repos tab', () => {
     fireEvent.blur(field);
     await waitFor(() => expect(settingsCalls()).toEqual([{ syncIntervalMinutes: 15 }]));
   });
+  it('toggles automatic repository sync and disables the interval field when off', async () => {
+    const { settingsCalls } = await renderView();
+    fireEvent.click(screen.getByRole('tab', { name: 'Organizations & Repos' }));
+    const checkbox = screen.getByLabelText('Enable automatic repository sync') as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+
+    const intervalField = screen.getByLabelText('Sync interval (minutes)') as HTMLInputElement;
+    expect(intervalField.disabled).toBe(false);
+
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(settingsCalls()).toEqual([{ autoSyncEnabled: false }]));
+  });
+
+  it('renders disabled sync interval when autoSyncEnabled is false in config', async () => {
+    await renderView(snapshot({ autoSyncEnabled: false }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Organizations & Repos' }));
+    const checkbox = screen.getByLabelText('Enable automatic repository sync') as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    const intervalField = screen.getByLabelText('Sync interval (minutes)') as HTMLInputElement;
+    expect(intervalField.disabled).toBe(true);
+    expect(screen.getByText(/Automatic sync is paused/)).toBeTruthy();
+  });
+
 
   it('clamps an out-of-range sync interval before saving', async () => {
     const { settingsCalls } = await renderView();

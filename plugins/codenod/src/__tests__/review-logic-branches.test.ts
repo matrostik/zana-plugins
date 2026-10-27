@@ -605,7 +605,30 @@ describe('post formatting', () => {
 
   it('formats a single-model finding without a suggestion', () => {
     const text = formatFinding(finding('f'), 1);
-    expect(text).toBe('**[HIGH] logic** — Broken\n\n<sub>CodeNod</sub>');
+    expect(text).toBe('⚠️ Error · 🧩 Logic\n\nBroken\n\n---\n\n*Review by [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)*');
+  });
+
+  it('formats a finding with a suggestion and multi-model consensus matching the GitHub alert layout', () => {
+    const text = formatFinding(
+      finding('f', {
+        severity: 'low',
+        category: 'style',
+        description: 'The committed plan cites local run artifacts that are not in the repository.',
+        suggestion: 'Remove the local artifact paths and session/authorization narrative.',
+        agreedBy: ['gpt-4', 'claude-3']
+      }),
+      2
+    );
+    expect(text).toBe(
+      'ℹ Info · 🎨 Style\n\n' +
+      'The committed plan cites local run artifacts that are not in the repository.\n\n' +
+      '> [!TIP]\n' +
+      '> ### Suggested fix\n' +
+      '>\n' +
+      '> Remove the local artifact paths and session/authorization narrative.\n\n' +
+      '---\n\n' +
+      '*Review by [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) · flagged by 2/2 models*'
+    );
   });
 
   it('caps inline comments at fifty and moves the rest to the body', () => {
@@ -626,6 +649,7 @@ describe('post formatting', () => {
     expect(payload.bodyIds).toEqual(['other', 'tick']);
     expect(payload.body.startsWith('Please check\n\n**Findings outside the diff:**')).toBe(true);
     expect(payload.body).toContain("`src/'x'.ts`");
+    expect(payload.body).toContain('**⚠️ Error · 🧩 Logic** — Broken');
     expect(payload.body).not.toContain('CodeNod summary');
   });
 
@@ -681,35 +705,6 @@ function posterHarness(
 }
 
 describe('poster', () => {
-  it('does not double-post findings when two submissions overlap', async () => {
-    const posted = new Set<string>();
-    const findings = [finding('in')];
-    const store = {
-      getReview: vi.fn(() => ({ id: 'r', prId: 'github.com/acme/api#4', headSha: 'abc1234567', status: 'completed', summary: 'S', consensusSummary: null })),
-      listFindings: vi.fn(() => findings.map((item) => ({ ...item, postedAt: posted.has(item.id) ? 1 : null }))),
-      listRuns: vi.fn(() => [{ status: 'completed' }]),
-      markFindingsPosted: vi.fn((ids: string[]) => ids.forEach((id) => posted.add(id))),
-      recordPostedReview: vi.fn()
-    };
-    const github = {
-      getPull: vi.fn(async () => ({ head: { sha: 'abc1234567' } })),
-      listFiles: vi.fn(async (): Promise<ChangedFile[]> => [{ path: 'src/a.ts', status: 'modified', additions: 1, deletions: 1, patch: PATCH }]),
-      createReview: vi.fn(async (_ref: unknown, _input: { comments: unknown[] }) => {
-        return { id: 1, html_url: 'https://github.com/acme/api/pull/4#r1' };
-      })
-    };
-    const poster = createPoster({ store: store as unknown as Store, github: github as unknown as GitHubClient });
-    const [first, second] = await Promise.all([
-      poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' }),
-      poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT', body: 'follow-up' })
-    ]);
-    expect(first.publishedCount).toBe(1);
-    expect(second.publishedCount).toBe(0);
-    expect(second.commentCount).toBe(0);
-    expect(github.createReview).toHaveBeenCalledTimes(2);
-    expect(github.createReview.mock.calls[1]?.[1]).toMatchObject({ comments: [] });
-  });
-
   it('reads the current head commit', async () => {
     const { poster, github } = posterHarness({ headSha: 'fff0000' });
     await expect(poster.currentHeadSha('github.com/acme/api#4')).resolves.toBe('fff0000');
@@ -741,14 +736,14 @@ describe('poster', () => {
     expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ commitId: 'abc1234567', comments: [] }));
   });
 
-  it('does not post findings that were already published', async () => {
+  it('posts selected findings even if previously published', async () => {
     const { poster, store, github } = posterHarness({
       findings: [finding('in'), finding('done', { postedAt: 5 })]
     });
     const result = await poster.post({ reviewId: 'r', findingIds: ['in', 'done'], event: 'COMMENT' });
-    expect(result.commentCount).toBe(1);
-    expect(store.markFindingsPosted).toHaveBeenCalledWith(['in']);
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ comments: [expect.objectContaining({ path: 'src/a.ts' })] }));
+    expect(result.commentCount).toBe(2);
+    expect(store.markFindingsPosted).toHaveBeenCalledWith(['in', 'done']);
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ comments: [expect.objectContaining({ path: 'src/a.ts' }), expect.objectContaining({ path: 'src/a.ts' })] }));
   });
 
   it('posts selected, undismissed findings inline and records the review', async () => {
@@ -758,7 +753,7 @@ describe('poster', () => {
     });
     const result = await poster.post({ reviewId: 'r', findingIds: ['in', 'gone'], event: 'APPROVE' });
     expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1, bodyFindingCount: 0, publishedCount: 1 });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ event: 'APPROVE', body: '**CodeNod summary:** Consensus view' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ event: 'APPROVE', body: '**[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) summary:** Consensus view' }));
     expect(store.markFindingsPosted).toHaveBeenCalledWith(['in']);
     expect(store.recordPostedReview).toHaveBeenCalledWith({ reviewId: 'r', event: 'APPROVE', githubReviewId: 7, url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1 });
   });
@@ -766,13 +761,13 @@ describe('poster', () => {
   it('falls back to the plain summary when there is no consensus summary', async () => {
     const { poster, github } = posterHarness({ findings: [finding('in')] });
     await poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: '**CodeNod summary:** Plain summary' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: '**[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) summary:** Plain summary' }));
   });
 
   it('uses a default approval body and tolerates an empty GitHub response', async () => {
     const { poster, store, github } = posterHarness({ created: null });
     const result = await poster.post({ reviewId: 'r', findingIds: [], event: 'APPROVE' });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: 'Approved after CodeNod review.' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: 'Approved after [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) review.' }));
     expect(result.url).toBeNull();
     expect(store.recordPostedReview).toHaveBeenCalledWith(expect.objectContaining({ githubReviewId: null, url: null }));
   });
@@ -780,7 +775,7 @@ describe('poster', () => {
   it('uses a generic body for change requests and ignores a non-numeric review id', async () => {
     const { poster, store, github } = posterHarness({ created: { id: 'x' } });
     await poster.post({ reviewId: 'r', findingIds: [], event: 'REQUEST_CHANGES' });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: 'CodeNod review' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: '[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) review' }));
     expect(store.recordPostedReview).toHaveBeenCalledWith(expect.objectContaining({ githubReviewId: null, url: null }));
   });
 });

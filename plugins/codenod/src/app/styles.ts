@@ -48,6 +48,7 @@ export const CODENOD_STYLES = `
   background: var(--cn-card); color: var(--cn-text); border: 1px solid var(--cn-border-strong);
   border-radius: 6px; padding: 4px 8px; font: inherit; min-width: 0;
 }
+.cn-input:disabled, .cn-select:disabled, .cn-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 .cn-textarea { width: 100%; min-height: 60px; resize: vertical; }
 .cn-body { display: flex; flex: 1; min-height: 0; }
 .cn-list { width: clamp(260px, 36%, 460px); border-right: 1px solid var(--cn-border); display: flex; flex-direction: column; min-height: 0; }
@@ -71,6 +72,7 @@ export const CODENOD_STYLES = `
 .cn-badge-ok { color: var(--cn-ok); border-color: color-mix(in srgb, var(--cn-ok) 50%, transparent); }
 .cn-badge-warn { color: var(--cn-warn); border-color: color-mix(in srgb, var(--cn-warn) 50%, transparent); }
 .cn-badge-danger { color: var(--cn-danger); border-color: color-mix(in srgb, var(--cn-danger) 50%, transparent); }
+.cn-badge-muted { color: var(--cn-muted); border-color: var(--cn-border); }
 .cn-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .cn-detail-scroll { flex: 1; overflow: auto; padding: 16px; }
 .cn-empty { padding: 32px; text-align: center; color: var(--cn-muted); }
@@ -109,7 +111,9 @@ export const CODENOD_STYLES = `
 .cn-severity-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--cn-dot); }
 .cn-severity-label { font-size: 12px; font-weight: 650; }
 .cn-category { padding: 3px 6px; border-radius: 3px; background: color-mix(in srgb, var(--cn-bg) 65%, transparent); color: var(--cn-text); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.2; }
-.cn-model-agreement { color: var(--cn-text); background: color-mix(in srgb, var(--cn-bg) 30%, transparent); }
+.cn-model-agreement { color: var(--cn-text); background: color-mix(in srgb, var(--cn-bg) 30%, transparent); white-space: normal; overflow-wrap: anywhere; }
+.cn-finding-select { display: inline-flex; align-items: center; gap: 4px; color: var(--cn-muted); font-size: 11px; cursor: pointer; }
+.cn-finding-select input { accent-color: var(--cn-accent); }
 .cn-finding-location { color: inherit; font-size: 11px; text-decoration: none; }
 .cn-finding-location:hover, .cn-file-link:hover { text-decoration: underline; }
 .cn-finding-description { margin: 6px 0 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }

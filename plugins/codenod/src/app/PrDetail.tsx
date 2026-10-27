@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
-import { errorText, formatDuration, relativeTime, scoreTone } from './format.ts';
+import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
 import { ProviderModelPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
@@ -129,6 +129,9 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
+  const initializedReviewId = useRef<string | null>(null);
+  const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
   let navigate: ReturnType<typeof useZccNavigate> | null = null;
   try {
@@ -144,7 +147,25 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
       .call('detail', { prId })
       .then((value) => {
         if (requestSeq.current !== requestId) return;
-        setDetail(value as PrDetailData);
+        const next = value as PrDetailData;
+        setDetail(next);
+        const nextReviewId = next.review?.id ?? null;
+        const reviewCompleted = next.review?.status === 'completed';
+        const eligible = next.findings.filter((finding) => !finding.dismissed && finding.postedAt === null);
+        const isNewReview = reviewCompleted && initializedReviewId.current !== nextReviewId;
+        if (reviewCompleted) {
+          initializedReviewId.current = nextReviewId;
+        }
+        const prevPosted = prevFindingsPosted.current;
+        const newlyPostedIds = new Set(
+          next.findings
+            .filter((finding) => finding.postedAt !== null && prevPosted.has(finding.id) && prevPosted.get(finding.id) !== finding.postedAt)
+            .map((finding) => finding.id)
+        );
+        prevFindingsPosted.current = new Map(next.findings.map((finding) => [finding.id, finding.postedAt]));
+        setSelectedFindingIds((selected) => isNewReview
+          ? new Set(eligible.map((finding) => finding.id))
+          : new Set(next.findings.filter((finding) => !finding.dismissed && !newlyPostedIds.has(finding.id) && selected.has(finding.id)).map((finding) => finding.id)));
       })
       .catch((cause) => {
         if (requestSeq.current !== requestId) return;
@@ -156,6 +177,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setDetail(null);
     setNotice(null);
     setPickerOpen(false);
+    initializedReviewId.current = null;
+    prevFindingsPosted.current = new Map();
     load();
   }, [load]);
   useEffect(() => {
@@ -172,9 +195,9 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setFilters({ severity: 'all', category: 'all' });
     setEditingFinding(false);
   }, [prId, reviewId]);
-  const postableFindings = detail?.findings.filter((finding) => !finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters)) ?? [];
+  const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && matchesFinding(finding, filters)) ?? [];
+  const selectedFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed) ?? [];
 
-  const modelCount = useMemo(() => detail?.runs.filter((run) => run.status === 'completed').length ?? 0, [detail]);
   const now = useNow(isActive(detail?.latestAttempt?.status) || isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
   const act = async (label: string, fn: () => Promise<void>) => {
@@ -234,6 +257,20 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
       setNotice({ kind: 'info', text: `Posted to GitHub (${result.commentCount} inline comment${result.commentCount === 1 ? '' : 's'}).` });
       load();
     });
+
+  const copyPrompt = async () => {
+    if (!detail || !selectedFindings.length) return;
+    try {
+      await copyTextToClipboard(formatFindingsPrompt({
+        owner: detail.pr.owner, repo: detail.pr.repo, number: detail.pr.number, title: detail.pr.title,
+        headSha: detail.review?.headSha ?? detail.pr.headSha,
+        findings: selectedFindings
+      }));
+      setNotice({ kind: 'info', text: `Copied ${selectedFindings.length} finding${selectedFindings.length === 1 ? '' : 's'} as a prompt.` });
+    } catch (cause) {
+      setNotice({ kind: 'error', text: `Could not copy findings: ${errorText(cause)}` });
+    }
+  };
 
   const deepReview = () =>
     act('deep', async () => {
@@ -315,7 +352,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             <div className="cn-tabs" role="tablist" aria-label="Review details">
               {(['findings', 'models', 'diff'] as DetailTab[]).map((id) => (
                 <button key={id} type="button" role="tab" className="cn-tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-                  {id === 'findings' ? `Findings (${findings.filter((finding) => !finding.dismissed).length})` : id === 'models' ? `Models (${runs.length})` : 'Diff'}
+                  {id === 'findings' ? `Findings (${findings.filter((finding) => !finding.dismissed).length})` : id === 'models' ? `Models (${attemptRuns.length})` : 'Diff'}
                 </button>
               ))}
             </div>
@@ -323,9 +360,14 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
               {tab === 'findings' ? (
                 findings.length === 0 && review.status !== 'completed' ? <p className="cn-empty">Findings appear when the review completes.</p> :
                 <FindingsView key={review.id} rpc={rpc} pr={pr} reviewId={review.id} headSha={review.headSha} stale={review.stale}
-                  findings={findings} modelCount={modelCount} filters={filters} onFiltersChange={setFilters}
+                  findings={findings} filters={filters} onFiltersChange={setFilters}
                   onEditingChange={setEditingFinding} disabled={busy !== null}
-                  onFindingsChange={(next) => setDetail((current) => current?.review?.id === review.id ? { ...current, findings: next } : current)} />
+                  selectedIds={selectedFindingIds} onSelectionChange={setSelectedFindingIds} onCopyPrompt={() => void copyPrompt()}
+                  onFindingsChange={(next) => {
+                    setDetail((current) => current?.review?.id === review.id ? { ...current, findings: next } : current);
+                    const eligibleIds = new Set(next.filter((finding) => !finding.dismissed).map((finding) => finding.id));
+                    setSelectedFindingIds((selected) => new Set([...selected].filter((id) => eligibleIds.has(id))));
+                  }} />
               ) : null}
               {tab === 'models' ? (
                 <table className="cn-table">
@@ -340,7 +382,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                     </tr>
                   </thead>
                   <tbody>
-                    {runs.map((run) => (
+                    {attemptRuns.map((run) => (
                       <tr key={run.id}>
                         <td className="cn-mono">
                           {run.providerId}/{run.model}

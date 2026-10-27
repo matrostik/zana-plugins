@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrDetail } from '../app/PrDetail.tsx';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
@@ -107,6 +107,30 @@ describe('PrDetail loading and setup', () => {
 });
 
 describe('PrDetail review actions', () => {
+  it('replaces the model results with the latest runs when starting a re-review', async () => {
+    const data = completedWithFindings();
+    data.runs[0].summary = 'Previous model result';
+    const call = makeRpc(data, {
+      startReview: () => {
+        data.latestAttempt = { ...detail('running').review!, id: 'rerun' };
+        data.latestRuns = detail('running').runs.slice(1).map((run) => ({ ...run, id: `rerun-${run.id}`, reviewId: 'rerun' }));
+      }
+    });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Models (3)' }));
+    expect(screen.getByText('Previous model result')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Re-review' }));
+    await screen.findByRole('button', { name: 'Cancel review' });
+    expect(screen.getByRole('tab', { name: 'Models (2)' })).toBeTruthy();
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('running')).toBeTruthy();
+    expect(within(table).getByText('queued')).toBeTruthy();
+    expect(within(table).queryByText('completed')).toBeNull();
+    expect(within(table).queryByText('Previous model result')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: /Findings/ }));
+    expect(screen.getByText('Null token crashes login')).toBeTruthy();
+  });
+
   it('checks the selected PR for new commits once on opening', async () => {
     const call = makeRpc(detail('completed'), { refreshPullRequest: () => null });
     renderDetail(call);
@@ -209,17 +233,221 @@ describe('PrDetail review actions', () => {
 });
 
 describe('PrDetail findings and posting', () => {
-  it('lists findings without checkboxes and dismisses', async () => {
+  it('shows model attribution, selects eligible findings, and dismisses', async () => {
     const call = makeRpc(completedWithFindings(), { dismissFinding: () => null });
     renderDetail(call);
     expect(await screen.findByText('Null token crashes login')).toBeTruthy();
     expect(screen.getByText('Line 12')).toBeTruthy();
     expect(screen.getByText('Posted')).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByText('Flagged by: cursor/a, cursor/b')).toBeTruthy();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    const card = screen.getByRole('article', { name: 'Finding in src/login.ts:12' });
+    expect(card.querySelector('.cn-finding-head')?.firstElementChild?.className).toContain('cn-finding-select');
+    expect((screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Select all issues' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Clear selection' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Deselect all issues' })).toBeNull();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dismiss' })[0]);
     await waitFor(() => expect(call).toHaveBeenCalledWith('dismissFinding', { findingId: 'f1', dismissed: true }));
+  });
+
+  it('posts only explicitly selected findings', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue', agreedBy: ['cursor/a'] }));
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 1 }) });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts:12' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f3'] })));
+  });
+
+  it('posts selected findings even when they were already posted', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 3 }) });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Select all issues' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 3 findings to GitHub' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f1', 'f2', 'f3'] })));
+  });
+
+  it('enables the post button and updates the count when manually selecting a previously posted finding', async () => {
+    const data = completedWithFindings();
+    data.findings[0] = { ...data.findings[0], postedAt: 100 };
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 1 }) });
+    renderDetail(call);
+    const postBtn = await screen.findByRole('button', { name: 'Post 0 findings to GitHub' });
+    expect((postBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }));
+
+    const enabledBtn = screen.getByRole('button', { name: 'Post 1 finding to GitHub' });
+    expect((enabledBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(enabledBtn);
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
+  });
+
+  it('preserves selected posted findings across background detail reloads', async () => {
+    let resolveRefresh!: () => void;
+    const refreshPromise = new Promise<void>((resolve) => { resolveRefresh = resolve; });
+    const data = completedWithFindings();
+    data.findings[0] = { ...data.findings[0], postedAt: 100 };
+    const call = vi.fn(async (method: string) => {
+      if (method === 'detail') return data;
+      if (method === 'refreshPullRequest') {
+        await refreshPromise;
+        return null;
+      }
+      throw new Error(`Unhandled RPC: ${method}`);
+    });
+    renderDetail(call);
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts' });
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(checkbox);
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+
+    resolveRefresh();
+    await waitFor(() => expect(call.mock.calls.filter(([m]) => m === 'detail')).toHaveLength(2));
+    expect((screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('auto-selects findings when a review opened while running completes', async () => {
+    let resolveRefresh!: () => void;
+    const refreshPromise = new Promise<void>((resolve) => { resolveRefresh = resolve; });
+    const runningData = detail('running');
+    const completedData = completedWithFindings();
+    let isCompleted = false;
+
+    const call = vi.fn(async (method: string) => {
+      if (method === 'detail') return isCompleted ? completedData : runningData;
+      if (method === 'refreshPullRequest') {
+        await refreshPromise;
+        isCompleted = true;
+        return null;
+      }
+      throw new Error(`Unhandled RPC: ${method}`);
+    });
+
+    renderDetail(call);
+    expect(await screen.findByText('Findings appear when the review completes.')).toBeTruthy();
+
+    resolveRefresh();
+    await waitFor(() => expect(call.mock.calls.filter(([m]) => m === 'detail')).toHaveLength(2));
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts:12' });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
+  });
+
+  it('deselects already-posted findings after re-posting them', async () => {
+    const data = completedWithFindings();
+    data.findings[0] = { ...data.findings[0], postedAt: 100 };
+    let posted = false;
+    const call = vi.fn(async (method: string, args?: unknown) => {
+      if (method === 'detail') {
+        if (!posted) return data;
+        return {
+          ...data,
+          findings: data.findings.map((item) => (item.id === 'f2' ? { ...item, postedAt: 200 } : item))
+        };
+      }
+      if (method === 'post') {
+        posted = true;
+        return { url: null, commentCount: 1 };
+      }
+      if (method === 'refreshPullRequest') return null;
+      throw new Error(`Unhandled RPC: ${method}`);
+    });
+
+    renderDetail(call);
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts' });
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(checkbox);
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+
+    const postBtn = screen.getByRole('button', { name: 'Post 1 finding to GitHub' });
+    fireEvent.click(postBtn);
+
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
+    await waitFor(() => {
+      const updatedCheckbox = screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' });
+      expect((updatedCheckbox as HTMLInputElement).checked).toBe(false);
+    });
+    expect(screen.getByRole('button', { name: 'Post 0 findings to GitHub' })).toBeTruthy();
+  });
+
+  it('copies selected findings as a prompt', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    renderDetail(makeRpc(completedWithFindings()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Review findings for acme/api#1: Add login')));
+    expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
+  });
+
+  it('uses the synchronous document copy command before the async Clipboard API', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('permission denied'));
+    const execCommand = vi.fn(() => {
+      expect(document.activeElement?.tagName).toBe('TEXTAREA');
+      return true;
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    renderDetail(makeRpc(completedWithFindings()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
+    await waitFor(() => expect(execCommand).toHaveBeenCalledWith('copy'));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
+  });
+
+  it('falls back to the Clipboard API when the synchronous document copy command throws', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const execCommand = vi.fn(() => {
+      throw new Error('execCommand copy failed');
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    renderDetail(makeRpc(completedWithFindings()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
+  });
+
+  it('selects and deselects all active findings regardless of filters', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
+    renderDetail(makeRpc(data));
+    const boxes = await screen.findAllByRole('checkbox');
+    expect(boxes).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(boxes.every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Select all issues' }));
+    expect(boxes.every((box) => (box as HTMLInputElement).checked)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(boxes.every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('disables select visible and select all issues when all matching findings are selected', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
+    renderDetail(makeRpc(data));
+    const selectAllBtn = await screen.findByRole('button', { name: 'Select all issues' });
+    const selectVisibleBtn = screen.getByRole('button', { name: 'Select visible' });
+    expect((selectAllBtn as HTMLButtonElement).disabled).toBe(false);
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(selectAllBtn);
+    expect((selectAllBtn as HTMLButtonElement).disabled).toBe(true);
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(selectVisibleBtn);
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('posts only unposted findings matching both filters, even inside collapsed files', async () => {

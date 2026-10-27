@@ -172,7 +172,9 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
 
   let lastSyncAt = (await zcc.storage.kv.get<number>('lastSyncAt')) ?? 0;
   zcc.background.schedule(SYNC_TICK_CRON, async () => {
-    const minutes = (await codenodSettings.load()).syncIntervalMinutes;
+    const currentSettings = await codenodSettings.load();
+    if (!currentSettings.autoSyncEnabled) return;
+    const minutes = currentSettings.syncIntervalMinutes;
     if (sync.isSyncing() || now() - lastSyncAt < minutes * 60_000) return;
     lastSyncAt = now();
     await runSync().catch((error) => zcc.log.warn(`codenod: sync failed: ${errorMessage(error)}`));
@@ -239,6 +241,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     hosts: await sync.hostStatuses(),
     syncing: sync.isSyncing(),
     lastSyncAt: (await zcc.storage.kv.get<number>('lastSyncAt')) ?? null,
+    autoSyncEnabled: (await codenodSettings.load()).autoSyncEnabled,
     activeReviews: reviews.activeCount(),
     hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0,
     hasWatchedRepos: store.listRepos().length > 0

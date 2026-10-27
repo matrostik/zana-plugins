@@ -230,7 +230,8 @@ describe('post payload', () => {
     expect(payload.inlineIds).toEqual(['in']);
     expect(payload.bodyIds).toEqual(['out', 'nofile']);
     expect(payload.comments[0]).toMatchObject({ path: 'src/a.ts', line: 2 });
-    expect(payload.comments[0].body).toContain('flagged by 2/2 models');
+    expect(payload.comments[0].body).toContain('*Review by [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) · flagged by 2/2 models*');
+    expect(payload.body).toContain('[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)');
     expect(payload.body).toContain('Findings outside the diff');
     expect(payload.body).toContain('src/a.ts:99');
   });
@@ -256,4 +257,25 @@ describe('settings store', () => {
     await expect(second).resolves.toMatchObject({ syncIntervalMinutes: 9, maxConcurrentReviews: 4 });
     expect(saved).toMatchObject({ syncIntervalMinutes: 9, maxConcurrentReviews: 4 });
   });
+  it('updates autoSyncEnabled in settings store', async () => {
+    let saved: unknown = {};
+    const settings = createSettingsStore({
+      kv: {
+        get: async <T>(key: string) => (key === 'settingsMigrated' ? (true as T) : (saved as T)),
+        set: async (key: string, value: unknown) => {
+          if (key === 'settings') saved = value;
+        }
+      },
+      readHostValues: async () => ({})
+    });
+
+    const updated = await settings.update({ autoSyncEnabled: false });
+    expect(updated.autoSyncEnabled).toBe(false);
+    expect(saved).toMatchObject({ autoSyncEnabled: false });
+
+    const reenabled = await settings.update({ autoSyncEnabled: true });
+    expect(reenabled.autoSyncEnabled).toBe(true);
+    expect(saved).toMatchObject({ autoSyncEnabled: true });
+  });
+
 });

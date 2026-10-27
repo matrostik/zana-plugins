@@ -6,6 +6,7 @@ export function NumberSetting(props: {
   label: string;
   value: number;
   limits: { min: number; max: number };
+  disabled?: boolean;
   onSave(value: number): void;
 }) {
   const inputId = `cn-setting-${props.id}`;
@@ -20,6 +21,7 @@ export function NumberSetting(props: {
         min={props.limits.min}
         max={props.limits.max}
         step={1}
+        disabled={props.disabled}
         defaultValue={props.value}
         onBlur={(event) => {
           const next = Number(event.target.value);

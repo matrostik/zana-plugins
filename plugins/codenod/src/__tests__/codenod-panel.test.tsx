@@ -28,6 +28,7 @@ function overview(overrides: Partial<Overview> = {}): Overview {
     activeReviews: 0,
     hasModels: true,
     hasWatchedRepos: true,
+    autoSyncEnabled: true,
     ...overrides
   };
 }
@@ -81,6 +82,15 @@ describe('CodenodPanel', () => {
     expect(await screen.findByText('Start by choosing review models in Settings.')).toBeTruthy();
     expect(screen.getByText('1 review running')).toBeTruthy();
   });
+  it('shows Auto-sync off badge when automatic repository sync is disabled', async () => {
+    answer({
+      overview: overview({ autoSyncEnabled: false }),
+      config: { models: [] }
+    });
+    render(<CodenodPanel pluginId="codenod" />);
+    expect(await screen.findByText('Auto-sync off')).toBeTruthy();
+  });
+
 
   it('opens a pull request review when one is selected', async () => {
     answer({ overview: overview(), config: { models: [{ providerId: 'cursor', model: 'a' }] }, detail: detail('completed') });

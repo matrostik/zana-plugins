@@ -27,9 +27,10 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 2. Click **Review** (or **Models…** to pick different models for this one review).
 3. Wait for the review to finish. You get a Zana inbox notification when it does.
 4. Read the scores and the **Findings** tab. Findings that several models agreed on are listed with all of their names.
-5. Filter findings by severity and category, expand file groups, and read the highlighted code context. Use **Edit** to revise an issue or its suggested fix before posting. Posted findings are read-only.
-6. Dismiss findings you want to exclude. Bulk dismiss affects only findings matching the current filters; **Undo** and **Restore** bring them back.
-7. Choose **Comment**, then click **Post N findings to GitHub**. This posts all active, unposted findings matching the filters, including those in collapsed file groups. Findings outside the diff appear in the review body.
+5. Filter findings by severity and category, expand file groups, and read the highlighted code context. Each finding identifies the model(s) that flagged it. Use **Edit** to revise an issue or its suggested fix before posting. Posted findings are read-only.
+6. Select or unselect individual findings, or use **Select all issues**, **Select visible**, and **Clear selection**. **Copy N selected as prompt** copies the selected findings with PR context, location, suggestions, and model attribution for use in another agent.
+7. Dismiss findings you want to exclude. Bulk dismiss affects only findings matching the current filters; **Undo** and **Restore** bring them back.
+8. Choose **Comment**, then click **Post N findings to GitHub**. This posts selected active findings matching the filters (including previously published findings when re-posting), including those in collapsed file groups. Findings outside the diff appear in the review body. Unposted findings start selected; published findings are deselected after posting. Clear or adjust the selection before posting when needed.
 8. To approve or request changes, choose that option instead. Zana asks you to confirm in a dialog first.
 
 Use **Deep Review in thread** to open a normal, visible Zana thread with the pull request loaded, when you want to dig in interactively.

@@ -19,6 +19,122 @@ export function formatDuration(startMs: number, endMs: number): string {
   return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, '0')}m`;
 }
 
+const SEVERITY_NAMES: Record<string, string> = {
+  critical: 'CRITICAL',
+  high: 'ERROR',
+  medium: 'WARNING',
+  low: 'INFO'
+};
+
+const CATEGORY_NAMES: Record<string, string> = {
+  security: 'Security',
+  performance: 'Performance',
+  logic: 'Logic',
+  style: 'Style'
+};
+
+export const PROMPT_LABELS = {
+  headerPrefix: 'Review findings for',
+  commitPrefix: 'Reviewed commit:',
+  findingPrefix: '--- Finding',
+  findingEndPrefix: '--- End Finding',
+  issuePrefix: 'Issue:',
+  suggestionPrefix: 'Suggestion:',
+  flaggedByPrefix: 'Flagged by:'
+} as const;
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, (c) => '\\' + c);
+}
+
+const ESCAPED_MARKERS = [
+  '---',
+  '===',
+  '\\d+[\\.)]',
+  ...Object.values(PROMPT_LABELS).map((label) => escapeRegex(label))
+].join('|');
+const INJECTION_PATTERN = new RegExp(`^\\s*(?:${ESCAPED_MARKERS})`, 'i');
+
+export function sanitizeSingleLine(text: string): string {
+  return text
+    .replace(/[\x00-\x1F\x7F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function sanitizePromptText(text: string): string {
+  const cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
+  if (!cleaned) return '(none)';
+  return cleaned
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trimEnd();
+      if (INJECTION_PATTERN.test(trimmed)) {
+        return `  > ${trimmed}`;
+      }
+      return trimmed;
+    })
+    .join('\n');
+}
+
+export function formatFindingsPrompt(input: {
+  owner: string; repo: string; number: number; title: string; headSha: string;
+  findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string; suggestion: string | null; agreedBy: string[] }>;
+}): string {
+  const owner = sanitizeSingleLine(input.owner);
+  const repo = sanitizeSingleLine(input.repo);
+  const title = sanitizeSingleLine(input.title);
+  const headSha = sanitizeSingleLine(input.headSha);
+  const header = [`${PROMPT_LABELS.headerPrefix} ${owner}/${repo}#${input.number}: ${title}`, `${PROMPT_LABELS.commitPrefix} ${headSha}`];
+  const entries = input.findings.map((finding, index) => {
+    const cleanFile = sanitizeSingleLine(finding.file);
+    const location = finding.line === null ? cleanFile : `${cleanFile}:${finding.line}`;
+    const severityLabel = SEVERITY_NAMES[finding.severity.toLowerCase()] ?? finding.severity.toUpperCase();
+    const categoryLabel = CATEGORY_NAMES[finding.category.toLowerCase()] ?? finding.category;
+    return [
+      `${PROMPT_LABELS.findingPrefix} ${index + 1} ---`,
+      `${index + 1}. [${severityLabel}] ${categoryLabel} — ${location}`,
+      `${PROMPT_LABELS.issuePrefix} ${sanitizePromptText(finding.description)}`,
+      ...(finding.suggestion ? [`${PROMPT_LABELS.suggestionPrefix} ${sanitizePromptText(finding.suggestion)}`] : []),
+      `${PROMPT_LABELS.flaggedByPrefix} ${finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}`,
+      `${PROMPT_LABELS.findingEndPrefix} ${index + 1} ---`
+    ].join('\n');
+  });
+  return [...header, '', entries.join('\n\n')].join('\n');
+}
+
+function copyWithDocumentCommand(text: string): boolean {
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return false;
+  let textarea: HTMLTextAreaElement | null = null;
+  try {
+    textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.setAttribute('aria-hidden', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    return typeof document.execCommand === 'function' && Boolean(document.execCommand('copy'));
+  } catch {
+    return false;
+  } finally {
+    textarea?.remove();
+  }
+}
+
+export async function copyTextToClipboard(text: string): Promise<void> {
+  // Try synchronously inside the click gesture before awaiting a permission-gated API.
+  if (copyWithDocumentCommand(text)) return;
+  if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable and the built-in copy command failed.');
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (cause) {
+    throw new Error(`Clipboard access was denied and the built-in copy command failed: ${errorText(cause)}`);
+  }
+}
+
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

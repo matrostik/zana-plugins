@@ -60,6 +60,7 @@ function snapshot(overrides: Partial<ConfigSnapshot> = {}, settings: Partial<Con
       workspaceMode: 'worktree',
       fallbackProjectId: null,
       archiveReviewThreads: true,
+      autoSyncEnabled: true,
       ...settings
     },
     defaultInstructions: '- Skip nitpicks.',
