@@ -19,6 +19,23 @@ export function formatDuration(startMs: number, endMs: number): string {
   return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, '0')}m`;
 }
 
+export function formatFindingsPrompt(input: {
+  owner: string; repo: string; number: number; title: string; headSha: string;
+  findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string; suggestion: string | null; agreedBy: string[] }>;
+}): string {
+  const header = [`Review findings for ${input.owner}/${input.repo}#${input.number}: ${input.title}`, `Reviewed commit: ${input.headSha}`];
+  const entries = input.findings.map((finding, index) => {
+    const location = finding.line === null ? finding.file : `${finding.file}:${finding.line}`;
+    return [
+      `${index + 1}. [${finding.severity.toUpperCase()}] ${finding.category} — ${location}`,
+      `Issue: ${finding.description}`,
+      ...(finding.suggestion ? [`Suggestion: ${finding.suggestion}`] : []),
+      `Flagged by: ${finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}`
+    ].join('\n');
+  });
+  return [...header, '', entries.join('\n\n')].join('\n');
+}
+
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

@@ -233,17 +233,37 @@ describe('PrDetail review actions', () => {
 });
 
 describe('PrDetail findings and posting', () => {
-  it('lists findings without checkboxes and dismisses', async () => {
+  it('shows model attribution, selects eligible findings, and dismisses', async () => {
     const call = makeRpc(completedWithFindings(), { dismissFinding: () => null });
     renderDetail(call);
     expect(await screen.findByText('Null token crashes login')).toBeTruthy();
     expect(screen.getByText('Line 12')).toBeTruthy();
     expect(screen.getByText('Posted')).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByText('Flagged by: cursor/a, cursor/b')).toBeTruthy();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dismiss' })[0]);
     await waitFor(() => expect(call).toHaveBeenCalledWith('dismissFinding', { findingId: 'f1', dismissed: true }));
+  });
+
+  it('posts only explicitly selected findings', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue', agreedBy: ['cursor/a'] }));
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 1 }) });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts:12' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 1 finding to GitHub' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f3'] })));
+  });
+
+  it('copies selected findings as a prompt', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    renderDetail(makeRpc(completedWithFindings()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Review findings for acme/api#1: Add login')));
+    expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
   });
 
   it('posts only unposted findings matching both filters, even inside collapsed files', async () => {

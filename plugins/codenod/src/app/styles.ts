@@ -109,7 +109,9 @@ export const CODENOD_STYLES = `
 .cn-severity-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--cn-dot); }
 .cn-severity-label { font-size: 12px; font-weight: 650; }
 .cn-category { padding: 3px 6px; border-radius: 3px; background: color-mix(in srgb, var(--cn-bg) 65%, transparent); color: var(--cn-text); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.2; }
-.cn-model-agreement { color: var(--cn-text); background: color-mix(in srgb, var(--cn-bg) 30%, transparent); }
+.cn-model-agreement { color: var(--cn-text); background: color-mix(in srgb, var(--cn-bg) 30%, transparent); white-space: normal; overflow-wrap: anywhere; }
+.cn-finding-select { display: inline-flex; align-items: center; gap: 4px; color: var(--cn-muted); font-size: 11px; cursor: pointer; }
+.cn-finding-select input { accent-color: var(--cn-accent); }
 .cn-finding-location { color: inherit; font-size: 11px; text-decoration: none; }
 .cn-finding-location:hover, .cn-file-link:hover { text-decoration: underline; }
 .cn-finding-description { margin: 6px 0 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }

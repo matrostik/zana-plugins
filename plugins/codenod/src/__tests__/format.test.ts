@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { errorText, formatDuration, relativeTime, scoreTone } from '../app/format.ts';
+import { errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from '../app/format.ts';
+
+describe('formatFindingsPrompt', () => {
+  it('formats selected findings as a prompt with provenance and suggestions', () => {
+    expect(formatFindingsPrompt({
+      owner: 'acme', repo: 'api', number: 7, title: 'Fix login', headSha: 'abcdef123456',
+      findings: [{ severity: 'high', category: 'security', file: 'src/auth.ts', line: 12, description: 'Unsafe redirect', suggestion: 'Validate URL', agreedBy: ['codex/gpt-6', 'cursor/a'] }]
+    })).toBe('Review findings for acme/api#7: Fix login\nReviewed commit: abcdef123456\n\n1. [HIGH] security — src/auth.ts:12\nIssue: Unsafe redirect\nSuggestion: Validate URL\nFlagged by: codex/gpt-6, cursor/a');
+  });
+});
 
 describe('relativeTime', () => {
   const now = Date.UTC(2026, 9, 25, 12);

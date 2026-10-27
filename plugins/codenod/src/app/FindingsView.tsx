@@ -107,7 +107,6 @@ function CodeContext({ finding, patch, loading }: { finding: FindingRow; patch?:
 
 function FindingCard(props: {
   finding: FindingRow;
-  modelCount: number;
   patch?: string | null;
   loading: boolean;
   fileUrl: string | null;
@@ -117,6 +116,8 @@ function FindingCard(props: {
   onCancel(): void;
   onSave(description: string, suggestion: string): Promise<void>;
   onDismiss(): void;
+  selected: boolean;
+  onToggleSelected(): void;
 }) {
   const { finding, editing } = props;
   const id = useId();
@@ -145,12 +146,13 @@ function FindingCard(props: {
         <span className="cn-severity-dot" />
         <strong className="cn-severity-label">{SEVERITIES[finding.severity]}</strong>
         <span className="cn-category">{finding.category}</span>
-        {props.modelCount > 1 ? (
-          <span className="cn-badge cn-model-agreement" title={finding.agreedBy.join(', ')}>
-            {finding.agreedBy.length}/{props.modelCount} models
-          </span>
-        ) : null}
+        <span className="cn-badge cn-model-agreement" title={finding.agreedBy.join(', ')}>
+          Flagged by: {finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}
+        </span>
         {finding.postedAt !== null ? <span className="cn-badge cn-badge-ok">Posted</span> : null}
+        {finding.postedAt === null && !finding.dismissed ? (
+          <label className="cn-finding-select"><input type="checkbox" checked={props.selected} disabled={props.disabled || editing} onChange={props.onToggleSelected} aria-label={`Select finding in ${location}`} />Select</label>
+        ) : null}
         <span className="cn-spacer" />
         {finding.line !== null ? (
           props.fileUrl ? (
@@ -255,12 +257,14 @@ export function FindingsView(props: {
   headSha: string;
   stale: boolean;
   findings: FindingRow[];
-  modelCount: number;
   filters: FindingFilters;
   onFiltersChange(filters: FindingFilters): void;
   onFindingsChange(findings: FindingRow[]): void;
   onEditingChange(editing: boolean): void;
   disabled: boolean;
+  selectedIds: Set<string>;
+  onSelectionChange(ids: Set<string>): void;
+  onCopyPrompt(): void;
 }) {
   const { findings, filters, rpc } = props;
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
@@ -301,6 +305,7 @@ export function FindingsView(props: {
   const active = findings.filter((finding) => !finding.dismissed);
   const visible = active.filter((finding) => matchesFinding(finding, filters));
   const dismissibleVisible = visible.filter((finding) => finding.postedAt === null);
+  const selectedEligible = findings.filter((finding) => props.selectedIds.has(finding.id) && !finding.dismissed && finding.postedAt === null);
   const dismissed = findings.filter((finding) => finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters));
   const groups = new Map<string, FindingRow[]>();
   for (const finding of visible) groups.set(finding.file, [...(groups.get(finding.file) ?? []), finding]);
@@ -396,6 +401,13 @@ export function FindingsView(props: {
           })}
         </div>
         <div className="cn-finding-tools">
+          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !dismissibleVisible.length} onClick={() => {
+            const next = new Set(props.selectedIds);
+            for (const finding of dismissibleVisible) next.add(finding.id);
+            props.onSelectionChange(next);
+          }}>Select visible</button>
+          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !props.selectedIds.size} onClick={() => props.onSelectionChange(new Set())}>Clear selection</button>
+          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !selectedEligible.length} onClick={props.onCopyPrompt}>Copy {selectedEligible.length} selected as prompt</button>
           {groups.size ? (
             <button
               type="button"
@@ -496,12 +508,18 @@ export function FindingsView(props: {
                   <FindingCard
                     key={finding.id}
                     finding={finding}
-                    modelCount={props.modelCount}
                     fileUrl={fileUrl}
                     patch={files.find((f) => f.path === file)?.patch}
                     loading={loading}
                     editing={editingId === finding.id}
                     disabled={disabled || (editingId !== null && editingId !== finding.id)}
+                    selected={props.selectedIds.has(finding.id)}
+                    onToggleSelected={() => {
+                      const next = new Set(props.selectedIds);
+                      if (next.has(finding.id)) next.delete(finding.id);
+                      else next.add(finding.id);
+                      props.onSelectionChange(next);
+                    }}
                     onEdit={() => setEditingId(finding.id)}
                     onCancel={() => setEditingId(null)}
                     onSave={(description, suggestion) => save(finding, description, suggestion)}
