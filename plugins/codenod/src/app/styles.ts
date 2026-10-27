@@ -2,18 +2,18 @@ export const STYLE_ELEMENT_ID = 'zcc-ext-codenod-styles';
 
 export const CODENOD_STYLES = `
 .cn-root {
-  --cn-bg: var(--background-base, #1e1e1e);
-  --cn-card: var(--background-card, #252526);
-  --cn-hover: var(--background-hover, rgba(255, 255, 255, 0.06));
+  --cn-bg: var(--bg-base, #1e1e1e);
+  --cn-card: var(--bg-panel, #252526);
+  --cn-hover: var(--bg-hover, rgba(255, 255, 255, 0.06));
   --cn-selected: color-mix(in srgb, var(--accent, #007acc) 22%, transparent);
-  --cn-border: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  --cn-border: var(--border, rgba(255, 255, 255, 0.08));
   --cn-border-strong: var(--border-strong, rgba(255, 255, 255, 0.16));
-  --cn-text: var(--text-normal, #cccccc);
+  --cn-text: var(--text-primary, #e6edf3);
   --cn-muted: var(--text-muted, #8a8a8a);
   --cn-accent: var(--accent, #007acc);
-  --cn-danger: #e5534b;
+  --cn-danger: var(--danger, #e5534b);
   --cn-warn: #d29922;
-  --cn-ok: #3fb950;
+  --cn-ok: var(--success, #3fb950);
   --cn-font: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   --cn-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   display: flex;
@@ -42,6 +42,7 @@ export const CODENOD_STYLES = `
 .cn-btn:focus-visible, .cn-tab:focus-visible, .cn-row:focus-visible { outline: 2px solid var(--cn-accent); outline-offset: -2px; }
 .cn-btn-primary { background: var(--cn-accent); border-color: var(--cn-accent); color: #fff; }
 .cn-btn-primary:hover:not(:disabled) { background: var(--cn-accent); filter: brightness(1.1); }
+.cn-btn-warn { border-color: var(--cn-warn); color: var(--cn-warn); background: color-mix(in srgb, var(--cn-warn) 10%, transparent); }
 .cn-btn-danger { border-color: var(--cn-danger); color: var(--cn-danger); }
 .cn-input, .cn-select, .cn-textarea {
   background: var(--cn-card); color: var(--cn-text); border: 1px solid var(--cn-border-strong);
@@ -80,15 +81,70 @@ export const CODENOD_STYLES = `
 .cn-score-value { font-size: 18px; font-weight: 600; }
 .cn-summary { line-height: 1.5; margin: 8px 0 12px; }
 .cn-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--cn-border); align-items: center; }
-.cn-finding { border: 1px solid var(--cn-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background: var(--cn-card); }
-.cn-finding[data-dismissed="true"] { opacity: 0.5; }
-.cn-finding-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.cn-finding p { margin: 6px 0 0; line-height: 1.45; }
+.cn-findings { padding-top: 14px; }
+.cn-finding-filters { padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--cn-border-strong); }
+.cn-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.cn-filter { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; border-radius: 20px; background: var(--cn-hover); color: var(--cn-muted); padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+.cn-filter[aria-pressed="true"] { background: var(--cn-selected); border-color: var(--cn-accent); color: var(--cn-text); }
+.cn-filter:hover:not(:disabled) { color: var(--cn-text); border-color: var(--cn-border-strong); }
+.cn-filter:disabled, .cn-text-btn:disabled, .cn-icon-btn:disabled, .cn-file-toggle:disabled { opacity: 0.5; cursor: default; }
+.cn-finding-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 4px; }
+.cn-finding-tools .cn-btn { display: inline-flex; gap: 5px; align-items: center; }
+.cn-file-group { margin-bottom: 16px; min-width: 0; }
+.cn-file-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; border-radius: 6px; background: var(--cn-hover); }
+.cn-file-toggle { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 9px 10px; border: 0; background: transparent; color: var(--cn-text); text-align: left; font: inherit; cursor: pointer; }
+.cn-file-name { font-family: var(--cn-mono); font-size: 12px; overflow-wrap: anywhere; }
+.cn-file-chevron { display: flex; }
+.cn-file-toggle[aria-expanded="true"] .cn-file-chevron { transform: rotate(90deg); }
+.cn-file-link { color: var(--cn-muted); padding: 8px 12px; text-decoration: none; }
+.cn-file-findings { display: flex; flex-direction: column; gap: 12px; }
+.cn-finding, .cn-filter { --cn-severity: #4c79ff; --cn-dot: #38bdf8; --cn-fill: #5279ff; --cn-fill-amount: 32%; }
+.cn-finding-critical, .cn-filter-critical { --cn-severity: #dc2626; --cn-dot: #f87171; --cn-fill: #dc2626; }
+.cn-finding-high, .cn-filter-high { --cn-severity: #ea580c; --cn-dot: #fb923c; --cn-fill: #d96935; }
+.cn-finding-medium, .cn-filter-medium { --cn-severity: #dc9300; --cn-dot: #facc15; --cn-fill: #ed873f; }
+:root[data-theme='light'] .cn-finding { --cn-fill-amount: 9%; }
+:root[data-theme='light'] .cn-filter, :root[data-theme='light'] .cn-finding { --cn-dot: var(--cn-severity); }
+.cn-finding { border: 1px solid var(--cn-severity); border-radius: 8px; padding: 12px; background: color-mix(in srgb, var(--cn-fill) var(--cn-fill-amount), var(--cn-card)); overflow: hidden; min-width: 0; }
+.cn-finding-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.cn-severity-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--cn-dot); }
+.cn-severity-label { font-size: 12px; font-weight: 650; }
+.cn-category { padding: 3px 6px; border-radius: 3px; background: color-mix(in srgb, var(--cn-bg) 65%, transparent); color: var(--cn-text); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.2; }
+.cn-model-agreement { color: var(--cn-text); background: color-mix(in srgb, var(--cn-bg) 30%, transparent); }
+.cn-finding-location { color: inherit; font-size: 11px; text-decoration: none; }
+.cn-finding-location:hover, .cn-file-link:hover { text-decoration: underline; }
+.cn-finding-description { margin: 6px 0 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.cn-finding-description code { font-family: var(--cn-mono); font-size: 0.94em; }
+.cn-suggested-fix { margin-top: 8px; border: 1px dashed color-mix(in srgb, var(--cn-ok) 70%, var(--cn-text)); border-radius: 3px; background: color-mix(in srgb, var(--cn-ok) 7%, transparent); overflow: hidden; }
+.cn-suggested-fix-header { display: flex; gap: 6px; align-items: center; padding: 6px 12px; border-bottom: 1px solid color-mix(in srgb, var(--cn-ok) 40%, var(--cn-border)); background: color-mix(in srgb, var(--cn-ok) 18%, transparent); color: color-mix(in srgb, var(--cn-ok) 65%, var(--cn-text)); font-size: 11px; }
+.cn-suggested-fix pre { margin: 0; padding: 8px 12px; font: 12px/1.65 var(--cn-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cn-icon { flex: 0 0 auto; vertical-align: middle; }
+.cn-icon-btn, .cn-text-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12px; }
+.cn-icon-btn { padding: 3px; }
+.cn-text-btn { padding: 4px 6px; }
+.cn-icon-btn:hover:not(:disabled), .cn-text-btn:hover:not(:disabled) { background: var(--cn-hover); }
+.cn-finding-footer { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--cn-border-strong); }
+.cn-finding-editor { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.cn-finding-editor label { font-size: 12px; font-weight: 600; }
+.cn-finding-editor .cn-textarea { padding: 8px 10px; line-height: 1.6; }
+.cn-finding-editor [role="alert"] { color: var(--cn-text); padding: 8px; border: 1px solid var(--cn-danger); border-radius: 4px; }
+.cn-undo { display: flex; gap: 12px; align-items: center; justify-content: space-between; border: 1px solid var(--cn-border-strong); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; background: var(--cn-card); }
+.cn-context-unavailable { margin: 8px 0; }
+.cn-snippet { border: 1px solid var(--cn-border-strong); border-radius: 5px; margin: 8px 0; background: var(--cn-bg); overflow: auto; font: 11px/1.8 var(--cn-mono); }
+.cn-snippet-line { display: flex; min-width: max-content; }
+.cn-snippet-line[data-target="true"] { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cn-warn) 75%, transparent); }
+.cn-line-number { width: 42px; flex: 0 0 42px; text-align: right; padding-right: 8px; color: var(--cn-muted); border-right: 1px solid var(--cn-border-strong); user-select: none; }
+.cn-line-sign { width: 20px; flex: 0 0 20px; text-align: center; color: var(--cn-muted); user-select: none; }
+.cn-snippet-line code { white-space: pre; padding-right: 12px; font: inherit; }
+.cn-filter:focus-visible, .cn-text-btn:focus-visible, .cn-icon-btn:focus-visible, .cn-file-toggle:focus-visible, .cn-file-link:focus-visible, .cn-snippet:focus-visible { outline: 2px solid var(--cn-accent); outline-offset: 2px; }
 .cn-sev-critical { color: var(--cn-danger); font-weight: 600; }
 .cn-sev-high { color: var(--cn-danger); }
 .cn-sev-medium { color: var(--cn-warn); }
 .cn-sev-low { color: var(--cn-muted); }
 .cn-banner { margin: 8px 12px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--cn-border-strong); background: var(--cn-card); }
+.cn-banner-warn { border-color: var(--cn-warn); background: color-mix(in srgb, var(--cn-warn) 12%, var(--cn-bg)); }
+.cn-banner-warn strong, .cn-banner-warn code { color: var(--cn-warn); }
+.cn-banner-warn p { margin: 6px 0 0; }
+.cn-banner-warn code { overflow-wrap: anywhere; }
 .cn-banner-error { border-color: var(--cn-danger); }
 .cn-table { width: 100%; border-collapse: collapse; }
 .cn-table th, .cn-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--cn-border); vertical-align: top; }
@@ -149,7 +205,12 @@ export const CODENOD_STYLES = `
 `;
 
 export function ensureStylesInjected(): void {
-  if (typeof document === 'undefined' || document.getElementById(STYLE_ELEMENT_ID)) return;
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById(STYLE_ELEMENT_ID);
+  if (existing) {
+    if (existing.textContent !== CODENOD_STYLES) existing.textContent = CODENOD_STYLES;
+    return;
+  }
   const style = document.createElement('style');
   style.id = STYLE_ELEMENT_ID;
   style.textContent = CODENOD_STYLES;

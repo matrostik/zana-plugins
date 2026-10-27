@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
-import type { ChangedFile, FindingRow, ModelChoice, ReviewEvent } from '../server/types.ts';
+import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { errorText, formatDuration, relativeTime, scoreTone } from './format.ts';
+import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
 import { ProviderModelPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
@@ -38,45 +39,6 @@ function ScoreChip({ label, value, kind, note }: { label: string; value: number 
       <div className="cn-score-label">{label}</div>
       <div className={`cn-score-value ${tone ? `cn-badge-${tone}` : ''}`}>{value === null ? 'N/A' : `${value}/10`}</div>
     </div>
-  );
-}
-
-function FindingCard(props: {
-  finding: FindingRow;
-  modelCount: number;
-  selected: boolean;
-  onToggle(): void;
-  onDismiss(): void;
-}) {
-  const { finding } = props;
-  const location = finding.line ? `${finding.file}:${finding.line}` : finding.file;
-  return (
-    <article className="cn-finding" data-dismissed={finding.dismissed}>
-      <div className="cn-finding-head">
-        <label className="cn-check">
-          <input type="checkbox" checked={props.selected} disabled={finding.dismissed || finding.postedAt !== null} onChange={props.onToggle} aria-label={`Select finding in ${location}`} />
-          <span className={`cn-sev-${finding.severity}`}>{finding.severity.toUpperCase()}</span>
-        </label>
-        <span className="cn-badge">{finding.category}</span>
-        {props.modelCount > 1 ? (
-          <span className={`cn-badge ${finding.agreedBy.length === props.modelCount ? 'cn-badge-ok' : ''}`} title={finding.agreedBy.join(', ')}>
-            {finding.agreedBy.length}/{props.modelCount} models
-          </span>
-        ) : null}
-        <span className="cn-mono cn-small">{location}</span>
-        {finding.postedAt ? <span className="cn-badge cn-badge-ok">Posted</span> : null}
-        <span className="cn-spacer" />
-        <button type="button" className="cn-btn cn-small" onClick={props.onDismiss}>
-          {finding.dismissed ? 'Restore' : 'Dismiss'}
-        </button>
-      </div>
-      <p>{finding.description}</p>
-      {finding.suggestion ? (
-        <p className="cn-muted">
-          <strong>Fix:</strong> {finding.suggestion}
-        </p>
-      ) : null}
-    </article>
   );
 }
 
@@ -160,7 +122,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const { rpc, prId } = props;
   const [detail, setDetail] = useState<PrDetailData | null>(null);
   const [tab, setTab] = useState<DetailTab>('findings');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filters, setFilters] = useState<FindingFilters>({ severity: 'all', category: 'all' });
+  const [editingFinding, setEditingFinding] = useState(false);
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -195,40 +158,24 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setPickerOpen(false);
     load();
   }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    void rpc.call('refreshPullRequest', { prId })
+      .then(() => { if (!cancelled) load(); })
+      .catch((cause) => { if (!cancelled) setNotice({ kind: 'error', text: `Could not check for new commits: ${errorText(cause)}` }); });
+    return () => { cancelled = true; };
+  }, [rpc, prId, load]);
   useRealtime('codenod:changed', load);
 
   const reviewId = detail?.review?.id ?? null;
-  const findingIds = detail?.findings.map((finding) => finding.id).join('\0') ?? '';
-  const postableKey = detail?.findings
-    .filter((finding) => !finding.dismissed && finding.postedAt === null)
-    .map((finding) => finding.id)
-    .join('\0') ?? '';
-  const selectionReview = useRef<string | null>(null);
-  const selectionFindings = useRef('');
   useEffect(() => {
-    if (!detail || !reviewId) {
-      selectionReview.current = null;
-      selectionFindings.current = '';
-      return;
-    }
-    const postableIds = postableKey ? postableKey.split('\0') : [];
-    const reviewChanged = selectionReview.current !== reviewId;
-    const findingsChanged = selectionFindings.current !== findingIds;
-    selectionReview.current = reviewId;
-    selectionFindings.current = findingIds;
-    if (reviewChanged || findingsChanged) {
-      setSelected(new Set(postableIds));
-      return;
-    }
-    const allowed = new Set(postableIds);
-    setSelected((current) => {
-      const next = new Set([...current].filter((id) => allowed.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [detail, reviewId, findingIds, postableKey]);
+    setFilters({ severity: 'all', category: 'all' });
+    setEditingFinding(false);
+  }, [prId, reviewId]);
+  const postableFindings = detail?.findings.filter((finding) => !finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters)) ?? [];
 
   const modelCount = useMemo(() => detail?.runs.filter((run) => run.status === 'completed').length ?? 0, [detail]);
-  const now = useNow(isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
+  const now = useNow(isActive(detail?.latestAttempt?.status) || isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
   const act = async (label: string, fn: () => Promise<void>) => {
     setBusy(label);
@@ -245,9 +192,12 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   if (!detail) return <div className="cn-detail">{notice ? <p className="cn-banner cn-banner-error">{notice.text}</p> : <p className="cn-empty">Loading…</p>}</div>;
 
   const { pr, review, runs, findings } = detail;
-  const reviewing = isActive(review?.status);
+  const attempt = detail.latestAttempt ?? review;
+  const attemptRuns = detail.latestRuns ?? runs;
+  const reviewing = isActive(attempt?.status);
+  const attemptElapsed = attempt ? formatDuration(attempt.createdAt, attempt.completedAt ?? now) : '';
   const reviewElapsed = review ? formatDuration(review.createdAt, review.completedAt ?? now) : '';
-  const canPost = review?.status === 'completed' && (selected.size > 0 || message.trim().length > 0 || event === 'APPROVE');
+  const canPost = review?.status === 'completed' && (postableFindings.length > 0 || message.trim().length > 0 || event === 'APPROVE');
 
   const startReview = (models?: ModelChoice[]) =>
     act('review', async () => {
@@ -266,7 +216,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         const result = await experimental_requestApproval(props.pluginId, {
           binding,
           title: `${EVENT_LABELS[event]} ${pr.owner}/${pr.repo}#${pr.number}`,
-          details: [pr.title, `Commit ${review.headSha.slice(0, 12)}`, `${selected.size} finding(s) included`],
+          details: [pr.title, `Commit ${review.headSha.slice(0, 12)}`, `${postableFindings.length} finding(s) included`],
           confirmLabel: EVENT_LABELS[event],
           tone: event === 'REQUEST_CHANGES' ? 'danger' : 'default'
         });
@@ -276,7 +226,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         }
         approvalToken = result.token;
       }
-      const result = (await rpc.call('post', { reviewId: review.id, findingIds: [...selected], event, body: message, approvalToken })) as {
+      const result = (await rpc.call('post', { reviewId: review.id, findingIds: postableFindings.map((finding) => finding.id), event, body: message, approvalToken })) as {
         url: string | null;
         commentCount: number;
       };
@@ -325,18 +275,24 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
           <p className="cn-empty">Not reviewed yet.</p>
         ) : (
           <>
-            {review.stale ? <p className="cn-banner">New commits were pushed after this review. Re-review before approving.</p> : null}
+            {review.stale ? (
+              <div className="cn-banner cn-banner-warn" role="status" aria-label="Review outdated">
+                <strong>Review is outdated</strong>
+                <p>This review ran against commit <code title={review.headSha}>{review.headSha.slice(0, 7)}</code>, but the PR is now at <code title={pr.headSha}>{pr.headSha.slice(0, 7)}</code>. Re-run the review to get up-to-date findings.</p>
+              </div>
+            ) : null}
             {reviewing ? (
               <p className="cn-banner cn-inline" role="status" aria-busy="true">
                 <span className="cn-spinner" aria-hidden="true" />
-                Review {review.status} · {runs.filter((run) => run.status === 'completed').length}/{runs.length} model(s) done · {reviewElapsed}
+                Review {attempt!.status} · {attemptRuns.filter((run) => run.status === 'completed').length}/{attemptRuns.length} model(s) done · {attemptElapsed}
               </p>
             ) : null}
-            {review.status === 'failed' ? (
+            {attempt?.status === 'failed' ? (
               <p className="cn-banner cn-banner-error">
-                Review failed after {reviewElapsed}: {review.error}
+                Review failed after {attemptElapsed}: {attempt.error}
               </p>
             ) : null}
+            {detail.latestAttempt?.status === 'cancelled' ? <p className="cn-banner">Rerun cancelled. Showing the previous completed review.</p> : null}
             {review.status === 'completed' ? (
               <>
                 <div className="cn-scores">
@@ -365,27 +321,11 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             </div>
             <div role="tabpanel" className="cn-section">
               {tab === 'findings' ? (
-                findings.length === 0 ? (
-                  <p className="cn-empty">{review.status === 'completed' ? 'No issues found.' : 'Findings appear when the review completes.'}</p>
-                ) : (
-                  findings.map((finding) => (
-                    <FindingCard
-                      key={finding.id}
-                      finding={finding}
-                      modelCount={modelCount}
-                      selected={selected.has(finding.id)}
-                      onToggle={() =>
-                        setSelected((current) => {
-                          const next = new Set(current);
-                          if (next.has(finding.id)) next.delete(finding.id);
-                          else next.add(finding.id);
-                          return next;
-                        })
-                      }
-                      onDismiss={() => void rpc.call('dismissFinding', { findingId: finding.id, dismissed: !finding.dismissed }).then(load)}
-                    />
-                  ))
-                )
+                findings.length === 0 && review.status !== 'completed' ? <p className="cn-empty">Findings appear when the review completes.</p> :
+                <FindingsView key={review.id} rpc={rpc} pr={pr} reviewId={review.id} headSha={review.headSha} stale={review.stale}
+                  findings={findings} modelCount={modelCount} filters={filters} onFiltersChange={setFilters}
+                  onEditingChange={setEditingFinding} disabled={busy !== null}
+                  onFindingsChange={(next) => setDetail((current) => current?.review?.id === review.id ? { ...current, findings: next } : current)} />
               ) : null}
               {tab === 'models' ? (
                 <table className="cn-table">
@@ -442,13 +382,13 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
       <div className="cn-actions">
         {reviewing ? (
-          <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void act('cancel', async () => void (await rpc.call('cancelReview', { reviewId: review!.id })))}>
+          <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void act('cancel', async () => void (await rpc.call('cancelReview', { reviewId: attempt!.id })))}>
             Cancel review
           </button>
         ) : (
           <>
-            <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || !props.hasModels} onClick={() => void startReview()}>
-              {review ? 'Re-review' : 'Review'}
+            <button type="button" className={`cn-btn ${review?.stale ? 'cn-btn-warn' : 'cn-btn-primary'}`} disabled={busy !== null || !props.hasModels} onClick={() => void startReview()}>
+              {review?.stale ? 'Review outdated — Rerun' : review ? 'Re-review' : 'Review'}
             </button>
             <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => setPickerOpen((open) => !open)} aria-expanded={pickerOpen}>
               Models…
@@ -474,8 +414,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                 </option>
               ))}
             </select>
-            <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || !canPost || (event !== 'COMMENT' && review.stale)} onClick={() => void post()}>
-              {busy === 'post' ? 'Posting…' : `Post ${selected.size} selected`}
+            <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || editingFinding || !canPost || (event !== 'COMMENT' && review.stale)} onClick={() => void post()}>
+              {busy === 'post' ? 'Posting…' : `Post ${postableFindings.length} finding${postableFindings.length === 1 ? '' : 's'} to GitHub`}
             </button>
           </>
         ) : null}

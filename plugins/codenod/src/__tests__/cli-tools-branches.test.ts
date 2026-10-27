@@ -522,6 +522,7 @@ describe('views', () => {
       listPullRequests: () => data.pullRequests ?? [],
       getPullRequest: (id: string) => (data.pullRequests ?? []).find((pr) => pr.id === id) ?? null,
       latestReview: (prId: string) => reviews.find((row) => row.prId === prId) ?? null,
+      latestCompletedReview: (prId: string) => reviews.find((row) => row.prId === prId && row.status === 'completed') ?? null,
       latestReviewsByPr: () => new Map(reviews.map((row) => [row.prId, row])),
       listRuns: (reviewId: string) => (data.runs ?? []).filter((row) => row.reviewId === reviewId),
       listFindings: (reviewId: string) => (data.findings ?? []).filter((row) => row.reviewId === reviewId),

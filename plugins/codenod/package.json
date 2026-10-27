@@ -1,6 +1,6 @@
 {
   "name": "@zcc-ext/codenod",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Ros Haitovich <rhaitovich@salesforce.com>",
   "type": "module",
   "description": "AI pull request review for GitHub and GitHub Enterprise, powered by the AI providers configured in Zana.",
@@ -29,6 +29,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
+    "@vitest/coverage-v8": "^4.1.12",
     "jsdom": "^26.1.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

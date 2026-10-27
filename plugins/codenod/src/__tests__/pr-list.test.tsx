@@ -60,6 +60,16 @@ describe('PrList', () => {
     expect(onSelect).toHaveBeenCalledWith('github.com/acme/web#2');
   });
 
+  it('shows an amber outdated badge while the newer head is being reviewed', () => {
+    const pr = item({
+      outdated: true,
+      review: { id: 'next', status: 'running', riskScore: null, headSha: 'sha1', createdAt: 0, stale: false, findingCount: 0 }
+    });
+    render(<PrList items={[pr]} tab="needs-review" onTabChange={() => {}} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} hasWatchedRepos />);
+    expect(screen.getByText('Outdated').className).toContain('cn-badge-warn');
+    expect(screen.getByText('Reviewing…')).toBeTruthy();
+  });
+
   it('switches tabs and shows an empty state', () => {
     const onTabChange = vi.fn();
     render(<PrList items={[]} tab="watched" onTabChange={onTabChange} query="" onQueryChange={() => {}} selectedId={null} onSelect={() => {}} hasWatchedRepos />);

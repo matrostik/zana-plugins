@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
+import { CODENOD_STYLES, ensureStylesInjected, STYLE_ELEMENT_ID } from '../app/styles.ts';
 
 /** Mirrors the host's slot validation so a bad registration fails here instead of as "Failed" in Zana. */
 const SLOT_ID = /^[a-zA-Z0-9_-]+$/;
@@ -33,6 +34,17 @@ function strictSlots(registered: Record<string, Registration[]>) {
 }
 
 describe('app registration', () => {
+  it('replaces stale styles when a rebuilt plugin is loaded', () => {
+    const style = document.createElement('style');
+    style.id = STYLE_ELEMENT_ID;
+    style.textContent = '.old-style {}';
+    document.getElementById(STYLE_ELEMENT_ID)?.remove();
+    document.head.appendChild(style);
+    ensureStylesInjected();
+    expect(style.textContent).toBe(CODENOD_STYLES);
+    ensureStylesInjected();
+    expect(document.querySelectorAll(`#${STYLE_ELEMENT_ID}`)).toHaveLength(1);
+  });
   it('registers slots the host accepts and opens the panel by its path', async () => {
     const { default: app } = (await import('../../app.tsx')) as unknown as { default: { setup(app: { slots: unknown }): void } };
     const registered: Record<string, Registration[]> = {};

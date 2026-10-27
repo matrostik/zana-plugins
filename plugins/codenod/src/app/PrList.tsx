@@ -118,6 +118,7 @@ export function PrList(props: {
                     <span>@{item.author}</span>
                     <span>{relativeTime(item.updatedAt)}</span>
                     {ci.text ? <span className={`cn-badge ${ci.tone}`}>{ci.text}</span> : null}
+                    {(item.outdated ?? item.review?.stale) ? <span className="cn-badge cn-badge-warn" title="New commits since the completed review">Outdated</span> : null}
                     <ReviewBadge review={item.review} />
                   </div>
                 </button>

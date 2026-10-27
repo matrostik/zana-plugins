@@ -2,12 +2,16 @@ import type { Store } from './db.ts';
 import type { FindingRow, PrBucket, PullRequestRow, ReviewRow, ReviewRunRow } from './types.ts';
 
 export interface PrListItem extends PullRequestRow {
+  outdated?: boolean;
   review: Pick<ReviewRow, 'id' | 'status' | 'riskScore' | 'headSha' | 'createdAt'> & { stale: boolean; findingCount: number } | null;
 }
 
 export interface PrDetail {
   pr: PullRequestRow;
   review: (ReviewRow & { stale: boolean }) | null;
+  /** A newer attempt is separate from the completed results displayed above. */
+  latestAttempt?: ReviewRow;
+  latestRuns?: ReviewRunRow[];
   runs: ReviewRunRow[];
   findings: FindingRow[];
   posted: Array<{ event: string; url: string | null; commentCount: number; postedAt: number }>;
@@ -27,6 +31,7 @@ export function sortFindings(findings: FindingRow[]): FindingRow[] {
 
 export function listPullRequests(store: Store, bucket?: PrBucket): PrListItem[] {
   const reviews = store.latestReviewsByPr();
+  const completedReviews = store.latestCompletedReviewsByPr?.();
   const pullRequests = store.listPullRequests().filter((pr) => !bucket || pr.buckets.includes(bucket));
   const completedIds = pullRequests.flatMap((pr) => {
     const review = reviews.get(pr.id);
@@ -35,8 +40,10 @@ export function listPullRequests(store: Store, bucket?: PrBucket): PrListItem[] 
   const findingCounts = store.countUndismissedFindings(completedIds);
   return pullRequests.map((pr) => {
     const review = reviews.get(pr.id);
+    const completed = review?.status === 'completed' ? review : completedReviews?.get(pr.id) ?? store.latestCompletedReview(pr.id);
     return {
       ...pr,
+      outdated: Boolean(completed && completed.headSha !== pr.headSha),
       review: review
         ? {
             id: review.id,
@@ -55,9 +62,12 @@ export function listPullRequests(store: Store, bucket?: PrBucket): PrListItem[] 
 export function getPrDetail(store: Store, prId: string): PrDetail | null {
   const pr = store.getPullRequest(prId);
   if (!pr) return null;
-  const review = store.latestReview(pr.id);
+  const latest = store.latestReview(pr.id);
+  const completed = latest && latest.status !== 'completed' ? store.latestCompletedReview(pr.id) : null;
+  const review = completed ?? latest;
   return {
     pr,
+    ...(completed && latest ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
     review: review ? { ...review, stale: review.headSha !== pr.headSha } : null,
     runs: review ? store.listRuns(review.id) : [],
     findings: review ? sortFindings(store.listFindings(review.id)) : [],
@@ -87,6 +97,7 @@ export function formatPrDetail(detail: PrDetail): string {
     return lines.join('\n');
   }
   lines.push(`Review ${review.status}${review.stale ? ' (stale: new commits since review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`);
+  if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status} at ${detail.latestAttempt.headSha}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing previous completed results.`);
   if (review.error) lines.push(`Error: ${review.error}`);
   if (review.status === 'completed') {
     lines.push(

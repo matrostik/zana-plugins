@@ -121,6 +121,13 @@ export const MIGRATIONS: readonly string[] = [
     url TEXT,
     comment_count INTEGER NOT NULL DEFAULT 0,
     posted_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS outdated_notifications (
+    pr_id TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    inbox_id TEXT NOT NULL,
+    notified_at INTEGER NOT NULL,
+    PRIMARY KEY (pr_id, head_sha)
   )`
 ];
 
@@ -367,8 +374,33 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return row ? toReview(row) : null;
     },
 
+    latestCompletedReview(prId: string): ReviewRow | null {
+      const row = db.prepare("SELECT * FROM reviews WHERE pr_id = ? AND status = 'completed' ORDER BY created_at DESC, rowid DESC LIMIT 1").get(prId) as Row | undefined;
+      return row ? toReview(row) : null;
+    },
+
+    latestCompletedReviewsByPr(): Map<string, ReviewRow> {
+      const rows = db.prepare(
+        `SELECT r.* FROM reviews r
+         WHERE r.status = 'completed' AND r.rowid = (
+           SELECT latest.rowid FROM reviews latest
+           WHERE latest.pr_id = r.pr_id AND latest.status = 'completed'
+           ORDER BY latest.created_at DESC, latest.rowid DESC LIMIT 1
+         )`
+      ).all() as Row[];
+      return new Map(rows.map((row) => [String(row.pr_id), toReview(row)]));
+    },
+
+    hasOutdatedNotification(prId: string, headSha: string): boolean {
+      return Boolean(db.prepare('SELECT 1 FROM outdated_notifications WHERE pr_id = ? AND head_sha = ?').get(prId, headSha));
+    },
+
+    recordOutdatedNotification(prId: string, headSha: string, inboxId: string): void {
+      db.prepare('INSERT OR IGNORE INTO outdated_notifications (pr_id, head_sha, inbox_id, notified_at) VALUES (?, ?, ?, ?)').run(prId, headSha, inboxId, now());
+    },
+
     latestReview(prId: string): ReviewRow | null {
-      const row = db.prepare('SELECT * FROM reviews WHERE pr_id = ? ORDER BY created_at DESC LIMIT 1').get(prId) as Row | undefined;
+      const row = db.prepare('SELECT * FROM reviews WHERE pr_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(prId) as Row | undefined;
       return row ? toReview(row) : null;
     },
 
@@ -486,7 +518,32 @@ export function createStore(db: Database, now: () => number = Date.now) {
     },
 
     setFindingDismissed(id: string, dismissed: boolean): void {
+      const row = db.prepare('SELECT posted_at FROM findings WHERE id = ?').get(id) as Row | undefined;
+      if (!row) throw new Error('Finding not found');
+      if (row.posted_at !== null) throw new Error('Posted findings cannot be dismissed');
       db.prepare('UPDATE findings SET dismissed = ? WHERE id = ?').run(dismissed ? 1 : 0, id);
+    },
+
+    editFinding(reviewId: string, id: string, description: string, suggestion: string | null): void {
+      if (!description.trim()) throw new Error('Issue text is required');
+      const row = db.prepare('SELECT * FROM findings WHERE id = ? AND review_id = ?').get(id, reviewId) as Row | undefined;
+      if (!row) throw new Error('Finding not found in this review');
+      if (row.posted_at !== null) throw new Error('Posted findings cannot be edited');
+      db.prepare('UPDATE findings SET description = ?, suggestion = ? WHERE id = ? AND review_id = ?')
+        .run(description.trim(), suggestion?.trim() ? suggestion : null, id, reviewId);
+    },
+
+    setFindingsDismissed(reviewId: string, ids: string[], dismissed: boolean): void {
+      db.transaction(() => {
+        const lookup = db.prepare('SELECT id, posted_at FROM findings WHERE id = ? AND review_id = ?');
+        for (const id of ids) {
+          const row = lookup.get(id, reviewId) as Row | undefined;
+          if (!row) throw new Error('Finding not found in this review');
+          if (row.posted_at !== null) throw new Error('Posted findings cannot be dismissed');
+        }
+        const update = db.prepare('UPDATE findings SET dismissed = ? WHERE id = ? AND review_id = ?');
+        for (const id of ids) update.run(dismissed ? 1 : 0, id, reviewId);
+      });
     },
 
     markFindingsPosted(ids: readonly string[]): void {

@@ -68,6 +68,7 @@ export function createFakeHost(options: FakeHostOptions = {}) {
   const threads = new Map<string, FakeThread>();
   const disposers: Array<() => unknown> = [];
   const settingValues: Record<string, string | number | boolean | undefined> = { ...(options.settings ?? {}) };
+  const settingDescriptors: Record<string, unknown> = {};
   let cli: { run(argv: string[], ctx: unknown): Promise<{ exitCode: number; stdout?: string; stderr?: string }> } | null = null;
   let threadCount = 0;
   const db = createSqliteDatabase();
@@ -90,6 +91,7 @@ export function createFakeHost(options: FakeHostOptions = {}) {
     log: { debug() {}, info() {}, warn() {}, error() {} },
     settings: {
       define(descriptors: Record<string, { default?: string | number | boolean }>) {
+        Object.assign(settingDescriptors, descriptors);
         for (const [key, descriptor] of Object.entries(descriptors)) {
           if (settingValues[key] === undefined && descriptor.default !== undefined) settingValues[key] = descriptor.default;
         }
@@ -172,6 +174,7 @@ export function createFakeHost(options: FakeHostOptions = {}) {
     inbox,
     tools,
     settingValues,
+    settingDescriptors,
     async callRpc(name: string, args?: unknown) {
       const handler = rpc.get(name);
       if (!handler) throw new Error(`no rpc ${name}`);

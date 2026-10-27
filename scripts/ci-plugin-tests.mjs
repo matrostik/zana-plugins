@@ -70,13 +70,16 @@ for (const id of targetPlugins) {
     }
   }
 
-  // 2. Install dependencies if package-lock.json exists and node_modules is empty
-  if (existsSync(join(pDir, 'package-lock.json')) && !existsSync(join(pDir, 'node_modules', 'vitest'))) {
+  // 2. Install dependencies if a required local test tool is missing
+  const hasVitest = existsSync(join(pDir, 'node_modules', 'vitest'));
+  const hasCoverageProvider = existsSync(join(pDir, 'node_modules', '@vitest', 'coverage-v8'));
+  if (existsSync(join(pDir, 'package-lock.json')) && (!hasVitest || !hasCoverageProvider)) {
     console.log(`[DEPS] Installing dependencies for ${id}...`);
     try {
       execFileSync('npm', ['ci', '--ignore-scripts'], { cwd: pDir, stdio: 'inherit', shell: true });
     } catch (e) {
-      console.warn(`[DEPS] npm ci failed; continuing with global test tools.`);
+      console.error(`[DEPS:FAIL] npm ci failed for ${id}.`);
+      hasFailures = true;
     }
   }
 
@@ -97,10 +100,13 @@ for (const id of targetPlugins) {
   if (existsSync(vitestConfig)) {
     console.log(`[TEST] Running Vitest with Coverage for ${id}...`);
     try {
-      execFileSync('vitest', ['run', '--coverage'], {
+      const localVitest = join(pDir, 'node_modules', 'vitest', 'vitest.mjs');
+      if (!existsSync(localVitest)) {
+        throw new Error(`Local Vitest not found at ${localVitest}`);
+      }
+      execFileSync(process.execPath, [localVitest, 'run', '--coverage'], {
         cwd: pDir,
         stdio: 'inherit',
-        shell: true,
         env: { ...process.env, CI: 'true' }
       });
       console.log(`[TEST:PASS] ${id} tests and coverage thresholds passed!`);

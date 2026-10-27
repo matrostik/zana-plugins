@@ -8,6 +8,7 @@ import { SettingsView } from './SettingsView.tsx';
 import type { ConfigSnapshot, Overview } from './types.ts';
 
 const TAB_KEY = 'codenod.tab';
+const FOCUS_SYNC_THROTTLE_MS = 60_000;
 
 function initialTab(): PrBucket {
   try {
@@ -46,6 +47,23 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
 
   useEffect(load, [load]);
   useRealtime('codenod:changed', load);
+
+  useEffect(() => {
+    let lastCheckedAt = 0;
+    let inFlight = false;
+    const resume = () => {
+      if (document.visibilityState === 'hidden' || inFlight || Date.now() - lastCheckedAt < FOCUS_SYNC_THROTTLE_MS) return;
+      lastCheckedAt = Date.now();
+      inFlight = true;
+      void rpc.call('refresh').then(load).catch((cause) => setError(errorText(cause))).finally(() => { inFlight = false; });
+    };
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => {
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [rpc, load]);
 
   const changeTab = (next: PrBucket) => {
     setTab(next);

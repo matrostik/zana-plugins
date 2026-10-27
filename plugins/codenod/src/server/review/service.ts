@@ -202,6 +202,9 @@ export function createReviewService(deps: ReviewServiceDeps) {
       scores: aggregateScores(succeeded.map(({ analysis }) => analysis))
     });
 
+    // A commit may have arrived while the models were working.
+    await deps.syncPullRequest(parsePrId(pr.id)).catch((error) => deps.log.warn(`codenod: post-review refresh failed: ${errorMessage(error)}`));
+
     if (deps.notify) {
       const done = deps.store.getReview(review.id)!;
       const blocking = clusters.filter((cluster) => cluster.severity === 'critical' || cluster.severity === 'high').length;

@@ -42,12 +42,28 @@ function answer(responses: Record<string, unknown>) {
 
 beforeEach(() => {
   sdk.call.mockReset();
+  const stored = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => { stored.set(key, value); },
+    clear: () => stored.clear()
+  });
   localStorage.clear();
 });
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('CodenodPanel', () => {
+  it('syncs when the app regains focus and throttles repeated focus events', async () => {
+    answer({ overview: overview(), config: { models: [] }, refresh: null });
+    render(<CodenodPanel pluginId="codenod" />);
+    await screen.findByText('Select a pull request to see its review.');
+    fireEvent.focus(window);
+    await waitFor(() => expect(sdk.call).toHaveBeenCalledWith('refresh'));
+    fireEvent.focus(window);
+    expect(sdk.call.mock.calls.filter(([method]) => method === 'refresh')).toHaveLength(1);
+  });
+
   it('shows sync status, running reviews, and host problems', async () => {
     answer({
       overview: overview({ activeReviews: 2, hosts: [{ host: 'ghe.acme.com', authSource: null, login: null, error: 'bad token', pullRequestCount: 0, syncedAt: null }] }),
