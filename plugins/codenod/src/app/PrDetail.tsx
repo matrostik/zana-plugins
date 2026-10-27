@@ -131,6 +131,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
   const selectedReviewId = useRef<string | null>(null);
+  const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
   let navigate: ReturnType<typeof useZccNavigate> | null = null;
   try {
@@ -152,9 +153,16 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         const eligible = next.findings.filter((finding) => !finding.dismissed && finding.postedAt === null);
         const isNewReview = selectedReviewId.current !== nextReviewId;
         selectedReviewId.current = nextReviewId;
+        const prevPosted = prevFindingsPosted.current;
+        const newlyPostedIds = new Set(
+          next.findings
+            .filter((finding) => prevPosted.get(finding.id) === null && finding.postedAt !== null)
+            .map((finding) => finding.id)
+        );
+        prevFindingsPosted.current = new Map(next.findings.map((finding) => [finding.id, finding.postedAt]));
         setSelectedFindingIds((selected) => isNewReview
           ? new Set(eligible.map((finding) => finding.id))
-          : new Set(next.findings.filter((finding) => !finding.dismissed && finding.postedAt === null && selected.has(finding.id)).map((finding) => finding.id)));
+          : new Set(next.findings.filter((finding) => !finding.dismissed && !newlyPostedIds.has(finding.id) && selected.has(finding.id)).map((finding) => finding.id)));
       })
       .catch((cause) => {
         if (requestSeq.current !== requestId) return;
@@ -166,6 +174,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setDetail(null);
     setNotice(null);
     setPickerOpen(false);
+    selectedReviewId.current = null;
+    prevFindingsPosted.current = new Map();
     load();
   }, [load]);
   useEffect(() => {

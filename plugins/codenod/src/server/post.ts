@@ -6,7 +6,8 @@ import type { ChangedFile, FindingRow, ReviewEvent } from './types.ts';
 
 const MAX_INLINE_COMMENTS = 50;
 const MAX_BODY_CHARS = 60_000;
-const CODENOD_LINK = '[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)';
+export const CODENOD_DOCS_URL = 'https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme';
+export const CODENOD_LINK = `[CodeNod](${CODENOD_DOCS_URL})`;
 
 export function formatFinding(finding: FindingRow, modelCount: number): string {
   const lines = [`**[${finding.severity.toUpperCase()}] ${finding.category}** — ${finding.description}`];

@@ -290,6 +290,31 @@ describe('PrDetail findings and posting', () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
   });
 
+  it('preserves selected posted findings across background detail reloads', async () => {
+    let resolveRefresh!: () => void;
+    const refreshPromise = new Promise<void>((resolve) => { resolveRefresh = resolve; });
+    const data = completedWithFindings();
+    data.findings[0] = { ...data.findings[0], postedAt: 100 };
+    const call = vi.fn(async (method: string) => {
+      if (method === 'detail') return data;
+      if (method === 'refreshPullRequest') {
+        await refreshPromise;
+        return null;
+      }
+      throw new Error(`Unhandled RPC: ${method}`);
+    });
+    renderDetail(call);
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts' });
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(checkbox);
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+
+    resolveRefresh();
+    await waitFor(() => expect(call.mock.calls.filter(([m]) => m === 'detail')).toHaveLength(2));
+    expect((screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }) as HTMLInputElement).checked).toBe(true);
+  });
+
   it('copies selected findings as a prompt', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
@@ -311,6 +336,19 @@ describe('PrDetail findings and posting', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
     await waitFor(() => expect(execCommand).toHaveBeenCalledWith('copy'));
     expect(writeText).not.toHaveBeenCalled();
+    expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
+  });
+
+  it('falls back to the Clipboard API when the synchronous document copy command throws', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const execCommand = vi.fn(() => {
+      throw new Error('execCommand copy failed');
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    renderDetail(makeRpc(completedWithFindings()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
   });
 

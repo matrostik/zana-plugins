@@ -461,12 +461,13 @@ describe('codenod settings', () => {
     expect((await config(host)).settings.customInstructions).toBe('Be strict');
   });
   it('skips scheduled background sync when autoSyncEnabled is disabled', async () => {
-    let synced = false;
-    const { host } = await setup();
-    await (host.callRpc('setSettings', { autoSyncEnabled: false }));
+    const { host, github } = await setup();
+    await host.callRpc('setSettings', { autoSyncEnabled: false });
 
+    const callsBefore = github.calls.length;
     await host.tick();
 
+    expect(github.calls.length).toBe(callsBefore);
     const overview = await (host.callRpc('overview') as Promise<{ autoSyncEnabled: boolean; syncing: boolean }>);
     expect(overview.autoSyncEnabled).toBe(false);
     expect(overview.syncing).toBe(false);

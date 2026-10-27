@@ -308,9 +308,8 @@ export function FindingsView(props: {
   const active = findings.filter((finding) => !finding.dismissed);
   const visible = active.filter((finding) => matchesFinding(finding, filters));
   const dismissibleVisible = visible.filter((finding) => finding.postedAt === null);
-  const selectable = active;
   const selectedFindings = findings.filter((finding) => props.selectedIds.has(finding.id) && !finding.dismissed);
-  const allSelected = selectable.length > 0 && selectable.every((finding) => props.selectedIds.has(finding.id));
+  const allSelected = active.length > 0 && active.every((finding) => props.selectedIds.has(finding.id));
   const dismissed = findings.filter((finding) => finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters));
   const groups = new Map<string, FindingRow[]>();
   for (const finding of visible) groups.set(finding.file, [...(groups.get(finding.file) ?? []), finding]);
@@ -406,9 +405,9 @@ export function FindingsView(props: {
           })}
         </div>
         <div className="cn-finding-tools">
-          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !selectable.length || allSelected} onClick={() => {
+          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !active.length || allSelected} onClick={() => {
             const next = new Set(props.selectedIds);
-            for (const finding of selectable) next.add(finding.id);
+            for (const finding of active) next.add(finding.id);
             props.onSelectionChange(next);
           }}>Select all issues</button>
           <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !visible.length} onClick={() => {

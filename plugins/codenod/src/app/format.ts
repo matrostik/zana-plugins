@@ -37,19 +37,23 @@ export function formatFindingsPrompt(input: {
 }
 
 function copyWithDocumentCommand(text: string): boolean {
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.setAttribute('readonly', '');
-  textarea.setAttribute('aria-hidden', 'true');
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return false;
+  let textarea: HTMLTextAreaElement | null = null;
   try {
+    textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.setAttribute('aria-hidden', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
-    return typeof document.execCommand === 'function' && document.execCommand('copy');
+    return typeof document.execCommand === 'function' && Boolean(document.execCommand('copy'));
+  } catch {
+    return false;
   } finally {
-    textarea.remove();
+    textarea?.remove();
   }
 }
 
