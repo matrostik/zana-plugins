@@ -263,14 +263,31 @@ describe('PrDetail findings and posting', () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f3'] })));
   });
 
-  it('never reposts selected findings that are already posted', async () => {
+  it('posts selected findings even when they were already posted', async () => {
     const data = completedWithFindings();
     data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
-    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 2 }) });
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 3 }) });
     renderDetail(call);
     fireEvent.click(await screen.findByRole('button', { name: 'Select all issues' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Post 2 findings to GitHub' }));
-    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f1', 'f3'] })));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 3 findings to GitHub' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f1', 'f2', 'f3'] })));
+  });
+
+  it('enables the post button and updates the count when manually selecting a previously posted finding', async () => {
+    const data = completedWithFindings();
+    data.findings[0] = { ...data.findings[0], postedAt: 100 };
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 1 }) });
+    renderDetail(call);
+    const postBtn = await screen.findByRole('button', { name: 'Post 0 findings to GitHub' });
+    expect((postBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }));
+
+    const enabledBtn = screen.getByRole('button', { name: 'Post 1 finding to GitHub' });
+    expect((enabledBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(enabledBtn);
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
   });
 
   it('copies selected findings as a prompt', async () => {

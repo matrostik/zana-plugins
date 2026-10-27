@@ -154,7 +154,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         selectedReviewId.current = nextReviewId;
         setSelectedFindingIds((selected) => isNewReview
           ? new Set(eligible.map((finding) => finding.id))
-          : new Set(next.findings.filter((finding) => !finding.dismissed && selected.has(finding.id)).map((finding) => finding.id)));
+          : new Set(next.findings.filter((finding) => !finding.dismissed && finding.postedAt === null && selected.has(finding.id)).map((finding) => finding.id)));
       })
       .catch((cause) => {
         if (requestSeq.current !== requestId) return;
@@ -182,7 +182,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setFilters({ severity: 'all', category: 'all' });
     setEditingFinding(false);
   }, [prId, reviewId]);
-  const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters)) ?? [];
+  const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && matchesFinding(finding, filters)) ?? [];
   const selectedFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed) ?? [];
 
   const now = useNow(isActive(detail?.latestAttempt?.status) || isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
