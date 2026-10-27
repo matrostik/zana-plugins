@@ -11,13 +11,13 @@ export function createOutdatedNotifier(deps: {
   let pending = Promise.resolve();
   return function notify(prIds?: string[]): Promise<void> {
     pending = pending.then(async () => {
-      const prs = prIds
-        ? prIds.flatMap((id) => { const pr = deps.store.getPullRequest(id); return pr ? [pr] : []; })
-        : deps.store.listPullRequests();
-      for (const pr of prs) {
-        const review = deps.store.latestCompletedReview(pr.id);
-        if (pr.state !== 'open' || !review || !pr.headSha || review.headSha === pr.headSha || deps.store.hasOutdatedNotification(pr.id, pr.headSha)) continue;
-        try {
+      try {
+        const prs = prIds
+          ? prIds.flatMap((id) => { const pr = deps.store.getPullRequest(id); return pr ? [pr] : []; })
+          : deps.store.listPullRequests();
+        for (const pr of prs) {
+          const review = deps.store.latestCompletedReview(pr.id);
+          if (pr.state !== 'open' || !review || !pr.headSha || review.headSha === pr.headSha || deps.store.hasOutdatedNotification(pr.id, pr.headSha)) continue;
           const projectId = await deps.projectForPr(pr);
           if (!projectId) continue;
           const result = await deps.push({
@@ -29,9 +29,9 @@ export function createOutdatedNotifier(deps: {
             ].join('\n')
           });
           deps.store.recordOutdatedNotification(pr.id, pr.headSha, result.id);
-        } catch (error) {
-          deps.warn(`codenod: outdated notification for ${pr.id} failed: ${error instanceof Error ? error.message : String(error)}`);
         }
+      } catch (error) {
+        deps.warn(`codenod: outdated notification batch failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     });
     return pending;

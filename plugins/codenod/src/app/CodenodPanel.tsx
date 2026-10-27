@@ -8,6 +8,7 @@ import { SettingsView } from './SettingsView.tsx';
 import type { ConfigSnapshot, Overview } from './types.ts';
 
 const TAB_KEY = 'codenod.tab';
+const FOCUS_SYNC_THROTTLE_MS = 60_000;
 
 function initialTab(): PrBucket {
   try {
@@ -51,7 +52,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
     let lastCheckedAt = 0;
     let inFlight = false;
     const resume = () => {
-      if (document.visibilityState === 'hidden' || inFlight || Date.now() - lastCheckedAt < 60_000) return;
+      if (document.visibilityState === 'hidden' || inFlight || Date.now() - lastCheckedAt < FOCUS_SYNC_THROTTLE_MS) return;
       lastCheckedAt = Date.now();
       inFlight = true;
       void rpc.call('refresh').then(load).catch((cause) => setError(errorText(cause))).finally(() => { inFlight = false; });

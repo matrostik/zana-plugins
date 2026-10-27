@@ -6,6 +6,21 @@ import type { Rpc } from './types.ts';
 export type FindingFilters = { severity: Severity | 'all'; category: IssueCategory | 'all' };
 export const SEVERITIES: Record<Severity, string> = { critical: 'Critical', high: 'Error', medium: 'Warning', low: 'Info' };
 const CATEGORIES: Record<IssueCategory, string> = { security: 'Security', performance: 'Performance', logic: 'Logic', style: 'Style' };
+const DEFAULT_EXPANDED_FILES = 3;
+const CONTEXT_LINES_BEFORE = 3;
+const CONTEXT_LINES_AFTER = 3;
+
+function githubBlobUrl(host: string, owner: string, repo: string, sha: string, file: string): string | null {
+  if (!/^[a-z0-9.-]+(?::\d{1,5})?$/.test(host)) return null;
+  try {
+    const url = new URL(`https://${host}`);
+    if (url.host !== host || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return null;
+    url.pathname = `/${[owner, repo, 'blob', sha, ...file.split('/')].map(encodeURIComponent).join('/')}`;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
 
 export function matchesFinding(finding: FindingRow, filters: FindingFilters): boolean {
   return (filters.severity === 'all' || finding.severity === filters.severity) && (filters.category === 'all' || finding.category === filters.category);
@@ -69,7 +84,7 @@ function snippetLines(patch: string | null | undefined, target: number): Snippet
   }
   const index = lines.findIndex((line) => line.newLine === target);
   if (index < 0) return [];
-  return lines.slice(Math.max(0, index - 3), index + 4).filter((line) => line.hunk === lines[index].hunk);
+  return lines.slice(Math.max(0, index - CONTEXT_LINES_BEFORE), index + CONTEXT_LINES_AFTER + 1).filter((line) => line.hunk === lines[index].hunk);
 }
 
 function CodeContext({ finding, patch, loading }: { finding: FindingRow; patch?: string | null; loading: boolean }) {
@@ -95,7 +110,7 @@ function FindingCard(props: {
   modelCount: number;
   patch?: string | null;
   loading: boolean;
-  fileUrl: string;
+  fileUrl: string | null;
   editing: boolean;
   disabled: boolean;
   onEdit(): void;
@@ -138,9 +153,11 @@ function FindingCard(props: {
         {finding.postedAt !== null ? <span className="cn-badge cn-badge-ok">Posted</span> : null}
         <span className="cn-spacer" />
         {finding.line !== null ? (
-          <a className="cn-finding-location" href={`${props.fileUrl}#L${finding.line}`} target="_blank" rel="noreferrer noopener" title={location}>
-            Line {finding.line}
-          </a>
+          props.fileUrl ? (
+            <a className="cn-finding-location" href={`${props.fileUrl}#L${finding.line}`} target="_blank" rel="noreferrer noopener" title={location}>
+              Line {finding.line}
+            </a>
+          ) : <span className="cn-finding-location" title={location}>Line {finding.line}</span>
         ) : null}
         {!editing && canEdit ? (
           <button
@@ -284,7 +301,7 @@ export function FindingsView(props: {
   const dismissed = findings.filter((finding) => finding.dismissed && matchesFinding(finding, filters));
   const groups = new Map<string, FindingRow[]>();
   for (const finding of visible) groups.set(finding.file, [...(groups.get(finding.file) ?? []), finding]);
-  const defaultExpanded = new Set([...new Set(active.map((finding) => finding.file))].slice(0, 3));
+  const defaultExpanded = new Set([...new Set(active.map((finding) => finding.file))].slice(0, DEFAULT_EXPANDED_FILES));
   const open = expanded ?? defaultExpanded;
   const allExpanded = [...groups.keys()].every((file) => open.has(file));
   const disabled = props.disabled || busy;
@@ -442,7 +459,7 @@ export function FindingsView(props: {
         </p>
       ) : null}
       {[...groups].map(([file, rows]) => {
-        const fileUrl = `https://${props.pr.host}/${props.pr.owner}/${props.pr.repo}/blob/${encodeURIComponent(props.headSha)}/${file.split('/').map(encodeURIComponent).join('/')}`;
+        const fileUrl = githubBlobUrl(props.pr.host, props.pr.owner, props.pr.repo, props.headSha, file);
         return (
           <section className="cn-file-group" key={file} aria-label={`Findings in ${file}`}>
             <div className="cn-file-header">
@@ -468,9 +485,7 @@ export function FindingsView(props: {
                 <span className="cn-file-name">{file}</span>
                 <span className="cn-count">{rows.length}</span>
               </button>
-              <a className="cn-file-link" href={fileUrl} target="_blank" rel="noreferrer noopener" aria-label={`Open ${file} on GitHub`}>
-                ↗
-              </a>
+              {fileUrl ? <a className="cn-file-link" href={fileUrl} target="_blank" rel="noreferrer noopener" aria-label={`Open ${file} on GitHub`}>↗</a> : null}
             </div>
             {open.has(file) ? (
               <div className="cn-file-findings">

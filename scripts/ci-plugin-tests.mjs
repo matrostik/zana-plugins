@@ -70,8 +70,10 @@ for (const id of targetPlugins) {
     }
   }
 
-  // 2. Install dependencies if package-lock.json exists and Vitest is missing
-  if (existsSync(join(pDir, 'package-lock.json')) && !existsSync(join(pDir, 'node_modules', 'vitest'))) {
+  // 2. Install dependencies if a required local test tool is missing
+  const hasVitest = existsSync(join(pDir, 'node_modules', 'vitest'));
+  const hasCoverageProvider = existsSync(join(pDir, 'node_modules', '@vitest', 'coverage-v8'));
+  if (existsSync(join(pDir, 'package-lock.json')) && (!hasVitest || !hasCoverageProvider)) {
     console.log(`[DEPS] Installing dependencies for ${id}...`);
     try {
       execFileSync('npm', ['ci', '--ignore-scripts'], { cwd: pDir, stdio: 'inherit', shell: true });

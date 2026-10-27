@@ -139,7 +139,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const result = await sync.syncAll();
     await notifyOutdated();
     // A detail refresh can discover a head before the background sync does.
-    for (const pr of store.listPullRequests()) {
+    for (const pr of result.changed) {
       const repo = store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
       const host = result.hosts.find((host) => host.host === pr.host);
       if (!host?.login || host.error) continue;
@@ -254,7 +254,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const pr = store.getPullRequest(asString(record, 'prId'));
     if (!pr) throw new Error('Pull request not found');
     const ref = parsePrId(pr.id);
-    const expectedHead = asString(record, 'headSha');
+    const requestedHead = record.headSha;
+    const expectedHead = typeof requestedHead === 'string' && requestedHead ? requestedHead : pr.headSha;
     const checkHead = async () => {
       if (!expectedHead) return;
       const currentHead = (await github.getPull(ref)).head.sha;

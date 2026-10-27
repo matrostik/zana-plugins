@@ -31,6 +31,7 @@ export function sortFindings(findings: FindingRow[]): FindingRow[] {
 
 export function listPullRequests(store: Store, bucket?: PrBucket): PrListItem[] {
   const reviews = store.latestReviewsByPr();
+  const completedReviews = store.latestCompletedReviewsByPr();
   const pullRequests = store.listPullRequests().filter((pr) => !bucket || pr.buckets.includes(bucket));
   const completedIds = pullRequests.flatMap((pr) => {
     const review = reviews.get(pr.id);
@@ -39,7 +40,7 @@ export function listPullRequests(store: Store, bucket?: PrBucket): PrListItem[] 
   const findingCounts = store.countUndismissedFindings(completedIds);
   return pullRequests.map((pr) => {
     const review = reviews.get(pr.id);
-    const completed = review?.status === 'completed' ? review : store.latestCompletedReview(pr.id);
+    const completed = review?.status === 'completed' ? review : completedReviews.get(pr.id) ?? null;
     return {
       ...pr,
       outdated: Boolean(completed && completed.headSha !== pr.headSha),

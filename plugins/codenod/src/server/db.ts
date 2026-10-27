@@ -379,6 +379,18 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return row ? toReview(row) : null;
     },
 
+    latestCompletedReviewsByPr(): Map<string, ReviewRow> {
+      const rows = db.prepare(
+        `SELECT r.* FROM reviews r
+         WHERE r.status = 'completed' AND r.rowid = (
+           SELECT latest.rowid FROM reviews latest
+           WHERE latest.pr_id = r.pr_id AND latest.status = 'completed'
+           ORDER BY latest.created_at DESC, latest.rowid DESC LIMIT 1
+         )`
+      ).all() as Row[];
+      return new Map(rows.map((row) => [String(row.pr_id), toReview(row)]));
+    },
+
     hasOutdatedNotification(prId: string, headSha: string): boolean {
       return Boolean(db.prepare('SELECT 1 FROM outdated_notifications WHERE pr_id = ? AND head_sha = ?').get(prId, headSha));
     },
