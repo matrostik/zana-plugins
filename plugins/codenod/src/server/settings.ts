@@ -14,6 +14,7 @@ export interface CodenodSettings {
   workspaceMode: WorkspaceMode;
   fallbackProjectId: string | null;
   archiveReviewThreads: boolean;
+  showReviewsOnAgentsBoard: boolean;
 }
 
 type HostSettingValues = Record<string, string | number | boolean | undefined>;
@@ -42,7 +43,8 @@ export const DEFAULT_SETTINGS: CodenodSettings = {
   reviewTimeoutMinutes: 20,
   workspaceMode: 'worktree',
   fallbackProjectId: null,
-  archiveReviewThreads: true
+  archiveReviewThreads: true,
+  showReviewsOnAgentsBoard: true
 };
 
 function clampInteger(value: number, limits: { min: number; max: number }): number {
@@ -85,6 +87,7 @@ export function applySettingsPatch(base: CodenodSettings, patch: unknown): Coden
     next.fallbackProjectId = typeof record.fallbackProjectId === 'string' && record.fallbackProjectId.trim() ? record.fallbackProjectId.trim() : null;
   }
   if (typeof record.archiveReviewThreads === 'boolean') next.archiveReviewThreads = record.archiveReviewThreads;
+  if (typeof record.showReviewsOnAgentsBoard === 'boolean') next.showReviewsOnAgentsBoard = record.showReviewsOnAgentsBoard;
   return next;
 }
 
@@ -108,7 +111,8 @@ export function settingsFromHostValues(values: HostSettingValues): CodenodSettin
     reviewTimeoutMinutes: values.reviewTimeoutMinutes,
     workspaceMode: values.workspaceMode,
     fallbackProjectId: values.fallbackProject,
-    archiveReviewThreads: values.archiveReviewThreads !== false
+    archiveReviewThreads: values.archiveReviewThreads !== false,
+    showReviewsOnAgentsBoard: values.showReviewsOnAgentsBoard !== false
   });
 }
 

@@ -278,12 +278,13 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
             required: ['providerId', 'model']
           }
         },
-        wait: { type: 'boolean', description: 'Wait for the review to finish (can take several minutes)' }
+        wait: { type: 'boolean', description: 'Wait for the review to finish (can take several minutes)' },
+        remediationGate: { type: 'boolean', description: 'Include structured blockingCount and blockingFindings in the response' }
       },
       required: ['pr']
     },
     execute: async (input, ctx) => {
-      const record = (input ?? {}) as { pr?: unknown; models?: unknown; wait?: unknown };
+      const record = (input ?? {}) as { pr?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
       const ref = parsePrRef(String(record.pr ?? ''), await app.defaultHost());
       const models = Array.isArray(record.models)
         ? record.models
@@ -291,9 +292,33 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
             .map((model) => ({ providerId: String(model.providerId), model: String(model.model), ...(model.reasoningLevel ? { reasoningLevel: String(model.reasoningLevel) } : {}) }))
         : undefined;
       const review = await app.startReview(ref, { models });
-      if (record.wait !== true || ctx.signal.aborted) return { reviewId: review.id, status: review.status };
+      if (record.wait !== true || ctx.signal.aborted) {
+        return { reviewId: review.id, status: review.status, ...(review.coordinatorThreadId ? { coordinatorThreadId: review.coordinatorThreadId } : {}) };
+      }
       const finished = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
-      return finished.status === 'completed' ? app.detail(ref) : { reviewId: finished.id, status: finished.status, error: finished.error };
+      if (finished.status !== 'completed') {
+        return { reviewId: finished.id, status: finished.status, error: finished.error, ...(finished.coordinatorThreadId ? { coordinatorThreadId: finished.coordinatorThreadId } : {}) };
+      }
+      const detail = await app.detail(ref);
+      if (record.remediationGate === true) {
+        const blocking = detail.findings.filter((f) => !f.dismissed && (f.severity === 'critical' || f.severity === 'high'));
+        return {
+          ...detail,
+          blockingCount: blocking.length,
+          blockingFindings: blocking.map((f) => ({
+            id: f.id,
+            severity: f.severity,
+            category: f.category,
+            file: f.file,
+            line: f.line,
+            description: f.description,
+            suggestion: f.suggestion,
+            agreedBy: f.agreedBy
+          })),
+          coordinatorThreadId: detail.review?.coordinatorThreadId ?? null
+        };
+      }
+      return detail;
     }
   });
 }

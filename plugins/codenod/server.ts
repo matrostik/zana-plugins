@@ -95,7 +95,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       workspaceMode: values.workspaceMode,
       maxConcurrent: values.maxConcurrentReviews,
       timeoutMs: values.reviewTimeoutMinutes * 60_000,
-      archiveThreads: values.archiveReviewThreads
+      archiveThreads: values.archiveReviewThreads,
+      showReviewsOnAgentsBoard: values.showReviewsOnAgentsBoard
     };
   };
 
@@ -109,12 +110,21 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     warn: (message) => zcc.log.warn(message)
   });
 
+  async function cleanupClosedPrThreads() {
+    const threadsToArchive = store.listClosedOrMergedPrThreads();
+    for (const item of threadsToArchive) {
+      await threads.archive({ threadId: item.threadId }).catch(() => undefined);
+      store.removePrThread(item.prId, item.threadId);
+    }
+  }
+
   const pendingAutoReviewPrIds = new Set<string>();
   async function refreshPullRequest(ref: ReturnType<typeof parsePrId>) {
     const previousHead = store.getPullRequest(prId(ref))?.headSha;
     const pr = await sync.syncPullRequest(ref);
     if (pr.headSha !== previousHead) pendingAutoReviewPrIds.add(pr.id);
     await notifyOutdated([pr.id]);
+    await cleanupClosedPrThreads();
     publish(CHANGED_EVENT, { prId: pr.id });
     return pr;
   }
@@ -141,6 +151,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   async function runSync() {
     const result = await sync.syncAll();
     await notifyOutdated();
+    await cleanupClosedPrThreads();
     const autoReviewPrs = new Map(result.changed.map((pr) => [pr.id, pr]));
     for (const pr of result.changed) pendingAutoReviewPrIds.add(pr.id);
     // A selected-PR refresh may discover a new head before the full sync sees it.
@@ -345,9 +356,15 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   });
 
   zcc.rpc.method('deepReview', async (args) => {
-    const detail = getPrDetail(store, asString(asRecord(args), 'prId'));
+    const record = asRecord(args);
+    const detail = getPrDetail(store, asString(record, 'prId'));
     if (!detail) throw new Error('Pull request not found');
     const { pr, review, findings } = detail;
+    const findingIds = asStringArray(record, 'findingIds');
+    const activeFindings = findings.filter((finding) => !finding.dismissed);
+    const targetFindings = findingIds.length > 0
+      ? activeFindings.filter((finding) => findingIds.includes(finding.id))
+      : activeFindings;
     const config = await reviewConfig();
     const project = await projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
     const projectId = project?.id ?? config.fallbackProjectId ?? (await projects.projects())[0]?.id;
@@ -356,9 +373,10 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const worktree = hasWorkspace && project?.path
       ? { kind: 'worktree' as const, branchSlug: `codenod-deep-${pr.number}`, baseBranch: await fetchPullRequestHead(run, project.path, project.remote, pr.number, pr.headSha) }
       : undefined;
+    const titleSuffix = findingIds.length > 0 ? ` (${targetFindings.length} issue${targetFindings.length === 1 ? '' : 's'})` : '';
     const spawned = await zcc.sdk.threads.spawn({
       projectId,
-      title: `Deep Review: ${pr.owner}/${pr.repo}#${pr.number}`,
+      title: `Deep Review: ${pr.owner}/${pr.repo}#${pr.number}${titleSuffix}`,
       prompt: getDeepReviewPrompt({
         url: pr.url,
         repository: `${pr.owner}/${pr.repo}`,
@@ -371,12 +389,13 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
         remote: hasWorkspace ? project?.remote ?? null : null,
         hasWorkspace,
         reviewSummary: review?.consensusSummary ?? review?.summary ?? null,
-        findings: findings.filter((finding) => !finding.dismissed)
+        findings: targetFindings
       }),
       permissionMode: FULL_ACCESS_PERMISSION_MODE,
       visibility: 'visible',
       ...(worktree ? { environment: worktree } : {})
     });
+    store.recordPrThread(pr.id, spawned.id, 'deep');
     return { threadId: spawned.id, projectId };
   });
 

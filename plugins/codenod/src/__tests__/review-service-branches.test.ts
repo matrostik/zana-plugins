@@ -485,6 +485,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
     maxConcurrent: 2,
     timeoutMs: 60_000,
     archiveThreads: true,
+    showReviewsOnAgentsBoard: false,
     ...options.config
   };
   const published: Array<{ event: string; payload: unknown }> = [];

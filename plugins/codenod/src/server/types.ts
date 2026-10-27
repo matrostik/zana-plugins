@@ -85,6 +85,7 @@ export interface ReviewRow extends ReviewScores {
   trigger: 'manual' | 'auto';
   createdAt: number;
   completedAt: number | null;
+  coordinatorThreadId?: string | null;
 }
 
 export interface ReviewRunRow extends ReviewScores {
@@ -115,6 +116,13 @@ export interface FindingRow {
   confidence: number;
   postedAt: number | null;
   dismissed: boolean;
+}
+
+export interface PrThreadRow {
+  prId: string;
+  threadId: string;
+  kind: 'coordinator' | 'deep';
+  createdAt: number;
 }
 
 export interface RepoRow {

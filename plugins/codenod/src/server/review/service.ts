@@ -8,7 +8,7 @@ import { aggregateScores, clusterIssues, dedupeIssues, type TaggedIssue } from '
 import { gatherReviewContext } from './context.ts';
 import { parseAnalysis } from './parse.ts';
 import { getConsensusPrompt, getFullReviewPrompt, getRepairPrompt, hasRequirementsContext } from './prompts.ts';
-import { pickReviewPermissionMode, runModelInThread, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from './runner.ts';
+import { FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, runModelInThread, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from './runner.ts';
 
 export type WorkspaceMode = 'worktree' | 'project' | 'diff-only';
 
@@ -20,6 +20,7 @@ export interface ReviewConfig {
   maxConcurrent: number;
   timeoutMs: number;
   archiveThreads: boolean;
+  showReviewsOnAgentsBoard: boolean;
 }
 
 export interface ReviewServiceDeps {
@@ -101,6 +102,32 @@ export function createReviewService(deps: ReviewServiceDeps) {
       return;
     }
     const workspace = await resolveWorkspace(pr, review.headSha, config);
+
+    let coordinatorThreadId: string | null = null;
+    if (config.showReviewsOnAgentsBoard) {
+      const existingThreads = deps.store.listPrThreads(pr.id).filter((t) => t.kind === 'coordinator');
+      for (const t of existingThreads) {
+        await deps.threads.archive({ threadId: t.threadId }).catch(() => undefined);
+        deps.store.removePrThread(pr.id, t.threadId);
+      }
+      try {
+        const spawnedCoord = await deps.threads.spawn({
+          projectId: workspace.projectId,
+          title: `CodeNod Review: ${pr.owner}/${pr.repo}#${pr.number}`,
+          prompt: `Automated multi-model code review in progress for ${pr.owner}/${pr.repo}#${pr.number}: "${pr.title}" at commit ${review.headSha.slice(0, 10)}.\n\nEvaluating with ${item.models.length} model(s): ${item.models.map(modelLabel).join(', ')}. Findings will appear here once evaluation completes.`,
+          permissionMode: FULL_ACCESS_PERMISSION_MODE,
+          visibility: 'visible',
+          environment: workspace.environment
+        });
+        coordinatorThreadId = spawnedCoord.id;
+        deps.store.setReviewCoordinatorThreadId(review.id, coordinatorThreadId);
+        deps.store.recordPrThread(pr.id, coordinatorThreadId, 'coordinator');
+        changed({ prId: pr.id, reviewId: review.id, coordinatorThreadId });
+      } catch (error) {
+        deps.log.warn(`codenod: could not spawn coordinator thread: ${errorMessage(error)}`);
+      }
+    }
+
     const promptContext = { ...gathered.prompt, customInstructions: config.customInstructions, hasWorkspace: workspace.hasWorkspace };
     const hasRequirements = hasRequirementsContext(promptContext);
     const prompt = getFullReviewPrompt(promptContext);
@@ -151,12 +178,21 @@ export function createReviewService(deps: ReviewServiceDeps) {
 
     if (signal.aborted) {
       deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
+      if (coordinatorThreadId) {
+        await deps.threads.send({ threadId: coordinatorThreadId, prompt: 'Review was cancelled.' }).catch(() => undefined);
+      }
       return;
     }
     const succeeded = outcomes.filter((outcome): outcome is { model: ModelChoice; analysis: ParsedAnalysis } => outcome !== null);
     if (succeeded.length === 0) {
       const errors = deps.store.listRuns(review.id).map((run) => run.error).filter(Boolean);
       deps.store.setReviewStatus(review.id, 'failed', errors[0] ?? 'Every model failed');
+      if (coordinatorThreadId) {
+        await deps.threads.send({
+          threadId: coordinatorThreadId,
+          prompt: `Code review failed. Errors:\n${errors.join('\n')}`
+        }).catch(() => undefined);
+      }
       return;
     }
 
@@ -201,6 +237,32 @@ export function createReviewService(deps: ReviewServiceDeps) {
       hasRequirements,
       scores: aggregateScores(succeeded.map(({ analysis }) => analysis))
     });
+
+    if (coordinatorThreadId) {
+      const done = deps.store.getReview(review.id)!;
+      const blocking = clusters.filter((c) => c.severity === 'critical' || c.severity === 'high').length;
+      const reviewText = [
+        `# Review Completed: ${pr.owner}/${pr.repo}#${pr.number}`,
+        `**Risk Score**: ${done.riskScore ?? '–'}/10`,
+        `**Findings**: ${clusters.length} total (${blocking} high or critical)`,
+        `**Evaluated by**: ${succeeded.map(({ model }) => modelLabel(model)).join(', ')}`,
+        '',
+        `### Summary`,
+        done.consensusSummary ?? done.summary ?? 'No summary available.',
+        '',
+        clusters.length > 0
+          ? `### Top Issues\n` +
+            clusters
+              .slice(0, 10)
+              .map(
+                (c) =>
+                  `- [${c.severity.toUpperCase()}] **${c.file}${c.line ? `:${c.line}` : ''}**: ${c.description} *(Agreed by: ${c.agreedBy.join(', ')})*`
+              )
+              .join('\n')
+          : 'No issues found.'
+      ].join('\n');
+      await deps.threads.send({ threadId: coordinatorThreadId, prompt: reviewText }).catch(() => undefined);
+    }
 
     // A commit may have arrived while the models were working.
     await deps.syncPullRequest(parsePrId(pr.id)).catch((error) => deps.log.warn(`codenod: post-review refresh failed: ${errorMessage(error)}`));

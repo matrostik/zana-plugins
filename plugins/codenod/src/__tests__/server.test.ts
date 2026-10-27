@@ -191,11 +191,15 @@ describe('codenod server', () => {
     expect(detail.findings[0]).toMatchObject({ severity: 'high', confidence: 1, agreedBy: ['claude-code/opus', 'claude-code/sonnet'] });
 
     const threads = [...host.threads.values()];
-    expect(threads).toHaveLength(2);
-    expect(threads.every((thread) => thread.args.visibility === 'hidden' && thread.args.permissionMode === 'full' && thread.archived)).toBe(true);
-    expect(threads[1].args.reasoningLevel).toBe('high');
-    expect(threads[1].sent[0]).toContain('could not be used');
-    const prompt = String(threads[0].args.prompt);
+    const workers = threads.filter((thread) => thread.args.visibility === 'hidden');
+    const coordinator = threads.find((thread) => thread.args.visibility === 'visible');
+    expect(workers).toHaveLength(2);
+    expect(workers.every((thread) => thread.args.permissionMode === 'full' && thread.archived)).toBe(true);
+    expect(coordinator).toBeTruthy();
+    expect(coordinator?.sent[0]).toContain('Review Completed');
+    expect(workers[1].args.reasoningLevel).toBe('high');
+    expect(workers[1].sent[0]).toContain('could not be used');
+    const prompt = String(workers[0].args.prompt);
     expect(prompt).toContain('Linked issue acme/api#12');
     expect(prompt).toContain('Coverage dropped');
     expect(prompt).toContain('There is no checkout');
@@ -222,7 +226,8 @@ describe('codenod server', () => {
 
     expect(ANALYSIS(6, longDescription).length).toBeGreaterThan(4_096);
     expect(detail.runs[0]).toMatchObject({ status: 'completed', summary: 'Review by risk 6' });
-    expect([...host.threads.values()][0].sent).toEqual([]);
+    const worker = [...host.threads.values()].find((thread) => thread.args.visibility === 'hidden')!;
+    expect(worker.sent).toEqual([]);
   });
 
   it('posts selected findings as inline comments', async () => {
@@ -354,13 +359,13 @@ describe('codenod server', () => {
     expect(first.pr.buckets.sort()).toEqual(['needs-review', 'watched']);
 
     await host.callRpc('refresh');
-    expect(host.threads.size).toBe(1);
+    expect(host.threads.size).toBe(2);
 
     state.headSha = 'sha2';
     await host.callRpc('refresh');
     const second = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (detail) => detail.review?.headSha === 'sha2' && detail.review.status === 'completed');
     expect(second.review?.trigger).toBe('auto');
-    expect(host.threads.size).toBe(2);
+    expect(host.threads.size).toBe(4);
   });
 
   it('still auto-reviews a head first discovered when opening its detail', async () => {
@@ -452,7 +457,8 @@ describe('codenod settings', () => {
       reviewTimeoutMinutes: 20,
       workspaceMode: 'diff-only',
       fallbackProjectId: 'home',
-      archiveReviewThreads: false
+      archiveReviewThreads: false,
+      showReviewsOnAgentsBoard: true
     });
     expect(host.kv.get('settingsMigrated')).toBe(true);
 
@@ -483,7 +489,8 @@ describe('codenod settings', () => {
 
     await host.callRpc('addRepo', { repo: 'acme/api' });
     await reviewToCompletion(host);
-    const prompt = String([...host.threads.values()][0].args.prompt);
+    const worker = [...host.threads.values()].find((thread) => thread.args.visibility === 'hidden')!;
+    const prompt = String(worker.args.prompt);
     expect(prompt).toContain('## Custom Review Instructions');
     expect(prompt).toContain('Skip nitpicks');
   });
@@ -524,5 +531,65 @@ describe('codenod settings', () => {
     const snapshot = await config(host);
     expect(snapshot.profiles).toEqual([{ host: 'github.com', login: 'me', name: 'Mona Lisa', email: null, avatarUrl: 'https://avatars.example/me' }]);
     expect(snapshot.projects).toEqual([{ id: 'home', name: 'Home' }]);
+  });
+
+  it('respects showReviewsOnAgentsBoard setting when disabled', async () => {
+    const { host } = await setup();
+    await host.callRpc('setSettings', { showReviewsOnAgentsBoard: false });
+    await reviewToCompletion(host);
+
+    const threads = [...host.threads.values()];
+    expect(threads.every((t) => t.args.visibility === 'hidden')).toBe(true);
+    expect(threads.some((t) => t.args.visibility === 'visible')).toBe(false);
+  });
+
+  it('archives visible review and deep review threads when PR is closed on GitHub', async () => {
+    const { host, state } = await setup();
+    const detail = await reviewToCompletion(host);
+    expect(detail.review?.coordinatorThreadId).toBeTruthy();
+
+    const { threadId: deepThreadId } = (await host.callRpc('deepReview', { prId: PR_ID })) as { threadId: string };
+    const coordThread = host.threads.get(detail.review!.coordinatorThreadId!)!;
+    const deepThread = host.threads.get(deepThreadId)!;
+    expect(coordThread.archived).toBe(false);
+    expect(deepThread.archived).toBe(false);
+
+    // Simulate PR merged/closed on GitHub
+    state.headSha = 'closed';
+    // When sync runs and pull is closed, closeMissingPullRequests or fetchRow sets it closed
+    // Close it in store directly to test cleanup
+    const db = host.zcc.storage.database();
+    db.prepare("UPDATE pull_requests SET state = 'closed' WHERE id = ?").run(PR_ID);
+
+    await host.callRpc('refresh');
+    expect(coordThread.archived).toBe(true);
+    expect(deepThread.archived).toBe(true);
+  });
+
+  it('scopes Deep Review prompt to selected findingIds when provided', async () => {
+    const { host } = await setup();
+    const detail = await reviewToCompletion(host);
+    const findingId = detail.findings[0].id;
+
+    const { threadId } = (await host.callRpc('deepReview', { prId: PR_ID, findingIds: [findingId] })) as { threadId: string };
+    const thread = host.threads.get(threadId)!;
+    expect(thread.args.title).toContain('(1 issue)');
+    expect(thread.args.prompt).toContain(detail.findings[0].description);
+  });
+
+  it('returns blockingCount and blockingFindings via codenod_review_pr with remediationGate', async () => {
+    const { host } = await setup();
+    await host.callRpc('setModels', { models: [MODELS[0]] });
+    await host.callRpc('refresh');
+    const tool = host.tools.find((t) => t.name === 'codenod_review_pr')!;
+
+    const result = (await tool.execute(
+      { pr: 'acme/api#4', wait: true, remediationGate: true },
+      { signal: new AbortController().signal }
+    )) as { blockingCount: number; blockingFindings: unknown[]; coordinatorThreadId: string | null };
+
+    expect(result.blockingCount).toBe(1);
+    expect(result.blockingFindings).toHaveLength(1);
+    expect(result.coordinatorThreadId).toBeTruthy();
   });
 });
