@@ -25,6 +25,12 @@ Like Git Tree, this plugin installs from pre-built artifacts committed alongside
 
 ## Changelog
 
+### 0.1.2
+
+- Added functionality to enable or disable automatic repository sync, with configurable interval between sync cycles.
+- Dedicated "Repository synchronization" section in Organizations & Repos settings with toggle control and disabled state handling.
+- Toolbar indicator showing when automatic background sync is paused.
+
 ### 0.1.1
 
 - Added theme-aware finding cards, suggested-fix panels, severity/category filters, collapsible file groups, and highlighted code context checked against the reviewed commit.

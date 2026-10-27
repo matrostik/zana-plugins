@@ -257,4 +257,25 @@ describe('settings store', () => {
     await expect(second).resolves.toMatchObject({ syncIntervalMinutes: 9, maxConcurrentReviews: 4 });
     expect(saved).toMatchObject({ syncIntervalMinutes: 9, maxConcurrentReviews: 4 });
   });
+  it('updates autoSyncEnabled in settings store', async () => {
+    let saved: unknown = {};
+    const settings = createSettingsStore({
+      kv: {
+        get: async <T>(key: string) => (key === 'settingsMigrated' ? (true as T) : (saved as T)),
+        set: async (key: string, value: unknown) => {
+          if (key === 'settings') saved = value;
+        }
+      },
+      readHostValues: async () => ({})
+    });
+
+    const updated = await settings.update({ autoSyncEnabled: false });
+    expect(updated.autoSyncEnabled).toBe(false);
+    expect(saved).toMatchObject({ autoSyncEnabled: false });
+
+    const reenabled = await settings.update({ autoSyncEnabled: true });
+    expect(reenabled.autoSyncEnabled).toBe(true);
+    expect(saved).toMatchObject({ autoSyncEnabled: true });
+  });
+
 });

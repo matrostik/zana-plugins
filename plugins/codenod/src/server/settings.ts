@@ -7,6 +7,7 @@ export interface CodenodSettings {
   customInstructions: string;
   /** GitHub Enterprise hosts; github.com is always included and never stored. */
   githubHosts: string[];
+  autoSyncEnabled: boolean;
   syncIntervalMinutes: number;
   maxConcurrentReviews: number;
   reviewTimeoutMinutes: number;
@@ -35,6 +36,7 @@ const MAX_HOSTS = 20;
 export const DEFAULT_SETTINGS: CodenodSettings = {
   customInstructions: DEFAULT_REVIEW_INSTRUCTIONS,
   githubHosts: [],
+  autoSyncEnabled: true,
   syncIntervalMinutes: 5,
   maxConcurrentReviews: 2,
   reviewTimeoutMinutes: 20,
@@ -71,6 +73,7 @@ export function applySettingsPatch(base: CodenodSettings, patch: unknown): Coden
     next.customInstructions = record.customInstructions.trim();
   }
   if ('githubHosts' in record) next.githubHosts = sanitizeHosts(record.githubHosts);
+  if (typeof record.autoSyncEnabled === 'boolean') next.autoSyncEnabled = record.autoSyncEnabled;
   for (const key of Object.keys(SETTING_LIMITS) as Array<keyof typeof SETTING_LIMITS>) {
     const value = asOptionalNumber(record, key);
     if (value !== undefined) next[key] = clampInteger(value, SETTING_LIMITS[key]);
@@ -99,6 +102,7 @@ export function settingsFromHostValues(values: HostSettingValues): CodenodSettin
   return applySettingsPatch(DEFAULT_SETTINGS, {
     customInstructions: legacyInstructions || DEFAULT_REVIEW_INSTRUCTIONS,
     githubHosts: [...new Set(hosts)],
+    autoSyncEnabled: typeof values.autoSyncEnabled === 'boolean' ? values.autoSyncEnabled : true,
     syncIntervalMinutes: values.syncIntervalMinutes,
     maxConcurrentReviews: values.maxConcurrentReviews,
     reviewTimeoutMinutes: values.reviewTimeoutMinutes,

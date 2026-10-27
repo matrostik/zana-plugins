@@ -446,6 +446,7 @@ describe('codenod settings', () => {
     expect(first.settings).toEqual({
       customInstructions: 'Be strict',
       githubHosts: ['git.example.com'],
+      autoSyncEnabled: true,
       syncIntervalMinutes: 10,
       maxConcurrentReviews: 2,
       reviewTimeoutMinutes: 20,
@@ -459,6 +460,18 @@ describe('codenod settings', () => {
     await createCodenodPlugin(host.zcc, { run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
     expect((await config(host)).settings.customInstructions).toBe('Be strict');
   });
+  it('skips scheduled background sync when autoSyncEnabled is disabled', async () => {
+    let synced = false;
+    const { host } = await setup();
+    await (host.callRpc('setSettings', { autoSyncEnabled: false }));
+
+    await host.tick();
+
+    const overview = await (host.callRpc('overview') as Promise<{ autoSyncEnabled: boolean; syncing: boolean }>);
+    expect(overview.autoSyncEnabled).toBe(false);
+    expect(overview.syncing).toBe(false);
+  });
+
 
   it('starts new installs with the default review instructions and sends them to reviewers', async () => {
     const { host } = await setup();

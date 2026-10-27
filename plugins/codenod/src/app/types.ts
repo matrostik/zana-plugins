@@ -12,6 +12,7 @@ export interface Overview {
   hosts: HostStatus[];
   syncing: boolean;
   lastSyncAt: number | null;
+  autoSyncEnabled: boolean;
   activeReviews: number;
   hasModels: boolean;
   hasWatchedRepos: boolean;

@@ -16,7 +16,6 @@ function HostsSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
   const [draft, setDraft] = useState<string[]>(saved);
   const [hostInput, setHostInput] = useState('');
   const hostsAction = useSettingsAction(onChanged);
-  const syncAction = useSettingsAction(onChanged);
 
   const savedKey = saved.join(',');
   // Keyed on the joined list so unrelated refreshes don't discard unsaved edits.
@@ -71,17 +70,7 @@ function HostsSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
         </button>
         {hostsAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
       </form>
-      {syncAction.error ? <p className="cn-banner cn-banner-error">{syncAction.error}</p> : null}
-      <div className="cn-inline">
-        <NumberSetting
-          id="syncIntervalMinutes"
-          label="Sync interval (minutes)"
-          value={config.settings.syncIntervalMinutes}
-          limits={config.limits.syncIntervalMinutes}
-          onSave={(value) => void syncAction.run(() => rpc.call('setSettings', { syncIntervalMinutes: value }))}
-        />
-        {syncAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
-      </div>
+      
     </section>
   );
 }
@@ -210,10 +199,57 @@ function ReposSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
   );
 }
 
+
+function SyncSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnapshot; onChanged(): void }) {
+  const toggleAction = useSettingsAction(onChanged);
+  const intervalAction = useSettingsAction(onChanged);
+  const autoSyncEnabled = config.settings.autoSyncEnabled !== false;
+
+  return (
+    <section className="cn-section" aria-labelledby="cn-sync-heading">
+      <h3 id="cn-sync-heading">Repository synchronization</h3>
+      <p className="cn-muted cn-small">
+        Polls GitHub periodically for pull requests and review triggers across watched repositories.
+      </p>
+      {toggleAction.error ? <p className="cn-banner cn-banner-error">{toggleAction.error}</p> : null}
+      {intervalAction.error ? <p className="cn-banner cn-banner-error">{intervalAction.error}</p> : null}
+      <div className="cn-inline" style={{ marginBottom: 8 }}>
+        <label className="cn-check">
+          <input
+            type="checkbox"
+            aria-label="Enable automatic repository sync"
+            checked={autoSyncEnabled}
+            onChange={(event) => void toggleAction.run(() => rpc.call('setSettings', { autoSyncEnabled: event.target.checked }))}
+          />
+          <span>Enable automatic sync</span>
+        </label>
+        {toggleAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
+      </div>
+      <div className="cn-inline">
+        <NumberSetting
+          id="syncIntervalMinutes"
+          label="Sync interval (minutes)"
+          value={config.settings.syncIntervalMinutes}
+          limits={config.limits.syncIntervalMinutes}
+          disabled={!autoSyncEnabled}
+          onSave={(value) => void intervalAction.run(() => rpc.call('setSettings', { syncIntervalMinutes: value }))}
+        />
+        {intervalAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
+      </div>
+      {!autoSyncEnabled ? (
+        <p className="cn-muted cn-small" style={{ marginTop: 4 }}>
+          Automatic sync is paused. Repositories will only update when you manually click Refresh.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function ReposTab({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnapshot; onChanged(): void }) {
   return (
     <>
       <HostsSection rpc={rpc} config={config} onChanged={onChanged} />
+      <SyncSection rpc={rpc} config={config} onChanged={onChanged} />
       <ReposSection rpc={rpc} config={config} onChanged={onChanged} />
     </>
   );

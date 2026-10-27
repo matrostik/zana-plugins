@@ -48,6 +48,7 @@ export const CODENOD_STYLES = `
   background: var(--cn-card); color: var(--cn-text); border: 1px solid var(--cn-border-strong);
   border-radius: 6px; padding: 4px 8px; font: inherit; min-width: 0;
 }
+.cn-input:disabled, .cn-select:disabled, .cn-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
 .cn-textarea { width: 100%; min-height: 60px; resize: vertical; }
 .cn-body { display: flex; flex: 1; min-height: 0; }
 .cn-list { width: clamp(260px, 36%, 460px); border-right: 1px solid var(--cn-border); display: flex; flex-direction: column; min-height: 0; }
@@ -71,6 +72,7 @@ export const CODENOD_STYLES = `
 .cn-badge-ok { color: var(--cn-ok); border-color: color-mix(in srgb, var(--cn-ok) 50%, transparent); }
 .cn-badge-warn { color: var(--cn-warn); border-color: color-mix(in srgb, var(--cn-warn) 50%, transparent); }
 .cn-badge-danger { color: var(--cn-danger); border-color: color-mix(in srgb, var(--cn-danger) 50%, transparent); }
+.cn-badge-muted { color: var(--cn-muted); border-color: var(--cn-border); }
 .cn-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .cn-detail-scroll { flex: 1; overflow: auto; padding: 16px; }
 .cn-empty { padding: 32px; text-align: center; color: var(--cn-muted); }

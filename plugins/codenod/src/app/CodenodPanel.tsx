@@ -93,6 +93,11 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
       <div className="cn-toolbar">
         <h1>CodeNod</h1>
         {overview?.lastSyncAt ? <span className="cn-muted cn-small">Synced {relativeTime(overview.lastSyncAt)}</span> : null}
+        {overview && overview.autoSyncEnabled === false ? (
+          <span className="cn-badge cn-badge-muted" title="Automatic repository sync is disabled">
+            Auto-sync off
+          </span>
+        ) : null}
         {overview && overview.activeReviews > 0 ? (
           <span className="cn-badge cn-badge-warn" role="status">
             {overview.activeReviews} review{overview.activeReviews === 1 ? '' : 's'} running
