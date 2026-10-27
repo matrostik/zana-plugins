@@ -4,16 +4,84 @@ import { fileURLToPath as __fileURLToPath } from "node:url";
 const require = __createRequire(import.meta.url);
 var __filename = __fileURLToPath(import.meta.url);
 var __dirname = __pathDirname(__filename);
+
+// d:/Dev/code/zana-plugins/plugins/provider-antigravity/dist/host.js
+import { createRequire as __createRequire } from "node:module";
+import { dirname as __pathDirname } from "node:path";
+import { fileURLToPath as __fileURLToPath } from "node:url";
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  writeSync
+} from "node:fs";
+import { join, resolve } from "node:path";
+import { extname } from "node:path";
+import { constants as fsConstants } from "node:fs";
+import { access } from "node:fs/promises";
+import path from "node:path";
+import { execFile as execFile3 } from "node:child_process";
+import { randomBytes as randomBytes2 } from "node:crypto";
+import { promises as fs2, readFileSync } from "node:fs";
+import { createServer } from "node:net";
+import { dirname as dirname2, isAbsolute, basename as basename3, relative, resolve as resolve3 } from "node:path";
+import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
+import { basename } from "node:path";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path2 from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { promisify } from "node:util";
+import path3 from "node:path";
+import path4 from "node:path";
+import { createInterface } from "node:readline";
+import { execFile as execFile2 } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename as basename2, dirname, join as join2, resolve as resolve2 } from "node:path";
+import { createConnection } from "node:net";
+import { createInterface as createInterface2 } from "node:readline";
+import {
+  copyFileSync,
+  existsSync as existsSync3,
+  mkdirSync as mkdirSync3,
+  readFileSync as readFileSync3,
+  rmSync as rmSync2,
+  statSync,
+  writeFileSync as writeFileSync2
+} from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
+import { execFile as execFile4, execFileSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync as existsSync2,
+  mkdirSync as mkdirSync2,
+  readFileSync as readFileSync2,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { dirname as dirname3, join as join3, resolve as resolve4 } from "node:path";
+import { promisify as promisify2 } from "node:util";
+var require2 = __createRequire(import.meta.url);
+var __filename = __fileURLToPath(import.meta.url);
+var __dirname = __pathDirname(__filename);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
-  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+var __require = /* @__PURE__ */ ((x) => typeof require2 !== "undefined" ? require2 : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require2 !== "undefined" ? require2 : a)[b]
 }) : x)(function(x) {
-  if (typeof require !== "undefined") return require.apply(this, arguments);
+  if (typeof require2 !== "undefined") return require2.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
 var __commonJS = (cb, mod) => function __require3() {
@@ -39,8 +107,6 @@ var __toESM = (mod, isNodeMode, target2) => (target2 = mod != null ? __create(__
   isNodeMode || !mod || !mod.__esModule ? __defProp(target2, "default", { value: mod, enumerable: true }) : target2,
   mod
 ));
-
-// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js
 var require_windows = __commonJS({
   "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
@@ -79,8 +145,6 @@ var require_windows = __commonJS({
     }
   }
 });
-
-// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js
 var require_mode = __commonJS({
   "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
@@ -112,8 +176,6 @@ var require_mode = __commonJS({
     }
   }
 });
-
-// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js
 var require_isexe = __commonJS({
   "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require("fs");
@@ -167,8 +229,6 @@ var require_isexe = __commonJS({
     }
   }
 });
-
-// ../../../zana/node_modules/.pnpm/which@2.0.2/node_modules/which/which.js
 var require_which = __commonJS({
   "../../../zana/node_modules/.pnpm/which@2.0.2/node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
@@ -263,8 +323,6 @@ var require_which = __commonJS({
     which.sync = whichSync;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js
 var require_path_key = __commonJS({
   "../../../zana/node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js"(exports, module) {
     "use strict";
@@ -280,8 +338,6 @@ var require_path_key = __commonJS({
     module.exports.default = pathKey;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js
 var require_resolveCommand = __commonJS({
   "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
@@ -322,8 +378,6 @@ var require_resolveCommand = __commonJS({
     module.exports = resolveCommand;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js
 var require_escape = __commonJS({
   "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
@@ -347,16 +401,12 @@ var require_escape = __commonJS({
     module.exports.argument = escapeArgument;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js
 var require_shebang_regex = __commonJS({
   "../../../zana/node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js
 var require_shebang_command = __commonJS({
   "../../../zana/node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
@@ -375,8 +425,6 @@ var require_shebang_command = __commonJS({
     };
   }
 });
-
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js
 var require_readShebang = __commonJS({
   "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
@@ -397,8 +445,6 @@ var require_readShebang = __commonJS({
     module.exports = readShebang;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js
 var require_parse = __commonJS({
   "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
@@ -459,8 +505,6 @@ var require_parse = __commonJS({
     module.exports = parse3;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js
 var require_enoent = __commonJS({
   "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
@@ -509,8 +553,6 @@ var require_enoent = __commonJS({
     };
   }
 });
-
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js
 var require_cross_spawn = __commonJS({
   "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
@@ -536,8 +578,6 @@ var require_cross_spawn = __commonJS({
     module.exports._enoent = enoent;
   }
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -799,8 +839,6 @@ __export(external_exports, {
   xid: () => xid2,
   xor: () => xor
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -1116,8 +1154,6 @@ __export(core_exports2, {
   version: () => version,
   withParser: () => withParser
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1959,8 +1995,6 @@ function constantCatch(value) {
   fn[CONSTANT_CATCH] = true;
   return fn;
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2081,8 +2115,6 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -2122,8 +2154,8 @@ var initializer = (inst, def) => {
     });
   }
 };
-var $ZodError = $constructor("$ZodError", initializer);
-var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
+var $ZodError = /* @__PURE__ */ $constructor("$ZodError", initializer);
+var $ZodRealError = /* @__PURE__ */ $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
 function node(obj, key, make) {
@@ -2273,8 +2305,6 @@ function prettifyError(error62) {
   }
   return lines.join("\n");
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -2433,8 +2463,6 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   anyString: () => anyString,
@@ -2605,8 +2633,6 @@ var sha384_base64url = /* @__PURE__ */ fixedBase64url(64);
 var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -3081,8 +3107,6 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
     payload.value = def.tx(payload.value);
   };
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -3122,15 +3146,11 @@ ${content.join("\n")}
     return factory(...Object.values(this.closed));
   }
 };
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 5
 };
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -5543,8 +5563,6 @@ function handleRefineResult(result, payload, input2, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -5820,8 +5838,6 @@ function isBackEdge(ctx, value) {
   const backEdges = ctx[STATE]?.backEdges;
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -5888,8 +5904,6 @@ __export(locales_exports, {
   zhCN: () => zh_CN_default,
   zhTW: () => zh_TW_default
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6000,8 +6014,6 @@ function ar_default() {
     localeError: error()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6111,8 +6123,6 @@ function az_default() {
     localeError: error2()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6280,8 +6290,6 @@ function be_default() {
     localeError: error3()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6406,8 +6414,6 @@ function bg_default() {
     localeError: error4()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -6520,8 +6526,6 @@ function bn_default() {
     localeError: error5()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6634,8 +6638,6 @@ function ca_default() {
     localeError: error6()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -6767,8 +6769,6 @@ function ckb_default() {
     localeError: error7()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6884,8 +6884,6 @@ function cs_default() {
     localeError: error8()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7005,8 +7003,6 @@ function da_default() {
     localeError: error9()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7119,8 +7115,6 @@ function de_default() {
     localeError: error10()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7232,8 +7226,6 @@ function el_default() {
     localeError: error11()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7357,8 +7349,6 @@ function en_default() {
     localeError: error12()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7472,8 +7462,6 @@ function eo_default() {
     localeError: error13()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7609,8 +7597,6 @@ function es_default() {
     localeError: error14()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7729,8 +7715,6 @@ function fa_default() {
     localeError: error15()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7847,8 +7831,6 @@ function fi_default() {
     localeError: error16()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7977,8 +7959,6 @@ function fr_default() {
     localeError: error17()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8090,8 +8070,6 @@ function fr_CA_default() {
     localeError: error18()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -8204,8 +8182,6 @@ function gu_default() {
     localeError: error19()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8406,8 +8382,6 @@ function he_default() {
     localeError: error20()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -8518,8 +8492,6 @@ function hi_default() {
     localeError: error21()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8645,8 +8617,6 @@ function hr_default() {
     localeError: error22()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8759,8 +8729,6 @@ function hu_default() {
     localeError: error23()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8918,8 +8886,6 @@ function hy_default() {
     localeError: error24()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -9030,8 +8996,6 @@ function id_default() {
     localeError: error25()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -9145,8 +9109,6 @@ function is_default() {
     localeError: error26()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -9259,8 +9221,6 @@ function it_default() {
     localeError: error27()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9372,8 +9332,6 @@ function ja_default() {
     localeError: error28()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9490,8 +9448,6 @@ function ka_default() {
     localeError: error29()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9606,13 +9562,9 @@ function km_default() {
     localeError: error30()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -9727,8 +9679,6 @@ function kn_default() {
     localeError: error31()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9844,8 +9794,6 @@ function ko_default() {
     localeError: error32()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -10052,8 +10000,6 @@ function lt_default() {
     localeError: error33()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -10167,8 +10113,6 @@ function mk_default() {
     localeError: error34()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -10280,8 +10224,6 @@ function ms_default() {
     localeError: error35()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -10392,8 +10334,6 @@ function ne_default() {
     localeError: error36()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -10508,8 +10448,6 @@ function nl_default() {
     localeError: error37()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -10622,8 +10560,6 @@ function nn_default() {
     localeError: error38()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10736,8 +10672,6 @@ function no_default() {
     localeError: error39()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10851,8 +10785,6 @@ function ota_default() {
     localeError: error40()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -10971,8 +10903,6 @@ function ps_default() {
     localeError: error41()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -11086,8 +11016,6 @@ function pl_default() {
     localeError: error42()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11230,8 +11158,6 @@ function pt_default() {
     localeError: error43()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11375,8 +11301,6 @@ function pt_BR_default() {
     localeError: error44()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -11498,8 +11422,6 @@ function ro_default() {
     localeError: error45()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11667,8 +11589,6 @@ function ru_default() {
     localeError: error46()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -11784,8 +11704,6 @@ function sk_default() {
     localeError: error47()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -11899,8 +11817,6 @@ function sl_default() {
     localeError: error48()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -12015,8 +11931,6 @@ function sv_default() {
     localeError: error49()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -12131,8 +12045,6 @@ function ta_default() {
     localeError: error50()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -12248,8 +12160,6 @@ function tg_default() {
     localeError: error51()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -12364,8 +12274,6 @@ function th_default() {
     localeError: error52()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -12472,8 +12380,6 @@ function tk_default() {
     localeError: error53()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -12583,8 +12489,6 @@ function tr_default() {
     localeError: error54()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -12697,13 +12601,9 @@ function uk_default() {
     localeError: error55()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -12818,8 +12718,6 @@ function ur_default() {
     localeError: error56()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -12932,8 +12830,6 @@ function uz_default() {
     localeError: error57()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -13046,8 +12942,6 @@ function vi_default() {
     localeError: error58()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -13161,8 +13055,6 @@ function zh_CN_default() {
     localeError: error59()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -13274,8 +13166,6 @@ function zh_TW_default() {
     localeError: error60()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -13387,8 +13277,6 @@ function yo_default() {
     localeError: error61()
   };
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -13437,10 +13325,8 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/compile.js
-var INVALID = Symbol.for("zod.compile.invalid");
-var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
+var INVALID = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
+var FALLBACK_FLAG = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
   constructor(message = "z.compile does not support async refinements, transforms, or checks") {
     super(message);
@@ -15039,8 +14925,6 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   }
   return accessor;
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -16098,8 +15982,6 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   const inst = new Class2(def);
   return inst;
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target2, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -16628,8 +16510,6 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -17220,7 +17100,7 @@ var nonoptionalProcessor = (schema, ctx, _json, params) => {
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
-var UNREPRESENTABLE_DEFAULT = Symbol();
+var UNREPRESENTABLE_DEFAULT = /* @__PURE__ */ Symbol();
 function serializeDefaultValue(value, schema, ctx, json2, params) {
   let unrepresentable = false;
   const serialized = JSON.stringify(value, (_, val) => {
@@ -17376,8 +17256,6 @@ function toJSONSchema(input2, params) {
   extractDefs(ctx, input2);
   return finalize(ctx, input2);
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -17454,11 +17332,7 @@ var JSONSchemaGenerator = class {
     return plainResult;
   }
 };
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -17638,8 +17512,6 @@ __export(schemas_exports2, {
   xid: () => xid2,
   xor: () => xor
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -17673,8 +17545,6 @@ __export(checks_exports2, {
   trim: () => _trim,
   uppercase: () => _uppercase
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -17719,8 +17589,6 @@ var ZodError = /* @__PURE__ */ $constructor("ZodError", initializer2);
 var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, void 0, {
   Parent: Error
 });
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -17733,8 +17601,6 @@ var safeEncode2 = /* @__PURE__ */ _safeEncode(ZodRealError);
 var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -17779,7 +17645,7 @@ var ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
     return this.check(superRefine(refinement, params));
   },
   overwrite(fn) {
-    return this.check(_overwrite(fn));
+    return this.check(/* @__PURE__ */ _overwrite(fn));
   },
   optional() {
     return optional(this);
@@ -17931,49 +17797,49 @@ var _ZodString = /* @__PURE__ */ $constructor(
     maxLength: (inst) => aggregateChecks(inst).maximum ?? null
   }, {
     regex(...args) {
-      return this.check(_regex(...args));
+      return this.check(/* @__PURE__ */ _regex(...args));
     },
     includes(...args) {
-      return this.check(_includes(...args));
+      return this.check(/* @__PURE__ */ _includes(...args));
     },
     startsWith(...args) {
-      return this.check(_startsWith(...args));
+      return this.check(/* @__PURE__ */ _startsWith(...args));
     },
     endsWith(...args) {
-      return this.check(_endsWith(...args));
+      return this.check(/* @__PURE__ */ _endsWith(...args));
     },
     min(...args) {
-      return this.check(_minLength(...args));
+      return this.check(/* @__PURE__ */ _minLength(...args));
     },
     max(...args) {
-      return this.check(_maxLength(...args));
+      return this.check(/* @__PURE__ */ _maxLength(...args));
     },
     length(...args) {
-      return this.check(_length(...args));
+      return this.check(/* @__PURE__ */ _length(...args));
     },
     nonempty(...args) {
-      return this.check(_minLength(1, ...args));
+      return this.check(/* @__PURE__ */ _minLength(1, ...args));
     },
     lowercase(params) {
-      return this.check(_lowercase(params));
+      return this.check(/* @__PURE__ */ _lowercase(params));
     },
     uppercase(params) {
-      return this.check(_uppercase(params));
+      return this.check(/* @__PURE__ */ _uppercase(params));
     },
     trim() {
-      return this.check(_trim());
+      return this.check(/* @__PURE__ */ _trim());
     },
     normalize(...args) {
-      return this.check(_normalize(...args));
+      return this.check(/* @__PURE__ */ _normalize(...args));
     },
     toLowerCase() {
-      return this.check(_toLowerCase());
+      return this.check(/* @__PURE__ */ _toLowerCase());
     },
     toUpperCase() {
-      return this.check(_toUpperCase());
+      return this.check(/* @__PURE__ */ _toUpperCase());
     },
     slugify() {
-      return this.check(_slugify());
+      return this.check(/* @__PURE__ */ _slugify());
     }
   })
 );
@@ -17982,86 +17848,86 @@ var ZodString = /* @__PURE__ */ $constructor("ZodString", (inst, def) => {
   _ZodString.init(inst, def);
 }, {
   email(params) {
-    return this.check(_email(ZodEmail, params));
+    return this.check(/* @__PURE__ */ _email(ZodEmail, params));
   },
   url(params) {
-    return this.check(_url(ZodURL, params));
+    return this.check(/* @__PURE__ */ _url(ZodURL, params));
   },
   jwt(params) {
-    return this.check(_jwt(ZodJWT, params));
+    return this.check(/* @__PURE__ */ _jwt(ZodJWT, params));
   },
   emoji(params) {
-    return this.check(_emoji2(ZodEmoji, params));
+    return this.check(/* @__PURE__ */ _emoji2(ZodEmoji, params));
   },
   guid(params) {
-    return this.check(_guid(ZodGUID, params));
+    return this.check(/* @__PURE__ */ _guid(ZodGUID, params));
   },
   uuid(params) {
-    return this.check(_uuid(ZodUUID, params));
+    return this.check(/* @__PURE__ */ _uuid(ZodUUID, params));
   },
   uuidv4(params) {
-    return this.check(_uuidv4(ZodUUID, params));
+    return this.check(/* @__PURE__ */ _uuidv4(ZodUUID, params));
   },
   uuidv6(params) {
-    return this.check(_uuidv6(ZodUUID, params));
+    return this.check(/* @__PURE__ */ _uuidv6(ZodUUID, params));
   },
   uuidv7(params) {
-    return this.check(_uuidv7(ZodUUID, params));
+    return this.check(/* @__PURE__ */ _uuidv7(ZodUUID, params));
   },
   nanoid(params) {
-    return this.check(_nanoid(ZodNanoID, params));
+    return this.check(/* @__PURE__ */ _nanoid(ZodNanoID, params));
   },
   cuid(params) {
-    return this.check(_cuid(ZodCUID, params));
+    return this.check(/* @__PURE__ */ _cuid(ZodCUID, params));
   },
   cuid2(params) {
-    return this.check(_cuid2(ZodCUID2, params));
+    return this.check(/* @__PURE__ */ _cuid2(ZodCUID2, params));
   },
   ulid(params) {
-    return this.check(_ulid(ZodULID, params));
+    return this.check(/* @__PURE__ */ _ulid(ZodULID, params));
   },
   base64(params) {
-    return this.check(_base64(ZodBase64, params));
+    return this.check(/* @__PURE__ */ _base64(ZodBase64, params));
   },
   base64url(params) {
-    return this.check(_base64url(ZodBase64URL, params));
+    return this.check(/* @__PURE__ */ _base64url(ZodBase64URL, params));
   },
   xid(params) {
-    return this.check(_xid(ZodXID, params));
+    return this.check(/* @__PURE__ */ _xid(ZodXID, params));
   },
   ksuid(params) {
-    return this.check(_ksuid(ZodKSUID, params));
+    return this.check(/* @__PURE__ */ _ksuid(ZodKSUID, params));
   },
   ipv4(params) {
-    return this.check(_ipv4(ZodIPv4, params));
+    return this.check(/* @__PURE__ */ _ipv4(ZodIPv4, params));
   },
   ipv6(params) {
-    return this.check(_ipv6(ZodIPv6, params));
+    return this.check(/* @__PURE__ */ _ipv6(ZodIPv6, params));
   },
   cidrv4(params) {
-    return this.check(_cidrv4(ZodCIDRv4, params));
+    return this.check(/* @__PURE__ */ _cidrv4(ZodCIDRv4, params));
   },
   cidrv6(params) {
-    return this.check(_cidrv6(ZodCIDRv6, params));
+    return this.check(/* @__PURE__ */ _cidrv6(ZodCIDRv6, params));
   },
   e164(params) {
-    return this.check(_e164(ZodE164, params));
+    return this.check(/* @__PURE__ */ _e164(ZodE164, params));
   },
   datetime(params) {
-    return this.check(_isoDateTime(ZodISODateTime, params));
+    return this.check(/* @__PURE__ */ _isoDateTime(ZodISODateTime, params));
   },
   date(params) {
-    return this.check(_isoDate(ZodISODate, params));
+    return this.check(/* @__PURE__ */ _isoDate(ZodISODate, params));
   },
   time(params) {
-    return this.check(_isoTime(ZodISOTime, params));
+    return this.check(/* @__PURE__ */ _isoTime(ZodISOTime, params));
   },
   duration(params) {
-    return this.check(_isoDuration(ZodISODuration, params));
+    return this.check(/* @__PURE__ */ _isoDuration(ZodISODuration, params));
   }
 });
 function string2(params) {
-  return _string(ZodString, params);
+  return /* @__PURE__ */ _string(ZodString, params);
 }
 var ZodStringFormat = /* @__PURE__ */ $constructor("ZodStringFormat", (inst, def) => {
   $ZodStringFormat.init(inst, def);
@@ -18088,40 +17954,40 @@ var ZodEmail = /* @__PURE__ */ $constructor("ZodEmail", (inst, def) => {
   ZodStringFormat.init(inst, def);
 });
 function email2(params) {
-  return _email(ZodEmail, params);
+  return /* @__PURE__ */ _email(ZodEmail, params);
 }
 var ZodGUID = /* @__PURE__ */ $constructor("ZodGUID", (inst, def) => {
   $ZodGUID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function guid2(params) {
-  return _guid(ZodGUID, params);
+  return /* @__PURE__ */ _guid(ZodGUID, params);
 }
 var ZodUUID = /* @__PURE__ */ $constructor("ZodUUID", (inst, def) => {
   $ZodUUID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function uuid2(params) {
-  return _uuid(ZodUUID, params);
+  return /* @__PURE__ */ _uuid(ZodUUID, params);
 }
 function uuidv4(params) {
-  return _uuidv4(ZodUUID, params);
+  return /* @__PURE__ */ _uuidv4(ZodUUID, params);
 }
 function uuidv6(params) {
-  return _uuidv6(ZodUUID, params);
+  return /* @__PURE__ */ _uuidv6(ZodUUID, params);
 }
 function uuidv7(params) {
-  return _uuidv7(ZodUUID, params);
+  return /* @__PURE__ */ _uuidv7(ZodUUID, params);
 }
 var ZodURL = /* @__PURE__ */ $constructor("ZodURL", (inst, def) => {
   $ZodURL.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function url(params) {
-  return _url(ZodURL, params);
+  return /* @__PURE__ */ _url(ZodURL, params);
 }
 function httpUrl(params) {
-  return _url(ZodURL, {
+  return /* @__PURE__ */ _url(ZodURL, {
     protocol: httpProtocol,
     hostname: domain,
     ...util_exports.normalizeParams(params)
@@ -18132,142 +17998,142 @@ var ZodEmoji = /* @__PURE__ */ $constructor("ZodEmoji", (inst, def) => {
   ZodStringFormat.init(inst, def);
 });
 function emoji2(params) {
-  return _emoji2(ZodEmoji, params);
+  return /* @__PURE__ */ _emoji2(ZodEmoji, params);
 }
 var ZodNanoID = /* @__PURE__ */ $constructor("ZodNanoID", (inst, def) => {
   $ZodNanoID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function nanoid2(params) {
-  return _nanoid(ZodNanoID, params);
+  return /* @__PURE__ */ _nanoid(ZodNanoID, params);
 }
 var ZodCUID = /* @__PURE__ */ $constructor("ZodCUID", (inst, def) => {
   $ZodCUID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function cuid3(params) {
-  return _cuid(ZodCUID, params);
+  return /* @__PURE__ */ _cuid(ZodCUID, params);
 }
 var ZodCUID2 = /* @__PURE__ */ $constructor("ZodCUID2", (inst, def) => {
   $ZodCUID2.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function cuid22(params) {
-  return _cuid2(ZodCUID2, params);
+  return /* @__PURE__ */ _cuid2(ZodCUID2, params);
 }
 var ZodULID = /* @__PURE__ */ $constructor("ZodULID", (inst, def) => {
   $ZodULID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function ulid2(params) {
-  return _ulid(ZodULID, params);
+  return /* @__PURE__ */ _ulid(ZodULID, params);
 }
 var ZodXID = /* @__PURE__ */ $constructor("ZodXID", (inst, def) => {
   $ZodXID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function xid2(params) {
-  return _xid(ZodXID, params);
+  return /* @__PURE__ */ _xid(ZodXID, params);
 }
 var ZodKSUID = /* @__PURE__ */ $constructor("ZodKSUID", (inst, def) => {
   $ZodKSUID.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function ksuid2(params) {
-  return _ksuid(ZodKSUID, params);
+  return /* @__PURE__ */ _ksuid(ZodKSUID, params);
 }
 var ZodIPv4 = /* @__PURE__ */ $constructor("ZodIPv4", (inst, def) => {
   $ZodIPv4.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function ipv42(params) {
-  return _ipv4(ZodIPv4, params);
+  return /* @__PURE__ */ _ipv4(ZodIPv4, params);
 }
 var ZodMAC = /* @__PURE__ */ $constructor("ZodMAC", (inst, def) => {
   $ZodMAC.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function mac2(params) {
-  return _mac(ZodMAC, params);
+  return /* @__PURE__ */ _mac(ZodMAC, params);
 }
 var ZodIPv6 = /* @__PURE__ */ $constructor("ZodIPv6", (inst, def) => {
   $ZodIPv6.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function ipv62(params) {
-  return _ipv6(ZodIPv6, params);
+  return /* @__PURE__ */ _ipv6(ZodIPv6, params);
 }
 var ZodCIDRv4 = /* @__PURE__ */ $constructor("ZodCIDRv4", (inst, def) => {
   $ZodCIDRv4.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function cidrv42(params) {
-  return _cidrv4(ZodCIDRv4, params);
+  return /* @__PURE__ */ _cidrv4(ZodCIDRv4, params);
 }
 var ZodCIDRv6 = /* @__PURE__ */ $constructor("ZodCIDRv6", (inst, def) => {
   $ZodCIDRv6.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function cidrv62(params) {
-  return _cidrv6(ZodCIDRv6, params);
+  return /* @__PURE__ */ _cidrv6(ZodCIDRv6, params);
 }
 var ZodBase64 = /* @__PURE__ */ $constructor("ZodBase64", (inst, def) => {
   $ZodBase64.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function base642(params) {
-  return _base64(ZodBase64, params);
+  return /* @__PURE__ */ _base64(ZodBase64, params);
 }
 var ZodBase64URL = /* @__PURE__ */ $constructor("ZodBase64URL", (inst, def) => {
   $ZodBase64URL.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function base64url2(params) {
-  return _base64url(ZodBase64URL, params);
+  return /* @__PURE__ */ _base64url(ZodBase64URL, params);
 }
 var ZodE164 = /* @__PURE__ */ $constructor("ZodE164", (inst, def) => {
   $ZodE164.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function e1642(params) {
-  return _e164(ZodE164, params);
+  return /* @__PURE__ */ _e164(ZodE164, params);
 }
 var ZodCreditCard = /* @__PURE__ */ $constructor("ZodCreditCard", (inst, def) => {
   $ZodCreditCard.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function creditCard2(params) {
-  return _creditCard(ZodCreditCard, params);
+  return /* @__PURE__ */ _creditCard(ZodCreditCard, params);
 }
 var ZodIBAN = /* @__PURE__ */ $constructor("ZodIBAN", (inst, def) => {
   $ZodIBAN.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function iban2(params) {
-  return _iban(ZodIBAN, params);
+  return /* @__PURE__ */ _iban(ZodIBAN, params);
 }
 var ZodJWT = /* @__PURE__ */ $constructor("ZodJWT", (inst, def) => {
   $ZodJWT.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function jwt(params) {
-  return _jwt(ZodJWT, params);
+  return /* @__PURE__ */ _jwt(ZodJWT, params);
 }
 var ZodCustomStringFormat = /* @__PURE__ */ $constructor("ZodCustomStringFormat", (inst, def) => {
   $ZodCustomStringFormat.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
 function stringFormat(format, fnOrRegex, _params = {}) {
-  return _stringFormat(ZodCustomStringFormat, format, fnOrRegex, _params);
+  return /* @__PURE__ */ _stringFormat(ZodCustomStringFormat, format, fnOrRegex, _params);
 }
 function hostname2(_params) {
-  return _stringFormat(ZodCustomStringFormat, "hostname", hostname, _params);
+  return /* @__PURE__ */ _stringFormat(ZodCustomStringFormat, "hostname", hostname, _params);
 }
 function hex2(_params) {
-  return _stringFormat(ZodCustomStringFormat, "hex", hex, _params);
+  return /* @__PURE__ */ _stringFormat(ZodCustomStringFormat, "hex", hex, _params);
 }
 function currencyCode2(_params) {
-  return _stringFormat(ZodCustomStringFormat, "currency_code", currencyCode, _params);
+  return /* @__PURE__ */ _stringFormat(ZodCustomStringFormat, "currency_code", currencyCode, _params);
 }
 function hash(alg, params) {
   const enc = params?.enc ?? "hex";
@@ -18275,7 +18141,7 @@ function hash(alg, params) {
   const regex = regexes_exports[format];
   if (!regex)
     throw new Error(`Unrecognized hash format: ${format}`);
-  return _stringFormat(ZodCustomStringFormat, format, regex, params);
+  return /* @__PURE__ */ _stringFormat(ZodCustomStringFormat, format, regex, params);
 }
 var ZodNumber = /* @__PURE__ */ $constructor(
   "ZodNumber",
@@ -18301,22 +18167,22 @@ var ZodNumber = /* @__PURE__ */ $constructor(
     format: (inst) => aggregateChecks(inst).format ?? null
   }, {
     gt(value, params) {
-      return this.check(_gt(value, params));
+      return this.check(/* @__PURE__ */ _gt(value, params));
     },
     gte(value, params) {
-      return this.check(_gte(value, params));
+      return this.check(/* @__PURE__ */ _gte(value, params));
     },
     min(value, params) {
-      return this.check(_gte(value, params));
+      return this.check(/* @__PURE__ */ _gte(value, params));
     },
     lt(value, params) {
-      return this.check(_lt(value, params));
+      return this.check(/* @__PURE__ */ _lt(value, params));
     },
     lte(value, params) {
-      return this.check(_lte(value, params));
+      return this.check(/* @__PURE__ */ _lte(value, params));
     },
     max(value, params) {
-      return this.check(_lte(value, params));
+      return this.check(/* @__PURE__ */ _lte(value, params));
     },
     int(params) {
       return this.check(int(params));
@@ -18325,22 +18191,22 @@ var ZodNumber = /* @__PURE__ */ $constructor(
       return this.check(int(params));
     },
     positive(params) {
-      return this.check(_gt(0, params));
+      return this.check(/* @__PURE__ */ _gt(0, params));
     },
     nonnegative(params) {
-      return this.check(_gte(0, params));
+      return this.check(/* @__PURE__ */ _gte(0, params));
     },
     negative(params) {
-      return this.check(_lt(0, params));
+      return this.check(/* @__PURE__ */ _lt(0, params));
     },
     nonpositive(params) {
-      return this.check(_lte(0, params));
+      return this.check(/* @__PURE__ */ _lte(0, params));
     },
     multipleOf(value, params) {
-      return this.check(_multipleOf(value, params));
+      return this.check(/* @__PURE__ */ _multipleOf(value, params));
     },
     step(value, params) {
-      return this.check(_multipleOf(value, params));
+      return this.check(/* @__PURE__ */ _multipleOf(value, params));
     },
     finite() {
       return this;
@@ -18348,26 +18214,26 @@ var ZodNumber = /* @__PURE__ */ $constructor(
   })
 );
 function number2(params) {
-  return _number(ZodNumber, params);
+  return /* @__PURE__ */ _number(ZodNumber, params);
 }
 var ZodNumberFormat = /* @__PURE__ */ $constructor("ZodNumberFormat", (inst, def) => {
   $ZodNumberFormat.init(inst, def);
   ZodNumber.init(inst, def);
 });
 function int(params) {
-  return _int(ZodNumberFormat, params);
+  return /* @__PURE__ */ _int(ZodNumberFormat, params);
 }
 function float32(params) {
-  return _float32(ZodNumberFormat, params);
+  return /* @__PURE__ */ _float32(ZodNumberFormat, params);
 }
 function float64(params) {
-  return _float64(ZodNumberFormat, params);
+  return /* @__PURE__ */ _float64(ZodNumberFormat, params);
 }
 function int32(params) {
-  return _int32(ZodNumberFormat, params);
+  return /* @__PURE__ */ _int32(ZodNumberFormat, params);
 }
 function uint32(params) {
-  return _uint32(ZodNumberFormat, params);
+  return /* @__PURE__ */ _uint32(ZodNumberFormat, params);
 }
 var ZodBoolean = /* @__PURE__ */ $constructor("ZodBoolean", (inst, def) => {
   $ZodBoolean.init(inst, def);
@@ -18375,7 +18241,7 @@ var ZodBoolean = /* @__PURE__ */ $constructor("ZodBoolean", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => booleanProcessor(inst, ctx, json2, params);
 });
 function boolean2(params) {
-  return _boolean(ZodBoolean, params);
+  return /* @__PURE__ */ _boolean(ZodBoolean, params);
 }
 var ZodBigInt = /* @__PURE__ */ $constructor(
   "ZodBigInt",
@@ -18390,52 +18256,52 @@ var ZodBigInt = /* @__PURE__ */ $constructor(
     format: (inst) => aggregateChecks(inst).format ?? null
   }, {
     gte(value, params) {
-      return this.check(_gte(value, params));
+      return this.check(/* @__PURE__ */ _gte(value, params));
     },
     min(value, params) {
-      return this.check(_gte(value, params));
+      return this.check(/* @__PURE__ */ _gte(value, params));
     },
     gt(value, params) {
-      return this.check(_gt(value, params));
+      return this.check(/* @__PURE__ */ _gt(value, params));
     },
     lt(value, params) {
-      return this.check(_lt(value, params));
+      return this.check(/* @__PURE__ */ _lt(value, params));
     },
     lte(value, params) {
-      return this.check(_lte(value, params));
+      return this.check(/* @__PURE__ */ _lte(value, params));
     },
     max(value, params) {
-      return this.check(_lte(value, params));
+      return this.check(/* @__PURE__ */ _lte(value, params));
     },
     positive(params) {
-      return this.check(_gt(BigInt(0), params));
+      return this.check(/* @__PURE__ */ _gt(BigInt(0), params));
     },
     negative(params) {
-      return this.check(_lt(BigInt(0), params));
+      return this.check(/* @__PURE__ */ _lt(BigInt(0), params));
     },
     nonpositive(params) {
-      return this.check(_lte(BigInt(0), params));
+      return this.check(/* @__PURE__ */ _lte(BigInt(0), params));
     },
     nonnegative(params) {
-      return this.check(_gte(BigInt(0), params));
+      return this.check(/* @__PURE__ */ _gte(BigInt(0), params));
     },
     multipleOf(value, params) {
-      return this.check(_multipleOf(value, params));
+      return this.check(/* @__PURE__ */ _multipleOf(value, params));
     }
   })
 );
 function bigint2(params) {
-  return _bigint(ZodBigInt, params);
+  return /* @__PURE__ */ _bigint(ZodBigInt, params);
 }
 var ZodBigIntFormat = /* @__PURE__ */ $constructor("ZodBigIntFormat", (inst, def) => {
   $ZodBigIntFormat.init(inst, def);
   ZodBigInt.init(inst, def);
 });
 function int64(params) {
-  return _int64(ZodBigIntFormat, params);
+  return /* @__PURE__ */ _int64(ZodBigIntFormat, params);
 }
 function uint64(params) {
-  return _uint64(ZodBigIntFormat, params);
+  return /* @__PURE__ */ _uint64(ZodBigIntFormat, params);
 }
 var ZodSymbol = /* @__PURE__ */ $constructor("ZodSymbol", (inst, def) => {
   $ZodSymbol.init(inst, def);
@@ -18443,7 +18309,7 @@ var ZodSymbol = /* @__PURE__ */ $constructor("ZodSymbol", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => symbolProcessor(inst, ctx, json2, params);
 });
 function symbol(params) {
-  return _symbol(ZodSymbol, params);
+  return /* @__PURE__ */ _symbol(ZodSymbol, params);
 }
 var ZodUndefined = /* @__PURE__ */ $constructor("ZodUndefined", (inst, def) => {
   $ZodUndefined.init(inst, def);
@@ -18451,7 +18317,7 @@ var ZodUndefined = /* @__PURE__ */ $constructor("ZodUndefined", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => undefinedProcessor(inst, ctx, json2, params);
 });
 function _undefined3(params) {
-  return _undefined2(ZodUndefined, params);
+  return /* @__PURE__ */ _undefined2(ZodUndefined, params);
 }
 var ZodNull = /* @__PURE__ */ $constructor("ZodNull", (inst, def) => {
   $ZodNull.init(inst, def);
@@ -18459,7 +18325,7 @@ var ZodNull = /* @__PURE__ */ $constructor("ZodNull", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => nullProcessor(inst, ctx, json2, params);
 });
 function _null3(params) {
-  return _null2(ZodNull, params);
+  return /* @__PURE__ */ _null2(ZodNull, params);
 }
 var ZodAny = /* @__PURE__ */ $constructor("ZodAny", (inst, def) => {
   $ZodAny.init(inst, def);
@@ -18467,7 +18333,7 @@ var ZodAny = /* @__PURE__ */ $constructor("ZodAny", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => anyProcessor(inst, ctx, json2, params);
 });
 function any() {
-  return _any(ZodAny);
+  return /* @__PURE__ */ _any(ZodAny);
 }
 var ZodUnknown = /* @__PURE__ */ $constructor("ZodUnknown", (inst, def) => {
   $ZodUnknown.init(inst, def);
@@ -18475,7 +18341,7 @@ var ZodUnknown = /* @__PURE__ */ $constructor("ZodUnknown", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => unknownProcessor(inst, ctx, json2, params);
 });
 function unknown() {
-  return _unknown(ZodUnknown);
+  return /* @__PURE__ */ _unknown(ZodUnknown);
 }
 var ZodNever = /* @__PURE__ */ $constructor("ZodNever", (inst, def) => {
   $ZodNever.init(inst, def);
@@ -18483,7 +18349,7 @@ var ZodNever = /* @__PURE__ */ $constructor("ZodNever", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => neverProcessor(inst, ctx, json2, params);
 });
 function never(params) {
-  return _never(ZodNever, params);
+  return /* @__PURE__ */ _never(ZodNever, params);
 }
 var ZodVoid = /* @__PURE__ */ $constructor("ZodVoid", (inst, def) => {
   $ZodVoid.init(inst, def);
@@ -18491,7 +18357,7 @@ var ZodVoid = /* @__PURE__ */ $constructor("ZodVoid", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => voidProcessor(inst, ctx, json2, params);
 });
 function _void2(params) {
-  return _void(ZodVoid, params);
+  return /* @__PURE__ */ _void(ZodVoid, params);
 }
 var ZodDate = /* @__PURE__ */ $constructor(
   "ZodDate",
@@ -18499,8 +18365,8 @@ var ZodDate = /* @__PURE__ */ $constructor(
     $ZodDate.init(inst, def);
     ZodType.init(inst, def);
     inst._zod.processJSONSchema = (ctx, json2, params) => dateProcessor(inst, ctx, json2, params);
-    inst.min = (value, params) => inst.check(_gte(value, params));
-    inst.max = (value, params) => inst.check(_lte(value, params));
+    inst.min = (value, params) => inst.check(/* @__PURE__ */ _gte(value, params));
+    inst.max = (value, params) => inst.check(/* @__PURE__ */ _lte(value, params));
   },
   /* @__PURE__ */ util_exports.derived({
     minDate: (inst) => {
@@ -18514,7 +18380,7 @@ var ZodDate = /* @__PURE__ */ $constructor(
   }, {})
 );
 function date2(params) {
-  return _date(ZodDate, params);
+  return /* @__PURE__ */ _date(ZodDate, params);
 }
 var ZodArray = /* @__PURE__ */ $constructor("ZodArray", (inst, def) => {
   _ensureDefaultMemoizer();
@@ -18524,23 +18390,23 @@ var ZodArray = /* @__PURE__ */ $constructor("ZodArray", (inst, def) => {
   inst.element = def.element;
 }, {
   min(n, params) {
-    return this.check(_minLength(n, params));
+    return this.check(/* @__PURE__ */ _minLength(n, params));
   },
   nonempty(params) {
-    return this.check(_minLength(1, params));
+    return this.check(/* @__PURE__ */ _minLength(1, params));
   },
   max(n, params) {
-    return this.check(_maxLength(n, params));
+    return this.check(/* @__PURE__ */ _maxLength(n, params));
   },
   length(n, params) {
-    return this.check(_length(n, params));
+    return this.check(/* @__PURE__ */ _length(n, params));
   },
   unwrap() {
     return this.element;
   }
 });
 function array(element, params) {
-  return _array(ZodArray, element, params);
+  return /* @__PURE__ */ _array(ZodArray, element, params);
 }
 function keyof(schema) {
   const shape = schema._zod.def.shape;
@@ -18753,10 +18619,10 @@ var ZodMap = /* @__PURE__ */ $constructor("ZodMap", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => mapProcessor(inst, ctx, json2, params);
   inst.keyType = def.keyType;
   inst.valueType = def.valueType;
-  inst.min = (...args) => inst.check(_minSize(...args));
-  inst.nonempty = (params) => inst.check(_minSize(1, params));
-  inst.max = (...args) => inst.check(_maxSize(...args));
-  inst.size = (...args) => inst.check(_size(...args));
+  inst.min = (...args) => inst.check(/* @__PURE__ */ _minSize(...args));
+  inst.nonempty = (params) => inst.check(/* @__PURE__ */ _minSize(1, params));
+  inst.max = (...args) => inst.check(/* @__PURE__ */ _maxSize(...args));
+  inst.size = (...args) => inst.check(/* @__PURE__ */ _size(...args));
 });
 function map(keyType, valueType, params) {
   return new ZodMap({
@@ -18771,10 +18637,10 @@ var ZodSet = /* @__PURE__ */ $constructor("ZodSet", (inst, def) => {
   $ZodSet.init(inst, def);
   ZodType.init(inst, def);
   inst._zod.processJSONSchema = (ctx, json2, params) => setProcessor(inst, ctx, json2, params);
-  inst.min = (...args) => inst.check(_minSize(...args));
-  inst.nonempty = (params) => inst.check(_minSize(1, params));
-  inst.max = (...args) => inst.check(_maxSize(...args));
-  inst.size = (...args) => inst.check(_size(...args));
+  inst.min = (...args) => inst.check(/* @__PURE__ */ _minSize(...args));
+  inst.nonempty = (params) => inst.check(/* @__PURE__ */ _minSize(1, params));
+  inst.max = (...args) => inst.check(/* @__PURE__ */ _maxSize(...args));
+  inst.size = (...args) => inst.check(/* @__PURE__ */ _size(...args));
 });
 function set(valueType, params) {
   return new ZodSet({
@@ -18861,12 +18727,12 @@ var ZodFile = /* @__PURE__ */ $constructor("ZodFile", (inst, def) => {
   $ZodFile.init(inst, def);
   ZodType.init(inst, def);
   inst._zod.processJSONSchema = (ctx, json2, params) => fileProcessor(inst, ctx, json2, params);
-  inst.min = (size, params) => inst.check(_minSize(size, params));
-  inst.max = (size, params) => inst.check(_maxSize(size, params));
-  inst.mime = (types, params) => inst.check(_mime(Array.isArray(types) ? types : [types], params));
+  inst.min = (size, params) => inst.check(/* @__PURE__ */ _minSize(size, params));
+  inst.max = (size, params) => inst.check(/* @__PURE__ */ _maxSize(size, params));
+  inst.mime = (types, params) => inst.check(/* @__PURE__ */ _mime(Array.isArray(types) ? types : [types], params));
 });
 function file(params) {
-  return _file(ZodFile, params);
+  return /* @__PURE__ */ _file(ZodFile, params);
 }
 var ZodTransform = /* @__PURE__ */ $constructor("ZodTransform", (inst, def) => {
   _ensureDefaultMemoizer();
@@ -19023,7 +18889,7 @@ var ZodNaN = /* @__PURE__ */ $constructor("ZodNaN", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => nanProcessor(inst, ctx, json2, params);
 });
 function nan(params) {
-  return _nan(ZodNaN, params);
+  return /* @__PURE__ */ _nan(ZodNaN, params);
 }
 var ZodPipe = /* @__PURE__ */ $constructor("ZodPipe", (inst, def) => {
   $ZodPipe.init(inst, def);
@@ -19141,13 +19007,13 @@ function check(fn) {
   return ch;
 }
 function custom(fn, _params) {
-  return _custom(ZodCustom, fn ?? (() => true), _params);
+  return /* @__PURE__ */ _custom(ZodCustom, fn ?? (() => true), _params);
 }
 function refine(fn, _params = {}) {
-  return _refine(ZodCustom, fn, _params);
+  return /* @__PURE__ */ _refine(ZodCustom, fn, _params);
 }
 function superRefine(fn, params) {
-  return _superRefine(fn, params);
+  return /* @__PURE__ */ _superRefine(fn, params);
 }
 var describe2 = describe;
 var meta2 = meta;
@@ -19155,7 +19021,7 @@ var ZodInstanceOf = /* @__PURE__ */ $constructor("ZodInstanceOf", (inst, def) =>
   ZodCustom.init(inst, def);
 }, {
   properties(shape, params) {
-    return this.check(_properties(shape, params));
+    return this.check(/* @__PURE__ */ _properties(shape, params));
   }
 });
 function _instanceof(cls, params = {}) {
@@ -19180,7 +19046,7 @@ function _instanceof(cls, params = {}) {
   };
   return inst;
 }
-var stringbool = (...args) => _stringbool({
+var stringbool = (...args) => /* @__PURE__ */ _stringbool({
   Codec: ZodCodec,
   Boolean: ZodBoolean,
   String: ZodString
@@ -19198,8 +19064,6 @@ function preprocess(fn, schema) {
     out: schema
   });
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -19224,8 +19088,6 @@ function getErrorMap() {
 var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19238,19 +19100,17 @@ __export(iso_exports, {
   time: () => time2
 });
 function datetime2(params) {
-  return _isoDateTime(ZodISODateTime, params);
+  return /* @__PURE__ */ _isoDateTime(ZodISODateTime, params);
 }
 function date3(params) {
-  return _isoDate(ZodISODate, params);
+  return /* @__PURE__ */ _isoDate(ZodISODate, params);
 }
 function time2(params) {
-  return _isoTime(ZodISOTime, params);
+  return /* @__PURE__ */ _isoTime(ZodISOTime, params);
 }
 function duration2(params) {
-  return _isoDuration(ZodISODuration, params);
+  return /* @__PURE__ */ _isoDuration(ZodISODuration, params);
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -19982,9 +19842,7 @@ function fromJSONSchema(schema, params) {
   };
   return convertSchema(normalized, ctx);
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/visit.js
-var RESOLVING = Symbol("z.visit/resolving");
+var RESOLVING = /* @__PURE__ */ Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
     const h = fnOrHandlers[node2._zod.def.type];
@@ -20137,8 +19995,6 @@ function visit(schema, fnOrHandlers) {
   }
   return run(schema);
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -20149,8 +20005,6 @@ function deepPartial(schema) {
     }
   });
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -20179,8 +20033,6 @@ function output(schema) {
     prefault: (s, rewritten) => rewritten ? s._zod.def.innerType : s
   });
 }
-
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -20190,30 +20042,26 @@ __export(coerce_exports, {
   string: () => string3
 });
 function string3(params) {
-  return _coercedString(ZodString, params);
+  return /* @__PURE__ */ _coercedString(ZodString, params);
 }
 function number3(params) {
-  return _coercedNumber(ZodNumber, params);
+  return /* @__PURE__ */ _coercedNumber(ZodNumber, params);
 }
 function boolean3(params) {
-  return _coercedBoolean(ZodBoolean, params);
+  return /* @__PURE__ */ _coercedBoolean(ZodBoolean, params);
 }
 function bigint3(params) {
-  return _coercedBigint(ZodBigInt, params);
+  return /* @__PURE__ */ _coercedBigint(ZodBigInt, params);
 }
 function date4(params) {
-  return _coercedDate(ZodDate, params);
+  return /* @__PURE__ */ _coercedDate(ZodDate, params);
 }
-
-// ../../../zana/packages/domain/src/bb-thread/active-thinking.ts
 var activeThinkingSchema = external_exports.object({
   id: external_exports.string(),
   text: external_exports.string(),
   startedAt: external_exports.number(),
   updatedAt: external_exports.number()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/shared-types.ts
 var reasoningLevelValues = [
   "none",
   "low",
@@ -20582,8 +20430,6 @@ var projectExecutionDefaultsSchema = external_exports.object({
   reasoningLevel: reasoningLevelSchema,
   permissionMode: permissionModeSchema
 });
-
-// ../../../zana/packages/domain/src/bb-thread/acp-cli.ts
 var ACP_DEFAULT_MODEL_ID = "acp-default";
 var providerSkillRootPathSchema = external_exports.string().min(1).refine((value) => {
   const normalized = value.replaceAll("\\", "/");
@@ -20665,8 +20511,6 @@ var acpPermissionCliSchema = external_exports.object({
     });
   }
 });
-
-// ../../../zana/packages/domain/src/bb-thread/app-settings.ts
 var appSettingsSchema = external_exports.object({
   /** Show shortcut hints after holding Command or Control. */
   showKeyboardHints: external_exports.boolean(),
@@ -20703,8 +20547,6 @@ var appSettingsSchema = external_exports.object({
    */
   onboardingCompletedAt: external_exports.string().nullable()
 }).strict();
-
-// ../../../zana/packages/domain/src/bb-thread/app-keybindings.ts
 var THREAD_JUMP_APP_COMMAND_IDS = [
   "thread.jump.1",
   "thread.jump.2",
@@ -20841,8 +20683,6 @@ var appKeybindingOverridesSchema = external_exports.array(appKeybindingOverrideS
     seen.add(override.command);
   }
 });
-
-// ../../../zana/packages/domain/src/bb-thread/json-value.ts
 var jsonValueSchema = external_exports.lazy(
   () => external_exports.union([
     external_exports.string(),
@@ -20857,8 +20697,6 @@ var jsonObjectSchema = external_exports.record(
   external_exports.string(),
   jsonValueSchema
 );
-
-// ../../../zana/packages/domain/src/bb-thread/code-theme.ts
 var DEFAULT_CODE_THEME_DARK = "pierre-dark";
 var DEFAULT_CODE_THEME_LIGHT = "pierre-light";
 var codeThemeNameSchema = external_exports.string().min(1).max(128).regex(
@@ -20887,8 +20725,6 @@ var uiCodeThemeDeclarationSchema = external_exports.object({
   dark: external_exports.string().min(1).max(256).optional(),
   light: external_exports.string().min(1).max(256).optional()
 }).strict();
-
-// ../../../zana/packages/domain/src/bb-thread/app-theme.ts
 var builtInThemeIdSchema = external_exports.enum([
   "default",
   "nord",
@@ -20945,8 +20781,6 @@ var appThemeSelectionSchema = external_exports.object({
   themeId: external_exports.string().min(1),
   faviconColor: faviconColorPreferenceSchema
 });
-
-// ../../../zana/packages/domain/src/bb-thread/background-task.ts
 var backgroundTaskStatusValues = [
   "pending",
   "running",
@@ -21005,16 +20839,12 @@ var backgroundTaskUsageSchema = external_exports.object({
   toolUses: external_exports.number(),
   durationMs: external_exports.number()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-interaction-limits.ts
 var PLUGIN_INTERACTION_MAX_TITLE_LENGTH = 160;
 var PLUGIN_INTERACTION_MAX_PAYLOAD_BYTES = 64 * 1024;
 var PLUGIN_INTERACTION_MAX_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1e3;
 function jsonByteLength(value) {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
-
-// ../../../zana/packages/domain/src/bb-thread/item-presentation.ts
 var THREAD_EVENT_ITEM_PRESENTATION_DETAIL_MAX_LENGTH = 280;
 var threadEventItemPresentationLabelSchema = external_exports.object({
   /** Present-tense row title while the item is in flight ("Reading file"). */
@@ -21051,8 +20881,6 @@ var threadEventItemPresentationSchema = external_exports.object({
     tone: external_exports.string().min(1).optional()
   }).optional()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/provider-extension-kind.ts
 var EXTENSION_KIND_PATTERN = /^[a-z0-9-]+\/[a-z0-9-]+$/u;
 function isExtensionKind(value) {
   return EXTENSION_KIND_PATTERN.test(value);
@@ -21060,8 +20888,6 @@ function isExtensionKind(value) {
 var extensionKindSchema = external_exports.string().refine(isExtensionKind, {
   message: 'extension kinds are "<pluginId>/<name>" (lowercase letters, digits, and "-")'
 });
-
-// ../../../zana/packages/domain/src/bb-thread/pending-interactions.ts
 var pendingInteractionStatusSchema = external_exports.enum([
   "pending",
   "resolving",
@@ -21465,11 +21291,7 @@ var interactionLifecycleSchema = external_exports.union([
   pluginInteractionLifecycleSchema,
   pluginExtensionInteractionLifecycleSchema
 ]);
-
-// ../../../zana/packages/domain/src/bb-thread/protocol-ids.ts
 var clientTurnRequestIdSchema = external_exports.string().regex(/^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u);
-
-// ../../../zana/packages/domain/src/bb-thread/system-message.ts
 var systemMessageKindValues = [
   "ownership-assigned",
   "ownership-removed",
@@ -21492,8 +21314,6 @@ var systemMessageSubjectSchema = external_exports.discriminatedUnion("kind", [
     count: external_exports.number()
   })
 ]);
-
-// ../../../zana/packages/domain/src/bb-thread/thread-events.ts
 var systemEventTypeValues = [
   "client/thread/start",
   "client/turn/requested",
@@ -21697,8 +21517,6 @@ var systemProviderTurnWatchdogEventDataSchema = external_exports.object({
   providerThreadId: external_exports.string().min(1).nullable(),
   firedAt: external_exports.number().int().nonnegative()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/thread-event-scope.ts
 var threadEventScopeKindValues = ["thread", "turn"];
 var threadEventScopeKindSchema = external_exports.enum(threadEventScopeKindValues);
 var threadEventScopeSchema = external_exports.discriminatedUnion("kind", [
@@ -21885,8 +21703,6 @@ function validateThreadEventScope(args) {
   }
   return { valid: true };
 }
-
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-goal.ts
 var threadTimelineGoalStatusSchema = external_exports.enum([
   "active",
   "paused",
@@ -21902,8 +21718,6 @@ var threadTimelineGoalSchema = external_exports.object({
   tokensUsed: external_exports.number(),
   timeUsedSeconds: external_exports.number()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/provider-event.ts
 var threadEventItemStatusSchema = external_exports.enum([
   "pending",
   "completed",
@@ -22629,8 +22443,6 @@ var threadEventTypeSchema = external_exports.string().refine(
   (value) => threadEventTypeSet.has(value),
   "Invalid thread event type"
 );
-
-// ../../../zana/packages/domain/src/bb-thread/change-kinds.ts
 var THREAD_CHANGE_KINDS = [
   "thread-created",
   "thread-deleted",
@@ -22833,8 +22645,6 @@ var changedMessageLenientSchema = external_exports.discriminatedUnion("entity", 
   hostChangedMessageLenientSchema,
   systemChangedMessageLenientSchema
 ]);
-
-// ../../../zana/packages/domain/src/bb-thread/claude-task-tools.ts
 var claudeTaskToolNameValues = [
   "TaskCreate",
   "TaskGet",
@@ -22905,8 +22715,6 @@ var claudeTaskToolOutputSchema = external_exports.union([
   claudeTaskListOutputSchema,
   claudeTaskUpdateOutputSchema
 ]);
-
-// ../../../zana/packages/domain/src/bb-thread/environment.ts
 var environmentStatusValues = [
   "provisioning",
   "ready",
@@ -22955,8 +22763,6 @@ var environmentSchema = external_exports.object({
   createdAt: external_exports.number(),
   updatedAt: external_exports.number()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/experiments.ts
 var experimentKeys = [
   "claudeCodeMockCliTraffic",
   "newOnboarding",
@@ -22964,8 +22770,6 @@ var experimentKeys = [
 ];
 var experimentKeySchema = external_exports.enum(experimentKeys);
 var experimentsSchema = external_exports.record(experimentKeySchema, external_exports.boolean());
-
-// ../../../zana/packages/domain/src/bb-thread/feature-flags.ts
 var featureFlagsSchema = external_exports.object({
   placeholder: external_exports.boolean(),
   /**
@@ -22982,8 +22786,6 @@ var featureFlagsSchema = external_exports.object({
    */
   timelineWindowEventBudget: external_exports.number().int().positive()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/git-checkout.ts
 var gitBranchForbiddenCharacterPattern = /[\u0000-\u001f\u007f\\:~^?*\[]/u;
 var gitBranchWhitespacePattern = /[ \t]/u;
 var gitReservedBranchNames = /* @__PURE__ */ new Set([
@@ -23077,8 +22879,6 @@ var projectSourceCheckoutSchema = external_exports.object({
    */
   selectedBranch: gitBranchRefClassificationSchema.nullable()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/host.ts
 var hostTypeValues = ["persistent"];
 var hostTypeSchema = external_exports.enum(hostTypeValues);
 var hostStatusValues = ["connected", "disconnected"];
@@ -23121,8 +22921,6 @@ var hostSchema = external_exports.object({
   createdAt: external_exports.number(),
   updatedAt: external_exports.number()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/provider-skill-roots.ts
 function isAbsoluteProviderSkillRootPath(value) {
   if (value.length === 0) {
     return false;
@@ -23142,8 +22940,6 @@ function isRelativeProviderSkillRootPath(value) {
   const normalized = value.replaceAll("\\", "/");
   return !normalized.startsWith("/") && !/^[a-zA-Z]:\//u.test(normalized) && normalized.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
-
-// ../../../zana/packages/domain/src/bb-thread/native-roots.ts
 var PROVIDER_NATIVE_ROOTS_MAX = 32;
 var PROVIDER_NATIVE_ROOT_NAME_PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}:$/u;
 var nativeRootNamePrefixSchema = external_exports.string().refine(
@@ -23327,8 +23123,6 @@ var providerNativeRootSetSchema = external_exports.object({
   commands: providerNativeRootsSchema,
   resolved: providerResolvedNativeRootsSchema
 }).strict();
-
-// ../../../zana/packages/domain/src/bb-thread/legacy-thread-events.ts
 var LEGACY_CODEX_GOAL_EXTENSION_KIND = "provider-codex/goal";
 var LEGACY_THREAD_EVENT_TYPES = [
   "thread/goal/updated",
@@ -23594,8 +23388,6 @@ function upgradeLegacyToolItem(item) {
   }
   return item;
 }
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-catalog-category.ts
 var PLUGIN_CATALOG_CATEGORY_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var pluginCatalogCategoryIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
 var pluginMarketplaceCollectionIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
@@ -23700,8 +23492,6 @@ var PLUGIN_CATALOG_CATEGORIES = [
   }
 ];
 var pluginCatalogCategoryById = new Map(PLUGIN_CATALOG_CATEGORIES.map((category) => [category.id, category]));
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-icon.ts
 function isPluginOwnedIconPath(icon) {
   return icon.startsWith("./");
 }
@@ -23713,11 +23503,7 @@ var NAMESPACED_GLYPH_PATTERN = /^[a-z0-9-]+\/[a-z0-9][a-z0-9-]*$/u;
 function isNamespacedGlyph(glyph) {
   return NAMESPACED_GLYPH_PATTERN.test(glyph);
 }
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-id.ts
 var pluginIdSchema = external_exports.string().regex(/^[a-z0-9][a-z0-9-]*$/u);
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-metadata.ts
 var PLUGIN_METADATA_MAX_BYTES = 256 * 1024;
 function exceedsPluginMetadataLimit(metadataJson) {
   return new TextEncoder().encode(metadataJson).byteLength > PLUGIN_METADATA_MAX_BYTES;
@@ -23730,8 +23516,6 @@ var pluginMetadataSchema = jsonObjectSchema.superRefine((value, ctx) => {
     });
   }
 });
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-manifest.ts
 var requiredManifestString = external_exports.string().trim().min(1);
 var pluginBrandingIconsSchema = external_exports.record(
   external_exports.string().max(
@@ -23806,8 +23590,6 @@ var pluginPackageJsonSchema = external_exports.object({
   }).optional(),
   bb: pluginBbManifestSchema
 }).passthrough();
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
 var MARKETPLACE_MAX_SCREENSHOTS = 6;
 var NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var TAG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -23946,12 +23728,8 @@ var marketplaceEntryV2Schema = external_exports.object({
   updatedAt: marketplaceDateTimeSchema.optional(),
   ...marketplaceEntryMetadataShape(false)
 });
-
-// ../../../zana/packages/domain/src/bb-thread/plugin-sdk-version.ts
 var PLUGIN_SDK_VERSION = "0.4.8";
 var PLUGIN_SDK_MAJOR = Number(PLUGIN_SDK_VERSION.split(".", 1)[0]);
-
-// ../../../zana/packages/domain/src/bb-thread/project.ts
 var projectKindValues = ["standard", "personal"];
 var projectKindSchema = external_exports.enum(projectKindValues);
 var projectSchema = external_exports.object({
@@ -23976,8 +23754,6 @@ var localPathProjectSourceSchema = baseProjectSourceSchema.extend({
   hostId: external_exports.string(),
   path: external_exports.string()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/prompt-history.ts
 var promptHistoryScopeValues = ["project", "thread"];
 var promptHistoryScopeSchema = external_exports.enum(promptHistoryScopeValues);
 var promptHistoryEntrySchema = external_exports.object({
@@ -23985,12 +23761,8 @@ var promptHistoryEntrySchema = external_exports.object({
   createdAt: external_exports.number(),
   input: external_exports.array(promptInputSchema).min(1)
 });
-
-// ../../../zana/packages/domain/src/bb-thread/provider-fork.ts
 var PROVIDER_FORK_VALUES = ["none", "tip", "checkpoint"];
 var providerForkSchema = external_exports.enum(PROVIDER_FORK_VALUES);
-
-// ../../../zana/packages/domain/src/bb-thread/provider-types.ts
 var modelReasoningEffortSchema = external_exports.object({
   reasoningEffort: reasoningLevelSchema,
   description: external_exports.string()
@@ -24160,8 +23932,6 @@ var dynamicToolSchema = external_exports.object({
   inputSchema: external_exports.unknown(),
   presentation: threadEventItemPresentationSchema.optional()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/queued-message.ts
 var queuedMessageWaitingOnKindValues = [
   "time",
   "thread-busy",
@@ -24232,16 +24002,12 @@ var queuedMessageSystemNoticeSchema = external_exports.object({
   kind: systemMessageKindSchema,
   subject: systemMessageSubjectSchema.nullable()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/raw-thread-id.ts
 var GENERATED_ID_ALPHABET = "23456789abcdefghijkmnpqrstuvwxyz";
 var GENERATED_ID_SUFFIX_LENGTH = 10;
 var THREAD_ID_PREFIX = "thr_";
 var RAW_THREAD_ID_PATTERN_SOURCE = `${THREAD_ID_PREFIX}[${GENERATED_ID_ALPHABET}]{${GENERATED_ID_SUFFIX_LENGTH}}`;
 var rawThreadIdPattern = new RegExp(`^${RAW_THREAD_ID_PATTERN_SOURCE}$`, "u");
 var rawThreadIdSchema = external_exports.string().regex(rawThreadIdPattern);
-
-// ../../../zana/packages/domain/src/bb-thread/reasoning-efforts.ts
 var NONE_REASONING_EFFORT = {
   reasoningEffort: "none",
   description: "No extended thinking"
@@ -24287,8 +24053,6 @@ var REASONING_EFFORT_BY_LEVEL = {
 function reasoningEffortsForLevels(levels) {
   return levels.map((level) => ({ ...REASONING_EFFORT_BY_LEVEL[level] }));
 }
-
-// ../../../zana/packages/domain/src/bb-thread/stored-thread-event.ts
 var threadEventRowInputSchema = external_exports.object({
   id: external_exports.string(),
   scope: threadEventScopeSchema,
@@ -24369,8 +24133,6 @@ function parseThreadEventRowInput(row) {
 var threadEventRowSchema = threadEventRowInputSchema.transform(
   (row) => parseThreadEventRowInput(row)
 );
-
-// ../../../zana/packages/domain/src/bb-thread/terminal.ts
 var TERMINAL_COLS_MAX = 500;
 var TERMINAL_ROWS_MAX = 200;
 var TERMINAL_DATA_MAX_BYTES = 64 * 1024;
@@ -24413,8 +24175,6 @@ var terminalDataBase64Schema = external_exports.string().min(1).max(TERMINAL_DAT
     message: `Terminal data must decode to ${TERMINAL_DATA_MAX_BYTES} bytes or less`
   }
 );
-
-// ../../../zana/packages/domain/src/bb-thread/thread-git-diff.ts
 var workspaceDiffTargetSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     type: external_exports.literal("uncommitted")
@@ -24458,8 +24218,6 @@ var threadGitDiffResponseSchema = external_exports.object({
    */
   mergeBaseRef: external_exports.string().nullable()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/thread-search.ts
 var threadSearchSourceKindValues = [
   "title",
   "title_fallback",
@@ -24470,8 +24228,6 @@ var threadSearchSourceKindValues = [
 var threadSearchSourceKindSchema = external_exports.enum(
   threadSearchSourceKindValues
 );
-
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
 var threadTimelineActivePromptModeSchema = external_exports.object({
   mode: external_exports.literal("plan"),
   /**
@@ -24484,8 +24240,6 @@ var threadTimelineActivePromptModeSchema = external_exports.object({
   providerId: external_exports.string().min(1),
   prompt: external_exports.string()
 }).strict();
-
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
 var threadTimelineModelFallbackSchema = external_exports.object({
   sourceSeq: external_exports.number().int().nonnegative(),
   detectedAt: external_exports.number(),
@@ -24494,8 +24248,6 @@ var threadTimelineModelFallbackSchema = external_exports.object({
   reason: external_exports.enum(["refusal", "provider"]),
   message: external_exports.string()
 });
-
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
 var threadTimelinePendingTodoItemStatusSchema = external_exports.enum([
   "pending",
   "in_progress",
@@ -24511,12 +24263,8 @@ var threadTimelinePendingTodosSchema = external_exports.object({
   updatedAt: external_exports.number(),
   items: external_exports.array(threadTimelinePendingTodoItemSchema)
 });
-
-// ../../../zana/packages/domain/src/bb-thread/thread-visibility.ts
 var threadVisibilityValues = ["visible", "hidden"];
 var threadVisibilitySchema = external_exports.enum(threadVisibilityValues);
-
-// ../../../zana/packages/domain/src/bb-thread/thread-status.ts
 var threadStatusValues = [
   "pending",
   "idle",
@@ -24526,12 +24274,8 @@ var threadStatusValues = [
   "error"
 ];
 var threadStatusSchema = external_exports.enum(threadStatusValues);
-
-// ../../../zana/packages/domain/src/bb-thread/thread-origin-kind.ts
 var threadOriginKindValues = ["fork"];
 var threadOriginKindSchema = external_exports.enum(threadOriginKindValues);
-
-// ../../../zana/packages/domain/src/bb-thread/thread.ts
 var threadRuntimeDisplayStatusValues = [
   ...threadStatusValues,
   "provisioning",
@@ -24807,8 +24551,6 @@ var threadListEntrySchema = threadWithRuntimeSchema.extend({
   environmentBranchName: external_exports.string().nullable(),
   environmentWorkspaceDisplayKind: environmentWorkspaceDisplayKindSchema
 });
-
-// ../../../zana/packages/domain/src/bb-thread/update-state.ts
 var RUN_STATE_PRESENTATION = {
   "in-progress": { icon: "Loading", label: "In progress", inFlight: true },
   succeeded: { icon: "CircleCheck", label: "Succeeded", inFlight: false },
@@ -24851,11 +24593,7 @@ var UPDATE_STATE_PRESENTATION = {
   },
   offline: { icon: "CircleX", label: "Offline", tone: "muted" }
 };
-
-// ../../../zana/packages/domain/src/bb-thread/prompt-attachment-limits.ts
 var PROMPT_ATTACHMENT_MAX_BYTES = 35 * 1024 * 1024;
-
-// ../../../zana/packages/provider-bridge-acp/src/launch-spec.ts
 var acpNativeSkillRootsSchema = external_exports.object({
   user: external_exports.array(providerNativeRootInputSchema).default([]),
   project: external_exports.array(providerNativeRootInputSchema).default([])
@@ -24892,12 +24630,8 @@ var acpLaunchSpecSchema = external_exports.object({
   nativeSkillRoots: acpNativeSkillRootsSchema.optional(),
   permissionCli: acpPermissionCliSchema.optional()
 }).strict();
-
-// ../../../zana/packages/provider-bridge-protocol/src/version.ts
 var PROVIDER_BRIDGE_PROTOCOL_VERSION = 2;
 var THREAD_DELTA_GRAMMAR_V3 = 3;
-
-// ../../../zana/packages/provider-bridge-protocol/src/handshake.ts
 var bridgeGrammarVersionsSchema = external_exports.tuple([external_exports.number().int().positive(), external_exports.number().int().positive()]).refine(([min, max]) => min <= max, {
   message: "grammarVersions must be an ascending [min, max] range"
 });
@@ -25004,8 +24738,6 @@ var initializeResultSchema = external_exports.object({
     bridgeCapabilitiesSchema
   )
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/execution-options.ts
 var bridgeExecutionOptionsSchema = external_exports.object({
   model: external_exports.string().min(1).optional(),
   serviceTier: serviceTierSchema.optional(),
@@ -25016,8 +24748,6 @@ var bridgeExecutionOptionsSchema = external_exports.object({
   /** Provider-scoped session options. Opaque outside the owning bridge. */
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 }).and(runtimePermissionPolicySchema);
-
-// ../../../zana/packages/provider-bridge-protocol/src/requests.ts
 var BRIDGE_REQUEST_METHODS = {
   initialize: "initialize",
   modelList: "model/list",
@@ -25135,8 +24865,6 @@ var modelListResultSchema = external_exports.object({
     options: external_exports.array(external_exports.object({ value: external_exports.string(), name: external_exports.string().optional() }))
   }).optional()
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/errors.ts
 var BRIDGE_JSON_RPC_ERRORS = {
   /** Standard JSON-RPC: params failed schema validation. */
   INVALID_PARAMS: -32602,
@@ -25159,8 +24887,6 @@ var providerRecoveryHintSchema = external_exports.object({
   retryable: external_exports.boolean()
 });
 var bridgeErrorDataSchema = external_exports.object({ recovery: providerRecoveryHintSchema.optional() }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/notifications.ts
 var BRIDGE_NOTIFICATION_METHODS = {
   threadIdentity: "thread/identity",
   sessionReplaced: "session/replaced",
@@ -25201,8 +24927,6 @@ var errorNotificationSchema = external_exports.object({
   threadId: external_exports.string().min(1).optional(),
   message: external_exports.string().min(1)
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-requests.ts
 var BRIDGE_INBOUND_REQUEST_METHODS = {
   toolCall: "item/tool/call",
   interactionRequest: "interaction/request"
@@ -25233,8 +24957,6 @@ var interactionRequestParamsSchema = external_exports.object({
   turnId: external_exports.union([external_exports.string().min(1), external_exports.null()]),
   payload: pendingInteractionPayloadSchema
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/thread-delta.ts
 var THREAD_DELTA_NOTIFICATION_METHOD = "thread/delta";
 var deltaPresentationSchema = threadEventItemPresentationSchema;
 var THREAD_DELTA_KEY_SEPARATOR = "";
@@ -25745,8 +25467,6 @@ var threadDeltaNotificationParamsSchema = external_exports.object({
   threadId: external_exports.string().min(1),
   deltas: external_exports.array(threadDeltaSchema)
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/provider-maintenance.ts
 var providerMaintenanceParamsSchema = external_exports.object({
   providerId: external_exports.string().min(1),
   cwd: external_exports.string().min(1).optional(),
@@ -25878,8 +25598,6 @@ var providerInstallationRunResultSchema = external_exports.discriminatedUnion(
     }).passthrough()
   ]
 );
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
 var bashArgsSchema = external_exports.object({
   command: external_exports.string().optional(),
   cwd: external_exports.string().optional()
@@ -25888,8 +25606,6 @@ var textBlockSchema = external_exports.object({
   type: external_exports.literal("text"),
   text: external_exports.string()
 });
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -25897,8 +25613,6 @@ function getStringProperty(value, key) {
   const next = value[key];
   return typeof next === "string" ? next : void 0;
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
 var contentWrapperSchema = external_exports.object({
   content: external_exports.array(external_exports.unknown())
 }).passthrough();
@@ -25974,8 +25688,6 @@ function describeResultContentBlock(block) {
   }
   return `[${type}]`;
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
 var MAX_JSON_RPC_LINE_BYTES = 64 * 1024 * 1024;
 function createBoundedLineFramer(args) {
   const maxLineBytes = args.maxLineBytes ?? MAX_JSON_RPC_LINE_BYTES;
@@ -26052,8 +25764,6 @@ function createBoundedLineFramer(args) {
   }
   return { push, end, clear: clearLine };
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
 var BridgeRecoveryError = class extends Error {
   code;
   recovery;
@@ -26115,15 +25825,6 @@ function runBridgeRequest(args) {
     args.sendError(args.request.id, -32e3, message);
   });
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
-import {
-  closeSync,
-  mkdirSync,
-  openSync,
-  writeSync
-} from "node:fs";
-import { join, resolve } from "node:path";
 var PROVIDER_BRIDGE_RECORD_DIR_ENV = "ZCC_PROVIDER_BRIDGE_RECORD_DIR";
 var BRIDGE_RECORDING_PROCESS_SCOPE = "_process";
 function bridgeRecordingFileName(direction) {
@@ -26300,7 +26001,7 @@ function createBridgeRecorder(args) {
     }
   };
 }
-var RECORDER_GLOBAL_KEY = Symbol.for("zcc.providerBridgeRecorder");
+var RECORDER_GLOBAL_KEY = /* @__PURE__ */ Symbol.for("zcc.providerBridgeRecorder");
 function globalSlot() {
   const holder = globalThis;
   const existing = holder[RECORDER_GLOBAL_KEY];
@@ -26325,16 +26026,12 @@ function getBridgeRecorder() {
 function experimental_recordProviderChildIo(child, scope) {
   getBridgeRecorder()?.recordChildIo(child, scope);
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
 function withoutBridgeRuntimeEnv(env) {
   const childEnv = { ...env };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   delete childEnv[PROVIDER_BRIDGE_RECORD_DIR_ENV];
   return childEnv;
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
 var providerToolCallResponseSchema = external_exports.object({
   success: external_exports.boolean(),
   contentItems: external_exports.array(
@@ -26454,8 +26151,6 @@ function buildBridgeToolCallContent(result) {
   }
   return blocks;
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
 var recordSchema = external_exports.record(external_exports.string(), external_exports.unknown());
 var jsonRpcEnvelopeSchema = external_exports.object({
   jsonrpc: external_exports.literal("2.0"),
@@ -26498,9 +26193,6 @@ var errorEnvelopeSchema = external_exports.object({
     message: external_exports.string().optional()
   }).passthrough().optional()
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
-import { extname } from "node:path";
 function mimeTypeFromExtension(filePath) {
   switch (extname(filePath).toLowerCase()) {
     case ".png":
@@ -26518,8 +26210,6 @@ function mimeTypeFromExtension(filePath) {
       return "image/png";
   }
 }
-
-// ../../../zana/packages/agent-process-utils/src/index.ts
 var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 function spawnPortableProcess(request) {
   return (0, import_cross_spawn.default)(request.command, request.args, {
@@ -26595,11 +26285,6 @@ function runPortableCommand(command, args, options) {
     });
   });
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
-import { constants as fsConstants } from "node:fs";
-import { access } from "node:fs/promises";
-import path from "node:path";
 var execFileAsync = runPortableCommand;
 var CLI_PROBE_TIMEOUT_MS = 5e3;
 async function resolveExecutablePath(command) {
@@ -26647,8 +26332,6 @@ function clampPercent(value) {
     Math.max(0, Math.round(Number.isFinite(value) ? value : 0))
   );
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
 var PRESENTATION_TITLE_MAX_LENGTH = 160;
 function presentationTitle(text) {
   const firstLine = text.trim().split("\n", 1)[0]?.trim() ?? "";
@@ -26719,13 +26402,9 @@ function toolPresentation(tool) {
     icon: { glyph: "Toolbox" }
   };
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
 function experimental_defineProviderBridge(definition) {
   return { experimental_apiVersion: 1, ...definition };
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
 var normalizedToolCallRequestSchema = external_exports.object({
   providerThreadId: external_exports.string().min(1),
   threadId: external_exports.string().min(1).optional(),
@@ -26736,8 +26415,6 @@ var normalizedToolCallRequestSchema = external_exports.object({
   tool: external_exports.string().min(1),
   arguments: external_exports.unknown()
 });
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
 function createProviderVisibilityMetadata(args) {
   return {
     parseRawEvent: args.parseRawEvent,
@@ -26747,20 +26424,7 @@ function createProviderVisibilityMetadata(args) {
     }
   };
 }
-
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
 var ignoredJsonRpcResultSchema = external_exports.unknown();
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/bridge.ts
-import { execFile as execFile3 } from "node:child_process";
-import { randomBytes as randomBytes2 } from "node:crypto";
-import { promises as fs2, readFileSync } from "node:fs";
-import { createServer } from "node:net";
-import { dirname as dirname2, isAbsolute, basename as basename3, relative, resolve as resolve3 } from "node:path";
-import { fileURLToPath } from "node:url";
-import { isDeepStrictEqual } from "node:util";
-
-// ../../../zana/packages/provider-bridge-acp/src/wire.ts
 var acpTextContentBlockSchema = external_exports.object({
   type: external_exports.literal("text"),
   text: external_exports.string()
@@ -27076,8 +26740,6 @@ var acpWriteTextFileParamsSchema = external_exports.object({
   path: external_exports.string(),
   content: external_exports.string()
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge-protocol.ts
 var acpModelListParamsSchema = modelListParamsSchema.extend({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 });
@@ -27193,18 +26855,6 @@ var acpWarningNotificationParamsSchema = external_exports.object({
   summary: external_exports.string().min(1),
   details: external_exports.string().optional()
 }).passthrough();
-
-// ../../../zana/packages/provider-bridge-acp/src/dialect.ts
-import { basename } from "node:path";
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path2 from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { promisify } from "node:util";
 var execFileAsync2 = promisify(execFile);
 var USAGE_FETCH_TIMEOUT_MS = 15e3;
 var CURSOR_DASHBOARD_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService";
@@ -27525,8 +27175,6 @@ async function readCursorUsage() {
     };
   }
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/presentation.ts
 function stripCodeTicks(text) {
   const trimmed = text.trim();
   return trimmed.length >= 2 && trimmed.startsWith("`") && trimmed.endsWith("`") ? trimmed.slice(1, -1) : trimmed;
@@ -27621,8 +27269,6 @@ function toolKindPresentation(args) {
     args.title === void 0 ? void 0 : presentationTitle(args.title)
   );
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/dialect.ts
 var GENERIC_ACP_DIALECT = { id: "acp" };
 var grokToolMetaSchema = external_exports.object({
   "x.ai/tool": external_exports.object({
@@ -27869,9 +27515,6 @@ function resolveAcpDialect(launch) {
   const byCommand = DIALECT_IDS_BY_COMMAND[basename(launch.command)];
   return byCommand === void 0 ? GENERIC_ACP_DIALECT : DIALECTS_BY_ID.get(byCommand) ?? GENERIC_ACP_DIALECT;
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/tool-call-operation.ts
-import path3 from "node:path";
 var acpRawInputCommandSchema = external_exports.object({ command: external_exports.string() }).passthrough();
 var acpRawInputPathSchema = external_exports.object({
   path: external_exports.string().optional(),
@@ -27963,8 +27606,6 @@ function resolveAcpFileChangeWriteScope(paths) {
   }
   return candidate;
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/tool-classification.ts
 var ZCC_TOOL_SERVER = "zcc";
 function isInjectedToolCandidate(event) {
   if (event.kind !== void 0 && event.kind !== "other") {
@@ -28333,8 +27974,6 @@ function classifyAcpToolCall2(event, injected, options) {
       return genericToolItem(event, title);
   }
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/visibility.ts
 var NORMALIZED_ACP_METHODS = /* @__PURE__ */ new Set([
   "thread/identity",
   "error",
@@ -28398,8 +28037,6 @@ var acpVisibilityMetadata = createProviderVisibilityMetadata({
   parseRawEvent: parseAcpRawEvent,
   describeParsedRawEvent: describeParsedAcpRawEvent
 });
-
-// ../../../zana/packages/provider-bridge-acp/src/system-instruction-echo.ts
 var SYSTEM_INSTRUCTIONS_OPEN = "<system_instructions>";
 var SYSTEM_INSTRUCTIONS_CLOSE = "</system_instructions>";
 var SYSTEM_INSTRUCTION_ECHO_MAX_CHARS = 256 * 1024;
@@ -28480,8 +28117,6 @@ function consumeEchoBuffer(buffer, expectedEcho) {
   }
   return { emit: buffer, buffer: "", done: true };
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/delta-translation.ts
 var ASSISTANT_STREAM_KEY = "assistant";
 var THOUGHT_STREAM_KEY = "thought";
 var ACP_PLAN_STEP_STATUS_BY_ENTRY_STATUS = {
@@ -29274,8 +28909,6 @@ function createAcpDeltaTranslator(options = {}) {
     translateAcpEvent
   };
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/interactions.ts
 function classifyAcpPermission(toolCall, options) {
   const own2 = classifyAcpToolCall(toolCall, options);
   if (own2.kind !== "generic" || !toolCall.startedToolCall) {
@@ -29391,11 +29024,6 @@ function resolveAcpPermissionDecision(args) {
   }
   return { decision: args.resolution.decision };
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/session-params.ts
-import path4 from "node:path";
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/model-catalog.ts
 var ACP_NATIVE_REASONING_EFFORTS = [
   {
     reasoningEffort: "medium",
@@ -29753,8 +29381,6 @@ function splitPrimaryModels(catalogModels, primaryModels) {
     )
   };
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/cursor-model-selection.ts
 var CURSOR_LEGACY_FAMILY_SELECTIONS = {
   "claude-4-sonnet": { modelId: "claude-sonnet-4" },
   "claude-4.5-opus": { modelId: "claude-opus-4-5" },
@@ -29840,8 +29466,6 @@ function buildCursorParameterizedModelCatalog(models) {
   }
   return [...normalized.values()].map((entry) => entry.model);
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/session-params.ts
 function sanitizeAcpSkillDescription(description) {
   const sanitized = description.replace(/[\r\n]+/gu, " ").replace(/\s+/gu, " ").replace(/[<>]/gu, "").trim();
   return sanitized.length > 0 ? sanitized : "(description unavailable)";
@@ -30003,9 +29627,6 @@ function buildAcpSessionParams(args) {
     ...args.dynamicTools && args.dynamicTools.length > 0 ? { dynamicTools: args.dynamicTools } : {}
   };
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/agent-connection.ts
-import { createInterface } from "node:readline";
 var STDERR_TAIL_MAX_CHUNKS = 40;
 var CLOSED_STDIN_ERROR_CODES = /* @__PURE__ */ new Set(["EPIPE", "ERR_STREAM_DESTROYED"]);
 var AcpAgentExitedError = class extends Error {
@@ -30277,17 +29898,6 @@ function createAcpAgentConnection(options) {
     }
   };
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
-import { execFile as execFile2 } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { basename as basename2, dirname, join as join2, resolve as resolve2 } from "node:path";
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
-import { createConnection } from "node:net";
-import { createInterface as createInterface2 } from "node:readline";
 var ACP_BRIDGE_MCP_SERVER_NAME = "zcc";
 var ENV_HOST = "ZCC_ACP_DYNAMIC_TOOL_HOST";
 var ENV_PORT = "ZCC_ACP_DYNAMIC_TOOL_PORT";
@@ -30532,8 +30142,6 @@ function runAcpDynamicToolMcpServer() {
     void handleRequest(env, message);
   });
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 var CURSOR_MCP_APPROVAL_FILE = "mcp-approvals.json";
 var CURSOR_APPROVAL_LOCK_STALE_MS = 3e4;
 var CURSOR_APPROVAL_LOCK_TIMEOUT_MS = 5e3;
@@ -30694,8 +30302,6 @@ async function revokeCursorSessionMcpServer(approval) {
     (approvals) => approvals.filter((candidate) => candidate !== approval.approval)
   );
 }
-
-// ../../../zana/packages/provider-bridge-acp/src/bridge/bridge.ts
 var sessionsByBbThreadId = /* @__PURE__ */ new Map();
 var bbThreadIdByProviderThreadId = /* @__PURE__ */ new Map();
 var pendingRuntimeRequests = /* @__PURE__ */ new Map();
@@ -32862,14 +32468,10 @@ var experimental_providerBridge = experimental_defineProviderBridge({
     });
   }
 });
-
-// ../../../zana/packages/provider-bridge-acp/src/probe.ts
 var acpAgentProbeSchema = external_exports.union([
   external_exports.object({ reachable: external_exports.literal(true), fork: external_exports.boolean() }),
   external_exports.object({ reachable: external_exports.literal(false), reason: external_exports.string() })
 ]);
-
-// ../../../zana/packages/plugin-sdk/dist/provider-bridge.js
 var __create2 = Object.create;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -37785,7 +37387,6 @@ var contentWrapperSchema2 = external_exports.object({
 }).passthrough();
 var shellEnvironmentVariableKeySchema2 = external_exports.string().regex(/^[A-Z_][A-Z0-9_]*$/i);
 var MAX_JSON_RPC_LINE_BYTES2 = 64 * 1024 * 1024;
-var RECORDER_GLOBAL_KEY2 = Symbol.for("zcc.providerBridgeRecorder");
 var providerToolCallResponseSchema2 = external_exports.object({
   success: external_exports.boolean(),
   contentItems: external_exports.array(
@@ -41252,34 +40853,6 @@ var desktopBrowserChangedSchema = external_exports.object({
   threadId: id,
   tabs: external_exports.array(desktopBrowserTabSchema).max(1e3)
 }).strict();
-
-// src/native-auth.ts
-import {
-  copyFileSync,
-  existsSync as existsSync3,
-  mkdirSync as mkdirSync3,
-  readFileSync as readFileSync3,
-  rmSync as rmSync2,
-  statSync,
-  writeFileSync as writeFileSync2
-} from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
-
-// src/native-runtime.ts
-import { execFile as execFile4, execFileSync } from "node:child_process";
-import {
-  chmodSync,
-  existsSync as existsSync2,
-  mkdirSync as mkdirSync2,
-  readFileSync as readFileSync2,
-  renameSync,
-  rmSync,
-  writeFileSync
-} from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { dirname as dirname3, join as join3, resolve as resolve4 } from "node:path";
-import { promisify as promisify2 } from "node:util";
 var execFileAsync3 = promisify2(execFile4);
 var PINNED_NATIVE_ACP_VERSION = "1.4.3";
 var NATIVE_ACP_DISTRIBUTIONS = {
@@ -41425,8 +40998,6 @@ function resolveNativeAcpRuntime(options) {
     platformKey
   };
 }
-
-// src/native-auth.ts
 var GOOGLE_ACP_AUTH_METHODS = [
   "oauth-personal",
   "oauth-business",
@@ -41745,8 +41316,6 @@ function getFastNativeReadiness(options) {
   }
   return buildSignInRequiredFastReadiness(options, sanitized);
 }
-
-// host.ts
 function buildDefaultNativeLaunchSpec(authMethod = "oauth-personal") {
   const runtime = resolveNativeAcpRuntime();
   const sanitized = prepareSanitizedGeminiHome({ authMethod });
