@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrDetail } from '../app/PrDetail.tsx';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
@@ -107,6 +107,30 @@ describe('PrDetail loading and setup', () => {
 });
 
 describe('PrDetail review actions', () => {
+  it('replaces the model results with the latest runs when starting a re-review', async () => {
+    const data = completedWithFindings();
+    data.runs[0].summary = 'Previous model result';
+    const call = makeRpc(data, {
+      startReview: () => {
+        data.latestAttempt = { ...detail('running').review!, id: 'rerun' };
+        data.latestRuns = detail('running').runs.slice(1).map((run) => ({ ...run, id: `rerun-${run.id}`, reviewId: 'rerun' }));
+      }
+    });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Models (3)' }));
+    expect(screen.getByText('Previous model result')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Re-review' }));
+    await screen.findByRole('button', { name: 'Cancel review' });
+    expect(screen.getByRole('tab', { name: 'Models (2)' })).toBeTruthy();
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('running')).toBeTruthy();
+    expect(within(table).getByText('queued')).toBeTruthy();
+    expect(within(table).queryByText('completed')).toBeNull();
+    expect(within(table).queryByText('Previous model result')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: /Findings/ }));
+    expect(screen.getByText('Null token crashes login')).toBeTruthy();
+  });
+
   it('checks the selected PR for new commits once on opening', async () => {
     const call = makeRpc(detail('completed'), { refreshPullRequest: () => null });
     renderDetail(call);

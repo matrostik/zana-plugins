@@ -315,7 +315,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             <div className="cn-tabs" role="tablist" aria-label="Review details">
               {(['findings', 'models', 'diff'] as DetailTab[]).map((id) => (
                 <button key={id} type="button" role="tab" className="cn-tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-                  {id === 'findings' ? `Findings (${findings.filter((finding) => !finding.dismissed).length})` : id === 'models' ? `Models (${runs.length})` : 'Diff'}
+                  {id === 'findings' ? `Findings (${findings.filter((finding) => !finding.dismissed).length})` : id === 'models' ? `Models (${attemptRuns.length})` : 'Diff'}
                 </button>
               ))}
             </div>
@@ -340,7 +340,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                     </tr>
                   </thead>
                   <tbody>
-                    {runs.map((run) => (
+                    {attemptRuns.map((run) => (
                       <tr key={run.id}>
                         <td className="cn-mono">
                           {run.providerId}/{run.model}

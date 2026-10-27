@@ -605,7 +605,7 @@ describe('post formatting', () => {
 
   it('formats a single-model finding without a suggestion', () => {
     const text = formatFinding(finding('f'), 1);
-    expect(text).toBe('**[HIGH] logic** — Broken\n\n<sub>CodeNod</sub>');
+    expect(text).toBe('**[HIGH] logic** — Broken\n\n<sub>[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)</sub>');
   });
 
   it('caps inline comments at fifty and moves the rest to the body', () => {
@@ -758,7 +758,7 @@ describe('poster', () => {
     });
     const result = await poster.post({ reviewId: 'r', findingIds: ['in', 'gone'], event: 'APPROVE' });
     expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1, bodyFindingCount: 0, publishedCount: 1 });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ event: 'APPROVE', body: '**CodeNod summary:** Consensus view' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ event: 'APPROVE', body: '**[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) summary:** Consensus view' }));
     expect(store.markFindingsPosted).toHaveBeenCalledWith(['in']);
     expect(store.recordPostedReview).toHaveBeenCalledWith({ reviewId: 'r', event: 'APPROVE', githubReviewId: 7, url: 'https://github.com/acme/api/pull/4#r7', commentCount: 1 });
   });
@@ -766,13 +766,13 @@ describe('poster', () => {
   it('falls back to the plain summary when there is no consensus summary', async () => {
     const { poster, github } = posterHarness({ findings: [finding('in')] });
     await poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: '**CodeNod summary:** Plain summary' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: '**[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) summary:** Plain summary' }));
   });
 
   it('uses a default approval body and tolerates an empty GitHub response', async () => {
     const { poster, store, github } = posterHarness({ created: null });
     const result = await poster.post({ reviewId: 'r', findingIds: [], event: 'APPROVE' });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: 'Approved after CodeNod review.' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: 'Approved after [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) review.' }));
     expect(result.url).toBeNull();
     expect(store.recordPostedReview).toHaveBeenCalledWith(expect.objectContaining({ githubReviewId: null, url: null }));
   });
@@ -780,7 +780,7 @@ describe('poster', () => {
   it('uses a generic body for change requests and ignores a non-numeric review id', async () => {
     const { poster, store, github } = posterHarness({ created: { id: 'x' } });
     await poster.post({ reviewId: 'r', findingIds: [], event: 'REQUEST_CHANGES' });
-    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: 'CodeNod review' }));
+    expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ body: '[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) review' }));
     expect(store.recordPostedReview).toHaveBeenCalledWith(expect.objectContaining({ githubReviewId: null, url: null }));
   });
 });

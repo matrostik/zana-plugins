@@ -6,12 +6,13 @@ import type { ChangedFile, FindingRow, ReviewEvent } from './types.ts';
 
 const MAX_INLINE_COMMENTS = 50;
 const MAX_BODY_CHARS = 60_000;
+const CODENOD_LINK = '[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)';
 
 export function formatFinding(finding: FindingRow, modelCount: number): string {
   const lines = [`**[${finding.severity.toUpperCase()}] ${finding.category}** — ${finding.description}`];
   if (finding.suggestion) lines.push('', `**Suggestion:** ${finding.suggestion}`);
-  if (modelCount > 1) lines.push('', `<sub>CodeNod · flagged by ${finding.agreedBy.length}/${modelCount} models</sub>`);
-  else lines.push('', '<sub>CodeNod</sub>');
+  if (modelCount > 1) lines.push('', `<sub>${CODENOD_LINK} · flagged by ${finding.agreedBy.length}/${modelCount} models</sub>`);
+  else lines.push('', `<sub>${CODENOD_LINK}</sub>`);
   return lines.join('\n');
 }
 
@@ -48,7 +49,7 @@ export function buildReviewPayload(input: {
   }
   const prefixParts: string[] = [];
   if (input.extraBody?.trim()) prefixParts.push(input.extraBody.trim());
-  if (input.summary) prefixParts.push(`**CodeNod summary:** ${input.summary}`);
+  if (input.summary) prefixParts.push(`**${CODENOD_LINK} summary:** ${input.summary}`);
   const prefix = prefixParts.join('\n\n');
   if (prefix.length > MAX_BODY_CHARS) return { comments, body: prefix.slice(0, MAX_BODY_CHARS), inlineIds, bodyIds: [] };
   const includedLines: string[] = [];
@@ -100,7 +101,7 @@ export function createPoster(deps: { store: Store; github: GitHubClient }) {
     const created = await deps.github.createReview(ref, {
       commitId: review.headSha,
       event: input.event,
-      body: payload.body || (input.event === 'APPROVE' ? 'Approved after CodeNod review.' : 'CodeNod review'),
+      body: payload.body || (input.event === 'APPROVE' ? `Approved after ${CODENOD_LINK} review.` : `${CODENOD_LINK} review`),
       comments: payload.comments
     });
     const publishedIds = [...payload.inlineIds, ...payload.bodyIds];

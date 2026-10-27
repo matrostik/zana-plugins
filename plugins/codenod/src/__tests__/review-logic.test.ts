@@ -230,7 +230,8 @@ describe('post payload', () => {
     expect(payload.inlineIds).toEqual(['in']);
     expect(payload.bodyIds).toEqual(['out', 'nofile']);
     expect(payload.comments[0]).toMatchObject({ path: 'src/a.ts', line: 2 });
-    expect(payload.comments[0].body).toContain('flagged by 2/2 models');
+    expect(payload.comments[0].body).toContain('<sub>[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) · flagged by 2/2 models</sub>');
+    expect(payload.body).toContain('[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)');
     expect(payload.body).toContain('Findings outside the diff');
     expect(payload.body).toContain('src/a.ts:99');
   });
