@@ -1,5 +1,6 @@
 import type { ModelChoice } from '../types.ts';
 import { errorMessage, sleep } from '../util.ts';
+import { extractJsonObject } from './parse.ts';
 
 export type SpawnEnvironment =
   | { kind: 'unmanaged' | 'personal' }
@@ -37,6 +38,66 @@ const STOPPED_STATUSES = new Set(['stopped', 'cancelled', 'canceled', 'archived'
 
 export const DEFAULT_POLL_MS = 10_000;
 export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+
+export const USAGE_LIMIT_PATTERNS: readonly RegExp[] = [
+  /usage limit (?:has been )?reached/i,
+  /(?:you have )?reached your (?:current )?(?:usage |request |token )?limit/i,
+  /(?:you have )?reached your (?:current )?quota/i,
+  /quota (?:has been )?exceeded/i,
+  /exceeded (?:your )?(?:current )?quota/i,
+  /insufficient[ _]quota/i,
+  /rate limit (?:exceeded|reached)/i,
+  /resource(?:_has_been|_is)?_exhausted/i,
+  /resource has been exhausted/i,
+  /credit balance is too low/i,
+  /(?:daily|monthly|current) (?:usage |request |token )?limit reached/i,
+  /limit will reset in \d+/i,
+  /quota will reset in \d+/i
+];
+
+export function looksLikeValidReview(text: string): boolean {
+  try {
+    const json = extractJsonObject(text);
+    if (!json) return false;
+    const data = JSON.parse(json) as Record<string, unknown>;
+    const hasSummary = typeof data.summary === 'string' && data.summary.trim().length > 0;
+    const hasScore = typeof data.riskScore === 'number' || (typeof data.riskScore === 'string' && !Number.isNaN(Number(data.riskScore)));
+    return typeof data === 'object' && data !== null && hasSummary && Boolean(hasScore);
+  } catch {
+    return false;
+  }
+}
+
+export function detectUsageLimit(text: string): string | null {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  for (const pattern of USAGE_LIMIT_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      const lines = trimmed
+        .split('\n')
+        .map((line) => line.trim().replace(/^[*#_`-]+/, '').replace(/[*#_`-]+$/, '').trim())
+        .filter(Boolean);
+
+      if (lines.length > 0 && lines.length <= 4 && trimmed.length <= 350) {
+        return lines.reduce((acc, curr) => {
+          if (!acc) return curr;
+          if (acc.endsWith(':') || acc.endsWith('.')) return `${acc} ${curr}`;
+          return `${acc}: ${curr}`;
+        }, '');
+      }
+
+      const matchedIdx = lines.findIndex((line) => pattern.test(line));
+      if (matchedIdx !== -1) {
+        const snippet = lines.slice(matchedIdx, Math.min(lines.length, matchedIdx + 2)).join(': ');
+        return snippet.length > 250 ? `${snippet.slice(0, 247)}…` : snippet;
+      }
+      return trimmed.length > 250 ? `${trimmed.slice(0, 247)}…` : trimmed;
+    }
+  }
+  return null;
+}
 
 interface Waiter {
   baseline: string;
@@ -81,7 +142,15 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     const output = await currentOutput(event.threadId);
     if (waiters.get(event.threadId) !== waiter) return;
     const text = output.trim() ? output : event.lastAssistantText ?? '';
-    if (text.trim() && text !== waiter.baseline) settle(event.threadId, { text });
+    if (text.trim() && text !== waiter.baseline) {
+      const usage = detectUsageLimit(text);
+      if (usage && !looksLikeValidReview(text)) {
+        await threads.stop({ threadId: event.threadId }).catch(() => undefined);
+        settle(event.threadId, { error: new Error(`Review thread stopped: usage limit reached (${usage})`) });
+        return;
+      }
+      settle(event.threadId, { text });
+    }
   }
 
   /** Reads the thread status once and settles the waiter when the thread has failed, stopped, or finished. */
@@ -96,7 +165,28 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
       const waiter = waiters.get(threadId);
       const text = await currentOutput(threadId);
       if (isFinished() || waiters.get(threadId) !== waiter) return;
-      if (text.trim() && text !== baseline) settle(threadId, { text });
+      if (text.trim() && text !== baseline) {
+        const usage = detectUsageLimit(text);
+        if (usage && !looksLikeValidReview(text)) {
+          await threads.stop({ threadId }).catch(() => undefined);
+          settle(threadId, { error: new Error(`Review thread stopped: usage limit reached (${usage})`) });
+          return;
+        }
+        settle(threadId, { text });
+      }
+    } else {
+      const waiter = waiters.get(threadId);
+      if (waiter && !isFinished()) {
+        const text = await currentOutput(threadId);
+        if (isFinished() || waiters.get(threadId) !== waiter) return;
+        if (text.trim() && text !== baseline) {
+          const usage = detectUsageLimit(text);
+          if (usage && !looksLikeValidReview(text)) {
+            await threads.stop({ threadId }).catch(() => undefined);
+            settle(threadId, { error: new Error(`Review thread stopped: usage limit reached (${usage})`) });
+          }
+        }
+      }
     }
   }
 
@@ -189,10 +279,20 @@ export async function runModelInThread(threads: ThreadsApi, waiter: ThreadWaiter
   input.signal?.addEventListener('abort', onAbort, { once: true });
   try {
     let text = await waiter.waitForOutput(threadId, { timeoutMs: input.timeoutMs, signal: input.signal });
+    const usage = detectUsageLimit(text);
+    if (usage && !input.validate(text).ok) {
+      await threads.stop({ threadId }).catch(() => undefined);
+      throw new Error(`Review thread stopped: usage limit reached (${usage})`);
+    }
     const first = input.validate(text);
     if (!first.ok) {
       await threads.send({ threadId, prompt: input.repairPrompt(first.problem) });
       text = await waiter.waitForOutput(threadId, { baseline: text, timeoutMs: input.timeoutMs, signal: input.signal });
+      const repairUsage = detectUsageLimit(text);
+      if (repairUsage && !input.validate(text).ok) {
+        await threads.stop({ threadId }).catch(() => undefined);
+        throw new Error(`Review thread stopped: usage limit reached (${repairUsage})`);
+      }
     }
     return { threadId, text };
   } catch (error) {
