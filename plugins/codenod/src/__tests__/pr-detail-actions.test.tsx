@@ -315,6 +315,71 @@ describe('PrDetail findings and posting', () => {
     expect((screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }) as HTMLInputElement).checked).toBe(true);
   });
 
+  it('auto-selects findings when a review opened while running completes', async () => {
+    let resolveRefresh!: () => void;
+    const refreshPromise = new Promise<void>((resolve) => { resolveRefresh = resolve; });
+    const runningData = detail('running');
+    const completedData = completedWithFindings();
+    let isCompleted = false;
+
+    const call = vi.fn(async (method: string) => {
+      if (method === 'detail') return isCompleted ? completedData : runningData;
+      if (method === 'refreshPullRequest') {
+        await refreshPromise;
+        isCompleted = true;
+        return null;
+      }
+      throw new Error(`Unhandled RPC: ${method}`);
+    });
+
+    renderDetail(call);
+    expect(await screen.findByText('Findings appear when the review completes.')).toBeTruthy();
+
+    resolveRefresh();
+    await waitFor(() => expect(call.mock.calls.filter(([m]) => m === 'detail')).toHaveLength(2));
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts:12' });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
+  });
+
+  it('deselects already-posted findings after re-posting them', async () => {
+    const data = completedWithFindings();
+    data.findings[0] = { ...data.findings[0], postedAt: 100 };
+    let posted = false;
+    const call = vi.fn(async (method: string, args?: unknown) => {
+      if (method === 'detail') {
+        if (!posted) return data;
+        return {
+          ...data,
+          findings: data.findings.map((item) => (item.id === 'f2' ? { ...item, postedAt: 200 } : item))
+        };
+      }
+      if (method === 'post') {
+        posted = true;
+        return { url: null, commentCount: 1 };
+      }
+      if (method === 'refreshPullRequest') return null;
+      throw new Error(`Unhandled RPC: ${method}`);
+    });
+
+    renderDetail(call);
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts' });
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(checkbox);
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+
+    const postBtn = screen.getByRole('button', { name: 'Post 1 finding to GitHub' });
+    fireEvent.click(postBtn);
+
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f2'] })));
+    await waitFor(() => {
+      const updatedCheckbox = screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' });
+      expect((updatedCheckbox as HTMLInputElement).checked).toBe(false);
+    });
+    expect(screen.getByRole('button', { name: 'Post 0 findings to GitHub' })).toBeTruthy();
+  });
+
   it('copies selected findings as a prompt', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });

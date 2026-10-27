@@ -19,6 +19,35 @@ export function formatDuration(startMs: number, endMs: number): string {
   return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, '0')}m`;
 }
 
+const SEVERITY_NAMES: Record<string, string> = {
+  critical: 'CRITICAL',
+  high: 'ERROR',
+  medium: 'WARNING',
+  low: 'INFO'
+};
+
+const CATEGORY_NAMES: Record<string, string> = {
+  security: 'Security',
+  performance: 'Performance',
+  logic: 'Logic',
+  style: 'Style'
+};
+
+function sanitizePromptText(text: string): string {
+  const cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
+  if (!cleaned) return '(none)';
+  return cleaned
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trimEnd();
+      if (/^\s*(?:---|===|\d+[\.)]|Issue:|Suggestion:|Flagged by:|Review findings|Reviewed commit)/i.test(trimmed)) {
+        return `  > ${trimmed}`;
+      }
+      return trimmed;
+    })
+    .join('\n');
+}
+
 export function formatFindingsPrompt(input: {
   owner: string; repo: string; number: number; title: string; headSha: string;
   findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string; suggestion: string | null; agreedBy: string[] }>;
@@ -26,11 +55,15 @@ export function formatFindingsPrompt(input: {
   const header = [`Review findings for ${input.owner}/${input.repo}#${input.number}: ${input.title}`, `Reviewed commit: ${input.headSha}`];
   const entries = input.findings.map((finding, index) => {
     const location = finding.line === null ? finding.file : `${finding.file}:${finding.line}`;
+    const severityLabel = SEVERITY_NAMES[finding.severity.toLowerCase()] ?? finding.severity.toUpperCase();
+    const categoryLabel = CATEGORY_NAMES[finding.category.toLowerCase()] ?? finding.category;
     return [
-      `${index + 1}. [${finding.severity.toUpperCase()}] ${finding.category} — ${location}`,
-      `Issue: ${finding.description}`,
-      ...(finding.suggestion ? [`Suggestion: ${finding.suggestion}`] : []),
-      `Flagged by: ${finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}`
+      `--- Finding ${index + 1} ---`,
+      `${index + 1}. [${severityLabel}] ${categoryLabel} — ${location}`,
+      `Issue: ${sanitizePromptText(finding.description)}`,
+      ...(finding.suggestion ? [`Suggestion: ${sanitizePromptText(finding.suggestion)}`] : []),
+      `Flagged by: ${finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}`,
+      `--- End Finding ${index + 1} ---`
     ].join('\n');
   });
   return [...header, '', entries.join('\n\n')].join('\n');

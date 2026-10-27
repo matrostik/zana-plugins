@@ -2,18 +2,46 @@ import type { Store } from './db.ts';
 import type { GitHubClient, ReviewCommentInput } from './github/client.ts';
 import { parsePrId } from './github/refs.ts';
 import { commentableLines } from './review/diff.ts';
-import type { ChangedFile, FindingRow, ReviewEvent } from './types.ts';
+import type { ChangedFile, FindingRow, IssueCategory, ReviewEvent, Severity } from './types.ts';
 
 const MAX_INLINE_COMMENTS = 50;
 const MAX_BODY_CHARS = 60_000;
 export const CODENOD_DOCS_URL = 'https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme';
 export const CODENOD_LINK = `[CodeNod](${CODENOD_DOCS_URL})`;
 
+export const SEVERITY_BADGES: Record<Severity, string> = {
+  critical: '🚨 Critical',
+  high: '⚠️ Error',
+  medium: '🟡 Warning',
+  low: 'ℹ Info'
+};
+
+export const CATEGORY_BADGES: Record<IssueCategory, string> = {
+  security: '🛡️ Security',
+  performance: '⚡ Performance',
+  logic: '🧩 Logic',
+  style: '🎨 Style'
+};
+
+export function formatFindingHeader(finding: { severity: string; category: string }): string {
+  const sevKey = finding.severity.toLowerCase() as Severity;
+  const catKey = finding.category.toLowerCase() as IssueCategory;
+  const severity = SEVERITY_BADGES[sevKey] ?? finding.severity;
+  const category = CATEGORY_BADGES[catKey] ?? finding.category;
+  return `${severity} · ${category}`;
+}
+
 export function formatFinding(finding: FindingRow, modelCount: number): string {
-  const lines = [`**[${finding.severity.toUpperCase()}] ${finding.category}** — ${finding.description}`];
-  if (finding.suggestion) lines.push('', `**Suggestion:** ${finding.suggestion}`);
-  if (modelCount > 1) lines.push('', `<sub>${CODENOD_LINK} · flagged by ${finding.agreedBy.length}/${modelCount} models</sub>`);
-  else lines.push('', `<sub>${CODENOD_LINK}</sub>`);
+  const lines: string[] = [formatFindingHeader(finding), '', finding.description];
+  if (finding.suggestion?.trim()) {
+    const suggestionLines = finding.suggestion.trim().split('\n').map((l) => (l.length > 0 ? `> ${l}` : '>'));
+    lines.push('', '> [!TIP]', '> ### Suggested fix', '>', ...suggestionLines);
+  }
+  lines.push('', '---', '');
+  const footerAttribution = modelCount > 1
+    ? `*Review by ${CODENOD_LINK} · flagged by ${finding.agreedBy.length}/${modelCount} models*`
+    : `*Review by ${CODENOD_LINK}*`;
+  lines.push(footerAttribution);
   return lines.join('\n');
 }
 
@@ -44,7 +72,9 @@ export function buildReviewPayload(input: {
       inlineIds.push(finding.id);
     } else {
       const location = finding.line != null ? `${finding.file}:${finding.line}` : finding.file;
-      bodyEntries.push(`- \`${location.replace(/`/g, "'")}\` ${formatFinding(finding, input.modelCount).replace(/\n+/g, ' ')}`);
+      const header = formatFindingHeader(finding);
+      const suggestionPart = finding.suggestion?.trim() ? ` (Suggested fix: ${finding.suggestion.trim().replace(/\n+/g, ' ')})` : '';
+      bodyEntries.push(`- \`${location.replace(/`/g, "'")}\` **${header}** — ${finding.description.replace(/\n+/g, ' ')}${suggestionPart}`);
       bodyIds.push(finding.id);
     }
   }

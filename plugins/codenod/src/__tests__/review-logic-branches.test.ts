@@ -605,7 +605,30 @@ describe('post formatting', () => {
 
   it('formats a single-model finding without a suggestion', () => {
     const text = formatFinding(finding('f'), 1);
-    expect(text).toBe('**[HIGH] logic** — Broken\n\n<sub>[CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)</sub>');
+    expect(text).toBe('⚠️ Error · 🧩 Logic\n\nBroken\n\n---\n\n*Review by [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme)*');
+  });
+
+  it('formats a finding with a suggestion and multi-model consensus matching the GitHub alert layout', () => {
+    const text = formatFinding(
+      finding('f', {
+        severity: 'low',
+        category: 'style',
+        description: 'The committed plan cites local run artifacts that are not in the repository.',
+        suggestion: 'Remove the local artifact paths and session/authorization narrative.',
+        agreedBy: ['gpt-4', 'claude-3']
+      }),
+      2
+    );
+    expect(text).toBe(
+      'ℹ Info · 🎨 Style\n\n' +
+      'The committed plan cites local run artifacts that are not in the repository.\n\n' +
+      '> [!TIP]\n' +
+      '> ### Suggested fix\n' +
+      '>\n' +
+      '> Remove the local artifact paths and session/authorization narrative.\n\n' +
+      '---\n\n' +
+      '*Review by [CodeNod](https://github.com/matrostik/zana-plugins/tree/master/plugins/codenod#readme) · flagged by 2/2 models*'
+    );
   });
 
   it('caps inline comments at fifty and moves the rest to the body', () => {
@@ -626,6 +649,7 @@ describe('post formatting', () => {
     expect(payload.bodyIds).toEqual(['other', 'tick']);
     expect(payload.body.startsWith('Please check\n\n**Findings outside the diff:**')).toBe(true);
     expect(payload.body).toContain("`src/'x'.ts`");
+    expect(payload.body).toContain('**⚠️ Error · 🧩 Logic** — Broken');
     expect(payload.body).not.toContain('CodeNod summary');
   });
 

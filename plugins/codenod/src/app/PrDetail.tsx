@@ -131,6 +131,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
   const selectedReviewId = useRef<string | null>(null);
+  const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
   let navigate: ReturnType<typeof useZccNavigate> | null = null;
@@ -150,13 +151,17 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         const next = value as PrDetailData;
         setDetail(next);
         const nextReviewId = next.review?.id ?? null;
+        const reviewCompleted = next.review?.status === 'completed';
         const eligible = next.findings.filter((finding) => !finding.dismissed && finding.postedAt === null);
-        const isNewReview = selectedReviewId.current !== nextReviewId;
+        const isNewReview = reviewCompleted && initializedReviewId.current !== nextReviewId;
+        if (reviewCompleted) {
+          initializedReviewId.current = nextReviewId;
+        }
         selectedReviewId.current = nextReviewId;
         const prevPosted = prevFindingsPosted.current;
         const newlyPostedIds = new Set(
           next.findings
-            .filter((finding) => prevPosted.get(finding.id) === null && finding.postedAt !== null)
+            .filter((finding) => finding.postedAt !== null && prevPosted.has(finding.id) && prevPosted.get(finding.id) !== finding.postedAt)
             .map((finding) => finding.id)
         );
         prevFindingsPosted.current = new Map(next.findings.map((finding) => [finding.id, finding.postedAt]));
@@ -175,6 +180,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setNotice(null);
     setPickerOpen(false);
     selectedReviewId.current = null;
+    initializedReviewId.current = null;
     prevFindingsPosted.current = new Map();
     load();
   }, [load]);
