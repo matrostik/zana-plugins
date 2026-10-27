@@ -15,7 +15,7 @@ Improve provenance and reuse of findings in the CodeNod PR detail view, and let 
 
 1. Show provenance on each finding as the names in `agreedBy`, including the single-model case. Render an explicit fallback such as “Model unavailable” only for malformed/legacy empty provenance. Keep the aggregate denominator/count as secondary information if useful; do not imply all completed models agree when only a subset flagged the finding.
 2. “Copy selected findings as prompt” means selection is for prompt generation and review/post selection can share the same selected IDs to avoid two inconsistent selection mechanisms. The copy action copies a ready-to-paste prompt containing PR identity/title, review commit, and each selected finding's severity, category, location, description, optional suggestion, and model attribution. It does not copy hidden diff/context or send data to another agent.
-3. Selecting findings is explicit. Default selection should preserve today's convenient behavior by selecting all eligible findings matching active filters when the selection feature is first used (or by a visible Select visible action). After selection becomes user-controlled, filter changes must not silently add/remove IDs; selection persists across filters and is pruned when findings become dismissed, posted, or disappear on review change.
+3. Selecting findings is explicit. Default selection should preserve today's convenient behavior by selecting all active, unposted findings when a review first loads. Active posted findings remain selectable for prompt copying. Filter changes must not silently add/remove IDs; selection persists across filters and is pruned when findings become dismissed or disappear on review change.
 4. “Post selected” submits only selected, eligible IDs. Keep the existing message-only comment behavior and approval flow for Approve/Request changes; for approval events, selection still controls included findings. GitHub remains an explicit user-triggered side effect.
 
 ## Implementation slices
@@ -29,9 +29,9 @@ Improve provenance and reuse of findings in the CodeNod PR detail view, and let 
 ### 2. Shared finding selection and copy-to-prompt
 
 - Own selected finding IDs at `PrDetail` level (or another component that can coordinate FindingsView and the post footer), keyed/reset by the active review ID.
-- Add accessible checkboxes to eligible cards and bulk “Select visible” / “Clear selection” controls. Selection should include only active and unposted findings; disabled/posted/dismissed cards cannot be selected.
+- Add accessible checkboxes to active cards, including posted findings, and “Select all issues”, “Select visible”, and “Clear selection” controls. Dismissed findings cannot be selected. GitHub posting filters selected IDs to active, unposted findings.
 - Add a pure formatter for the prompt text, preferably in `src/app/format.ts` or a focused utility, so it is deterministic and directly unit-testable. Escape/quote model-produced content as plain text and delimit findings clearly; do not interpret model HTML.
-- Add “Copy N selected as prompt”. Use the supported browser clipboard API from the user gesture; surface success/failure through the existing status/error pattern. Disable the action at zero eligible selections. Avoid adding a server RPC because clipboard access belongs in the renderer.
+- Add “Copy N selected as prompt”. Use the renderer clipboard APIs from the user gesture; surface success/failure through the existing status/error pattern. Disable the action when no active findings are selected. Avoid adding a server RPC because clipboard access belongs in the renderer.
 - Preserve current edit and dismiss semantics. Disable selection/copy while editing or while conflicting actions are busy.
 
 ### 3. Post only selected findings
@@ -39,7 +39,7 @@ Improve provenance and reuse of findings in the CodeNod PR detail view, and let 
 - Pass selected IDs into the detail post calculation and derive `postableFindings` by intersecting selected IDs with active, unposted findings matching the current filters. Clearly show selected eligible count and provide a visible select/clear action so users understand why filtered findings are or are not included.
 - Submit only these IDs through the existing `post` RPC; keep server-side filtering/validation as the authority. Do not change the post payload or GitHub API behavior unless implementation reveals a specific gap.
 - Preserve message-only COMMENT behavior. Preserve signed approval binding and stale-review protections for APPROVE/REQUEST_CHANGES. Ensure the confirmation detail reports the actual selected finding count.
-- After a successful post, remove newly posted IDs from selection. On failed/partial posts, preserve IDs that remain eligible so the user can retry; reconcile against refreshed findings.
+- Keep posted findings selected after posting so they remain available for prompt copying. Only unposted selected findings are sent to GitHub; reconcile selection against refreshed findings and retain active posted IDs.
 
 ### 4. Documentation and regression coverage
 
@@ -51,7 +51,7 @@ Improve provenance and reuse of findings in the CodeNod PR detail view, and let 
 ## Acceptance criteria
 
 - Every finding card identifies the model(s) that flagged it, including single-model reviews.
-- A user can select one or more eligible findings, copy a complete prompt containing only those findings, and receive a clear result if clipboard access fails.
+- A user can select active findings, including posted ones, copy a complete prompt containing only those selected findings, and receive a clear result if clipboard access fails.
 - A user can post only chosen eligible findings; unselected findings are not sent. Filter changes do not unexpectedly broaden selection.
 - Existing dismissal/editing, message-only comments, GitHub posting safeguards, stale approval refusal, and post reconciliation continue to work.
 - UI and formatter regression tests cover the behaviors above; `npm run typecheck`, `npm test`, and `npm run build` pass.

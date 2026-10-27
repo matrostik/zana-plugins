@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
-import { errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
+import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
 import { ProviderModelPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
@@ -154,7 +154,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         selectedReviewId.current = nextReviewId;
         setSelectedFindingIds((selected) => isNewReview
           ? new Set(eligible.map((finding) => finding.id))
-          : new Set(eligible.filter((finding) => selected.has(finding.id)).map((finding) => finding.id)));
+          : new Set(next.findings.filter((finding) => !finding.dismissed && selected.has(finding.id)).map((finding) => finding.id)));
       })
       .catch((cause) => {
         if (requestSeq.current !== requestId) return;
@@ -183,7 +183,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setEditingFinding(false);
   }, [prId, reviewId]);
   const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters)) ?? [];
-  const selectedEligibleFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && finding.postedAt === null) ?? [];
+  const selectedFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed) ?? [];
 
   const now = useNow(isActive(detail?.latestAttempt?.status) || isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
@@ -246,15 +246,14 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     });
 
   const copyPrompt = async () => {
-    if (!detail || !selectedEligibleFindings.length) return;
+    if (!detail || !selectedFindings.length) return;
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this environment.');
-      await navigator.clipboard.writeText(formatFindingsPrompt({
+      await copyTextToClipboard(formatFindingsPrompt({
         owner: detail.pr.owner, repo: detail.pr.repo, number: detail.pr.number, title: detail.pr.title,
         headSha: detail.review?.headSha ?? detail.pr.headSha,
-        findings: selectedEligibleFindings
+        findings: selectedFindings
       }));
-      setNotice({ kind: 'info', text: `Copied ${selectedEligibleFindings.length} finding${selectedEligibleFindings.length === 1 ? '' : 's'} as a prompt.` });
+      setNotice({ kind: 'info', text: `Copied ${selectedFindings.length} finding${selectedFindings.length === 1 ? '' : 's'} as a prompt.` });
     } catch (cause) {
       setNotice({ kind: 'error', text: `Could not copy findings: ${errorText(cause)}` });
     }
@@ -353,7 +352,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                   selectedIds={selectedFindingIds} onSelectionChange={setSelectedFindingIds} onCopyPrompt={() => void copyPrompt()}
                   onFindingsChange={(next) => {
                     setDetail((current) => current?.review?.id === review.id ? { ...current, findings: next } : current);
-                    const eligibleIds = new Set(next.filter((finding) => !finding.dismissed && finding.postedAt === null).map((finding) => finding.id));
+                    const eligibleIds = new Set(next.filter((finding) => !finding.dismissed).map((finding) => finding.id));
                     setSelectedFindingIds((selected) => new Set([...selected].filter((id) => eligibleIds.has(id))));
                   }} />
               ) : null}

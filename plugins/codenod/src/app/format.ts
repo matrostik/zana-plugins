@@ -36,6 +36,34 @@ export function formatFindingsPrompt(input: {
   return [...header, '', entries.join('\n\n')].join('\n');
 }
 
+function copyWithDocumentCommand(text: string): boolean {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.setAttribute('aria-hidden', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  try {
+    textarea.focus();
+    textarea.select();
+    return typeof document.execCommand === 'function' && document.execCommand('copy');
+  } finally {
+    textarea.remove();
+  }
+}
+
+export async function copyTextToClipboard(text: string): Promise<void> {
+  // Try synchronously inside the click gesture before awaiting a permission-gated API.
+  if (copyWithDocumentCommand(text)) return;
+  if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable and the built-in copy command failed.');
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (cause) {
+    throw new Error(`Clipboard access was denied and the built-in copy command failed: ${errorText(cause)}`);
+  }
+}
+
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

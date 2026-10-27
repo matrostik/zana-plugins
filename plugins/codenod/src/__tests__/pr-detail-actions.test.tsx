@@ -241,7 +241,13 @@ describe('PrDetail findings and posting', () => {
     expect(screen.getByText('Posted')).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
     expect(screen.getByText('Flagged by: cursor/a, cursor/b')).toBeTruthy();
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    const card = screen.getByRole('article', { name: 'Finding in src/login.ts:12' });
+    expect(card.querySelector('.cn-finding-head')?.firstElementChild?.className).toContain('cn-finding-select');
+    expect((screen.getByRole('checkbox', { name: 'Select finding in src/login.ts' }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Select all issues' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Clear selection' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Deselect all issues' })).toBeNull();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Dismiss' })[0]);
     await waitFor(() => expect(call).toHaveBeenCalledWith('dismissFinding', { findingId: 'f1', dismissed: true }));
@@ -257,6 +263,16 @@ describe('PrDetail findings and posting', () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f3'] })));
   });
 
+  it('never reposts selected findings that are already posted', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
+    const call = makeRpc(data, { post: () => ({ url: null, commentCount: 2 }) });
+    renderDetail(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Select all issues' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post 2 findings to GitHub' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('post', expect.objectContaining({ findingIds: ['f1', 'f3'] })));
+  });
+
   it('copies selected findings as a prompt', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
@@ -264,6 +280,35 @@ describe('PrDetail findings and posting', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Review findings for acme/api#1: Add login')));
     expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
+  });
+
+  it('uses the synchronous document copy command before the async Clipboard API', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('permission denied'));
+    const execCommand = vi.fn(() => {
+      expect(document.activeElement?.tagName).toBe('TEXTAREA');
+      return true;
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    renderDetail(makeRpc(completedWithFindings()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy 1 selected as prompt' }));
+    await waitFor(() => expect(execCommand).toHaveBeenCalledWith('copy'));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(await screen.findByText('Copied 1 finding as a prompt.')).toBeTruthy();
+  });
+
+  it('selects and deselects all active findings regardless of filters', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
+    renderDetail(makeRpc(data));
+    const boxes = await screen.findAllByRole('checkbox');
+    expect(boxes).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(boxes.every((box) => !(box as HTMLInputElement).checked)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Select all issues' }));
+    expect(boxes.every((box) => (box as HTMLInputElement).checked)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(boxes.every((box) => !(box as HTMLInputElement).checked)).toBe(true);
   });
 
   it('posts only unposted findings matching both filters, even inside collapsed files', async () => {
