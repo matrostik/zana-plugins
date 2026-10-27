@@ -431,6 +431,25 @@ describe('PrDetail findings and posting', () => {
     expect(boxes.every((box) => !(box as HTMLInputElement).checked)).toBe(true);
   });
 
+  it('disables select visible and select all issues when all matching findings are selected', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', description: 'Other issue' }));
+    renderDetail(makeRpc(data));
+    const selectAllBtn = await screen.findByRole('button', { name: 'Select all issues' });
+    const selectVisibleBtn = screen.getByRole('button', { name: 'Select visible' });
+    expect((selectAllBtn as HTMLButtonElement).disabled).toBe(false);
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(selectAllBtn);
+    expect((selectAllBtn as HTMLButtonElement).disabled).toBe(true);
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(selectVisibleBtn);
+    expect((selectVisibleBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('posts only unposted findings matching both filters, even inside collapsed files', async () => {
     const data = completedWithFindings();
     data.findings.push(finding({ id: 'f3', severity: 'medium', category: 'security', file: 'src/auth.ts', description: 'Unsafe redirect' }));

@@ -310,6 +310,7 @@ export function FindingsView(props: {
   const dismissibleVisible = visible.filter((finding) => finding.postedAt === null);
   const selectedFindings = findings.filter((finding) => props.selectedIds.has(finding.id) && !finding.dismissed);
   const allSelected = active.length > 0 && active.every((finding) => props.selectedIds.has(finding.id));
+  const allVisibleSelected = visible.length > 0 && visible.every((finding) => props.selectedIds.has(finding.id));
   const dismissed = findings.filter((finding) => finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters));
   const groups = new Map<string, FindingRow[]>();
   for (const finding of visible) groups.set(finding.file, [...(groups.get(finding.file) ?? []), finding]);
@@ -410,7 +411,7 @@ export function FindingsView(props: {
             for (const finding of active) next.add(finding.id);
             props.onSelectionChange(next);
           }}>Select all issues</button>
-          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !visible.length} onClick={() => {
+          <button type="button" className="cn-btn cn-small" disabled={controlsDisabled || !visible.length || allVisibleSelected} onClick={() => {
             const next = new Set(props.selectedIds);
             for (const finding of visible) next.add(finding.id);
             props.onSelectionChange(next);

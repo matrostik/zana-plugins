@@ -130,7 +130,6 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [notice, setNotice] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
-  const selectedReviewId = useRef<string | null>(null);
   const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
@@ -157,7 +156,6 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         if (reviewCompleted) {
           initializedReviewId.current = nextReviewId;
         }
-        selectedReviewId.current = nextReviewId;
         const prevPosted = prevFindingsPosted.current;
         const newlyPostedIds = new Set(
           next.findings
@@ -179,7 +177,6 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
     setDetail(null);
     setNotice(null);
     setPickerOpen(false);
-    selectedReviewId.current = null;
     initializedReviewId.current = null;
     prevFindingsPosted.current = new Map();
     load();

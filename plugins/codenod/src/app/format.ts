@@ -33,14 +33,43 @@ const CATEGORY_NAMES: Record<string, string> = {
   style: 'Style'
 };
 
-function sanitizePromptText(text: string): string {
+export const PROMPT_LABELS = {
+  headerPrefix: 'Review findings for',
+  commitPrefix: 'Reviewed commit:',
+  findingPrefix: '--- Finding',
+  findingEndPrefix: '--- End Finding',
+  issuePrefix: 'Issue:',
+  suggestionPrefix: 'Suggestion:',
+  flaggedByPrefix: 'Flagged by:'
+} as const;
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, (c) => '\\' + c);
+}
+
+const ESCAPED_MARKERS = [
+  '---',
+  '===',
+  '\\d+[\\.)]',
+  ...Object.values(PROMPT_LABELS).map((label) => escapeRegex(label))
+].join('|');
+const INJECTION_PATTERN = new RegExp(`^\\s*(?:${ESCAPED_MARKERS})`, 'i');
+
+export function sanitizeSingleLine(text: string): string {
+  return text
+    .replace(/[\x00-\x1F\x7F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function sanitizePromptText(text: string): string {
   const cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
   if (!cleaned) return '(none)';
   return cleaned
     .split(/\r?\n/)
     .map((line) => {
       const trimmed = line.trimEnd();
-      if (/^\s*(?:---|===|\d+[\.)]|Issue:|Suggestion:|Flagged by:|Review findings|Reviewed commit)/i.test(trimmed)) {
+      if (INJECTION_PATTERN.test(trimmed)) {
         return `  > ${trimmed}`;
       }
       return trimmed;
@@ -52,18 +81,23 @@ export function formatFindingsPrompt(input: {
   owner: string; repo: string; number: number; title: string; headSha: string;
   findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string; suggestion: string | null; agreedBy: string[] }>;
 }): string {
-  const header = [`Review findings for ${input.owner}/${input.repo}#${input.number}: ${input.title}`, `Reviewed commit: ${input.headSha}`];
+  const owner = sanitizeSingleLine(input.owner);
+  const repo = sanitizeSingleLine(input.repo);
+  const title = sanitizeSingleLine(input.title);
+  const headSha = sanitizeSingleLine(input.headSha);
+  const header = [`${PROMPT_LABELS.headerPrefix} ${owner}/${repo}#${input.number}: ${title}`, `${PROMPT_LABELS.commitPrefix} ${headSha}`];
   const entries = input.findings.map((finding, index) => {
-    const location = finding.line === null ? finding.file : `${finding.file}:${finding.line}`;
+    const cleanFile = sanitizeSingleLine(finding.file);
+    const location = finding.line === null ? cleanFile : `${cleanFile}:${finding.line}`;
     const severityLabel = SEVERITY_NAMES[finding.severity.toLowerCase()] ?? finding.severity.toUpperCase();
     const categoryLabel = CATEGORY_NAMES[finding.category.toLowerCase()] ?? finding.category;
     return [
-      `--- Finding ${index + 1} ---`,
+      `${PROMPT_LABELS.findingPrefix} ${index + 1} ---`,
       `${index + 1}. [${severityLabel}] ${categoryLabel} — ${location}`,
-      `Issue: ${sanitizePromptText(finding.description)}`,
-      ...(finding.suggestion ? [`Suggestion: ${sanitizePromptText(finding.suggestion)}`] : []),
-      `Flagged by: ${finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}`,
-      `--- End Finding ${index + 1} ---`
+      `${PROMPT_LABELS.issuePrefix} ${sanitizePromptText(finding.description)}`,
+      ...(finding.suggestion ? [`${PROMPT_LABELS.suggestionPrefix} ${sanitizePromptText(finding.suggestion)}`] : []),
+      `${PROMPT_LABELS.flaggedByPrefix} ${finding.agreedBy.length ? finding.agreedBy.join(', ') : 'Model unavailable'}`,
+      `${PROMPT_LABELS.findingEndPrefix} ${index + 1} ---`
     ].join('\n');
   });
   return [...header, '', entries.join('\n\n')].join('\n');

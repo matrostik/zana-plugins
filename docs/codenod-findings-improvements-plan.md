@@ -29,17 +29,17 @@ Improve provenance and reuse of findings in the CodeNod PR detail view, and let 
 ### 2. Shared finding selection and copy-to-prompt
 
 - Own selected finding IDs at `PrDetail` level (or another component that can coordinate FindingsView and the post footer), keyed/reset by the active review ID.
-- Add accessible checkboxes to active cards, including posted findings, and “Select all issues”, “Select visible”, and “Clear selection” controls. Dismissed findings cannot be selected. GitHub posting filters selected IDs to active, unposted findings.
+- Add accessible checkboxes to active cards, including posted findings, and “Select all issues”, “Select visible”, and “Clear selection” controls. Dismissed findings cannot be selected. GitHub posting includes selected active findings (with support for re-posting previously published findings).
 - Add a pure formatter for the prompt text, preferably in `src/app/format.ts` or a focused utility, so it is deterministic and directly unit-testable. Escape/quote model-produced content as plain text and delimit findings clearly; do not interpret model HTML.
 - Add “Copy N selected as prompt”. Use the renderer clipboard APIs from the user gesture; surface success/failure through the existing status/error pattern. Disable the action when no active findings are selected. Avoid adding a server RPC because clipboard access belongs in the renderer.
 - Preserve current edit and dismiss semantics. Disable selection/copy while editing or while conflicting actions are busy.
 
 ### 3. Post only selected findings
 
-- Pass selected IDs into the detail post calculation and derive `postableFindings` by intersecting selected IDs with active, unposted findings matching the current filters. Clearly show selected eligible count and provide a visible select/clear action so users understand why filtered findings are or are not included.
+- Pass selected IDs into the detail post calculation and derive `postableFindings` by intersecting selected IDs with active findings matching the current filters. Clearly show selected eligible count and provide a visible select/clear action so users understand why filtered findings are or are not included.
 - Submit only these IDs through the existing `post` RPC; keep server-side filtering/validation as the authority. Do not change the post payload or GitHub API behavior unless implementation reveals a specific gap.
 - Preserve message-only COMMENT behavior. Preserve signed approval binding and stale-review protections for APPROVE/REQUEST_CHANGES. Ensure the confirmation detail reports the actual selected finding count.
-- Keep posted findings selected after posting so they remain available for prompt copying. Only unposted selected findings are sent to GitHub; reconcile selection against refreshed findings and retain active posted IDs.
+- Deselect posted findings after posting while retaining unposted findings the payload left out. Selected previously published findings can be re-posted to GitHub; selection reconciliation preserves active selected findings across refreshes and prunes newly published IDs.
 
 ### 4. Documentation and regression coverage
 
