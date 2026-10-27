@@ -142,20 +142,28 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const result = await sync.syncAll();
     await notifyOutdated();
     const autoReviewPrs = new Map(result.changed.map((pr) => [pr.id, pr]));
+    for (const pr of result.changed) pendingAutoReviewPrIds.add(pr.id);
     // A selected-PR refresh may discover a new head before the full sync sees it.
     for (const id of pendingAutoReviewPrIds) {
       const pr = store.getPullRequest(id);
       if (pr) autoReviewPrs.set(id, pr);
+      else pendingAutoReviewPrIds.delete(id);
     }
-    pendingAutoReviewPrIds.clear();
-    for (const pr of autoReviewPrs.values()) {
+    for (const [id, pr] of autoReviewPrs) {
       const repo = store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
       const host = result.hosts.find((host) => host.host === pr.host);
       if (!host?.login || host.error) continue;
       const login = host.login;
-      if (!repo?.autoReview || pr.isDraft || !pr.buckets.includes('needs-review') || pr.author === login) continue;
-      if (store.hasReviewForHead(pr.id, pr.headSha)) continue;
+      if (!repo?.autoReview || pr.isDraft || !pr.buckets.includes('needs-review') || pr.author === login) {
+        pendingAutoReviewPrIds.delete(id);
+        continue;
+      }
+      if (store.hasReviewForHead(pr.id, pr.headSha)) {
+        pendingAutoReviewPrIds.delete(id);
+        continue;
+      }
       await reviews.startReview(parsePrId(pr.id), { trigger: 'auto' }).catch((error) => zcc.log.warn(`codenod: auto-review of ${pr.id} failed: ${errorMessage(error)}`));
+      pendingAutoReviewPrIds.delete(id);
     }
     await zcc.storage.kv.set('lastSyncAt', now());
     publish(CHANGED_EVENT, { sync: true });
@@ -264,7 +272,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     if (!pr) throw new Error('Pull request not found');
     const ref = parsePrId(pr.id);
     const requestedHead = record.headSha;
-    const expectedHead = typeof requestedHead === 'string' && requestedHead ? requestedHead : pr.headSha;
+    const expectedHead = typeof requestedHead === 'string' && requestedHead ? requestedHead : null;
     const checkHead = async () => {
       if (!expectedHead) return;
       const currentHead = (await github.getPull(ref)).head.sha;

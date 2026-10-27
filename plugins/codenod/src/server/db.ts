@@ -518,6 +518,9 @@ export function createStore(db: Database, now: () => number = Date.now) {
     },
 
     setFindingDismissed(id: string, dismissed: boolean): void {
+      const row = db.prepare('SELECT posted_at FROM findings WHERE id = ?').get(id) as Row | undefined;
+      if (!row) throw new Error('Finding not found');
+      if (row.posted_at !== null) throw new Error('Posted findings cannot be dismissed');
       db.prepare('UPDATE findings SET dismissed = ? WHERE id = ?').run(dismissed ? 1 : 0, id);
     },
 
@@ -532,9 +535,11 @@ export function createStore(db: Database, now: () => number = Date.now) {
 
     setFindingsDismissed(reviewId: string, ids: string[], dismissed: boolean): void {
       db.transaction(() => {
-        const lookup = db.prepare('SELECT id FROM findings WHERE id = ? AND review_id = ?');
+        const lookup = db.prepare('SELECT id, posted_at FROM findings WHERE id = ? AND review_id = ?');
         for (const id of ids) {
-          if (!lookup.get(id, reviewId)) throw new Error('Finding not found in this review');
+          const row = lookup.get(id, reviewId) as Row | undefined;
+          if (!row) throw new Error('Finding not found in this review');
+          if (row.posted_at !== null) throw new Error('Posted findings cannot be dismissed');
         }
         const update = db.prepare('UPDATE findings SET dismissed = ? WHERE id = ? AND review_id = ?');
         for (const id of ids) update.run(dismissed ? 1 : 0, id, reviewId);

@@ -171,7 +171,7 @@ function FindingCard(props: {
             <Icon name="edit" />
           </button>
         ) : null}
-        {!editing ? (
+        {!editing && finding.postedAt === null ? (
           <button
             className="cn-icon-btn"
             type="button"
@@ -235,10 +235,12 @@ function FindingCard(props: {
                 Edit
               </button>
             ) : null}
-            <button type="button" disabled={props.disabled} className="cn-text-btn" onClick={props.onDismiss}>
-              <Icon name="dismiss" />
-              Dismiss
-            </button>
+            {canEdit ? (
+              <button type="button" disabled={props.disabled} className="cn-text-btn" onClick={props.onDismiss}>
+                <Icon name="dismiss" />
+                Dismiss
+              </button>
+            ) : null}
           </div>
         </>
       )}
@@ -298,7 +300,8 @@ export function FindingsView(props: {
 
   const active = findings.filter((finding) => !finding.dismissed);
   const visible = active.filter((finding) => matchesFinding(finding, filters));
-  const dismissed = findings.filter((finding) => finding.dismissed && matchesFinding(finding, filters));
+  const dismissibleVisible = visible.filter((finding) => finding.postedAt === null);
+  const dismissed = findings.filter((finding) => finding.dismissed && finding.postedAt === null && matchesFinding(finding, filters));
   const groups = new Map<string, FindingRow[]>();
   for (const finding of visible) groups.set(finding.file, [...(groups.get(finding.file) ?? []), finding]);
   const defaultExpanded = new Set([...new Set(active.map((finding) => finding.file))].slice(0, DEFAULT_EXPANDED_FILES));
@@ -406,15 +409,15 @@ export function FindingsView(props: {
           <button
             type="button"
             className="cn-btn cn-small"
-            disabled={controlsDisabled || !visible.length}
+            disabled={controlsDisabled || !dismissibleVisible.length}
             onClick={() =>
               void dismiss(
-                visible.map((f) => f.id),
+                dismissibleVisible.map((f) => f.id),
                 true
               )
             }
           >
-            Dismiss {visible.length} filtered finding{visible.length === 1 ? '' : 's'}
+            Dismiss {dismissibleVisible.length} filtered finding{dismissibleVisible.length === 1 ? '' : 's'}
           </button>
           {dismissed.length ? (
             <button
