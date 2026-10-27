@@ -109,8 +109,11 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     warn: (message) => zcc.log.warn(message)
   });
 
+  const pendingAutoReviewPrIds = new Set<string>();
   async function refreshPullRequest(ref: ReturnType<typeof parsePrId>) {
+    const previousHead = store.getPullRequest(prId(ref))?.headSha;
     const pr = await sync.syncPullRequest(ref);
+    if (pr.headSha !== previousHead) pendingAutoReviewPrIds.add(pr.id);
     await notifyOutdated([pr.id]);
     publish(CHANGED_EVENT, { prId: pr.id });
     return pr;
@@ -138,8 +141,14 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   async function runSync() {
     const result = await sync.syncAll();
     await notifyOutdated();
-    // A detail refresh can discover a head before the background sync does.
-    for (const pr of result.changed) {
+    const autoReviewPrs = new Map(result.changed.map((pr) => [pr.id, pr]));
+    // A selected-PR refresh may discover a new head before the full sync sees it.
+    for (const id of pendingAutoReviewPrIds) {
+      const pr = store.getPullRequest(id);
+      if (pr) autoReviewPrs.set(id, pr);
+    }
+    pendingAutoReviewPrIds.clear();
+    for (const pr of autoReviewPrs.values()) {
       const repo = store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
       const host = result.hosts.find((host) => host.host === pr.host);
       if (!host?.login || host.error) continue;
