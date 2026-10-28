@@ -369,6 +369,9 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const targetFindings = findingIds.length > 0
       ? activeFindings.filter((finding) => findingIds.includes(finding.id))
       : activeFindings;
+    if (findingIds.length > 0 && targetFindings.length === 0) {
+      throw new Error('No active findings match the selection (selected findings may have been dismissed)');
+    }
     const config = await reviewConfig();
     const project = await projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
     const projectId = project?.id ?? config.fallbackProjectId ?? (await projects.projects())[0]?.id;

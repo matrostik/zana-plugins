@@ -607,6 +607,17 @@ describe('codenod settings', () => {
     expect(thread.args.prompt).toContain(detail.findings[0].description);
   });
 
+  it('rejects Deep Review when every selected finding was dismissed', async () => {
+    const { host } = await setup();
+    const detail = await reviewToCompletion(host);
+    const findingId = detail.findings[0].id;
+    await host.callRpc('dismissFinding', { findingId, dismissed: true });
+
+    await expect(host.callRpc('deepReview', { prId: PR_ID, findingIds: [findingId] })).rejects.toThrow(
+      'No active findings match the selection (selected findings may have been dismissed)'
+    );
+  });
+
   it('returns blockingCount and blockingFindings via codenod_review_pr with remediationGate', async () => {
     const { host } = await setup();
     await host.callRpc('setModels', { models: [MODELS[0]] });

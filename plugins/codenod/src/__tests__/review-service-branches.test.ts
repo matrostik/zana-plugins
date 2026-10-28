@@ -652,6 +652,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
       return store.getPullRequest(id)!;
     },
     publish: (event, payload) => void published.push({ event, payload }),
+    coordinatorRetryDelayMs: 0,
     log
   });
 
@@ -1009,6 +1010,42 @@ describe('review service', () => {
     expect(store.getReview(running.id)?.status).toBe('cancelled');
     expect(store.getReview(queued.id)?.status).toBe('queued');
     expect(spawned).toHaveLength(1);
+  });
+
+  it('retries coordinator updates and logs a warning on repeated failure', async () => {
+    let sendCalls = 0;
+    const { store, service, threads, log, settled } = createServiceHarness({
+      config: { showReviewsOnAgentsBoard: true }
+    });
+    threads.send = vi.fn(async () => {
+      sendCalls++;
+      throw new Error('coordinator busy');
+    });
+
+    const review = await service.startReview(prRef());
+    await settled();
+
+    expect(sendCalls).toBe(3);
+    const coordId = store.getReview(review.id)!.coordinatorThreadId!;
+    expect(log.warn).toHaveBeenCalledWith(`codenod: failed to update coordinator thread ${coordId}: coordinator busy`);
+  });
+
+  it('updates coordinator thread with failure status when review throws partway', async () => {
+    const { store, service, threads, settled } = createServiceHarness({
+      config: { showReviewsOnAgentsBoard: true },
+      respond: () => {
+        throw new Error('unexpected crash');
+      }
+    });
+
+    const review = await service.startReview(prRef());
+    await settled();
+
+    const coordId = store.getReview(review.id)!.coordinatorThreadId!;
+    expect(threads.send).toHaveBeenCalledWith({
+      threadId: coordId,
+      prompt: expect.stringContaining('Code review failed')
+    });
   });
 });
 
