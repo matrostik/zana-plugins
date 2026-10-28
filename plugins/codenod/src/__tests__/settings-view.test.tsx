@@ -32,6 +32,7 @@ function snapshot(overrides: Partial<ConfigSnapshot['settings']> = {}): ConfigSn
       workspaceMode: 'worktree',
       fallbackProjectId: null,
       archiveReviewThreads: true,
+      showReviewsOnAgentsBoard: true,
       autoSyncEnabled: true,
       ...overrides
     },

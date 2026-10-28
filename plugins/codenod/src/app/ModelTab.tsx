@@ -114,6 +114,10 @@ function ExecutionSection({ rpc, config, onChanged }: { rpc: Rpc; config: Config
           <input type="checkbox" checked={settings.archiveReviewThreads} onChange={(event) => save({ archiveReviewThreads: event.target.checked })} />
           Archive hidden review threads when done
         </label>
+        <label className="cn-check">
+          <input type="checkbox" checked={settings.showReviewsOnAgentsBoard} onChange={(event) => save({ showReviewsOnAgentsBoard: event.target.checked })} />
+          Show review coordinator on Agents board
+        </label>
       </div>
       {saved ? <span className="cn-muted" role="status">Saved</span> : null}
     </section>

@@ -7,6 +7,8 @@ import { createProjectMatcher, type ProjectMatcher, type ZanaProject } from '../
 import {
   createThreadWaiter,
   DEFAULT_POLL_MS,
+  detectUsageLimit,
+  looksLikeValidReview,
   pickReviewPermissionMode,
   runModelInThread,
   type RunModelInput,
@@ -233,6 +235,48 @@ describe('thread waiter', () => {
 
     await expect(result).resolves.toBe('done');
   });
+
+  it('stops the thread and rejects with usage limit error when thread.idle event carries quota message', async () => {
+    useFakeClock();
+    const { threads, state } = createFakeThreads();
+    const waiter = createThreadWaiter(threads, { pollMs: POLL_MS });
+
+    const quotaText = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
+    const result = waiter.waitForOutput('thread-1');
+    state.output = quotaText;
+    await waiter.onEvent({ name: 'thread.idle', threadId: 'thread-1', lastAssistantText: quotaText });
+
+    await expect(result).rejects.toThrow('Review thread stopped: usage limit reached (Usage Limit Reached: You have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.)');
+    expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
+  });
+
+  it('stops the thread and rejects when polling detects usage limit in finished thread output', async () => {
+    useFakeClock();
+    const quotaText = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
+    const { threads, state } = createFakeThreads({ status: 'completed', output: quotaText });
+    const waiter = createThreadWaiter(threads, { pollMs: POLL_MS });
+
+    const result = waiter.waitForOutput('thread-1');
+    const assertion = expect(result).rejects.toThrow('Review thread stopped: usage limit reached (Usage Limit Reached: You have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.)');
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    await assertion;
+    expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
+  });
+
+  it('does not read thread output or stop thread while status is still running', async () => {
+    useFakeClock();
+    const { threads, state } = createFakeThreads({ status: 'running', output: 'Rate limit exceeded: quota will reset in 60 seconds' });
+    const waiter = createThreadWaiter(threads, { pollMs: POLL_MS });
+
+    let settled = false;
+    const result = waiter.waitForOutput('thread-1').finally(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(POLL_MS * 2);
+
+    expect(settled).toBe(false);
+    expect(threads.output).not.toHaveBeenCalled();
+    expect(threads.stop).not.toHaveBeenCalled();
+    void result.catch(() => undefined);
+  });
 });
 
 const RUN_MODEL: ModelChoice = { providerId: 'claude-code', model: 'opus', reasoningLevel: 'high' };
@@ -326,6 +370,88 @@ describe('runModelInThread', () => {
     await assertion;
     expect(threads.stop).toHaveBeenCalledTimes(2);
     expect(threads.archive).toHaveBeenCalledWith({ threadId: 'thread-1' });
+  });
+
+  it('stops the thread immediately and throws without attempting repair when usage limit is reached', async () => {
+    const { threads } = createFakeThreads();
+    const quotaMsg = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
+    const { waiter } = createScriptedWaiter([quotaMsg]);
+
+    await expect(runModelInThread(threads, waiter, runInput())).rejects.toThrow(
+      'Review thread stopped: usage limit reached (Usage Limit Reached: You have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.)'
+    );
+
+    expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
+    expect(threads.send).not.toHaveBeenCalled();
+    expect(threads.archive).toHaveBeenCalledWith({ threadId: 'thread-1' });
+  });
+
+  it('stops the thread immediately if a repair attempt encounters a usage limit', async () => {
+    const { threads } = createFakeThreads();
+    const quotaMsg = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
+    const { waiter } = createScriptedWaiter(['malformed output', quotaMsg]);
+
+    await expect(runModelInThread(threads, waiter, runInput())).rejects.toThrow(
+      'Review thread stopped: usage limit reached (Usage Limit Reached: You have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.)'
+    );
+
+    expect(threads.send).toHaveBeenCalledTimes(1);
+    expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
+    expect(threads.archive).toHaveBeenCalledWith({ threadId: 'thread-1' });
+  });
+
+  it('attempts repair instead of failing immediately when malformed review output mentions quota', async () => {
+    const { threads } = createFakeThreads();
+    const malformedWithQuota = '{"summary": "rate limit handling", "riskScore": 3, "logicIssues": [';
+    const validRepair = '{"ok": 1}';
+    const { waiter } = createScriptedWaiter([malformedWithQuota, validRepair]);
+
+    const result = await runModelInThread(threads, waiter, runInput({ validate: (t) => (t.endsWith('}') ? { ok: true } : { ok: false, problem: 'incomplete JSON' }), archiveWhenDone: false }));
+    expect(result.text).toBe(validRepair);
+    expect(threads.send).toHaveBeenCalledTimes(1);
+    expect(threads.stop).not.toHaveBeenCalled();
+  });
+});
+
+describe('detectUsageLimit and looksLikeValidReview', () => {
+  it('detects antigravity usage limit error with reset duration', () => {
+    const text = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
+    expect(detectUsageLimit(text)).toBe(
+      'Usage Limit Reached: You have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.'
+    );
+  });
+
+  it('detects provider quota and rate limit errors across various styles', () => {
+    expect(detectUsageLimit('You have exceeded your current quota, please check your plan and billing details.')).toContain('exceeded your current quota');
+    expect(detectUsageLimit('Your credit balance is too low to access the Claude API.')).toContain('credit balance is too low');
+    expect(detectUsageLimit('RESOURCE_EXHAUSTED: quota exceeded for model')).toContain('RESOURCE_EXHAUSTED');
+    expect(detectUsageLimit('Rate limit exceeded: quota will reset in 60 seconds')).toContain('Rate limit exceeded');
+    expect(detectUsageLimit('{"error": {"code": "insufficient_quota", "message": "quota limit reached"}}')).toContain('insufficient_quota');
+  });
+
+  it('ignores normal responses without usage limits', () => {
+    expect(detectUsageLimit('The code changes look good and all tests pass.')).toBeNull();
+    expect(detectUsageLimit('')).toBeNull();
+  });
+
+  it('recognizes valid review analysis and distinguishes it from usage limit errors', () => {
+    const valid = JSON.stringify({
+      summary: 'Fix rate limit handling in API client',
+      riskScore: 2,
+      logicIssues: [{ file: 'api.ts', description: 'Handle rate limit exceeded response' }]
+    });
+    expect(looksLikeValidReview(valid)).toBe(true);
+    expect(looksLikeValidReview('Usage Limit Reached\nYou have reached your current quota.')).toBe(false);
+  });
+
+  it('does not treat malformed reviews containing review JSON keys as usage limit', () => {
+    const malformed = '{"summary": "Review for rate limiting", "riskScore": 4, "logicIssues": [{"description": "quota exceeded in check"';
+    expect(detectUsageLimit(malformed)).toBeNull();
+  });
+
+  it('ignores usage limit patterns in long text', () => {
+    const longText = 'A'.repeat(400) + ' usage limit reached';
+    expect(detectUsageLimit(longText)).toBeNull();
   });
 });
 
@@ -485,6 +611,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
     maxConcurrent: 2,
     timeoutMs: 60_000,
     archiveThreads: true,
+    showReviewsOnAgentsBoard: false,
     ...options.config
   };
   const published: Array<{ event: string; payload: unknown }> = [];
@@ -525,6 +652,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
       return store.getPullRequest(id)!;
     },
     publish: (event, payload) => void published.push({ event, payload }),
+    coordinatorRetryDelayMs: 0,
     log
   });
 
@@ -595,6 +723,28 @@ describe('review service', () => {
     expect(threads.send.mock.calls[0][0].prompt).toContain('could not be used');
     expect(store.getReview(review.id)).toMatchObject({ status: 'failed', error: 'Model reply was not usable: the reply did not contain a valid JSON object' });
     expect(spawned[0].args.permissionMode).toBe('full');
+  });
+
+  it('stops a model that hits usage limit without sending repair prompts and completes review with successful models', async () => {
+    const quotaMsg = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
+    const { store, service, threads, settled } = createServiceHarness({
+      config: { models: SERVICE_MODELS },
+      respond: ({ model }) => {
+        if (model === 'gpt') return quotaMsg;
+        return VALID_REPLY;
+      }
+    });
+
+    const review = await service.startReview(prRef());
+    await settled();
+
+    expect(store.getReview(review.id)).toMatchObject({ status: 'completed' });
+    const runs = store.listRuns(review.id);
+    const gptRun = runs.find((r) => r.model === 'gpt')!;
+    expect(gptRun.status).toBe('failed');
+    expect(gptRun.error).toContain('usage limit reached');
+    expect(threads.send).not.toHaveBeenCalled();
+    expect(threads.stop).toHaveBeenCalled();
   });
 
   it('summarizes agreement when several models succeed', async () => {
@@ -860,6 +1010,42 @@ describe('review service', () => {
     expect(store.getReview(running.id)?.status).toBe('cancelled');
     expect(store.getReview(queued.id)?.status).toBe('queued');
     expect(spawned).toHaveLength(1);
+  });
+
+  it('retries coordinator updates and logs a warning on repeated failure', async () => {
+    let sendCalls = 0;
+    const { store, service, threads, log, settled } = createServiceHarness({
+      config: { showReviewsOnAgentsBoard: true }
+    });
+    threads.send = vi.fn(async () => {
+      sendCalls++;
+      throw new Error('coordinator busy');
+    });
+
+    const review = await service.startReview(prRef());
+    await settled();
+
+    expect(sendCalls).toBe(3);
+    const coordId = store.getReview(review.id)!.coordinatorThreadId!;
+    expect(log.warn).toHaveBeenCalledWith(`codenod: failed to update coordinator thread ${coordId}: coordinator busy`);
+  });
+
+  it('updates coordinator thread with failure status when review throws partway', async () => {
+    const { store, service, threads, settled } = createServiceHarness({
+      config: { showReviewsOnAgentsBoard: true },
+      respond: () => {
+        throw new Error('unexpected crash');
+      }
+    });
+
+    const review = await service.startReview(prRef());
+    await settled();
+
+    const coordId = store.getReview(review.id)!.coordinatorThreadId!;
+    expect(threads.send).toHaveBeenCalledWith({
+      threadId: coordId,
+      prompt: expect.stringContaining('Code review failed')
+    });
   });
 });
 

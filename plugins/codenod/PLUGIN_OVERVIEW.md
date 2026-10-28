@@ -25,6 +25,13 @@ Like Git Tree, this plugin installs from pre-built artifacts committed alongside
 
 ## Changelog
 
+### 0.1.3
+
+- **Agents Board Review Coordinator**: Automated multi-model reviews spawn a single visible Coordinator Thread on Zana's Agents board (1 card per PR review instead of flooding with individual worker threads). Sub-model evaluation runs remain hidden, headless workers.
+- **Review Thread Auto-Archive**: Visible Coordinator Threads and Deep Review threads are automatically archived once a PR is closed or merged on GitHub.
+- **Deep Review with Targeted Findings**: Users can launch a Deep Review focused specifically on their selected finding(s).
+- **Agent Post-PR Self-Review Loop**: Agents can invoke `codenod_review_pr` with `wait: true` and `remediationGate: true` to receive structured blocking findings for automated self-remediation before human sign-off.
+
 ### 0.1.2
 
 - Added functionality to enable or disable automatic repository sync, with configurable interval between sync cycles.

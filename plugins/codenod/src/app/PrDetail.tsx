@@ -274,7 +274,10 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   const deepReview = () =>
     act('deep', async () => {
-      const result = (await rpc.call('deepReview', { prId: pr.id })) as { threadId: string };
+      const findingIds = selectedFindingIds.size > 0 && selectedFindingIds.size < findings.length
+        ? [...selectedFindingIds]
+        : undefined;
+      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds })) as { threadId: string };
       if (navigate?.toThread) navigate.toThread(result.threadId);
       else setNotice({ kind: 'info', text: 'Deep Review thread started. Find it in your thread list.' });
     });
@@ -438,8 +441,23 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
           </>
         )}
         <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void deepReview()}>
-          Deep Review in thread
+          {selectedFindingIds.size > 0 && selectedFindingIds.size < findings.length
+            ? `Deep Review (${selectedFindingIds.size} selected)`
+            : 'Deep Review in thread'}
         </button>
+        {review?.coordinatorThreadId ? (
+          <button
+            type="button"
+            className="cn-btn"
+            disabled={busy !== null}
+            onClick={() => {
+              if (navigate?.toThread) navigate.toThread(review.coordinatorThreadId!);
+              else setNotice({ kind: 'info', text: `Review thread ID: ${review.coordinatorThreadId}` });
+            }}
+          >
+            Review thread
+          </button>
+        ) : null}
         <a className="cn-btn" href={pr.url} target="_blank" rel="noreferrer noopener">
           Open on GitHub
         </a>

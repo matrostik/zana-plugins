@@ -128,6 +128,14 @@ export const MIGRATIONS: readonly string[] = [
     inbox_id TEXT NOT NULL,
     notified_at INTEGER NOT NULL,
     PRIMARY KEY (pr_id, head_sha)
+  )`,
+  `ALTER TABLE reviews ADD COLUMN coordinator_thread_id TEXT`,
+  `CREATE TABLE IF NOT EXISTS pr_threads (
+    pr_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (pr_id, thread_id)
   )`
 ];
 
@@ -229,6 +237,7 @@ function toReview(row: Row): ReviewRow {
     error: str(row.error),
     createdAt: Number(row.created_at),
     completedAt: num(row.completed_at),
+    coordinatorThreadId: str(row.coordinator_thread_id),
     ...scoresFromRow(row)
   };
 }
@@ -422,6 +431,47 @@ export function createStore(db: Database, now: () => number = Date.now) {
     setReviewStatus(id: string, status: ReviewStatus, error: string | null = null): void {
       const done = status === 'completed' || status === 'failed' || status === 'cancelled';
       db.prepare('UPDATE reviews SET status = ?, error = ?, completed_at = ? WHERE id = ?').run(status, error, done ? now() : null, id);
+    },
+
+    setReviewCoordinatorThreadId(id: string, threadId: string): void {
+      db.prepare('UPDATE reviews SET coordinator_thread_id = ? WHERE id = ?').run(threadId, id);
+    },
+
+    recordPrThread(prId: string, threadId: string, kind: 'coordinator' | 'deep'): void {
+      db.prepare('INSERT OR REPLACE INTO pr_threads (pr_id, thread_id, kind, created_at) VALUES (?, ?, ?, ?)').run(
+        prId,
+        threadId,
+        kind,
+        now()
+      );
+    },
+
+    listPrThreads(prId: string): Array<{ prId: string; threadId: string; kind: 'coordinator' | 'deep'; createdAt: number }> {
+      const rows = db.prepare('SELECT pr_id, thread_id, kind, created_at FROM pr_threads WHERE pr_id = ?').all(prId) as Row[];
+      return rows.map((r) => ({
+        prId: String(r.pr_id),
+        threadId: String(r.thread_id),
+        kind: String(r.kind) as 'coordinator' | 'deep',
+        createdAt: Number(r.created_at)
+      }));
+    },
+
+    removePrThread(prId: string, threadId: string): void {
+      db.prepare('DELETE FROM pr_threads WHERE pr_id = ? AND thread_id = ?').run(prId, threadId);
+    },
+
+    listClosedOrMergedPrThreads(): Array<{ prId: string; threadId: string; kind: 'coordinator' | 'deep' }> {
+      const rows = db.prepare(
+        `SELECT pt.pr_id, pt.thread_id, pt.kind
+         FROM pr_threads pt
+         JOIN pull_requests pr ON pr.id = pt.pr_id
+         WHERE pr.state IN ('closed', 'merged')`
+      ).all() as Row[];
+      return rows.map((r) => ({
+        prId: String(r.pr_id),
+        threadId: String(r.thread_id),
+        kind: String(r.kind) as 'coordinator' | 'deep'
+      }));
     },
 
     completeReview(id: string, input: { summary: string; consensusSummary: string | null; hasRequirements: boolean; scores: ReviewScores }): void {

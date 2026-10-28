@@ -32,7 +32,18 @@ Run `zcc codenod models` to see the `provider:model` ids accepted by `--models`.
 
 - `codenod_list_prs` — open pull requests with CI state and latest review status; optional `tab`.
 - `codenod_get_review` — scores (risk, coverage, requirements, simplicity, stability), summary, per-model runs, and findings for `pr`.
-- `codenod_review_pr` — start an unattended AI review of `pr`; optional `models` and `wait`. It never posts to GitHub.
+- `codenod_review_pr` — start an unattended AI review of `pr`; optional `models`, `wait`, and `remediationGate`. It never posts to GitHub. When `wait: true` and `remediationGate: true`, returns `blockingCount`, `blockingFindings`, and `coordinatorThreadId`.
+
+## Post-PR Self-Review Playbook
+
+When an agent authors changes and creates a pull request (e.g. via `gh pr create`):
+1. **Trigger Review**: Call `codenod_review_pr` with `pr`, `wait: true`, and `remediationGate: true`.
+   - The review automatically creates a single visible Coordinator Thread on Zana's Agents board so the review is observable without thread clutter.
+2. **Inspect Blocking Findings**: The tool response provides structured `blockingCount` and `blockingFindings` (critical and high-severity issues flagged by review models).
+3. **Bounded 1-Retry Remediation**:
+   - If `blockingCount > 0`, address the issues in the workspace, commit, and push.
+   - Run `codenod_review_pr` with `wait: true` and `remediationGate: true` **at most once more**.
+   - If findings remain after this single remediation cycle, do not loop further; report the findings and PR link to the user.
 
 ## Reading Results
 
