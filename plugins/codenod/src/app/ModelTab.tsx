@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ModelChoice } from '../server/types.ts';
 import { errorText } from './format.ts';
-import { ProviderModelPicker, SelectedModelOrder } from './ModelSearchPicker.tsx';
+import { ModelPriorityPicker } from './ModelSearchPicker.tsx';
 import { NumberSetting } from './SettingFields.tsx';
 import { useSettingsAction } from './settings-action.ts';
 import type { AvailableProvider, ConfigSnapshot, Rpc } from './types.ts';
@@ -32,7 +32,7 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
     <section className="cn-section" aria-labelledby="cn-models-heading">
       <h3 id="cn-models-heading">Review models</h3>
       <p className="cn-muted cn-small">
-        Each selected model reviews the pull request in its own hidden Zana thread. Pick two or more for multi-model consensus (up to 5).
+        Choose a provider and model for each priority. Reviews use every selected model together for consensus (up to 5).
       </p>
       {shownError ? <p className="cn-banner cn-banner-error">{shownError}</p> : null}
       {!providers ? (
@@ -41,10 +41,7 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
         <p className="cn-muted">No AI provider is available in Zana. Sign in to one under Settings → Providers.</p>
       ) : (
         <>
-          <SelectedModelOrder value={draft} providers={providers} onChange={setDraft} />
-          {providers.map((provider) => (
-            <ProviderModelPicker key={provider.providerId} provider={provider} value={draft} onChange={setDraft} showReasoning showSelected={false} />
-          ))}
+          <ModelPriorityPicker value={draft} providers={providers} onChange={setDraft} />
         </>
       )}
       <div className="cn-inline">

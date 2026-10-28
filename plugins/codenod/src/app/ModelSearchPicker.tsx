@@ -149,39 +149,159 @@ export function ProviderModelPicker(props: { provider: AvailableProvider; value:
   );
 }
 
-export function SelectedModelOrder(props: {
+export function ModelPriorityPicker(props: {
   value: ModelChoice[];
   providers: AvailableProvider[];
   onChange(next: ModelChoice[]): void;
 }) {
   const { value, providers, onChange } = props;
   const providerById = new Map(providers.map((provider) => [provider.providerId, provider]));
+  const selectableProviders = providers.filter((provider) => provider.models.length > 0);
+  const [addingModel, setAddingModel] = useState(value.length === 0);
+  const [addingProviderId, setAddingProviderId] = useState('');
+  const [editingProviderIds, setEditingProviderIds] = useState<Record<string, string>>({});
+  const hasPendingEdit = Object.keys(editingProviderIds).length > 0;
+  const unusedModels = (provider: AvailableProvider, exceptIndex = -1) => provider.models.filter((model) =>
+    !value.some((choice, index) => index !== exceptIndex && choice.providerId === provider.providerId && choice.model === model.id)
+  );
+  const canAddModel = value.length < MAX_REVIEW_MODELS && selectableProviders.some((provider) => unusedModels(provider).length > 0);
+
   return (
     <section className="cn-model-priority" aria-labelledby="cn-model-priority-heading">
       <h4 id="cn-model-priority-heading">Review model priority</h4>
-      <p className="cn-muted cn-small">Models run together for consensus. Priority 1 is used for coordinator and Deep Review threads.</p>
-      {value.length === 0 ? <p className="cn-muted cn-small">No models selected yet.</p> : (
+      <p className="cn-muted cn-small">Models run together for consensus. Priority 1 is tried first for coordinator and Deep Review threads.</p>
+      {providers.some((provider) => provider.models.length === 0 && provider.error) ? (
+        <p className="cn-muted cn-small">
+          Providers without available models are omitted: {providers.filter((provider) => provider.models.length === 0 && provider.error)
+            .map((provider) => `${provider.displayName} (${provider.error})`).join('; ')}
+        </p>
+      ) : null}
+      {value.length > 0 ? (
         <ol className="cn-priority-list">
           {value.map((item, index) => {
-            const provider = providerById.get(item.providerId);
-            const catalog = provider?.models.find((model) => model.id === item.model);
+            const key = modelKey(item.providerId, item.model);
+            const providerId = editingProviderIds[key] ?? item.providerId;
+            const provider = providerById.get(providerId);
+            const originalProvider = providerById.get(item.providerId);
+            const catalog = originalProvider?.models.find((model) => model.id === item.model);
+            const modelOptions = provider ? unusedModels(provider, index) : [];
+            const providerOptions = selectableProviders.filter((candidate) => unusedModels(candidate, index).length > 0);
             return (
-              <SelectedModelItem
-                key={modelKey(item.providerId, item.model)}
-                item={item}
-                label={catalog?.label ?? item.model}
-                providerName={provider?.displayName ?? item.providerId}
-                reasoningLevels={catalog?.reasoningLevels ?? []}
-                showReasoning
-                priority={index + 1}
-                maxPriority={value.length}
-                onMove={(offset) => onChange(moveModelChoice(value, index, offset))}
-                onChange={(next) => onChange(next(value))}
-              />
+              <li className="cn-priority-row" key={key}>
+                <span className="cn-priority-rank">{index + 1}</span>
+                <label className="cn-field">
+                  <span className="cn-muted cn-small">Provider</span>
+                  <select
+                    className="cn-select"
+                    aria-label={`Provider for priority ${index + 1}`}
+                    value={providerId}
+                    onChange={(event) => {
+                      const nextId = event.target.value;
+                      setEditingProviderIds((current) => {
+                        const next = { ...current };
+                        if (nextId === item.providerId) delete next[key];
+                        else next[key] = nextId;
+                        return next;
+                      });
+                    }}
+                  >
+                    {providerOptions.map((option) => <option key={option.providerId} value={option.providerId}>{option.displayName}</option>)}
+                    {!providerOptions.some((option) => option.providerId === providerId) ? (
+                      <option value={providerId} disabled>{provider?.displayName ?? providerId} (unavailable)</option>
+                    ) : null}
+                  </select>
+                </label>
+                <label className="cn-field">
+                  <span className="cn-muted cn-small">Model</span>
+                  <select
+                    className="cn-select"
+                    aria-label={`Model for priority ${index + 1}`}
+                    value={editingProviderIds[key] ? '' : item.model}
+                    disabled={!provider || modelOptions.length === 0}
+                    onChange={(event) => {
+                      const modelId = event.target.value;
+                      const nextModel = provider?.models.find((model) => model.id === modelId);
+                      if (!provider || !nextModel) return;
+                      onChange(value.map((choice, choiceIndex) => choiceIndex === index
+                        ? { providerId: provider.providerId, model: nextModel.id, ...(choice.providerId === provider.providerId && choice.model === nextModel.id && choice.reasoningLevel ? { reasoningLevel: choice.reasoningLevel } : {}) }
+                        : choice));
+                      setEditingProviderIds((current) => { const next = { ...current }; delete next[key]; return next; });
+                    }}
+                  >
+                    {!editingProviderIds[key] && !provider?.models.some((model) => model.id === item.model)
+                      ? <option value={item.model} disabled>{item.model} (unavailable)</option>
+                      : null}
+                    {editingProviderIds[key] ? <option value="">Choose a model…</option> : null}
+                    {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+                  </select>
+                  {provider && provider.models.length === 0 && provider.error ? <span className="cn-muted cn-small">{provider.error}</span> : null}
+                </label>
+                {!editingProviderIds[key] && catalog?.reasoningLevels.length ? (
+                  <label className="cn-field">
+                    <span className="cn-muted cn-small">Reasoning</span>
+                    <select
+                      className="cn-select cn-small"
+                      aria-label={`Reasoning level for ${catalog.label}`}
+                      value={item.reasoningLevel ?? ''}
+                      onChange={(event) => onChange(value.map((choice, choiceIndex) => choiceIndex === index
+                        ? { ...choice, ...(event.target.value ? { reasoningLevel: event.target.value } : { reasoningLevel: undefined }) }
+                        : choice))}
+                    >
+                      <option value="">Default</option>
+                      {catalog.reasoningLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+                    </select>
+                  </label>
+                ) : null}
+                <span className="cn-priority-controls">
+                  <button type="button" className="cn-btn cn-small" aria-label={`Move priority ${index + 1} up`} disabled={index === 0} onClick={() => onChange(moveModelChoice(value, index, -1))}>Move up</button>
+                  <button type="button" className="cn-btn cn-small" aria-label={`Move priority ${index + 1} down`} disabled={index === value.length - 1} onClick={() => onChange(moveModelChoice(value, index, 1))}>Move down</button>
+                  <button type="button" className="cn-btn cn-small" aria-label={`Remove priority ${index + 1}`} onClick={() => {
+                    onChange(value.filter((_, choiceIndex) => choiceIndex !== index));
+                    setEditingProviderIds((current) => { const next = { ...current }; delete next[key]; return next; });
+                  }}>Remove</button>
+                </span>
+              </li>
             );
           })}
         </ol>
-      )}
+      ) : null}
+      {addingModel ? (
+        <div className="cn-priority-row cn-priority-add-row">
+          <span className="cn-priority-rank">{value.length + 1}</span>
+          <label className="cn-field">
+            <span className="cn-muted cn-small">Provider</span>
+            <select className="cn-select" aria-label={`Provider for priority ${value.length + 1}`} value={addingProviderId} onChange={(event) => setAddingProviderId(event.target.value)}>
+              <option value="">Choose a provider…</option>
+              {selectableProviders.filter((provider) => unusedModels(provider).length > 0).map((provider) => <option key={provider.providerId} value={provider.providerId}>{provider.displayName}</option>)}
+            </select>
+          </label>
+          <label className="cn-field">
+            <span className="cn-muted cn-small">Model</span>
+            <select
+              className="cn-select"
+              aria-label={`Model for priority ${value.length + 1}`}
+              value=""
+              disabled={!addingProviderId}
+              onChange={(event) => {
+                const provider = providerById.get(addingProviderId);
+                const model = provider?.models.find((candidate) => candidate.id === event.target.value);
+                if (!provider || !model) return;
+                onChange(addModelChoice(value, provider.providerId, model.id));
+                setAddingProviderId('');
+                setAddingModel(false);
+              }}
+            >
+              <option value="">Choose a model…</option>
+              {(providerById.get(addingProviderId) ? unusedModels(providerById.get(addingProviderId)!) : [])
+                .map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+            </select>
+          </label>
+          {value.length > 0 ? <button type="button" className="cn-btn cn-small" onClick={() => { setAddingModel(false); setAddingProviderId(''); }}>Cancel</button> : null}
+        </div>
+      ) : canAddModel && !hasPendingEdit ? (
+        <button type="button" className="cn-btn cn-small" onClick={() => setAddingModel(true)}>Add model</button>
+      ) : null}
+      {!selectableProviders.length ? <p className="cn-muted cn-small">No providers currently have available models.</p> : null}
     </section>
   );
 }

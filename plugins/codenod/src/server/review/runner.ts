@@ -38,6 +38,7 @@ const STOPPED_STATUSES = new Set(['stopped', 'cancelled', 'canceled', 'archived'
 
 export const DEFAULT_POLL_MS = 10_000;
 export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+export const DEFAULT_STARTUP_TIMEOUT_MS = 15_000;
 
 export const USAGE_LIMIT_PATTERNS: readonly RegExp[] = [
   /usage limit (?:has been )?reached/i,
@@ -166,12 +167,18 @@ interface Waiter {
   reject(error: Error): void;
 }
 
+interface StartWaiter {
+  resolve(result: 'started' | 'pending'): void;
+  reject(error: Error): void;
+}
+
 /**
  * Tracks hidden worker threads. Completion comes from `thread.idle` /
  * `thread.failed` events when available, with status polling as a fallback.
  */
 export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: number } = {}) {
   const waiters = new Map<string, Waiter>();
+  const startWaiters = new Map<string, StartWaiter>();
   const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 
   async function currentOutput(threadId: string): Promise<string> {
@@ -191,6 +198,15 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
   }
 
   async function onEvent(event: ThreadEvent): Promise<void> {
+    const startWaiter = startWaiters.get(event.threadId);
+    if (startWaiter && event.name === 'thread.failed') {
+      startWaiters.delete(event.threadId);
+      startWaiter.reject(new Error(`Thread failed to start: ${errorMessage(event.error ?? 'provider startup failed')}`));
+    } else if (startWaiter && (event.name === 'thread.active' || event.name === 'thread.idle')) {
+      startWaiters.delete(event.threadId);
+      startWaiter.resolve('started');
+    }
+
     const waiter = waiters.get(event.threadId);
     if (!waiter) return;
     if (event.name === 'thread.failed') {
@@ -212,6 +228,51 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
         }
       }
       settle(event.threadId, { text });
+    }
+  }
+
+  /** Waits for the host to activate a thread, rejecting failures that happen before activation. */
+  async function waitForStart(threadId: string, timeoutMs = DEFAULT_STARTUP_TIMEOUT_MS): Promise<'started' | 'pending'> {
+    let settled = false;
+    const result = new Promise<'started' | 'pending'>((resolve, reject) => {
+      startWaiters.set(threadId, {
+        resolve: (value) => { settled = true; resolve(value); },
+        reject: (error) => { settled = true; reject(error); }
+      });
+    });
+    const deadline = Date.now() + timeoutMs;
+    try {
+      while (!settled && Date.now() < deadline) {
+        const thread = await threads.get({ threadId }).catch(() => null);
+        const status = thread?.status?.toLowerCase() ?? '';
+        if (FAILED_STATUSES.has(status)) {
+          const waiter = startWaiters.get(threadId);
+          startWaiters.delete(threadId);
+          waiter?.reject(new Error(`Thread failed to start with status "${status}"`));
+          break;
+        }
+        if (STOPPED_STATUSES.has(status)) {
+          const waiter = startWaiters.get(threadId);
+          startWaiters.delete(threadId);
+          waiter?.reject(new Error('Thread was stopped before the provider started'));
+          break;
+        }
+        if (DONE_STATUSES.has(status) || status === 'active' || status === 'running') {
+          const waiter = startWaiters.get(threadId);
+          startWaiters.delete(threadId);
+          waiter?.resolve('started');
+          break;
+        }
+        await sleep(Math.min(250, Math.max(1, deadline - Date.now())));
+      }
+      if (!settled) {
+        const waiter = startWaiters.get(threadId);
+        startWaiters.delete(threadId);
+        waiter?.resolve('pending');
+      }
+      return await result;
+    } finally {
+      startWaiters.delete(threadId);
     }
   }
 
@@ -290,10 +351,63 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     }
   }
 
-  return { onEvent, waitForOutput, pending: () => waiters.size };
+  return { onEvent, waitForOutput, waitForStart, pending: () => waiters.size };
 }
 
-export type ThreadWaiter = ReturnType<typeof createThreadWaiter>;
+export type ThreadWaiter = Omit<ReturnType<typeof createThreadWaiter>, 'waitForStart'> & {
+  waitForStart?: (threadId: string, timeoutMs?: number) => Promise<'started' | 'pending'>;
+};
+
+export interface VisibleThreadSpawnArgs {
+  projectId: string;
+  prompt: string;
+  title: string;
+  permissionMode?: string;
+  visibility: 'visible';
+  environment?: SpawnEnvironment;
+}
+
+export async function spawnVisibleWithPriorityFallback(
+  threads: ThreadsApi,
+  waiter: ThreadWaiter,
+  models: ModelChoice[],
+  args: VisibleThreadSpawnArgs
+): Promise<{ id: string; model: ModelChoice; priority: number; usedFallback: boolean }> {
+  const failures: string[] = [];
+  for (const [index, model] of models.entries()) {
+    let threadId: string;
+    try {
+      const environment = args.environment?.kind === 'worktree'
+        ? { ...args.environment, branchSlug: `${args.environment.branchSlug ?? 'codenod-review'}-p${index + 1}` }
+        : args.environment;
+      const failedPriorities = index === 1 ? 'priority 1' : `priorities 1–${index}`;
+      const fallbackContext = index === 0 ? '' : `CodeNod could not start ${failedPriorities}; this thread is using priority ${index + 1} (${model.providerId}/${model.model}).\n\n`;
+      const spawned = await threads.spawn({
+        ...args,
+        title: index === 0 ? args.title : `${args.title} (priority ${index + 1})`,
+        prompt: `${fallbackContext}${args.prompt}`,
+        environment,
+        providerId: model.providerId,
+        model: model.model,
+        reasoningLevel: model.reasoningLevel
+      });
+      threadId = spawned.id;
+    } catch (error) {
+      failures.push(`Priority ${index + 1} (${model.providerId}/${model.model}): ${errorMessage(error)}`);
+      continue;
+    }
+
+    try {
+      if (waiter.waitForStart) await waiter.waitForStart(threadId);
+      return { id: threadId, model, priority: index + 1, usedFallback: index > 0 };
+    } catch (error) {
+      failures.push(`Priority ${index + 1} (${model.providerId}/${model.model}): ${errorMessage(error)}`);
+      await threads.archive({ threadId }).catch(() => undefined);
+    }
+  }
+
+  throw new Error(`Could not start a thread with any selected model. ${failures.join(' | ')}`);
+}
 
 export interface RunModelInput {
   projectId: string;

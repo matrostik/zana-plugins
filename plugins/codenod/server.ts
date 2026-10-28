@@ -8,7 +8,7 @@ import { createOutdatedNotifier } from './src/server/outdated.ts';
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
-import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, type ThreadsApi } from './src/server/review/runner.ts';
+import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, spawnVisibleWithPriorityFallback, type ThreadsApi } from './src/server/review/runner.ts';
 import { fetchPullRequestHead } from './src/server/review/workspace.ts';
 import { CHANGED_EVENT, createReviewService, type ReviewConfig } from './src/server/review/service.ts';
 import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
@@ -384,11 +384,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       : undefined;
     const focusOnFindings = findingIds.length > 0;
     const titleSuffix = focusOnFindings ? ` (${targetFindings.length} issue${targetFindings.length === 1 ? '' : 's'})` : '';
-    const spawned = await zcc.sdk.threads.spawn({
+    const spawned = await spawnVisibleWithPriorityFallback(threads, waiter, config.models, {
       projectId,
-      providerId: primaryModel.providerId,
-      model: primaryModel.model,
-      reasoningLevel: primaryModel.reasoningLevel,
       title: `Deep Review: ${pr.owner}/${pr.repo}#${pr.number}${titleSuffix}`,
       prompt: getDeepReviewPrompt({
         url: pr.url,
@@ -410,7 +407,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       ...(worktree ? { environment: worktree } : {})
     });
     store.recordPrThread(pr.id, spawned.id, 'deep');
-    return { threadId: spawned.id, projectId };
+    return { threadId: spawned.id, projectId, priority: spawned.priority, model: spawned.model, usedFallback: spawned.usedFallback };
   });
 
   zcc.rpc.method('config', async () => ({

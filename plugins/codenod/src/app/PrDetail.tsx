@@ -4,7 +4,7 @@ import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
-import { ProviderModelPicker, SelectedModelOrder } from './ModelSearchPicker.tsx';
+import { ModelPriorityPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'diff';
@@ -105,8 +105,7 @@ function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: M
         <p className="cn-muted">Loading models…</p>
       ) : (
         <>
-          <SelectedModelOrder value={chosen} providers={providers} onChange={setChosen} />
-          {providers.map((provider) => <ProviderModelPicker key={provider.providerId} provider={provider} value={chosen} onChange={setChosen} showSelected={false} />)}
+          <ModelPriorityPicker value={chosen} providers={providers} onChange={setChosen} />
         </>
       )}
       <div className="cn-inline">
@@ -292,9 +291,14 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   const deepReview = () =>
     act('deep', async () => {
-      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds: targetedFindingIds })) as { threadId: string };
+      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds: targetedFindingIds })) as { threadId: string; priority: number; model: ModelChoice; usedFallback: boolean };
       if (navigate?.toThread) navigate.toThread(result.threadId);
-      else setNotice({ kind: 'info', text: 'Deep Review thread started. Find it in your thread list.' });
+      if (result.usedFallback) {
+        const failedPriorities = result.priority === 2 ? 'Priority 1 could not start' : `Priorities 1–${result.priority - 1} could not start`;
+        setNotice({ kind: 'info', text: `${failedPriorities}. Deep Review is using priority ${result.priority} (${result.model.providerId}/${result.model.model}).` });
+      } else if (!navigate?.toThread) {
+        setNotice({ kind: 'info', text: 'Deep Review thread started. Find it in your thread list.' });
+      }
     });
 
   return (
