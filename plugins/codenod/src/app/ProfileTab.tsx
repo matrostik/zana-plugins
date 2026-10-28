@@ -19,9 +19,18 @@ function AccountsSection({ config }: { config: ConfigSnapshot }) {
           const profile = profiles.get(host.host);
           return (
             <li key={host.host} className="cn-account">
-              {profile?.avatarUrl ? <img className="cn-avatar" src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" /> : <span className="cn-avatar" aria-hidden="true" />}
-              <div>
-                <div className="cn-account-name">{profile?.name ?? (profile ? `@${profile.login}` : 'Not signed in')}</div>
+              {profile?.avatarUrl ? (
+                <img className="cn-avatar" src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="cn-avatar" aria-hidden="true" />
+              )}
+              <div className="cn-account-body">
+                <div className="cn-account-title-row">
+                  <div className="cn-account-name">{profile?.name ?? (profile ? `@${profile.login}` : 'Not signed in')}</div>
+                  {host.authSource ? (
+                    <span className="cn-badge-auth">{AUTH_LABELS[host.authSource] ?? host.authSource}</span>
+                  ) : null}
+                </div>
                 {profile ? (
                   <div className="cn-muted cn-small">
                     @{profile.login} · {profile.email ?? 'email private'}
@@ -32,7 +41,7 @@ function AccountsSection({ config }: { config: ConfigSnapshot }) {
                   {host.authSource ? ` · via ${AUTH_LABELS[host.authSource] ?? host.authSource}` : ''}
                   {` · last sync ${host.syncedAt ? relativeTime(host.syncedAt) : 'never'}`}
                 </div>
-                {host.error ? <div className="cn-small cn-badge-danger">{host.error}</div> : null}
+                {host.error ? <div className="cn-small cn-badge-danger" style={{ marginTop: 4 }}>{host.error}</div> : null}
               </div>
             </li>
           );
@@ -87,7 +96,14 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
         <span id="cn-instructions-count" className={isTooLong ? 'cn-small cn-badge-danger' : 'cn-muted cn-small'}>
           {draft.length} / {maxChars}
         </span>
-        {action.saved ? <span className="cn-muted" role="status">Saved</span> : null}
+        {action.saved ? (
+          <span className="cn-status-saved" role="status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Saved
+          </span>
+        ) : null}
       </div>
       <details className="cn-prompt">
         <summary>View built-in prompt</summary>

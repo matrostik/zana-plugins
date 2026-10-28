@@ -36,13 +36,13 @@ function HostsSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
       </p>
       {hostsAction.error ? <p className="cn-banner cn-banner-error">{hostsAction.error}</p> : null}
       <ul className="cn-host-list">
-        <li className="cn-inline">
+        <li className="cn-host-item">
           <span className="cn-mono">{DEFAULT_HOST}</span>
-          <span className="cn-muted cn-small">always on</span>
+          <span className="cn-badge cn-badge-ok">always on</span>
         </li>
         {draft.map((host) => (
-          <li key={host} className="cn-inline">
-            <span className="cn-mono">{host}</span>
+          <li key={host} className="cn-host-item">
+            <span className="cn-mono" style={{ flex: 1 }}>{host}</span>
             <button type="button" className="cn-btn cn-btn-danger cn-small" aria-label={`Remove host ${host}`} onClick={() => setDraft(draft.filter((item) => item !== host))}>
               Remove
             </button>
@@ -50,7 +50,7 @@ function HostsSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
         ))}
       </ul>
       <form
-        className="cn-inline"
+        className="cn-inline cn-host-form"
         onSubmit={(event) => {
           event.preventDefault();
           addHost();
@@ -68,9 +68,15 @@ function HostsSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
         >
           Save hosts
         </button>
-        {hostsAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
+        {hostsAction.saved ? (
+          <span className="cn-status-saved" role="status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Saved
+          </span>
+        ) : null}
       </form>
-      
     </section>
   );
 }
@@ -101,7 +107,7 @@ function ReposSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
       </p>
       {error ? <p className="cn-banner cn-banner-error">{error}</p> : null}
       <form
-        className="cn-inline"
+        className="cn-inline cn-repo-form"
         onSubmit={(event) => {
           event.preventDefault();
           const repo = repoInput.trim();
@@ -114,12 +120,13 @@ function ReposSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
       >
         <input
           className="cn-input"
+          style={{ minWidth: 260 }}
           placeholder="owner/repo or host/owner/repo"
           aria-label="Repository to watch"
           value={repoInput}
           onChange={(event) => setRepoInput(event.target.value)}
         />
-        <button type="submit" className="cn-btn">
+        <button type="submit" className="cn-btn cn-btn-primary">
           Add
         </button>
         <button type="button" className="cn-btn" onClick={() => void run(async () => setSuggestions((await rpc.call('discoverRepos')) as Array<{ id: string; pullRequests: number }>))}>
@@ -127,13 +134,14 @@ function ReposSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
         </button>
       </form>
       {suggestions ? (
-        <div className="cn-banner">
+        <div className="cn-banner cn-suggestions-banner">
           {suggestions.length === 0 ? (
             <span className="cn-muted">No other repositories with recent activity.</span>
           ) : (
             <div className="cn-inline">
+              <span className="cn-muted cn-small" style={{ fontWeight: 600 }}>Suggestions:</span>
               {suggestions.slice(0, MAX_SUGGESTIONS).map((suggestion) => (
-                <button key={suggestion.id} type="button" className="cn-btn cn-small" onClick={() => void run(() => rpc.call('addRepo', { repo: suggestion.id }))}>
+                <button key={suggestion.id} type="button" className="cn-btn cn-small cn-suggestion-chip" onClick={() => void run(() => rpc.call('addRepo', { repo: suggestion.id }))}>
                   + {suggestion.id} ({suggestion.pullRequests})
                 </button>
               ))}
@@ -142,63 +150,68 @@ function ReposSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnap
         </div>
       ) : null}
       {config.repos.length === 0 ? (
-        <p className="cn-muted">No watched repositories.</p>
+        <p className="cn-muted" style={{ marginTop: 12 }}>No watched repositories.</p>
       ) : (
-        groupReposByOrganization(config.repos).map((group) => (
-          <details key={group.key} className="cn-org" open>
-            <summary>
-              <span className="cn-mono">{group.key}</span> <span className="cn-count">{group.repos.length}</span>
-            </summary>
-            <table className="cn-table">
-              <thead>
-                <tr>
-                  <th scope="col">Repository</th>
-                  <th scope="col">Auto-review</th>
-                  <th scope="col">Spec pattern</th>
-                  <th scope="col">
-                    <span className="cn-muted">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.repos.map((repo) => (
-                  <tr key={repo.id}>
-                    <td className="cn-mono">{repo.name}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`Auto-review ${repo.id}`}
-                        checked={repo.autoReview}
-                        onChange={(event) => void run(() => rpc.call('updateRepo', { id: repo.id, autoReview: event.target.checked }))}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="cn-input cn-small"
-                        aria-label={`Spec pattern for ${repo.id}`}
-                        defaultValue={repo.specGlob ?? ''}
-                        placeholder="none"
-                        onBlur={(event) => {
-                          if ((repo.specGlob ?? '') !== event.target.value.trim()) void run(() => rpc.call('updateRepo', { id: repo.id, specGlob: event.target.value.trim() }));
-                        }}
-                      />
-                    </td>
-                    <td>
-                      <button type="button" className="cn-btn cn-btn-danger cn-small" aria-label={`Remove ${repo.id}`} onClick={() => void run(() => rpc.call('removeRepo', { id: repo.id }))}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-        ))
+        <div className="cn-org-list">
+          {groupReposByOrganization(config.repos).map((group) => (
+            <details key={group.key} className="cn-org" open>
+              <summary>
+                <span className="cn-mono">{group.key}</span> <span className="cn-count">{group.repos.length}</span>
+              </summary>
+              <div className="cn-table-wrap">
+                <table className="cn-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Repository</th>
+                      <th scope="col" style={{ width: 110, textAlign: 'center' }}>Auto-review</th>
+                      <th scope="col">Spec pattern</th>
+                      <th scope="col" style={{ width: 90, textAlign: 'right' }}>
+                        <span className="cn-muted">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.repos.map((repo) => (
+                      <tr key={repo.id}>
+                        <td className="cn-mono" style={{ fontWeight: 500 }}>{repo.name}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            style={{ width: 16, height: 16, accentColor: 'var(--cn-accent)', cursor: 'pointer' }}
+                            aria-label={`Auto-review ${repo.id}`}
+                            checked={repo.autoReview}
+                            onChange={(event) => void run(() => rpc.call('updateRepo', { id: repo.id, autoReview: event.target.checked }))}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="cn-input cn-small"
+                            style={{ width: '100%', maxWidth: 280 }}
+                            aria-label={`Spec pattern for ${repo.id}`}
+                            defaultValue={repo.specGlob ?? ''}
+                            placeholder="none"
+                            onBlur={(event) => {
+                              if ((repo.specGlob ?? '') !== event.target.value.trim()) void run(() => rpc.call('updateRepo', { id: repo.id, specGlob: event.target.value.trim() }));
+                            }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button type="button" className="cn-btn cn-btn-danger cn-small" aria-label={`Remove ${repo.id}`} onClick={() => void run(() => rpc.call('removeRepo', { id: repo.id }))}>
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          ))}
+        </div>
       )}
     </section>
   );
 }
-
 
 function SyncSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnapshot; onChanged(): void }) {
   const toggleAction = useSettingsAction(onChanged);
@@ -213,34 +226,50 @@ function SyncSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnaps
       </p>
       {toggleAction.error ? <p className="cn-banner cn-banner-error">{toggleAction.error}</p> : null}
       {intervalAction.error ? <p className="cn-banner cn-banner-error">{intervalAction.error}</p> : null}
-      <div className="cn-inline" style={{ marginBottom: 8 }}>
-        <label className="cn-check">
-          <input
-            type="checkbox"
-            aria-label="Enable automatic repository sync"
-            checked={autoSyncEnabled}
-            onChange={(event) => void toggleAction.run(() => rpc.call('setSettings', { autoSyncEnabled: event.target.checked }))}
+      <div className="cn-fields">
+        <div className="cn-inline">
+          <label className="cn-check">
+            <input
+              type="checkbox"
+              aria-label="Enable automatic repository sync"
+              checked={autoSyncEnabled}
+              onChange={(event) => void toggleAction.run(() => rpc.call('setSettings', { autoSyncEnabled: event.target.checked }))}
+            />
+            <span>Enable automatic sync</span>
+          </label>
+          {toggleAction.saved ? (
+            <span className="cn-status-saved" role="status">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Saved
+            </span>
+          ) : null}
+        </div>
+        <div className="cn-inline">
+          <NumberSetting
+            id="syncIntervalMinutes"
+            label="Sync interval (minutes)"
+            value={config.settings.syncIntervalMinutes}
+            limits={config.limits.syncIntervalMinutes}
+            disabled={!autoSyncEnabled}
+            onSave={(value) => void intervalAction.run(() => rpc.call('setSettings', { syncIntervalMinutes: value }))}
           />
-          <span>Enable automatic sync</span>
-        </label>
-        {toggleAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
+          {intervalAction.saved ? (
+            <span className="cn-status-saved" role="status">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Saved
+            </span>
+          ) : null}
+        </div>
+        {!autoSyncEnabled ? (
+          <p className="cn-muted cn-small" style={{ marginTop: 4 }}>
+            Automatic sync is paused. Repositories will only update when you manually click Refresh.
+          </p>
+        ) : null}
       </div>
-      <div className="cn-inline">
-        <NumberSetting
-          id="syncIntervalMinutes"
-          label="Sync interval (minutes)"
-          value={config.settings.syncIntervalMinutes}
-          limits={config.limits.syncIntervalMinutes}
-          disabled={!autoSyncEnabled}
-          onSave={(value) => void intervalAction.run(() => rpc.call('setSettings', { syncIntervalMinutes: value }))}
-        />
-        {intervalAction.saved ? <span className="cn-muted" role="status">Saved</span> : null}
-      </div>
-      {!autoSyncEnabled ? (
-        <p className="cn-muted cn-small" style={{ marginTop: 4 }}>
-          Automatic sync is paused. Repositories will only update when you manually click Refresh.
-        </p>
-      ) : null}
     </section>
   );
 }
