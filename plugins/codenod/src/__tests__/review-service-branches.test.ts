@@ -250,10 +250,10 @@ describe('thread waiter', () => {
     expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
   });
 
-  it('stops the thread and rejects when polling detects usage limit in thread output', async () => {
+  it('stops the thread and rejects when polling detects usage limit in finished thread output', async () => {
     useFakeClock();
     const quotaText = 'Usage Limit Reached\nYou have reached your current quota for this period. Your limit will reset in 3 days, 17 hours.';
-    const { threads, state } = createFakeThreads({ status: 'running', output: quotaText });
+    const { threads, state } = createFakeThreads({ status: 'completed', output: quotaText });
     const waiter = createThreadWaiter(threads, { pollMs: POLL_MS });
 
     const result = waiter.waitForOutput('thread-1');
@@ -261,6 +261,21 @@ describe('thread waiter', () => {
     await vi.advanceTimersByTimeAsync(POLL_MS);
     await assertion;
     expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
+  });
+
+  it('does not read thread output or stop thread while status is still running', async () => {
+    useFakeClock();
+    const { threads, state } = createFakeThreads({ status: 'running', output: 'Rate limit exceeded: quota will reset in 60 seconds' });
+    const waiter = createThreadWaiter(threads, { pollMs: POLL_MS });
+
+    let settled = false;
+    const result = waiter.waitForOutput('thread-1').finally(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(POLL_MS * 2);
+
+    expect(settled).toBe(false);
+    expect(threads.output).not.toHaveBeenCalled();
+    expect(threads.stop).not.toHaveBeenCalled();
+    void result.catch(() => undefined);
   });
 });
 
@@ -384,6 +399,18 @@ describe('runModelInThread', () => {
     expect(threads.stop).toHaveBeenCalledWith({ threadId: 'thread-1' });
     expect(threads.archive).toHaveBeenCalledWith({ threadId: 'thread-1' });
   });
+
+  it('attempts repair instead of failing immediately when malformed review output mentions quota', async () => {
+    const { threads } = createFakeThreads();
+    const malformedWithQuota = '{"summary": "rate limit handling", "riskScore": 3, "logicIssues": [';
+    const validRepair = '{"ok": 1}';
+    const { waiter } = createScriptedWaiter([malformedWithQuota, validRepair]);
+
+    const result = await runModelInThread(threads, waiter, runInput({ validate: (t) => (t.endsWith('}') ? { ok: true } : { ok: false, problem: 'incomplete JSON' }), archiveWhenDone: false }));
+    expect(result.text).toBe(validRepair);
+    expect(threads.send).toHaveBeenCalledTimes(1);
+    expect(threads.stop).not.toHaveBeenCalled();
+  });
 });
 
 describe('detectUsageLimit and looksLikeValidReview', () => {
@@ -415,6 +442,16 @@ describe('detectUsageLimit and looksLikeValidReview', () => {
     });
     expect(looksLikeValidReview(valid)).toBe(true);
     expect(looksLikeValidReview('Usage Limit Reached\nYou have reached your current quota.')).toBe(false);
+  });
+
+  it('does not treat malformed reviews containing review JSON keys as usage limit', () => {
+    const malformed = '{"summary": "Review for rate limiting", "riskScore": 4, "logicIssues": [{"description": "quota exceeded in check"';
+    expect(detectUsageLimit(malformed)).toBeNull();
+  });
+
+  it('ignores usage limit patterns in long text', () => {
+    const longText = 'A'.repeat(400) + ' usage limit reached';
+    expect(detectUsageLimit(longText)).toBeNull();
   });
 });
 

@@ -113,8 +113,12 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   async function cleanupClosedPrThreads() {
     const threadsToArchive = store.listClosedOrMergedPrThreads();
     for (const item of threadsToArchive) {
-      await threads.archive({ threadId: item.threadId }).catch(() => undefined);
-      store.removePrThread(item.prId, item.threadId);
+      try {
+        await threads.archive({ threadId: item.threadId });
+        store.removePrThread(item.prId, item.threadId);
+      } catch (error) {
+        zcc.log.warn(`codenod: failed to archive thread ${item.threadId} for PR ${item.prId}: ${errorMessage(error)}`);
+      }
     }
   }
 

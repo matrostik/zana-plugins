@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import createCodenodPlugin from '../../server.ts';
 import type { ConfigSnapshot } from '../app/types.ts';
 import type { CommandRunner } from '../server/github/auth.ts';
@@ -196,6 +196,13 @@ describe('codenod server', () => {
     expect(workers).toHaveLength(2);
     expect(workers.every((thread) => thread.args.permissionMode === 'full' && thread.archived)).toBe(true);
     expect(coordinator).toBeTruthy();
+    expect(coordinator?.args).toMatchObject({
+      visibility: 'visible',
+      permissionMode: 'read-only',
+      environment: { kind: 'unmanaged' }
+    });
+    expect(coordinator?.args.prompt).toContain('read-only review coordinator');
+    expect(coordinator?.args.prompt).toContain('untrusted display data');
     expect(coordinator?.sent[0]).toContain('Review Completed');
     expect(workers[1].args.reasoningLevel).toBe('high');
     expect(workers[1].sent[0]).toContain('could not be used');
@@ -564,6 +571,29 @@ describe('codenod settings', () => {
     await host.callRpc('refresh');
     expect(coordThread.archived).toBe(true);
     expect(deepThread.archived).toBe(true);
+  });
+
+  it('retains thread row and logs a warning when archiving closed PR thread fails', async () => {
+    const { host } = await setup();
+    const detail = await reviewToCompletion(host);
+    const coordId = detail.review!.coordinatorThreadId!;
+
+    const db = host.zcc.storage.database();
+    db.prepare("UPDATE pull_requests SET state = 'closed' WHERE id = ?").run(PR_ID);
+
+    const warnSpy = vi.spyOn(host.zcc.log, 'warn');
+    const origArchive = host.zcc.sdk.threads.archive;
+    host.zcc.sdk.threads.archive = vi.fn(async () => { throw new Error('network down'); });
+
+    await host.callRpc('refresh');
+    const rows = db.prepare('SELECT * FROM pr_threads WHERE thread_id = ?').all(coordId);
+    expect(rows).toHaveLength(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`failed to archive thread ${coordId}`));
+
+    host.zcc.sdk.threads.archive = origArchive;
+    await host.callRpc('refresh');
+    const remaining = db.prepare('SELECT * FROM pr_threads WHERE thread_id = ?').all(coordId);
+    expect(remaining).toHaveLength(0);
   });
 
   it('scopes Deep Review prompt to selected findingIds when provided', async () => {
