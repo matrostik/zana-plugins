@@ -4,7 +4,7 @@ import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
-import { ProviderModelPicker } from './ModelSearchPicker.tsx';
+import { ModelPriorityPicker } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'diff';
@@ -104,7 +104,7 @@ function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: M
       {!providers ? (
         <p className="cn-muted">Loading models…</p>
       ) : (
-        providers.map((provider) => <ProviderModelPicker key={provider.providerId} provider={provider} value={chosen} onChange={setChosen} />)
+        <ModelPriorityPicker value={chosen} providers={providers} onChange={setChosen} />
       )}
       <div className="cn-inline">
         <button type="button" className="cn-btn cn-btn-primary" disabled={chosen.length === 0} onClick={() => props.onRun(chosen)}>
@@ -130,6 +130,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [notice, setNotice] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
+  const [findingSelectionCustomized, setFindingSelectionCustomized] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
@@ -194,6 +195,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   useEffect(() => {
     setFilters({ severity: 'all', category: 'all' });
     setEditingFinding(false);
+    setFindingSelectionCustomized(false);
   }, [prId, reviewId]);
   const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && matchesFinding(finding, filters)) ?? [];
   const selectedFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed) ?? [];
@@ -221,6 +223,16 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const attemptElapsed = attempt ? formatDuration(attempt.createdAt, attempt.completedAt ?? now) : '';
   const reviewElapsed = review ? formatDuration(review.createdAt, review.completedAt ?? now) : '';
   const canPost = review?.status === 'completed' && (postableFindings.length > 0 || message.trim().length > 0 || event === 'APPROVE');
+
+  const activeFindings = findings.filter((f) => !f.dismissed);
+  const isAllActive =
+    activeFindings.length > 0 &&
+    selectedFindingIds.size >= activeFindings.length &&
+    activeFindings.every((f) => selectedFindingIds.has(f.id));
+  const targetedFindingIds =
+    findingSelectionCustomized && !isAllActive && selectedFindings.length > 0 && selectedFindings.length < activeFindings.length
+      ? selectedFindings.map((f) => f.id)
+      : undefined;
 
   const startReview = (models?: ModelChoice[]) =>
     act('review', async () => {
@@ -274,12 +286,14 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   const deepReview = () =>
     act('deep', async () => {
-      const findingIds = selectedFindingIds.size > 0 && selectedFindingIds.size < findings.length
-        ? [...selectedFindingIds]
-        : undefined;
-      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds })) as { threadId: string };
+      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds: targetedFindingIds })) as { threadId: string; priority: number; model: ModelChoice; usedFallback: boolean };
       if (navigate?.toThread) navigate.toThread(result.threadId);
-      else setNotice({ kind: 'info', text: 'Deep Review thread started. Find it in your thread list.' });
+      if (result.usedFallback) {
+        const failedPriorities = result.priority === 2 ? 'Priority 1 could not start' : `Priorities 1–${result.priority - 1} could not start`;
+        setNotice({ kind: 'info', text: `${failedPriorities}. Deep Review is using priority ${result.priority} (${result.model.providerId}/${result.model.model}).` });
+      } else if (!navigate?.toThread) {
+        setNotice({ kind: 'info', text: 'Deep Review thread started. Find it in your thread list.' });
+      }
     });
 
   return (
@@ -365,7 +379,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                 <FindingsView key={review.id} rpc={rpc} pr={pr} reviewId={review.id} headSha={review.headSha} stale={review.stale}
                   findings={findings} filters={filters} onFiltersChange={setFilters}
                   onEditingChange={setEditingFinding} disabled={busy !== null}
-                  selectedIds={selectedFindingIds} onSelectionChange={setSelectedFindingIds} onCopyPrompt={() => void copyPrompt()}
+                  selectedIds={selectedFindingIds} onSelectionChange={(next) => { setFindingSelectionCustomized(true); setSelectedFindingIds(next); }} onCopyPrompt={() => void copyPrompt()}
                   onFindingsChange={(next) => {
                     setDetail((current) => current?.review?.id === review.id ? { ...current, findings: next } : current);
                     const eligibleIds = new Set(next.filter((finding) => !finding.dismissed).map((finding) => finding.id));
@@ -441,8 +455,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
           </>
         )}
         <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void deepReview()}>
-          {selectedFindingIds.size > 0 && selectedFindingIds.size < findings.length
-            ? `Deep Review (${selectedFindingIds.size} selected)`
+          {targetedFindingIds && targetedFindingIds.length > 0
+            ? `Deep Review (${targetedFindingIds.length} selected)`
             : 'Deep Review in thread'}
         </button>
         {review?.coordinatorThreadId ? (

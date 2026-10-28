@@ -202,6 +202,15 @@ export const CODENOD_STYLES = `
 .cn-combobox-empty { padding: 8px 10px; color: var(--cn-muted); }
 .cn-selected-models { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .cn-selected-model { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cn-model-priority { margin: 0 0 20px; padding: 12px; border: 1px solid var(--cn-border-strong); border-radius: 8px; background: var(--cn-card); }
+.cn-model-priority h4 { margin: 0 0 4px; font-size: 13px; }
+.cn-priority-list { display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 10px 0 0; padding: 0; }
+.cn-priority-list .cn-priority-row, .cn-priority-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px; border: 1px solid var(--cn-border); border-radius: 6px; }
+.cn-priority-row .cn-field, .cn-priority-add-row .cn-field { flex: 1; min-width: 150px; margin: 0; }
+.cn-priority-row .cn-select, .cn-priority-add-row .cn-select { width: 100%; max-width: none; }
+.cn-priority-rank { display: inline-flex; width: 26px; height: 26px; flex: 0 0 26px; align-items: center; justify-content: center; border-radius: 50%; background: var(--cn-selected); color: var(--cn-text); font-weight: 700; }
+.cn-selected-model-name { display: inline-flex; flex: 1; min-width: 150px; flex-direction: column; gap: 2px; }
+.cn-priority-controls { display: inline-flex; gap: 4px; }
 @media (max-width: 720px) {
   .cn-body { flex-direction: column; }
   .cn-list { width: 100%; max-height: 45%; border-right: none; border-bottom: 1px solid var(--cn-border); }

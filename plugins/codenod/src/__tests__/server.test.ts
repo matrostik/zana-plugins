@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import createCodenodPlugin from '../../server.ts';
+import { remediationGateStaleReason } from '../server/cli-and-tools.ts';
 import type { ConfigSnapshot } from '../app/types.ts';
 import type { CommandRunner } from '../server/github/auth.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS } from '../server/review/prompts.ts';
@@ -8,6 +9,28 @@ import type { PrDetail, PrListItem } from '../server/views.ts';
 import { createFakeFetch, createFakeHost, respond, type FakeThread } from './fake-host.ts';
 
 const PATCH = '@@ -1,2 +1,3 @@\n const a = 1;\n+const user = find();\n+user.name.trim();';
+
+describe('remediation gate stale reason', () => {
+  it('distinguishes a superseded review from a changed pull request head', () => {
+    const common = { currentHeadSha: 'sha1', finishedReview: { id: 'finished', headSha: 'sha1' } };
+
+    expect(remediationGateStaleReason({
+      ...common,
+      currentReview: { id: 'newer', headSha: 'sha1', stale: false }
+    })).toBe('Review is stale: a newer review superseded this result');
+    expect(remediationGateStaleReason({
+      ...common,
+      currentHeadSha: 'sha2',
+      currentReview: { id: 'finished', headSha: 'sha1', stale: true }
+    })).toBe('Review is stale: head commit changed during review');
+    expect(remediationGateStaleReason({
+      ...common,
+      currentReview: { id: 'finished', headSha: 'sha1', stale: false }
+    })).toBeNull();
+    expect(remediationGateStaleReason({ ...common, currentReview: null }))
+      .toBe('Review is stale: no current review is available');
+  });
+});
 
 const ANALYSIS = (risk: number, description: string) =>
   JSON.stringify({
@@ -632,5 +655,29 @@ describe('codenod settings', () => {
     expect(result.blockingCount).toBe(1);
     expect(result.blockingFindings).toHaveLength(1);
     expect(result.coordinatorThreadId).toBeTruthy();
+  });
+
+  it('returns status stale via codenod_review_pr with remediationGate when head SHA changed during review', async () => {
+    let advanced = false;
+    const { host, state } = await setup({
+      reply: (thread, prompt) => {
+        if (!advanced) {
+          advanced = true;
+          state.headSha = 'sha2';
+        }
+        return reply(thread, prompt);
+      }
+    });
+    await host.callRpc('setModels', { models: [MODELS[0]] });
+    await host.callRpc('refresh');
+    const tool = host.tools.find((t) => t.name === 'codenod_review_pr')!;
+
+    const result = (await tool.execute(
+      { pr: 'acme/api#4', wait: true, remediationGate: true },
+      { signal: new AbortController().signal }
+    )) as { status: string; error?: string };
+
+    expect(result.status).toBe('stale');
+    expect(result.error).toContain('Review is stale: head commit changed during review');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useMemo, useState } from 'react';
 import type { ModelChoice } from '../server/types.ts';
 import type { AvailableProvider } from './types.ts';
 
@@ -14,205 +14,175 @@ export function addModelChoice(current: ModelChoice[], providerId: string, model
   return [...current, { providerId, model }];
 }
 
-export function removeModelChoice(current: ModelChoice[], providerId: string, model: string): ModelChoice[] {
-  return current.filter((item) => !(item.providerId === providerId && item.model === model));
+export function moveModelChoice(current: ModelChoice[], index: number, offset: -1 | 1): ModelChoice[] {
+  const target = index + offset;
+  if (index < 0 || index >= current.length || target < 0 || target >= current.length) return current;
+  const next = [...current];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
 }
-
-export function setModelReasoning(current: ModelChoice[], providerId: string, model: string, reasoningLevel: string): ModelChoice[] {
-  return current.map((item) =>
-    item.providerId === providerId && item.model === model ? { ...item, ...(reasoningLevel ? { reasoningLevel } : { reasoningLevel: undefined }) } : item
+export function ModelPriorityPicker(props: {
+  value: ModelChoice[];
+  providers: AvailableProvider[];
+  onChange(next: ModelChoice[]): void;
+}) {
+  const { value, providers, onChange } = props;
+  const providerById = useMemo(() => new Map(providers.map((provider) => [provider.providerId, provider])), [providers]);
+  const selectableProviders = providers.filter((provider) => provider.models.length > 0);
+  const [addingModel, setAddingModel] = useState(value.length === 0);
+  const unusedModels = (provider: AvailableProvider, exceptIndex = -1) => provider.models.filter((model) =>
+    !value.some((choice, index) => index !== exceptIndex && choice.providerId === provider.providerId && choice.model === model.id)
   );
-}
-
-function matchesQuery(label: string, id: string, query: string): boolean {
-  if (!query) return true;
-  const needle = query.toLowerCase();
-  return label.toLowerCase().includes(needle) || id.toLowerCase().includes(needle);
-}
-
-export function ProviderModelPicker(props: { provider: AvailableProvider; value: ModelChoice[]; onChange(next: ModelChoice[]): void; showReasoning?: boolean }) {
-  const { provider, value, onChange, showReasoning } = props;
-  const listId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-
-  const selectedHere = value.filter((item) => item.providerId === provider.providerId);
-  const catalogById = useMemo(() => new Map(provider.models.map((model) => [model.id, model])), [provider.models]);
-  const atCap = value.length >= MAX_REVIEW_MODELS;
-  const options = useMemo(() => {
-    if (atCap) return [];
-    const selectedIds = new Set(selectedHere.map((item) => item.model));
-    return provider.models.filter((model) => !selectedIds.has(model.id) && matchesQuery(model.label, model.id, query.trim()));
-  }, [atCap, provider.models, query, selectedHere]);
-
-  useEffect(() => setHighlight(0), [query, open, provider.providerId]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [open]);
-
-  const add = (modelId: string) => {
-    onChange(addModelChoice(value, provider.providerId, modelId));
-    setQuery('');
-    setOpen(false);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setOpen(true);
-      setHighlight((current) => (options.length === 0 ? 0 : Math.min(current + 1, options.length - 1)));
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setOpen(true);
-      setHighlight((current) => Math.max(current - 1, 0));
-      return;
-    }
-    if (event.key === 'Enter' && open && options[highlight]) {
-      event.preventDefault();
-      add(options[highlight].id);
-      return;
-    }
-    if (event.key === 'Escape') setOpen(false);
-  };
-
-  const emptyCatalog = provider.models.length === 0 && selectedHere.length === 0;
+  const canAddModel = value.length < MAX_REVIEW_MODELS && selectableProviders.some((provider) => unusedModels(provider).length > 0);
+  const addableProviders = selectableProviders.filter((provider) => unusedModels(provider).length > 0);
 
   return (
-    <fieldset className="cn-section">
-      <legend>{provider.displayName}</legend>
-      {emptyCatalog ? <p className="cn-muted cn-small">{provider.error ?? 'No models reported'}</p> : null}
-      {provider.models.length > 0 ? (
-        <div className="cn-combobox" ref={rootRef}>
-          <input
-            className="cn-input"
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-label={`Search ${provider.displayName} models`}
-            placeholder={`Search ${provider.displayName} models…`}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setOpen(true);
-            }}
-            onFocus={() => setOpen(true)}
-            onKeyDown={onKeyDown}
-          />
-          {open ? (
-            <ModelOptionList
-              id={listId}
-              atCap={atCap}
-              options={options}
-              highlight={highlight}
-              query={query}
-              allSelected={selectedHere.length === provider.models.length}
-              onHighlight={setHighlight}
-              onSelect={add}
-            />
-          ) : null}
-        </div>
+    <section className="cn-model-priority" aria-labelledby="cn-model-priority-heading">
+      <h4 id="cn-model-priority-heading">Review model priority</h4>
+      <p className="cn-muted cn-small">Models run together for consensus. Priority 1 is tried first for coordinator and Deep Review threads.</p>
+      {providers.some((provider) => provider.models.length === 0 && provider.error) ? (
+        <p className="cn-muted cn-small">
+          Providers without available models are omitted: {providers.filter((provider) => provider.models.length === 0 && provider.error)
+            .map((provider) => `${provider.displayName} (${provider.error})`).join('; ')}
+        </p>
       ) : null}
-      {selectedHere.length > 0 ? (
-        <ul className="cn-selected-models">
-          {selectedHere.map((item) => (
-            <SelectedModelItem
+      {value.length > 0 ? (
+        <ol className="cn-priority-list">
+          {value.map((item, index) => (
+            <PriorityRow
               key={modelKey(item.providerId, item.model)}
               item={item}
-              label={catalogById.get(item.model)?.label ?? item.model}
-              reasoningLevels={catalogById.get(item.model)?.reasoningLevels ?? []}
-              showReasoning={showReasoning}
-              onChange={(next) => onChange(next(value))}
+              index={index}
+              value={value}
+              provider={providerById.get(item.providerId)}
+              providerOptions={selectableProviders.filter((candidate) => unusedModels(candidate, index).length > 0)}
+              modelOptions={providerById.get(item.providerId) ? unusedModels(providerById.get(item.providerId)!, index) : []}
+              onChange={onChange}
             />
           ))}
-        </ul>
+        </ol>
       ) : null}
-    </fieldset>
+      {addingModel ? (
+        <AddPriorityRow
+          priority={value.length + 1}
+          value={value}
+          providers={addableProviders}
+          providerById={providerById}
+          unusedModels={unusedModels}
+          onChange={(next) => { onChange(next); setAddingModel(false); }}
+          onCancel={value.length > 0 ? () => setAddingModel(false) : undefined}
+        />
+      ) : canAddModel ? (
+        <button type="button" className="cn-btn cn-small" onClick={() => setAddingModel(true)}>Add model</button>
+      ) : null}
+      {!selectableProviders.length ? <p className="cn-muted cn-small">No providers currently have available models.</p> : null}
+    </section>
   );
 }
 
-function ModelOptionList(props: {
-  id: string;
-  atCap: boolean;
-  options: AvailableProvider['models'];
-  highlight: number;
-  query: string;
-  allSelected: boolean;
-  onHighlight(index: number): void;
-  onSelect(modelId: string): void;
-}) {
-  const { id, atCap, options, highlight, query, allSelected, onHighlight, onSelect } = props;
-  let emptyText = 'No models';
-  if (query.trim()) emptyText = 'No matching models';
-  else if (allSelected) emptyText = 'All models from this provider are selected';
-  return (
-    <ul id={id} className="cn-combobox-list" role="listbox">
-      {atCap ? (
-        <li className="cn-combobox-empty">You already picked {MAX_REVIEW_MODELS} models.</li>
-      ) : options.length === 0 ? (
-        <li className="cn-combobox-empty">{emptyText}</li>
-      ) : (
-        options.map((model, index) => (
-          <li key={model.id} role="presentation">
-            <button
-              type="button"
-              className="cn-combobox-option"
-              role="option"
-              aria-selected={index === highlight}
-              onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => onHighlight(index)}
-              onClick={() => onSelect(model.id)}
-            >
-              <span>{model.label}</span>
-              {model.label !== model.id ? <span className="cn-muted cn-small">{model.id}</span> : null}
-            </button>
-          </li>
-        ))
-      )}
-    </ul>
-  );
-}
-
-function SelectedModelItem(props: {
+function PriorityRow(props: {
   item: ModelChoice;
-  label: string;
-  reasoningLevels: string[];
-  showReasoning?: boolean;
-  onChange(update: (current: ModelChoice[]) => ModelChoice[]): void;
+  index: number;
+  value: ModelChoice[];
+  provider?: AvailableProvider;
+  providerOptions: AvailableProvider[];
+  modelOptions: AvailableProvider['models'];
+  onChange(next: ModelChoice[]): void;
 }) {
-  const { item, label, reasoningLevels, showReasoning, onChange } = props;
+  const { item, index, value, provider, providerOptions, modelOptions, onChange } = props;
+  const catalog = provider?.models.find((model) => model.id === item.model);
+  const changeProvider = (providerId: string) => {
+    const nextProvider = providerOptions.find((candidate) => candidate.providerId === providerId);
+    const nextModel = nextProvider?.models.find((model) => !value.some((choice, choiceIndex) =>
+      choiceIndex !== index && choice.providerId === nextProvider.providerId && choice.model === model.id
+    ));
+    if (!nextProvider || !nextModel) return;
+    onChange(value.map((choice, choiceIndex) => choiceIndex === index ? { providerId, model: nextModel.id } : choice));
+  };
+  const changeModel = (modelId: string) => {
+    const nextModel = provider?.models.find((model) => model.id === modelId);
+    if (!provider || !nextModel) return;
+    onChange(value.map((choice, choiceIndex) => choiceIndex === index
+      ? { providerId: provider.providerId, model: nextModel.id, ...(choice.model === nextModel.id && choice.reasoningLevel ? { reasoningLevel: choice.reasoningLevel } : {}) }
+      : choice));
+  };
+  const changeReasoning = (reasoningLevel: string) => onChange(value.map((choice, choiceIndex) => choiceIndex === index
+    ? { ...choice, ...(reasoningLevel ? { reasoningLevel } : { reasoningLevel: undefined }) }
+    : choice));
+
   return (
-    <li className="cn-selected-model">
-      <span>{label}</span>
-      {showReasoning && reasoningLevels.length > 0 ? (
-        <select
-          className="cn-select cn-small"
-          aria-label={`Reasoning level for ${label}`}
-          value={item.reasoningLevel ?? ''}
-          onChange={(event) => onChange((current) => setModelReasoning(current, item.providerId, item.model, event.target.value))}
-        >
-          <option value="">Default reasoning</option>
-          {reasoningLevels.map((level) => (
-            <option key={level} value={level}>
-              {level}
-            </option>
-          ))}
+    <li className="cn-priority-row">
+      <span className="cn-priority-rank">{index + 1}</span>
+      <label className="cn-field">
+        <span className="cn-muted cn-small">Provider</span>
+        <select className="cn-select" aria-label={`Provider for priority ${index + 1}`} value={item.providerId} onChange={(event) => changeProvider(event.target.value)}>
+          {providerOptions.map((option) => <option key={option.providerId} value={option.providerId}>{option.displayName}</option>)}
+          {!providerOptions.some((option) => option.providerId === item.providerId) ? (
+            <option value={item.providerId} disabled>{provider?.displayName ?? item.providerId} (unavailable)</option>
+          ) : null}
         </select>
+      </label>
+      <label className="cn-field">
+        <span className="cn-muted cn-small">Model</span>
+        <select className="cn-select" aria-label={`Model for priority ${index + 1}`} value={item.model} disabled={!provider || modelOptions.length === 0} onChange={(event) => changeModel(event.target.value)}>
+          {!provider?.models.some((model) => model.id === item.model) ? <option value={item.model} disabled>{item.model} (unavailable)</option> : null}
+          {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+        </select>
+      </label>
+      {catalog?.reasoningLevels.length ? (
+        <label className="cn-field">
+          <span className="cn-muted cn-small">Reasoning</span>
+          <select className="cn-select cn-small" aria-label={`Reasoning level for ${catalog.label}`} value={item.reasoningLevel ?? ''} onChange={(event) => changeReasoning(event.target.value)}>
+            <option value="">Default</option>
+            {catalog.reasoningLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+          </select>
+        </label>
       ) : null}
-      <button type="button" className="cn-btn cn-small" onClick={() => onChange((current) => removeModelChoice(current, item.providerId, item.model))}>
-        Remove
-      </button>
+      <span className="cn-priority-controls">
+        <button type="button" className="cn-btn cn-small" aria-label={`Move priority ${index + 1} up`} disabled={index === 0} onClick={() => onChange(moveModelChoice(value, index, -1))}>Move up</button>
+        <button type="button" className="cn-btn cn-small" aria-label={`Move priority ${index + 1} down`} disabled={index === value.length - 1} onClick={() => onChange(moveModelChoice(value, index, 1))}>Move down</button>
+        <button type="button" className="cn-btn cn-small" aria-label={`Remove priority ${index + 1}`} onClick={() => onChange(value.filter((_, choiceIndex) => choiceIndex !== index))}>Remove</button>
+      </span>
     </li>
   );
 }
 
+function AddPriorityRow(props: {
+  priority: number;
+  value: ModelChoice[];
+  providers: AvailableProvider[];
+  providerById: Map<string, AvailableProvider>;
+  unusedModels(provider: AvailableProvider): AvailableProvider['models'];
+  onChange(next: ModelChoice[]): void;
+  onCancel?: () => void;
+}) {
+  const { priority, value, providers, providerById, unusedModels, onChange, onCancel } = props;
+  const [providerId, setProviderId] = useState('');
+  const provider = providerById.get(providerId);
+  const modelOptions = provider ? unusedModels(provider) : [];
+  const selectModel = (modelId: string) => {
+    const model = provider?.models.find((candidate) => candidate.id === modelId);
+    if (provider && model) onChange(addModelChoice(value, provider.providerId, model.id));
+  };
+
+  return (
+    <div className="cn-priority-row cn-priority-add-row">
+      <span className="cn-priority-rank">{priority}</span>
+      <label className="cn-field">
+        <span className="cn-muted cn-small">Provider</span>
+        <select className="cn-select" aria-label={`Provider for priority ${priority}`} value={providerId} onChange={(event) => setProviderId(event.target.value)}>
+          <option value="">Choose a provider…</option>
+          {providers.map((candidate) => <option key={candidate.providerId} value={candidate.providerId}>{candidate.displayName}</option>)}
+        </select>
+      </label>
+      <label className="cn-field">
+        <span className="cn-muted cn-small">Model</span>
+        <select className="cn-select" aria-label={`Model for priority ${priority}`} value="" disabled={!provider} onChange={(event) => selectModel(event.target.value)}>
+          <option value="">Choose a model…</option>
+          {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
+        </select>
+      </label>
+      {onCancel ? <button type="button" className="cn-btn cn-small" onClick={onCancel}>Cancel</button> : null}
+    </div>
+  );
+}

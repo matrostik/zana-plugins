@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { addModelChoice, MAX_REVIEW_MODELS, ProviderModelPicker, removeModelChoice } from '../app/ModelSearchPicker.tsx';
+import { addModelChoice, MAX_REVIEW_MODELS, ModelPriorityPicker, moveModelChoice } from '../app/ModelSearchPicker.tsx';
 import type { AvailableProvider } from '../app/types.ts';
 import type { ModelChoice } from '../server/types.ts';
 
@@ -19,10 +19,12 @@ const cursor: AvailableProvider = {
   ]
 };
 
-function Harness({ initial = [] as ModelChoice[], showReasoning = true }) {
-  const [value, setValue] = useState<ModelChoice[]>(initial);
-  return <ProviderModelPicker provider={cursor} value={value} onChange={setValue} showReasoning={showReasoning} />;
-}
+const claude: AvailableProvider = {
+  providerId: 'claude-code',
+  displayName: 'Claude Code',
+  error: null,
+  models: [{ id: 'sonnet', label: 'Sonnet', reasoningLevels: [] }]
+};
 
 describe('model choice helpers', () => {
   it('adds, ignores duplicates, caps at five, and removes', () => {
@@ -30,29 +32,65 @@ describe('model choice helpers', () => {
     for (let index = 0; index < 6; index++) value = addModelChoice(value, 'cursor', `m${index}`);
     expect(value).toHaveLength(MAX_REVIEW_MODELS);
     expect(addModelChoice(value, 'cursor', 'm0')).toEqual(value);
-    expect(removeModelChoice(value, 'cursor', 'm0')).toHaveLength(4);
+    expect(value).toHaveLength(5);
+  });
+
+  it('moves priorities in either direction without mutating the source array', () => {
+    const original: ModelChoice[] = [
+      { providerId: 'cursor', model: 'first' },
+      { providerId: 'claude-code', model: 'second' },
+      { providerId: 'codex', model: 'third' }
+    ];
+
+    expect(moveModelChoice(original, 0, 1).map((item) => item.model)).toEqual(['second', 'first', 'third']);
+    expect(moveModelChoice(original, 2, -1).map((item) => item.model)).toEqual(['first', 'third', 'second']);
+    expect(original.map((item) => item.model)).toEqual(['first', 'second', 'third']);
+  });
+
+  it('keeps the original array for empty input, invalid indices, and boundary moves', () => {
+    const original: ModelChoice[] = [{ providerId: 'cursor', model: 'first' }];
+    expect(moveModelChoice([], 0, 1)).toEqual([]);
+    expect(moveModelChoice(original, -1, 1)).toBe(original);
+    expect(moveModelChoice(original, 1, -1)).toBe(original);
+    expect(moveModelChoice(original, 0, -1)).toBe(original);
+    expect(moveModelChoice(original, 0, 1)).toBe(original);
   });
 });
 
-describe('ProviderModelPicker', () => {
-  it('filters the catalog and lists only selected models under the field', () => {
+describe('ModelPriorityPicker', () => {
+  it('commits the first available model as soon as a row provider changes', () => {
+    function Harness() {
+      const [value, setValue] = useState<ModelChoice[]>([{ providerId: 'cursor', model: 'grok-4.6' }]);
+      return <>
+        <ModelPriorityPicker value={value} providers={[cursor, claude]} onChange={setValue} />
+        <output>{JSON.stringify(value)}</output>
+      </>;
+    }
+
     render(<Harness />);
-    const search = screen.getByLabelText('Search Cursor models');
-    fireEvent.focus(search);
-    expect(screen.getByRole('option', { name: /Composer 2/ })).toBeTruthy();
-    fireEvent.change(search, { target: { value: 'composer' } });
-    expect(screen.queryByRole('option', { name: /grok-4.6/ })).toBeNull();
-    fireEvent.click(screen.getByRole('option', { name: /Composer 2/ }));
-    expect(screen.getByText('Composer 2')).toBeTruthy();
-    expect(screen.queryByRole('option')).toBeNull();
-    expect(screen.queryByText('gpt-5.6-sol')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Provider for priority 1'), { target: { value: 'claude-code' } });
+
+    expect((screen.getByLabelText('Model for priority 1') as HTMLSelectElement).value).toBe('sonnet');
+    expect(screen.getByText('[{"providerId":"claude-code","model":"sonnet"}]')).toBeTruthy();
   });
 
-  it('sets reasoning and removes a selected model', () => {
-    render(<Harness initial={[{ providerId: 'cursor', model: 'grok-4.6' }]} />);
-    fireEvent.change(screen.getByLabelText('Reasoning level for grok-4.6'), { target: { value: 'high' } });
-    expect((screen.getByLabelText('Reasoning level for grok-4.6') as HTMLSelectElement).value).toBe('high');
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
-    expect(screen.queryByText('grok-4.6')).toBeNull();
+  it('reorders selected models with the priority controls', () => {
+    function Harness() {
+      const [value, setValue] = useState<ModelChoice[]>([
+        { providerId: 'cursor', model: 'grok-4.6' },
+        { providerId: 'claude-code', model: 'sonnet' }
+      ]);
+      return <>
+        <ModelPriorityPicker value={value} providers={[cursor, claude]} onChange={setValue} />
+        <output>{value.map((choice) => choice.model).join(',')}</output>
+      </>;
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Move priority 1 down' }));
+
+    expect(screen.getByText('sonnet,grok-4.6')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Move priority 1 up' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Move priority 2 down' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

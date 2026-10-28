@@ -38,6 +38,7 @@ const STOPPED_STATUSES = new Set(['stopped', 'cancelled', 'canceled', 'archived'
 
 export const DEFAULT_POLL_MS = 10_000;
 export const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+export const DEFAULT_STARTUP_TIMEOUT_MS = 15_000;
 
 export const USAGE_LIMIT_PATTERNS: readonly RegExp[] = [
   /usage limit (?:has been )?reached/i,
@@ -72,27 +73,74 @@ function hasReviewJsonContent(text: string): boolean {
   return /"(?:summary|riskScore|securityIssues|performanceIssues|logicIssues|styleIssues|coverageScore|requirementsScore|simplicityScore|stabilityScore)"/i.test(text);
 }
 
-export function detectUsageLimit(text: string): string | null {
-  if (!text || typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  if (!trimmed || trimmed.length > 350) return null;
+export function detectStructuredProviderError(text: string): string | null {
+  try {
+    const candidate = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const json = extractJsonObject(candidate);
+    if (!json || json.trim() !== candidate) return null;
+    const data = JSON.parse(json) as Record<string, unknown>;
+    if (!data || typeof data !== 'object') return null;
 
-  const lines = trimmed
+    const hasErrorEnvelope = data.error !== null && typeof data.error === 'object';
+    const knownRootErrorCode = [data.code, data.type].some((value) =>
+      typeof value === 'string' && /(quota|rate.?limit|resource.?exhausted)/i.test(value)
+    );
+    const errorObj = hasErrorEnvelope
+      ? (data.error as Record<string, unknown>)
+      : knownRootErrorCode ? data : null;
+    if (!errorObj) return null;
+
+    const code = String(errorObj.code ?? '');
+    const type = String(errorObj.type ?? '');
+    const status = String(errorObj.status ?? '');
+    const message = String(errorObj.message ?? '');
+
+    const combined = `${code} ${type} ${status} ${message}`.trim();
+    if (!combined) return null;
+
+    for (const pattern of USAGE_LIMIT_PATTERNS) {
+      if (pattern.test(combined)) {
+        if (message && code && code !== message) {
+          return `${message} (${code})`;
+        }
+        return message || code || type || status || 'Usage limit reached';
+      }
+    }
+  } catch {
+    // Ignore JSON parse errors
+  }
+  return null;
+}
+
+export function detectUsageLimit(text: string, lastAssistantText?: string): string | null {
+  if (!text && !lastAssistantText) return null;
+  if (looksLikeValidReview(text) || (lastAssistantText && looksLikeValidReview(lastAssistantText))) {
+    return null;
+  }
+
+  const structured = (lastAssistantText ? detectStructuredProviderError(lastAssistantText) : null) ?? (text ? detectStructuredProviderError(text) : null);
+  if (structured) return structured;
+
+  const candidate = (lastAssistantText && lastAssistantText.trim().length > 0 ? lastAssistantText : (text.length > 2000 ? text.slice(-2000) : text)).trim();
+  if (!candidate || hasReviewJsonContent(candidate)) return null;
+  const standaloneJson = candidate.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (extractJsonObject(standaloneJson)?.trim() === standaloneJson) return null;
+  const finalParagraph = candidate.split(/\n\s*\n/).at(-1)?.trim() ?? '';
+  const lines = finalParagraph
     .split('\n')
     .map((line) => line.trim().replace(/^[*#_`-]+/, '').replace(/[*#_`-]+$/, '').trim())
     .filter(Boolean);
-
-  if (lines.length === 0 || lines.length > 4) return null;
-  if (hasReviewJsonContent(trimmed)) return null;
+  if (!lines.length) return null;
 
   for (const pattern of USAGE_LIMIT_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return lines.reduce((acc, curr) => {
-        if (!acc) return curr;
-        if (acc.endsWith(':') || acc.endsWith('.')) return `${acc} ${curr}`;
-        return `${acc}: ${curr}`;
-      }, '');
-    }
+    const matchIndex = lines.map((line) => !/[{}\[\]]/.test(line) && pattern.test(line)).lastIndexOf(true);
+    if (matchIndex < 0 || lines[matchIndex].length > 350) continue;
+    const start = Math.max(0, matchIndex - 1);
+    const end = Math.min(lines.length, matchIndex + 2);
+    return lines.slice(start, end).reduce((message, line) => {
+      if (!message) return line;
+      return message.endsWith(':') || message.endsWith('.') ? `${message} ${line}` : `${message}: ${line}`;
+    }, '').slice(0, 350);
   }
   return null;
 }
@@ -104,9 +152,10 @@ export function usageLimitErrorMessage(usage: string): string {
 export async function stopForUsageLimit(
   threads: Pick<ThreadsApi, 'stop'>,
   threadId: string,
-  text: string
+  text: string,
+  lastAssistantText?: string
 ): Promise<Error | null> {
-  const usage = detectUsageLimit(text);
+  const usage = detectUsageLimit(text, lastAssistantText);
   if (!usage) return null;
   await threads.stop({ threadId }).catch(() => undefined);
   return new Error(usageLimitErrorMessage(usage));
@@ -118,12 +167,18 @@ interface Waiter {
   reject(error: Error): void;
 }
 
+interface StartWaiter {
+  resolve(result: 'started' | 'pending'): void;
+  reject(error: Error): void;
+}
+
 /**
  * Tracks hidden worker threads. Completion comes from `thread.idle` /
  * `thread.failed` events when available, with status polling as a fallback.
  */
 export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: number } = {}) {
   const waiters = new Map<string, Waiter>();
+  const startWaiters = new Map<string, StartWaiter>();
   const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 
   async function currentOutput(threadId: string): Promise<string> {
@@ -143,6 +198,15 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
   }
 
   async function onEvent(event: ThreadEvent): Promise<void> {
+    const startWaiter = startWaiters.get(event.threadId);
+    if (startWaiter && event.name === 'thread.failed') {
+      startWaiters.delete(event.threadId);
+      startWaiter.reject(new Error(`Thread failed to start: ${errorMessage(event.error ?? 'provider startup failed')}`));
+    } else if (startWaiter && (event.name === 'thread.active' || event.name === 'thread.idle')) {
+      startWaiters.delete(event.threadId);
+      startWaiter.resolve('started');
+    }
+
     const waiter = waiters.get(event.threadId);
     if (!waiter) return;
     if (event.name === 'thread.failed') {
@@ -157,13 +221,75 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     const text = output.trim() ? output : event.lastAssistantText ?? '';
     if (text.trim() && text !== waiter.baseline) {
       if (!looksLikeValidReview(text)) {
-        const usageError = await stopForUsageLimit(threads, event.threadId, text);
+        const usageError = await stopForUsageLimit(threads, event.threadId, text, event.lastAssistantText);
         if (usageError) {
           settle(event.threadId, { error: usageError });
           return;
         }
       }
       settle(event.threadId, { text });
+    }
+  }
+
+  /** Waits for the host to activate a thread, rejecting failures that happen before activation. */
+  async function waitForStart(threadId: string, timeoutMs = DEFAULT_STARTUP_TIMEOUT_MS): Promise<'started' | 'pending'> {
+    let settled = false;
+    const result = new Promise<'started' | 'pending'>((resolve, reject) => {
+      startWaiters.set(threadId, {
+        resolve: (value) => { settled = true; resolve(value); },
+        reject: (error) => { settled = true; reject(error); }
+      });
+    });
+    const observedResult = result.then(
+      (value) => ({ kind: 'result' as const, value }),
+      (error: unknown) => ({ kind: 'error' as const, error })
+    );
+    const deadline = Date.now() + timeoutMs;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<{ kind: 'timeout' }>((resolve) => {
+      timeoutHandle = setTimeout(() => resolve({ kind: 'timeout' }), Math.max(0, timeoutMs));
+    });
+    const poll = async (): Promise<Awaited<typeof observedResult> | { kind: 'timeout' }> => {
+      while (!settled && Date.now() < deadline) {
+        const lookup = await Promise.race([
+          threads.get({ threadId }).catch(() => null).then((thread) => ({ kind: 'status' as const, thread })),
+          observedResult
+        ]);
+        if (lookup.kind !== 'status') return lookup;
+        if (settled) return observedResult;
+        const status = lookup.thread?.status?.toLowerCase() ?? '';
+        if (FAILED_STATUSES.has(status)) {
+          startWaiters.get(threadId)?.reject(new Error(`Thread failed to start with status "${status}"`));
+          return observedResult;
+        }
+        if (STOPPED_STATUSES.has(status)) {
+          startWaiters.get(threadId)?.reject(new Error('Thread was stopped before the provider started'));
+          return observedResult;
+        }
+        if (DONE_STATUSES.has(status) || status === 'active' || status === 'running') {
+          startWaiters.get(threadId)?.resolve('started');
+          return observedResult;
+        }
+        const remaining = deadline - Date.now();
+        const tick = await Promise.race([
+          sleep(Math.min(250, Math.max(1, remaining))).then(() => ({ kind: 'tick' as const })),
+          observedResult
+        ]);
+        if (tick.kind !== 'tick') return tick;
+      }
+      return { kind: 'timeout' };
+    };
+    try {
+      const outcome = await Promise.race([observedResult, timeout, poll()]);
+      if (outcome.kind === 'timeout') {
+        startWaiters.get(threadId)?.resolve('pending');
+        return 'pending';
+      }
+      if (outcome.kind === 'error') throw outcome.error;
+      return outcome.value;
+    } finally {
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+      startWaiters.delete(threadId);
     }
   }
 
@@ -242,10 +368,63 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     }
   }
 
-  return { onEvent, waitForOutput, pending: () => waiters.size };
+  return { onEvent, waitForOutput, waitForStart, pending: () => waiters.size };
 }
 
 export type ThreadWaiter = ReturnType<typeof createThreadWaiter>;
+
+export interface VisibleThreadSpawnArgs {
+  projectId: string;
+  prompt: string;
+  title: string;
+  permissionMode?: string;
+  visibility: 'visible';
+  environment?: SpawnEnvironment;
+}
+
+export async function spawnVisibleWithPriorityFallback(
+  threads: ThreadsApi,
+  waiter: ThreadWaiter,
+  models: ModelChoice[],
+  args: VisibleThreadSpawnArgs
+): Promise<{ id: string; model: ModelChoice; priority: number; usedFallback: boolean }> {
+  const failures: string[] = [];
+  for (const [index, model] of models.entries()) {
+    let threadId: string;
+    try {
+      const environment = args.environment?.kind === 'worktree' && index > 0
+        ? { ...args.environment, branchSlug: `${args.environment.branchSlug ?? 'codenod-review'}-p${index + 1}` }
+        : args.environment;
+      const failedPriorities = index === 1 ? 'priority 1' : `priorities 1–${index}`;
+      const fallbackContext = index === 0 ? '' : `CodeNod could not start ${failedPriorities}; this thread is using priority ${index + 1} (${model.providerId}/${model.model}).\n\n`;
+      const spawned = await threads.spawn({
+        ...args,
+        title: index === 0 ? args.title : `${args.title} (priority ${index + 1})`,
+        prompt: `${fallbackContext}${args.prompt}`,
+        environment,
+        providerId: model.providerId,
+        model: model.model,
+        reasoningLevel: model.reasoningLevel
+      });
+      threadId = spawned.id;
+    } catch (error) {
+      failures.push(`Priority ${index + 1} (${model.providerId}/${model.model}): ${errorMessage(error)}`);
+      continue;
+    }
+
+    try {
+      const startStatus = await waiter.waitForStart(threadId);
+      if (startStatus === 'pending') throw new Error('Provider startup timed out');
+      return { id: threadId, model, priority: index + 1, usedFallback: index > 0 };
+    } catch (error) {
+      failures.push(`Priority ${index + 1} (${model.providerId}/${model.model}): ${errorMessage(error)}`);
+      await threads.stop({ threadId }).catch(() => undefined);
+      await threads.archive({ threadId }).catch(() => undefined);
+    }
+  }
+
+  throw new Error(`Could not start a thread with any selected model. ${failures.join(' | ')}`);
+}
 
 export interface RunModelInput {
   projectId: string;

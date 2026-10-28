@@ -363,6 +363,16 @@ describe('deep review prompt', () => {
     expect(prompt).not.toContain('Problem 40');
     expect(prompt).toContain("Automated review summary: Risky 'change'");
   });
+
+  it('focuses specifically on selected findings without truncating to forty when focusOnFindings is true', () => {
+    const findings = Array.from({ length: 45 }, (_, index) => ({ severity: 'high', category: 'logic', file: 'src/a.ts', line: index === 0 ? null : index, description: `Problem ${index}` }));
+    const prompt = getDeepReviewPrompt(input({ findings, focusOnFindings: true }));
+    expect(prompt).toContain('Focus your investigation specifically on validating and analyzing the 45 selected finding(s)');
+    expect(prompt).toContain('Focus on the following 45 selected finding(s).');
+    expect(prompt.match(/^- \[/gm)).toHaveLength(45);
+    expect(prompt).toContain('Problem 44');
+    expect(prompt).not.toContain('Review the change end to end');
+  });
 });
 
 describe('diff filtering', () => {

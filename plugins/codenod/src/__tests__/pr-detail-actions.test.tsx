@@ -230,6 +230,37 @@ describe('PrDetail review actions', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Deep Review in thread' }));
     expect(await screen.findByText('Deep Review thread started. Find it in your thread list.')).toBeTruthy();
   });
+
+  it('keeps Deep Review untargeted for default post selection, but targets custom subset', async () => {
+    const data = completedWithFindings();
+    data.findings.push(finding({ id: 'f3', file: 'src/other.ts', line: null, description: 'Other issue', agreedBy: ['cursor/a'] }));
+    const call = makeRpc(data, { deepReview: () => ({ threadId: 't1' }) });
+    renderDetail(call);
+
+    // Default post selection is [f1, f3], so Deep Review is untargeted
+    const deepReviewBtn = await screen.findByRole('button', { name: 'Deep Review in thread' });
+    expect(deepReviewBtn).toBeTruthy();
+
+    // Now clear selection and select only f1
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select finding in src/login.ts:12' }));
+
+    // Now selection is [f1], which is a custom subset -> targeted button
+    expect(await screen.findByRole('button', { name: 'Deep Review (1 selected)' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Deep Review (1 selected)' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('deepReview', { prId: 'github.com/acme/api#1', findingIds: ['f1'] }));
+  });
+
+  it('targets the explicitly selected remaining findings even when they match the default post selection', async () => {
+    const call = makeRpc(completedWithFindings(), { deepReview: () => ({ threadId: 't1' }) });
+    renderDetail(call);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear selection' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select finding in src/login.ts:12' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Deep Review (1 selected)' }));
+
+    await waitFor(() => expect(call).toHaveBeenCalledWith('deepReview', { prId: 'github.com/acme/api#1', findingIds: ['f1'] }));
+  });
 });
 
 describe('PrDetail findings and posting', () => {

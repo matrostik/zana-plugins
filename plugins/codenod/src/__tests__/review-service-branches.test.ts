@@ -11,6 +11,7 @@ import {
   looksLikeValidReview,
   pickReviewPermissionMode,
   runModelInThread,
+  spawnVisibleWithPriorityFallback,
   type RunModelInput,
   type ThreadsApi,
   type ThreadWaiter
@@ -236,6 +237,84 @@ describe('thread waiter', () => {
     await expect(result).resolves.toBe('done');
   });
 
+  it('rejects a provider failure while the status lookup is still pending', async () => {
+    const { threads } = createFakeThreads();
+    let releaseLookup: (value: { status: string }) => void = () => undefined;
+    threads.get.mockReturnValue(new Promise((resolve) => { releaseLookup = resolve; }));
+    const waiter = createThreadWaiter(threads, { pollMs: 0 });
+    const starting = waiter.waitForStart('thread-1', 1_000);
+    const failure = expect(starting).rejects.toThrow('not configured');
+    await Promise.resolve();
+
+    await waiter.onEvent({ name: 'thread.failed', threadId: 'thread-1', error: new Error('not configured') });
+    releaseLookup({ status: 'running' });
+
+    await failure;
+  });
+
+  it('resolves the startup deadline even if the status lookup never returns', async () => {
+    const { threads } = createFakeThreads();
+    threads.get.mockReturnValue(new Promise(() => undefined));
+    const waiter = createThreadWaiter(threads);
+
+    const outcome = await Promise.race([
+      waiter.waitForStart('thread-1', 5),
+      new Promise<'still waiting'>((resolve) => setTimeout(() => resolve('still waiting'), 25))
+    ]);
+
+    expect(outcome).toBe('pending');
+  });
+
+  it('resolves startup lifecycle events while the status lookup is pending', async () => {
+    const { threads } = createFakeThreads();
+    threads.get.mockReturnValue(new Promise(() => undefined));
+    const waiter = createThreadWaiter(threads);
+    const starting = waiter.waitForStart('thread-1', 5_000);
+    const started = expect(starting).resolves.toBe('started');
+
+    await waiter.onEvent({ name: 'thread.active', threadId: 'thread-1' });
+
+    await started;
+  });
+
+  it('tries the next model when visible thread startup times out', async () => {
+    const { threads } = createFakeThreads();
+    threads.spawn.mockImplementation(async ({ providerId }) => ({ id: `${providerId}-thread` }));
+    const waiterStartStatuses: Array<'started' | 'pending'> = ['pending', 'started'];
+    const waiter: ThreadWaiter = {
+      onEvent: async () => undefined,
+      waitForOutput: async () => '',
+      waitForStart: vi.fn(async (): Promise<'started' | 'pending'> => waiterStartStatuses.shift() ?? 'started'),
+      pending: () => 0
+    };
+    const models = [
+      { providerId: 'unavailable', model: 'one' },
+      { providerId: 'available', model: 'two' }
+    ];
+
+    const result = await spawnVisibleWithPriorityFallback(threads, waiter, models, {
+      projectId: 'home', prompt: 'Review', title: 'Review', visibility: 'visible'
+    });
+
+    expect(result).toMatchObject({ id: 'available-thread', model: models[1], priority: 2, usedFallback: true });
+    expect(threads.stop).toHaveBeenCalledWith({ threadId: 'unavailable-thread' });
+    expect(threads.archive).toHaveBeenCalledWith({ threadId: 'unavailable-thread' });
+  });
+
+  it('keeps the configured worktree branch name for priority one', async () => {
+    const { threads } = createFakeThreads();
+    const waiter = createThreadWaiter(threads);
+
+    await spawnVisibleWithPriorityFallback(threads, waiter, [{ providerId: 'cursor', model: 'grok' }], {
+      projectId: 'home', prompt: 'Review', title: 'Review', visibility: 'visible',
+      environment: { kind: 'worktree', branchSlug: 'codenod-deep-7', baseBranch: 'main' }
+    });
+
+    expect(threads.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      environment: { kind: 'worktree', branchSlug: 'codenod-deep-7', baseBranch: 'main' }
+    }));
+  });
+
   it('stops the thread and rejects with usage limit error when thread.idle event carries quota message', async () => {
     useFakeClock();
     const { threads, state } = createFakeThreads();
@@ -287,7 +366,7 @@ function createScriptedWaiter(replies: Array<string | Error>) {
     if (next instanceof Error) throw next;
     return next ?? '';
   });
-  const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, pending: () => 0 };
+  const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, waitForStart: async () => 'started', pending: () => 0 };
   return { waiter, waitForOutput };
 }
 
@@ -359,7 +438,7 @@ describe('runModelInThread', () => {
     const waitForOutput = vi.fn<ThreadWaiter['waitForOutput']>(
       (_threadId, args) => new Promise<string>((_resolve, reject) => args?.signal?.addEventListener('abort', () => reject(new Error('Review cancelled'))))
     );
-    const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, pending: () => 0 };
+    const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, waitForStart: async () => 'started', pending: () => 0 };
     const controller = new AbortController();
 
     const running = runModelInThread(threads, waiter, runInput({ signal: controller.signal }));
@@ -427,11 +506,22 @@ describe('detectUsageLimit and looksLikeValidReview', () => {
     expect(detectUsageLimit('RESOURCE_EXHAUSTED: quota exceeded for model')).toContain('RESOURCE_EXHAUSTED');
     expect(detectUsageLimit('Rate limit exceeded: quota will reset in 60 seconds')).toContain('Rate limit exceeded');
     expect(detectUsageLimit('{"error": {"code": "insufficient_quota", "message": "quota limit reached"}}')).toContain('insufficient_quota');
+    expect(detectUsageLimit('{"type":"insufficient_quota","message":"quota exceeded"}')).toContain('quota exceeded');
+  });
+
+  it('ignores generic JSON examples and provider envelopes embedded in transcripts', () => {
+    expect(detectUsageLimit('{"message":"rate limit exceeded"}')).toBeNull();
+    expect(detectUsageLimit('Example response: {"error":{"code":"insufficient_quota","message":"quota exceeded"}}'))
+      .toBeNull();
   });
 
   it('ignores normal responses without usage limits', () => {
     expect(detectUsageLimit('The code changes look good and all tests pass.')).toBeNull();
     expect(detectUsageLimit('')).toBeNull();
+  });
+
+  it('ignores loose usage limit wording buried in a long single line', () => {
+    expect(detectUsageLimit(`${'A'.repeat(400)} usage limit reached`)).toBeNull();
   });
 
   it('recognizes valid review analysis and distinguishes it from usage limit errors', () => {
@@ -449,8 +539,32 @@ describe('detectUsageLimit and looksLikeValidReview', () => {
     expect(detectUsageLimit(malformed)).toBeNull();
   });
 
-  it('ignores usage limit patterns in long text', () => {
-    const longText = 'A'.repeat(400) + ' usage limit reached';
+  it('recognizes pretty-printed multiline and long structured provider error envelopes', () => {
+    const prettyJson = JSON.stringify(
+      {
+        error: {
+          message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.',
+          type: 'insufficient_quota',
+          param: null,
+          code: 'insufficient_quota'
+        }
+      },
+      null,
+      2
+    );
+    expect(prettyJson.split('\n').length).toBeGreaterThan(6);
+    expect(prettyJson.length).toBeGreaterThan(250);
+    expect(detectUsageLimit(prettyJson)).toContain('insufficient_quota');
+  });
+
+  it('detects usage limit error appended to a long transcript tail or last assistant text', () => {
+    const transcript = 'Turn 1: user prompt...\n' + 'A'.repeat(3000) + '\n\nRate limit exceeded: quota will reset in 60 seconds';
+    expect(detectUsageLimit(transcript)).toContain('Rate limit exceeded');
+    expect(detectUsageLimit('full transcript', 'Rate limit exceeded: quota will reset in 60 seconds')).toContain('Rate limit exceeded');
+  });
+
+  it('ignores long text that does not match usage limit patterns', () => {
+    const longText = 'A'.repeat(400) + ' and some code explanation without errors';
     expect(detectUsageLimit(longText)).toBeNull();
   });
 });
@@ -593,6 +707,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
   const waiter: ThreadWaiter = {
     onEvent: async () => undefined,
     pending: () => 0,
+    waitForStart: async () => 'started',
     waitForOutput: async (threadId, args = {}) => {
       const thread = spawned.find((entry) => entry.id === threadId)!;
       return respond({ model: String(thread.args.model), attempt: args.baseline === undefined ? 0 : 1, signal: args.signal });
@@ -1024,6 +1139,7 @@ describe('review service', () => {
 
     const review = await service.startReview(prRef());
     await settled();
+    await until(() => sendCalls === 3);
 
     expect(sendCalls).toBe(3);
     const coordId = store.getReview(review.id)!.coordinatorThreadId!;
@@ -1040,12 +1156,43 @@ describe('review service', () => {
 
     const review = await service.startReview(prRef());
     await settled();
+    await until(() => threads.send.mock.calls.length > 0);
 
     const coordId = store.getReview(review.id)!.coordinatorThreadId!;
+    expect(threads.send).toHaveBeenCalledTimes(1);
     expect(threads.send).toHaveBeenCalledWith({
       threadId: coordId,
       prompt: expect.stringContaining('Code review failed')
     });
+  });
+
+  it('waits for coordinator thread to become idle before sending update', async () => {
+    let getCalls = 0;
+    const { service, threads, settled } = createServiceHarness({
+      config: { showReviewsOnAgentsBoard: true }
+    });
+    threads.get = vi.fn(async () => {
+      getCalls++;
+      return { status: getCalls === 1 ? 'running' : 'idle' };
+    });
+
+    await service.startReview(prRef());
+    await settled();
+    await until(() => threads.send.mock.calls.length > 0);
+
+    expect(getCalls).toBeGreaterThanOrEqual(2);
+    expect(threads.send).toHaveBeenCalled();
+  });
+
+  it.each(['failed', 'stopped'])('sends coordinator updates when its thread is %s', async (status) => {
+    const { service, threads, settled } = createServiceHarness({ config: { showReviewsOnAgentsBoard: true } });
+    threads.get = vi.fn(async () => ({ status }));
+
+    await service.startReview(prRef());
+    await settled();
+    await until(() => threads.send.mock.calls.length > 0);
+
+    expect(threads.send).toHaveBeenCalled();
   });
 });
 

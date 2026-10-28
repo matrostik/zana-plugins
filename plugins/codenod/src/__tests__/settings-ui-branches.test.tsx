@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ProviderModelPicker } from '../app/ModelSearchPicker.tsx';
 import { PrList } from '../app/PrList.tsx';
 import { SettingsView } from '../app/SettingsView.tsx';
 import type { AvailableProvider, ConfigSnapshot } from '../app/types.ts';
 import type { TokenSource } from '../server/github/auth.ts';
-import type { CiState, ModelChoice, RepoRow } from '../server/types.ts';
+import type { CiState, RepoRow } from '../server/types.ts';
 import type { PrListItem } from '../server/views.ts';
 
 afterEach(cleanup);
@@ -22,24 +20,6 @@ const cursor: AvailableProvider = {
     { id: 'composer-2', label: 'Composer 2', reasoningLevels: [] }
   ]
 };
-
-function PickerHarness({ provider = cursor, initial = [] as ModelChoice[], showReasoning = true }) {
-  const [value, setValue] = useState<ModelChoice[]>(initial);
-  return (
-    <>
-      <ProviderModelPicker provider={provider} value={value} onChange={setValue} showReasoning={showReasoning} />
-      <output aria-label="Selected models">{value.map((item) => `${item.model}${item.reasoningLevel ? `:${item.reasoningLevel}` : ''}`).join(',')}</output>
-    </>
-  );
-}
-
-function selectedModels(): string {
-  return screen.getByLabelText('Selected models').textContent ?? '';
-}
-
-function highlightedOption(): string {
-  return screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')?.textContent ?? '';
-}
 
 function repo(host: string, owner: string, name: string, overrides: Partial<RepoRow> = {}): RepoRow {
   return { id: `${host}/${owner}/${name}`, host, owner, name, autoReview: false, specGlob: null, addedAt: 0, ...overrides };
@@ -103,156 +83,6 @@ async function openTab(name: string) {
   fireEvent.click(screen.getByRole('tab', { name }));
   await screen.findByRole('tabpanel', { name });
 }
-
-describe('ProviderModelPicker keyboard and pointer behavior', () => {
-  it('moves the highlight with arrow keys, stays within bounds, and adds the highlighted model on Enter', () => {
-    render(<PickerHarness />);
-    const search = screen.getByRole('combobox', { name: 'Search Cursor models' });
-    fireEvent.focus(search);
-    expect(highlightedOption()).toBe('grok-4.6');
-
-    fireEvent.keyDown(search, { key: 'ArrowUp' });
-    expect(highlightedOption()).toBe('grok-4.6');
-    fireEvent.keyDown(search, { key: 'ArrowDown' });
-    fireEvent.keyDown(search, { key: 'ArrowDown' });
-    fireEvent.keyDown(search, { key: 'ArrowDown' });
-    expect(highlightedOption()).toBe('Composer 2composer-2');
-    fireEvent.keyDown(search, { key: 'ArrowUp' });
-    expect(highlightedOption()).toBe('gpt-5.6-sol');
-
-    fireEvent.keyDown(search, { key: 'Enter' });
-    expect(selectedModels()).toBe('gpt-5.6-sol');
-    expect(screen.queryByRole('listbox')).toBeNull();
-    expect(search.getAttribute('aria-expanded')).toBe('false');
-  });
-
-  it('ignores Enter while closed and closes the list on Escape', () => {
-    render(<PickerHarness />);
-    const search = screen.getByRole('combobox', { name: 'Search Cursor models' });
-    fireEvent.keyDown(search, { key: 'Enter' });
-    expect(selectedModels()).toBe('');
-
-    fireEvent.keyDown(search, { key: 'ArrowDown' });
-    expect(screen.getByRole('listbox')).toBeTruthy();
-    fireEvent.keyDown(search, { key: 'a' });
-    expect(screen.getByRole('listbox')).toBeTruthy();
-    fireEvent.keyDown(search, { key: 'Escape' });
-    expect(screen.queryByRole('listbox')).toBeNull();
-  });
-
-  it('opens the list with ArrowUp and highlights the option under the pointer', () => {
-    render(<PickerHarness />);
-    const search = screen.getByRole('combobox', { name: 'Search Cursor models' });
-    fireEvent.keyDown(search, { key: 'ArrowUp' });
-    fireEvent.mouseEnter(screen.getByRole('option', { name: /Composer 2/ }));
-    expect(highlightedOption()).toBe('Composer 2composer-2');
-    fireEvent.keyDown(search, { key: 'Enter' });
-    expect(selectedModels()).toBe('composer-2');
-  });
-
-  it('closes the list on a pointer press outside but not inside', () => {
-    render(<PickerHarness />);
-    const search = screen.getByRole('combobox', { name: 'Search Cursor models' });
-    fireEvent.focus(search);
-    fireEvent.pointerDown(search);
-    expect(screen.getByRole('listbox')).toBeTruthy();
-    fireEvent.pointerDown(document.body);
-    expect(screen.queryByRole('listbox')).toBeNull();
-  });
-
-  it('matches models by id as well as label', () => {
-    render(<PickerHarness />);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Search Cursor models' }), { target: { value: 'COMPOSER-2' } });
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Composer 2composer-2']);
-  });
-});
-
-describe('ProviderModelPicker empty states', () => {
-  it('explains when no models match the search and ignores arrow keys and Enter', () => {
-    render(<PickerHarness />);
-    const search = screen.getByRole('combobox', { name: 'Search Cursor models' });
-    fireEvent.change(search, { target: { value: 'claude' } });
-    expect(screen.getByText('No matching models')).toBeTruthy();
-    fireEvent.keyDown(search, { key: 'ArrowDown' });
-    fireEvent.keyDown(search, { key: 'Enter' });
-    expect(selectedModels()).toBe('');
-  });
-
-  it('tells the user when every model from the provider is already selected', () => {
-    const all = cursor.models.map((model) => ({ providerId: 'cursor', model: model.id }));
-    render(<PickerHarness initial={all} />);
-    fireEvent.focus(screen.getByRole('combobox', { name: 'Search Cursor models' }));
-    expect(screen.getByText('All models from this provider are selected')).toBeTruthy();
-  });
-
-  it('stops offering models once the five-model cap is reached', () => {
-    const initial: ModelChoice[] = [
-      { providerId: 'cursor', model: 'grok-4.6' },
-      { providerId: 'claude', model: 'opus' },
-      { providerId: 'claude', model: 'sonnet' },
-      { providerId: 'claude', model: 'haiku' },
-      { providerId: 'codex', model: 'gpt-5' }
-    ];
-    render(<PickerHarness initial={initial} />);
-    const search = screen.getByRole('combobox', { name: 'Search Cursor models' });
-    fireEvent.focus(search);
-    expect(screen.getByText('You already picked 5 models.')).toBeTruthy();
-    expect(within(screen.getByRole('listbox')).queryByRole('option')).toBeNull();
-    fireEvent.keyDown(search, { key: 'ArrowDown' });
-    fireEvent.keyDown(search, { key: 'Enter' });
-    expect(selectedModels().split(',')).toHaveLength(5);
-  });
-
-  it('keeps a saved model that the provider no longer reports, shown by its raw id', () => {
-    const provider: AvailableProvider = { ...cursor, models: [cursor.models[0]] };
-    render(<PickerHarness provider={provider} initial={[{ providerId: 'cursor', model: 'grok-4.6' }, { providerId: 'cursor', model: 'retired-model' }]} />);
-    fireEvent.focus(screen.getByRole('combobox', { name: 'Search Cursor models' }));
-    expect(screen.getByText('No models')).toBeTruthy();
-    expect(screen.getByText('retired-model')).toBeTruthy();
-    expect(screen.queryByLabelText('Reasoning level for retired-model')).toBeNull();
-  });
-
-  it('shows the provider error when its catalog is empty', () => {
-    render(<PickerHarness provider={{ ...cursor, models: [], error: 'Sign in to Cursor first.' }} />);
-    expect(screen.getByText('Sign in to Cursor first.')).toBeTruthy();
-    expect(screen.queryByRole('combobox')).toBeNull();
-  });
-
-  it('falls back to a generic message when an empty catalog has no error', () => {
-    render(<PickerHarness provider={{ ...cursor, models: [] }} />);
-    expect(screen.getByText('No models reported')).toBeTruthy();
-  });
-
-  it('lets the user remove a selection even when the provider catalog is empty', () => {
-    render(<PickerHarness provider={{ ...cursor, models: [], error: 'Offline' }} initial={[{ providerId: 'cursor', model: 'grok-4.6' }]} />);
-    expect(screen.queryByText('Offline')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
-    expect(selectedModels()).toBe('');
-  });
-});
-
-describe('ProviderModelPicker reasoning levels', () => {
-  it('resets one model to default reasoning without touching other selections', () => {
-    render(
-      <PickerHarness
-        initial={[
-          { providerId: 'cursor', model: 'grok-4.6', reasoningLevel: 'high' },
-          { providerId: 'cursor', model: 'composer-2' }
-        ]}
-      />
-    );
-    const select = screen.getByLabelText('Reasoning level for grok-4.6') as HTMLSelectElement;
-    expect(select.value).toBe('high');
-    fireEvent.change(select, { target: { value: '' } });
-    expect(selectedModels()).toBe('grok-4.6,composer-2');
-    expect(screen.queryByLabelText('Reasoning level for Composer 2')).toBeNull();
-  });
-
-  it('hides the reasoning control when reasoning is turned off', () => {
-    render(<PickerHarness initial={[{ providerId: 'cursor', model: 'grok-4.6' }]} showReasoning={false} />);
-    expect(screen.queryByLabelText('Reasoning level for grok-4.6')).toBeNull();
-  });
-});
 
 describe('PrList badges and states', () => {
   function item(overrides: Partial<PrListItem>): PrListItem {
@@ -537,6 +367,11 @@ describe('Organizations & Repos tab repositories', () => {
 });
 
 describe('AI Model tab', () => {
+  async function choosePriorityModel(providerName: string, modelId: string) {
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Provider for priority 1' }), { target: { value: providerName.toLowerCase() } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Model for priority 1' }), { target: { value: modelId } });
+  }
+
   it('shows a loading message while providers are fetched', async () => {
     await renderView(snapshot(), { availableModels: () => new Promise(() => {}) });
     await openTab('AI Model');
@@ -562,8 +397,7 @@ describe('AI Model tab', () => {
   it('saves the picked models and confirms', async () => {
     const { callsTo } = await renderView(snapshot(), { availableModels: () => [cursor] });
     await openTab('AI Model');
-    fireEvent.focus(await screen.findByRole('combobox', { name: 'Search Cursor models' }));
-    fireEvent.click(screen.getByRole('option', { name: 'grok-4.6' }));
+    await choosePriorityModel('Cursor', 'grok-4.6');
     fireEvent.click(screen.getByRole('button', { name: 'Save models (1)' }));
     expect(await screen.findByRole('status')).toBeTruthy();
     expect(callsTo('setModels')).toEqual([{ models: [{ providerId: 'cursor', model: 'grok-4.6' }] }]);
@@ -572,8 +406,7 @@ describe('AI Model tab', () => {
   it('keeps unsaved model picks when another setting is saved', async () => {
     const { callsTo } = await renderView(snapshot(), { config: () => snapshot(), availableModels: () => [cursor] });
     await openTab('AI Model');
-    fireEvent.focus(await screen.findByRole('combobox', { name: 'Search Cursor models' }));
-    fireEvent.click(screen.getByRole('option', { name: 'grok-4.6' }));
+    await choosePriorityModel('Cursor', 'grok-4.6');
     fireEvent.change(screen.getByLabelText('Review workspace'), { target: { value: 'project' } });
     await waitFor(() => expect(callsTo('config').length).toBeGreaterThan(1));
     expect(screen.getByRole('button', { name: 'Save models (1)' })).toBeTruthy();
@@ -587,7 +420,7 @@ describe('AI Model tab', () => {
       }
     });
     await openTab('AI Model');
-    await screen.findByRole('combobox', { name: 'Search Cursor models' });
+    await screen.findByRole('combobox', { name: 'Provider for priority 1' });
     fireEvent.click(screen.getByRole('button', { name: 'Save models (0)' }));
     expect(await screen.findByText('Model is not allowed')).toBeTruthy();
   });
