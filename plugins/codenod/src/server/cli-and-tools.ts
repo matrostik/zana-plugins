@@ -301,6 +301,14 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
       }
       const detail = await app.detail(ref);
       if (record.remediationGate === true) {
+        if (!detail.review || detail.review.id !== finished.id || detail.review.headSha !== detail.pr.headSha || detail.review.stale) {
+          return {
+            reviewId: finished.id,
+            status: 'stale',
+            error: 'Review is stale: head commit changed during review',
+            ...(finished.coordinatorThreadId ? { coordinatorThreadId: finished.coordinatorThreadId } : {})
+          };
+        }
         const blocking = detail.findings.filter((f) => !f.dismissed && (f.severity === 'critical' || f.severity === 'high'));
         return {
           ...detail,

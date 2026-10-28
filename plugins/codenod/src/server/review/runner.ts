@@ -72,26 +72,73 @@ function hasReviewJsonContent(text: string): boolean {
   return /"(?:summary|riskScore|securityIssues|performanceIssues|logicIssues|styleIssues|coverageScore|requirementsScore|simplicityScore|stabilityScore)"/i.test(text);
 }
 
-export function detectUsageLimit(text: string): string | null {
-  if (!text || typeof text !== 'string') return null;
-  const trimmed = text.trim();
-  if (!trimmed || trimmed.length > 350) return null;
+export function detectStructuredProviderError(text: string): string | null {
+  try {
+    const json = extractJsonObject(text);
+    if (!json) return null;
+    const data = JSON.parse(json) as Record<string, unknown>;
+    if (!data || typeof data !== 'object') return null;
 
-  const lines = trimmed
-    .split('\n')
-    .map((line) => line.trim().replace(/^[*#_`-]+/, '').replace(/[*#_`-]+$/, '').trim())
-    .filter(Boolean);
+    const errorObj = data.error && typeof data.error === 'object'
+      ? (data.error as Record<string, unknown>)
+      : data;
 
-  if (lines.length === 0 || lines.length > 4) return null;
-  if (hasReviewJsonContent(trimmed)) return null;
+    const code = String(errorObj.code ?? data.code ?? '');
+    const type = String(errorObj.type ?? data.type ?? '');
+    const status = String(errorObj.status ?? data.status ?? '');
+    const message = String(errorObj.message ?? data.message ?? '');
+
+    const combined = `${code} ${type} ${status} ${message}`.trim();
+    if (!combined) return null;
+
+    for (const pattern of USAGE_LIMIT_PATTERNS) {
+      if (pattern.test(combined)) {
+        if (message && code && code !== message) {
+          return `${message} (${code})`;
+        }
+        return message || code || type || status || 'Usage limit reached';
+      }
+    }
+  } catch {
+    // Ignore JSON parse errors
+  }
+  return null;
+}
+
+export function detectUsageLimit(text: string, lastAssistantText?: string): string | null {
+  if (!text && !lastAssistantText) return null;
+  if (looksLikeValidReview(text) || (lastAssistantText && looksLikeValidReview(lastAssistantText))) {
+    return null;
+  }
+
+  const structured = (lastAssistantText ? detectStructuredProviderError(lastAssistantText) : null) ?? (text ? detectStructuredProviderError(text) : null);
+  if (structured) return structured;
+
+  const candidate = (lastAssistantText && lastAssistantText.trim().length > 0 ? lastAssistantText : (text.length > 2000 ? text.slice(-2000) : text)).trim();
+  if (!candidate || hasReviewJsonContent(candidate)) return null;
 
   for (const pattern of USAGE_LIMIT_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return lines.reduce((acc, curr) => {
-        if (!acc) return curr;
-        if (acc.endsWith(':') || acc.endsWith('.')) return `${acc} ${curr}`;
-        return `${acc}: ${curr}`;
-      }, '');
+    if (pattern.test(candidate)) {
+      const lines = candidate
+        .split('\n')
+        .map((line) => line.trim().replace(/^[*#_`-]+/, '').replace(/[*#_`-]+$/, '').trim())
+        .filter(Boolean);
+
+      if (lines.length <= 4) {
+        return lines.reduce((acc, curr) => {
+          if (!acc) return curr;
+          if (acc.endsWith(':') || acc.endsWith('.')) return `${acc} ${curr}`;
+          return `${acc}: ${curr}`;
+        }, '');
+      }
+
+      const matchIndex = lines.findIndex((l) => pattern.test(l));
+      if (matchIndex !== -1) {
+        const start = Math.max(0, matchIndex - 1);
+        const end = Math.min(lines.length, matchIndex + 2);
+        return lines.slice(start, end).join(' — ');
+      }
+      return lines[0];
     }
   }
   return null;
@@ -104,9 +151,10 @@ export function usageLimitErrorMessage(usage: string): string {
 export async function stopForUsageLimit(
   threads: Pick<ThreadsApi, 'stop'>,
   threadId: string,
-  text: string
+  text: string,
+  lastAssistantText?: string
 ): Promise<Error | null> {
-  const usage = detectUsageLimit(text);
+  const usage = detectUsageLimit(text, lastAssistantText);
   if (!usage) return null;
   await threads.stop({ threadId }).catch(() => undefined);
   return new Error(usageLimitErrorMessage(usage));
@@ -157,7 +205,7 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
     const text = output.trim() ? output : event.lastAssistantText ?? '';
     if (text.trim() && text !== waiter.baseline) {
       if (!looksLikeValidReview(text)) {
-        const usageError = await stopForUsageLimit(threads, event.threadId, text);
+        const usageError = await stopForUsageLimit(threads, event.threadId, text, event.lastAssistantText);
         if (usageError) {
           settle(event.threadId, { error: usageError });
           return;

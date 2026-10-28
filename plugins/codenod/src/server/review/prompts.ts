@@ -379,6 +379,7 @@ export interface DeepReviewPromptInput {
   hasWorkspace: boolean;
   reviewSummary: string | null;
   findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string }>;
+  focusOnFindings?: boolean;
 }
 
 export function getDeepReviewPrompt(input: DeepReviewPromptInput): string {
@@ -390,12 +391,24 @@ Confirm HEAD is ${input.headSha.slice(0, 12)}.`
     : input.hasWorkspace
     ? `This workspace is a checkout of ${input.repository}. Confirm HEAD is ${input.headSha.slice(0, 12)} before reading code.`
     : `There is no local checkout of ${input.repository}. Use \`gh pr diff ${input.url}\` and \`gh pr view ${input.url}\` (or the GitHub API) to read the change.`;
-  const prior = input.findings.length > 0
-    ? `\n\nCodeNod's automated review already reported these findings. Verify each one against the code (confirm, refute, or refine) before adding new ones:\n${input.findings
-        .slice(0, 40)
-        .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
-        .join('\n')}`
+  const instruction = input.focusOnFindings
+    ? `Focus your investigation specifically on validating and analyzing the ${input.findings.length} selected finding(s) listed below. Trace callers and data flow for each affected area, verify whether each issue is genuine (confirm, refute, or refine), and determine the exact fix or remediation.`
+    : 'Review the change end to end: trace callers of modified functions, check tests for the changed behavior, and look for correctness, security, and backward-compatibility problems that a diff-only review would miss.';
+
+  const findingsList = input.focusOnFindings
+    ? input.findings
+    : input.findings.slice(0, 40);
+
+  const prior = findingsList.length > 0
+    ? input.focusOnFindings
+      ? `\n\nFocus on the following ${findingsList.length} selected finding(s). Verify each against the code:\n${findingsList
+          .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
+          .join('\n')}`
+      : `\n\nCodeNod's automated review already reported these findings. Verify each one against the code (confirm, refute, or refine) before adding new ones:\n${findingsList
+          .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
+          .join('\n')}`
     : '';
+
   const summary = input.reviewSummary ? `\n\nAutomated review summary: ${sanitizeUntrusted(input.reviewSummary, 800)}` : '';
   return `Deep review of pull request ${input.url}
 
@@ -404,7 +417,7 @@ Branch: ${sanitizeUntrusted(input.headRef, 200)} → ${sanitizeUntrusted(input.b
 
 ${checkout}
 
-Review the change end to end: trace callers of modified functions, check tests for the changed behavior, and look for correctness, security, and backward-compatibility problems that a diff-only review would miss.${summary}${prior}
+${instruction}${summary}${prior}
 
 Do not push, comment on GitHub, or approve. Finish with a prioritized list of findings (severity, file:line, problem, fix) and a one-line merge recommendation.`;
 }

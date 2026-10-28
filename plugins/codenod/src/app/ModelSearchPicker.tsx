@@ -18,6 +18,14 @@ export function removeModelChoice(current: ModelChoice[], providerId: string, mo
   return current.filter((item) => !(item.providerId === providerId && item.model === model));
 }
 
+export function moveModelChoice(current: ModelChoice[], index: number, offset: -1 | 1): ModelChoice[] {
+  const target = index + offset;
+  if (index < 0 || index >= current.length || target < 0 || target >= current.length) return current;
+  const next = [...current];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
 export function setModelReasoning(current: ModelChoice[], providerId: string, model: string, reasoningLevel: string): ModelChoice[] {
   return current.map((item) =>
     item.providerId === providerId && item.model === model ? { ...item, ...(reasoningLevel ? { reasoningLevel } : { reasoningLevel: undefined }) } : item
@@ -30,8 +38,8 @@ function matchesQuery(label: string, id: string, query: string): boolean {
   return label.toLowerCase().includes(needle) || id.toLowerCase().includes(needle);
 }
 
-export function ProviderModelPicker(props: { provider: AvailableProvider; value: ModelChoice[]; onChange(next: ModelChoice[]): void; showReasoning?: boolean }) {
-  const { provider, value, onChange, showReasoning } = props;
+export function ProviderModelPicker(props: { provider: AvailableProvider; value: ModelChoice[]; onChange(next: ModelChoice[]): void; showReasoning?: boolean; showSelected?: boolean }) {
+  const { provider, value, onChange, showReasoning, showSelected = true } = props;
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
@@ -123,7 +131,7 @@ export function ProviderModelPicker(props: { provider: AvailableProvider; value:
           ) : null}
         </div>
       ) : null}
-      {selectedHere.length > 0 ? (
+      {showSelected && selectedHere.length > 0 ? (
         <ul className="cn-selected-models">
           {selectedHere.map((item) => (
             <SelectedModelItem
@@ -138,6 +146,43 @@ export function ProviderModelPicker(props: { provider: AvailableProvider; value:
         </ul>
       ) : null}
     </fieldset>
+  );
+}
+
+export function SelectedModelOrder(props: {
+  value: ModelChoice[];
+  providers: AvailableProvider[];
+  onChange(next: ModelChoice[]): void;
+}) {
+  const { value, providers, onChange } = props;
+  const providerById = new Map(providers.map((provider) => [provider.providerId, provider]));
+  return (
+    <section className="cn-model-priority" aria-labelledby="cn-model-priority-heading">
+      <h4 id="cn-model-priority-heading">Review model priority</h4>
+      <p className="cn-muted cn-small">Models run together for consensus. Priority 1 is used for coordinator and Deep Review threads.</p>
+      {value.length === 0 ? <p className="cn-muted cn-small">No models selected yet.</p> : (
+        <ol className="cn-priority-list">
+          {value.map((item, index) => {
+            const provider = providerById.get(item.providerId);
+            const catalog = provider?.models.find((model) => model.id === item.model);
+            return (
+              <SelectedModelItem
+                key={modelKey(item.providerId, item.model)}
+                item={item}
+                label={catalog?.label ?? item.model}
+                providerName={provider?.displayName ?? item.providerId}
+                reasoningLevels={catalog?.reasoningLevels ?? []}
+                showReasoning
+                priority={index + 1}
+                maxPriority={value.length}
+                onMove={(offset) => onChange(moveModelChoice(value, index, offset))}
+                onChange={(next) => onChange(next(value))}
+              />
+            );
+          })}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -186,14 +231,19 @@ function ModelOptionList(props: {
 function SelectedModelItem(props: {
   item: ModelChoice;
   label: string;
+  providerName?: string;
   reasoningLevels: string[];
   showReasoning?: boolean;
+  priority?: number;
+  maxPriority?: number;
+  onMove?(offset: -1 | 1): void;
   onChange(update: (current: ModelChoice[]) => ModelChoice[]): void;
 }) {
-  const { item, label, reasoningLevels, showReasoning, onChange } = props;
+  const { item, label, providerName, reasoningLevels, showReasoning, priority, maxPriority, onMove, onChange } = props;
   return (
     <li className="cn-selected-model">
-      <span>{label}</span>
+      {priority !== undefined ? <span className="cn-priority-rank">{priority}</span> : null}
+      <span className="cn-selected-model-name">{label}<span className="cn-muted cn-small">{providerName}</span></span>
       {showReasoning && reasoningLevels.length > 0 ? (
         <select
           className="cn-select cn-small"
@@ -208,6 +258,12 @@ function SelectedModelItem(props: {
             </option>
           ))}
         </select>
+      ) : null}
+      {onMove && priority !== undefined ? (
+        <span className="cn-priority-controls">
+          <button type="button" className="cn-btn cn-small" aria-label={`Move ${label} up`} disabled={priority === 1} onClick={() => onMove(-1)}>Move up</button>
+          <button type="button" className="cn-btn cn-small" aria-label={`Move ${label} down`} disabled={priority === maxPriority} onClick={() => onMove(1)}>Move down</button>
+        </span>
       ) : null}
       <button type="button" className="cn-btn cn-small" onClick={() => onChange((current) => removeModelChoice(current, item.providerId, item.model))}>
         Remove

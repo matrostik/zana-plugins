@@ -4,7 +4,7 @@ import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
-import { ProviderModelPicker } from './ModelSearchPicker.tsx';
+import { ProviderModelPicker, SelectedModelOrder } from './ModelSearchPicker.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'diff';
@@ -104,7 +104,10 @@ function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: M
       {!providers ? (
         <p className="cn-muted">Loading models…</p>
       ) : (
-        providers.map((provider) => <ProviderModelPicker key={provider.providerId} provider={provider} value={chosen} onChange={setChosen} />)
+        <>
+          <SelectedModelOrder value={chosen} providers={providers} onChange={setChosen} />
+          {providers.map((provider) => <ProviderModelPicker key={provider.providerId} provider={provider} value={chosen} onChange={setChosen} showSelected={false} />)}
+        </>
       )}
       <div className="cn-inline">
         <button type="button" className="cn-btn cn-btn-primary" disabled={chosen.length === 0} onClick={() => props.onRun(chosen)}>
@@ -222,6 +225,21 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const reviewElapsed = review ? formatDuration(review.createdAt, review.completedAt ?? now) : '';
   const canPost = review?.status === 'completed' && (postableFindings.length > 0 || message.trim().length > 0 || event === 'APPROVE');
 
+  const activeFindings = findings.filter((f) => !f.dismissed);
+  const defaultPostIds = findings.filter((f) => !f.dismissed && f.postedAt === null).map((f) => f.id);
+  const isDefaultPostSelection =
+    defaultPostIds.length > 0 &&
+    selectedFindingIds.size === defaultPostIds.length &&
+    defaultPostIds.every((id) => selectedFindingIds.has(id));
+  const isAllActive =
+    activeFindings.length > 0 &&
+    selectedFindingIds.size >= activeFindings.length &&
+    activeFindings.every((f) => selectedFindingIds.has(f.id));
+  const targetedFindingIds =
+    !isDefaultPostSelection && !isAllActive && selectedFindingIds.size > 0 && selectedFindingIds.size < activeFindings.length
+      ? activeFindings.filter((f) => selectedFindingIds.has(f.id)).map((f) => f.id)
+      : undefined;
+
   const startReview = (models?: ModelChoice[]) =>
     act('review', async () => {
       setPickerOpen(false);
@@ -274,10 +292,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   const deepReview = () =>
     act('deep', async () => {
-      const findingIds = selectedFindingIds.size > 0 && selectedFindingIds.size < findings.length
-        ? [...selectedFindingIds]
-        : undefined;
-      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds })) as { threadId: string };
+      const result = (await rpc.call('deepReview', { prId: pr.id, findingIds: targetedFindingIds })) as { threadId: string };
       if (navigate?.toThread) navigate.toThread(result.threadId);
       else setNotice({ kind: 'info', text: 'Deep Review thread started. Find it in your thread list.' });
     });
@@ -441,8 +456,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
           </>
         )}
         <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void deepReview()}>
-          {selectedFindingIds.size > 0 && selectedFindingIds.size < findings.length
-            ? `Deep Review (${selectedFindingIds.size} selected)`
+          {targetedFindingIds && targetedFindingIds.length > 0
+            ? `Deep Review (${targetedFindingIds.length} selected)`
             : 'Deep Review in thread'}
         </button>
         {review?.coordinatorThreadId ? (

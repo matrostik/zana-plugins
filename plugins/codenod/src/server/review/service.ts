@@ -39,6 +39,7 @@ export interface ReviewServiceDeps {
   publish: (event: string, payload: unknown) => void;
   log: { info(message: string): void; warn(message: string): void };
   coordinatorRetryDelayMs?: number;
+  coordinatorTimeoutMs?: number;
 }
 
 export const CHANGED_EVENT = 'codenod:changed';
@@ -83,8 +84,12 @@ async function setupCoordinator(
   try {
     const safeTitle = sanitizeUntrusted(pr.title, 300);
     const modelLabels = models.map(modelLabel).join(', ');
+    const primaryModel = models[0];
     const spawnedCoord = await deps.threads.spawn({
       projectId,
+      providerId: primaryModel.providerId,
+      model: primaryModel.model,
+      reasoningLevel: primaryModel.reasoningLevel,
       title: `CodeNod Review: ${pr.owner}/${pr.repo}#${pr.number}`,
       prompt: [
         'You are a read-only review coordinator tracking an automated multi-model code review. Do NOT run commands, execute tools, or modify files.',
@@ -108,6 +113,36 @@ async function setupCoordinator(
   }
 }
 
+const COORDINATOR_DONE_STATUSES = new Set(['idle', 'completed', 'done', 'finished']);
+
+async function waitForCoordinatorIdle(
+  deps: ReviewServiceDeps,
+  coordinatorThreadId: string,
+  timeoutMs: number
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const delayMs = deps.coordinatorRetryDelayMs ?? 500;
+  const maxAttempts = delayMs <= 0 ? 5 : Math.max(5, Math.ceil(timeoutMs / Math.max(1, delayMs)));
+  let attempt = 0;
+  while (attempt < maxAttempts && Date.now() < deadline) {
+    attempt++;
+    try {
+      const thread = await deps.threads.get({ threadId: coordinatorThreadId });
+      if (!thread || COORDINATOR_DONE_STATUSES.has(thread.status?.toLowerCase())) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    if (attempt >= maxAttempts || Date.now() >= deadline) break;
+    if (delayMs > 0) {
+      await sleep(Math.min(delayMs, Math.max(1, deadline - Date.now())));
+    } else {
+      await sleep(0);
+    }
+  }
+}
+
 async function notifyCoordinator(
   deps: ReviewServiceDeps,
   coordinatorThreadId: string | null,
@@ -120,19 +155,28 @@ async function notifyCoordinator(
     text
   ].join('\n');
   const delayMs = deps.coordinatorRetryDelayMs ?? 500;
-  const maxAttempts = 3;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  const timeoutMs = deps.coordinatorTimeoutMs ?? 60_000;
+  const deadline = Date.now() + timeoutMs;
+
+  await waitForCoordinatorIdle(deps, coordinatorThreadId, timeoutMs);
+
+  const maxAttempts = delayMs <= 0 ? 3 : Math.max(3, Math.ceil(timeoutMs / 1000));
+  let attempt = 0;
+  let lastError: unknown;
+  while (attempt < maxAttempts && Date.now() <= deadline) {
+    attempt++;
     try {
       await deps.threads.send({ threadId: coordinatorThreadId, prompt });
       return;
     } catch (error) {
-      if (attempt === maxAttempts) {
-        deps.log.warn(`codenod: failed to update coordinator thread ${coordinatorThreadId}: ${errorMessage(error)}`);
-      } else {
-        await sleep(delayMs * attempt);
+      lastError = error;
+      if (attempt >= maxAttempts || Date.now() >= deadline) break;
+      if (delayMs > 0) {
+        await sleep(Math.min(delayMs * Math.min(attempt, 4), Math.max(1, deadline - Date.now())));
       }
     }
   }
+  deps.log.warn(`codenod: failed to update coordinator thread ${coordinatorThreadId}: ${errorMessage(lastError)}`);
 }
 
 function formatCoordinatorCompletionMessage(
@@ -323,65 +367,58 @@ export function createReviewService(deps: ReviewServiceDeps) {
     changed({ prId: pr.id, reviewId: review.id });
 
     let coordinatorThreadId: string | null = null;
-    try {
-      const config = await deps.config();
-      const repo = deps.store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
-      const gathered = await gatherReviewContext(deps.github, parsePrId(pr.id), { specGlob: repo?.specGlob ?? null });
-      if (signal.aborted) {
-        deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
-        return;
-      }
-      if (gathered.pull.head.sha !== review.headSha) {
-        deps.store.setReviewStatus(review.id, 'cancelled', `Pull request moved to ${gathered.pull.head.sha.slice(0, 12)} before this review started`);
-        changed({ prId: pr.id, reviewId: review.id });
-        const current = await deps.syncPullRequest(parsePrId(pr.id));
-        if (!signal.aborted && current.headSha !== review.headSha) await startReview(parsePrId(pr.id), { models: item.models, trigger: item.trigger });
-        return;
-      }
-      const workspace = await resolveWorkspace(pr, review.headSha, config);
-      if (config.showReviewsOnAgentsBoard) {
-        coordinatorThreadId = await setupCoordinator(deps, pr, review, workspace.projectId, item.models, changed);
-      }
-
-      const promptContext = { ...gathered.prompt, customInstructions: config.customInstructions, hasWorkspace: workspace.hasWorkspace };
-      const hasRequirements = hasRequirementsContext(promptContext);
-      const outcomes = await executeReviewModels(deps, pr, review, item.models, workspace, getFullReviewPrompt(promptContext), hasRequirements, config, signal, changed);
-
-      if (signal.aborted) {
-        deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
-        await notifyCoordinator(deps, coordinatorThreadId, 'Review was cancelled.');
-        return;
-      }
-      const succeeded = outcomes.filter((outcome): outcome is ReviewModelOutcome => outcome !== null);
-      if (succeeded.length === 0) {
-        const errors = deps.store.listRuns(review.id).map((run) => run.error).filter(Boolean);
-        deps.store.setReviewStatus(review.id, 'failed', errors[0] ?? 'Every model failed');
-        await notifyCoordinator(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
-        return;
-      }
-
-      const clusters = recordFindings(deps, review.id, succeeded);
-      const consensusSummary = await buildConsensusSummary(deps, clusters, succeeded);
-      deps.store.completeReview(review.id, {
-        summary: succeeded[0].analysis.summary,
-        consensusSummary,
-        hasRequirements,
-        scores: aggregateScores(succeeded.map(({ analysis }) => analysis))
-      });
-
-      if (coordinatorThreadId) {
-        const completionText = formatCoordinatorCompletionMessage(pr, deps.store.getReview(review.id)!, succeeded, clusters);
-        await notifyCoordinator(deps, coordinatorThreadId, completionText);
-      }
-
-      await deps.syncPullRequest(parsePrId(pr.id)).catch((error) => deps.log.warn(`codenod: post-review refresh failed: ${errorMessage(error)}`));
-      await sendReviewNotification(deps, pr, review.id, workspace.projectId, succeeded, clusters, item.models.length);
-    } catch (error) {
-      if (coordinatorThreadId) {
-        await notifyCoordinator(deps, coordinatorThreadId, `Code review failed: ${errorMessage(error)}`).catch(() => undefined);
-      }
-      throw error;
+    const config = await deps.config();
+    const repo = deps.store.getRepo(`${pr.host}/${pr.owner}/${pr.repo}`);
+    const gathered = await gatherReviewContext(deps.github, parsePrId(pr.id), { specGlob: repo?.specGlob ?? null });
+    if (signal.aborted) {
+      deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
+      return;
     }
+    if (gathered.pull.head.sha !== review.headSha) {
+      deps.store.setReviewStatus(review.id, 'cancelled', `Pull request moved to ${gathered.pull.head.sha.slice(0, 12)} before this review started`);
+      changed({ prId: pr.id, reviewId: review.id });
+      const current = await deps.syncPullRequest(parsePrId(pr.id));
+      if (!signal.aborted && current.headSha !== review.headSha) await startReview(parsePrId(pr.id), { models: item.models, trigger: item.trigger });
+      return;
+    }
+    const workspace = await resolveWorkspace(pr, review.headSha, config);
+    if (config.showReviewsOnAgentsBoard) {
+      coordinatorThreadId = await setupCoordinator(deps, pr, review, workspace.projectId, item.models, changed);
+    }
+
+    const promptContext = { ...gathered.prompt, customInstructions: config.customInstructions, hasWorkspace: workspace.hasWorkspace };
+    const hasRequirements = hasRequirementsContext(promptContext);
+    const outcomes = await executeReviewModels(deps, pr, review, item.models, workspace, getFullReviewPrompt(promptContext), hasRequirements, config, signal, changed);
+
+    if (signal.aborted) {
+      deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
+      await notifyCoordinator(deps, coordinatorThreadId, 'Review was cancelled.');
+      return;
+    }
+    const succeeded = outcomes.filter((outcome): outcome is ReviewModelOutcome => outcome !== null);
+    if (succeeded.length === 0) {
+      const errors = deps.store.listRuns(review.id).map((run) => run.error).filter(Boolean);
+      deps.store.setReviewStatus(review.id, 'failed', errors[0] ?? 'Every model failed');
+      await notifyCoordinator(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
+      return;
+    }
+
+    const clusters = recordFindings(deps, review.id, succeeded);
+    const consensusSummary = await buildConsensusSummary(deps, clusters, succeeded);
+    deps.store.completeReview(review.id, {
+      summary: succeeded[0].analysis.summary,
+      consensusSummary,
+      hasRequirements,
+      scores: aggregateScores(succeeded.map(({ analysis }) => analysis))
+    });
+
+    if (coordinatorThreadId) {
+      const completionText = formatCoordinatorCompletionMessage(pr, deps.store.getReview(review.id)!, succeeded, clusters);
+      await notifyCoordinator(deps, coordinatorThreadId, completionText);
+    }
+
+    await deps.syncPullRequest(parsePrId(pr.id)).catch((error) => deps.log.warn(`codenod: post-review refresh failed: ${errorMessage(error)}`));
+    await sendReviewNotification(deps, pr, review.id, workspace.projectId, succeeded, clusters, item.models.length);
   }
 
   async function pump(): Promise<void> {

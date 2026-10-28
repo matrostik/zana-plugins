@@ -373,6 +373,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       throw new Error('No active findings match the selection (selected findings may have been dismissed)');
     }
     const config = await reviewConfig();
+    const primaryModel = config.models[0];
+    if (!primaryModel) throw new Error('Choose a priority 1 review model in CodeNod Settings → Models before starting Deep Review.');
     const project = await projects.projectForRepo({ host: pr.host, owner: pr.owner, name: pr.repo });
     const projectId = project?.id ?? config.fallbackProjectId ?? (await projects.projects())[0]?.id;
     if (!projectId) throw new Error('No Zana project is available for the Deep Review thread');
@@ -380,9 +382,13 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     const worktree = hasWorkspace && project?.path
       ? { kind: 'worktree' as const, branchSlug: `codenod-deep-${pr.number}`, baseBranch: await fetchPullRequestHead(run, project.path, project.remote, pr.number, pr.headSha) }
       : undefined;
-    const titleSuffix = findingIds.length > 0 ? ` (${targetFindings.length} issue${targetFindings.length === 1 ? '' : 's'})` : '';
+    const focusOnFindings = findingIds.length > 0;
+    const titleSuffix = focusOnFindings ? ` (${targetFindings.length} issue${targetFindings.length === 1 ? '' : 's'})` : '';
     const spawned = await zcc.sdk.threads.spawn({
       projectId,
+      providerId: primaryModel.providerId,
+      model: primaryModel.model,
+      reasoningLevel: primaryModel.reasoningLevel,
       title: `Deep Review: ${pr.owner}/${pr.repo}#${pr.number}${titleSuffix}`,
       prompt: getDeepReviewPrompt({
         url: pr.url,
@@ -396,7 +402,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
         remote: hasWorkspace ? project?.remote ?? null : null,
         hasWorkspace,
         reviewSummary: review?.consensusSummary ?? review?.summary ?? null,
-        findings: targetFindings
+        findings: targetFindings,
+        focusOnFindings
       }),
       permissionMode: FULL_ACCESS_PERMISSION_MODE,
       visibility: 'visible',

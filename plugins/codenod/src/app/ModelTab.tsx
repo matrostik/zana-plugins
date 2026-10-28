@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ModelChoice } from '../server/types.ts';
 import { errorText } from './format.ts';
-import { ProviderModelPicker } from './ModelSearchPicker.tsx';
+import { ProviderModelPicker, SelectedModelOrder } from './ModelSearchPicker.tsx';
 import { NumberSetting } from './SettingFields.tsx';
 import { useSettingsAction } from './settings-action.ts';
 import type { AvailableProvider, ConfigSnapshot, Rpc } from './types.ts';
@@ -40,9 +40,12 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
       ) : providers.length === 0 ? (
         <p className="cn-muted">No AI provider is available in Zana. Sign in to one under Settings → Providers.</p>
       ) : (
-        providers.map((provider) => (
-          <ProviderModelPicker key={provider.providerId} provider={provider} value={draft} onChange={setDraft} showReasoning />
-        ))
+        <>
+          <SelectedModelOrder value={draft} providers={providers} onChange={setDraft} />
+          {providers.map((provider) => (
+            <ProviderModelPicker key={provider.providerId} provider={provider} value={draft} onChange={setDraft} showReasoning showSelected={false} />
+          ))}
+        </>
       )}
       <div className="cn-inline">
         <button type="button" className="cn-btn cn-btn-primary" onClick={() => void action.run(() => rpc.call('setModels', { models: draft }))}>

@@ -633,4 +633,28 @@ describe('codenod settings', () => {
     expect(result.blockingFindings).toHaveLength(1);
     expect(result.coordinatorThreadId).toBeTruthy();
   });
+
+  it('returns status stale via codenod_review_pr with remediationGate when head SHA changed during review', async () => {
+    let advanced = false;
+    const { host, state } = await setup({
+      reply: (thread, prompt) => {
+        if (!advanced) {
+          advanced = true;
+          state.headSha = 'sha2';
+        }
+        return reply(thread, prompt);
+      }
+    });
+    await host.callRpc('setModels', { models: [MODELS[0]] });
+    await host.callRpc('refresh');
+    const tool = host.tools.find((t) => t.name === 'codenod_review_pr')!;
+
+    const result = (await tool.execute(
+      { pr: 'acme/api#4', wait: true, remediationGate: true },
+      { signal: new AbortController().signal }
+    )) as { status: string; error?: string };
+
+    expect(result.status).toBe('stale');
+    expect(result.error).toContain('Review is stale: head commit changed during review');
+  });
 });
