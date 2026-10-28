@@ -399,15 +399,13 @@ Confirm HEAD is ${input.headSha.slice(0, 12)}.`
     ? input.findings
     : input.findings.slice(0, 40);
 
-  const prior = findingsList.length > 0
-    ? input.focusOnFindings
-      ? `\n\nFocus on the following ${findingsList.length} selected finding(s). Verify each against the code:\n${findingsList
-          .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
-          .join('\n')}`
-      : `\n\nCodeNod's automated review already reported these findings. Verify each one against the code (confirm, refute, or refine) before adding new ones:\n${findingsList
-          .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
-          .join('\n')}`
-    : '';
+  const findingLines = findingsList
+    .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
+    .join('\n');
+  const findingHeader = input.focusOnFindings
+    ? `Focus on the following ${findingsList.length} selected finding(s). Verify each against the code:`
+    : "CodeNod's automated review already reported these findings. Verify each one against the code (confirm, refute, or refine) before adding new ones:";
+  const prior = findingsList.length > 0 ? `\n\n${findingHeader}\n${findingLines}` : '';
 
   const summary = input.reviewSummary ? `\n\nAutomated review summary: ${sanitizeUntrusted(input.reviewSummary, 800)}` : '';
   return `Deep review of pull request ${input.url}

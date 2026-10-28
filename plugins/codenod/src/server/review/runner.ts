@@ -117,30 +117,22 @@ export function detectUsageLimit(text: string, lastAssistantText?: string): stri
 
   const candidate = (lastAssistantText && lastAssistantText.trim().length > 0 ? lastAssistantText : (text.length > 2000 ? text.slice(-2000) : text)).trim();
   if (!candidate || hasReviewJsonContent(candidate)) return null;
+  const finalParagraph = candidate.split(/\n\s*\n/).at(-1)?.trim() ?? '';
+  const lines = finalParagraph
+    .split('\n')
+    .map((line) => line.trim().replace(/^[*#_`-]+/, '').replace(/[*#_`-]+$/, '').trim())
+    .filter(Boolean);
+  if (!lines.length) return null;
 
   for (const pattern of USAGE_LIMIT_PATTERNS) {
-    if (pattern.test(candidate)) {
-      const lines = candidate
-        .split('\n')
-        .map((line) => line.trim().replace(/^[*#_`-]+/, '').replace(/[*#_`-]+$/, '').trim())
-        .filter(Boolean);
-
-      if (lines.length <= 4) {
-        return lines.reduce((acc, curr) => {
-          if (!acc) return curr;
-          if (acc.endsWith(':') || acc.endsWith('.')) return `${acc} ${curr}`;
-          return `${acc}: ${curr}`;
-        }, '');
-      }
-
-      const matchIndex = lines.findIndex((l) => pattern.test(l));
-      if (matchIndex !== -1) {
-        const start = Math.max(0, matchIndex - 1);
-        const end = Math.min(lines.length, matchIndex + 2);
-        return lines.slice(start, end).join(' — ');
-      }
-      return lines[0];
-    }
+    const matchIndex = lines.map((line) => pattern.test(line)).lastIndexOf(true);
+    if (matchIndex < 0 || lines[matchIndex].length > 350) continue;
+    const start = Math.max(0, matchIndex - 1);
+    const end = Math.min(lines.length, matchIndex + 2);
+    return lines.slice(start, end).reduce((message, line) => {
+      if (!message) return line;
+      return message.endsWith(':') || message.endsWith('.') ? `${message} ${line}` : `${message}: ${line}`;
+    }, '').slice(0, 350);
   }
   return null;
 }
@@ -240,10 +232,15 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
         reject: (error) => { settled = true; reject(error); }
       });
     });
+    const observedResult = result.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error })
+    );
     const deadline = Date.now() + timeoutMs;
     try {
       while (!settled && Date.now() < deadline) {
         const thread = await threads.get({ threadId }).catch(() => null);
+        if (settled) break;
         const status = thread?.status?.toLowerCase() ?? '';
         if (FAILED_STATUSES.has(status)) {
           const waiter = startWaiters.get(threadId);
@@ -270,7 +267,9 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
         startWaiters.delete(threadId);
         waiter?.resolve('pending');
       }
-      return await result;
+      const outcome = await observedResult;
+      if ('error' in outcome) throw outcome.error;
+      return outcome.value;
     } finally {
       startWaiters.delete(threadId);
     }
@@ -354,9 +353,7 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
   return { onEvent, waitForOutput, waitForStart, pending: () => waiters.size };
 }
 
-export type ThreadWaiter = Omit<ReturnType<typeof createThreadWaiter>, 'waitForStart'> & {
-  waitForStart?: (threadId: string, timeoutMs?: number) => Promise<'started' | 'pending'>;
-};
+export type ThreadWaiter = ReturnType<typeof createThreadWaiter>;
 
 export interface VisibleThreadSpawnArgs {
   projectId: string;
@@ -377,7 +374,7 @@ export async function spawnVisibleWithPriorityFallback(
   for (const [index, model] of models.entries()) {
     let threadId: string;
     try {
-      const environment = args.environment?.kind === 'worktree'
+      const environment = args.environment?.kind === 'worktree' && index > 0
         ? { ...args.environment, branchSlug: `${args.environment.branchSlug ?? 'codenod-review'}-p${index + 1}` }
         : args.environment;
       const failedPriorities = index === 1 ? 'priority 1' : `priorities 1–${index}`;
@@ -398,10 +395,12 @@ export async function spawnVisibleWithPriorityFallback(
     }
 
     try {
-      if (waiter.waitForStart) await waiter.waitForStart(threadId);
+      const startStatus = await waiter.waitForStart(threadId);
+      if (startStatus === 'pending') throw new Error('Provider startup timed out');
       return { id: threadId, model, priority: index + 1, usedFallback: index > 0 };
     } catch (error) {
       failures.push(`Priority ${index + 1} (${model.providerId}/${model.model}): ${errorMessage(error)}`);
+      await threads.stop({ threadId }).catch(() => undefined);
       await threads.archive({ threadId }).catch(() => undefined);
     }
   }

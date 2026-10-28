@@ -122,7 +122,11 @@ async function setupCoordinator(
   }
 }
 
-const COORDINATOR_DONE_STATUSES = new Set(['idle', 'completed', 'done', 'finished']);
+const DEFAULT_COORDINATOR_RETRY_DELAY_MS = 500;
+const DEFAULT_COORDINATOR_TIMEOUT_MS = 60_000;
+const COORDINATOR_MAX_SEND_ATTEMPTS = 3;
+const COORDINATOR_MAX_BACKOFF_MULTIPLIER = 4;
+const COORDINATOR_DONE_STATUSES = new Set(['idle', 'completed', 'done', 'finished', 'failed', 'error', 'errored', 'crashed', 'stopped', 'cancelled', 'canceled', 'archived', 'deleted']);
 
 async function waitForCoordinatorIdle(
   deps: ReviewServiceDeps,
@@ -130,7 +134,7 @@ async function waitForCoordinatorIdle(
   timeoutMs: number
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  const delayMs = deps.coordinatorRetryDelayMs ?? 500;
+  const delayMs = deps.coordinatorRetryDelayMs ?? DEFAULT_COORDINATOR_RETRY_DELAY_MS;
   const maxAttempts = delayMs <= 0 ? 5 : Math.max(5, Math.ceil(timeoutMs / Math.max(1, delayMs)));
   let attempt = 0;
   while (attempt < maxAttempts && Date.now() < deadline) {
@@ -163,13 +167,13 @@ async function notifyCoordinator(
     '',
     text
   ].join('\n');
-  const delayMs = deps.coordinatorRetryDelayMs ?? 500;
-  const timeoutMs = deps.coordinatorTimeoutMs ?? 60_000;
-  const deadline = Date.now() + timeoutMs;
+  const delayMs = deps.coordinatorRetryDelayMs ?? DEFAULT_COORDINATOR_RETRY_DELAY_MS;
+  const timeoutMs = deps.coordinatorTimeoutMs ?? DEFAULT_COORDINATOR_TIMEOUT_MS;
 
   await waitForCoordinatorIdle(deps, coordinatorThreadId, timeoutMs);
 
-  const maxAttempts = delayMs <= 0 ? 3 : Math.max(3, Math.ceil(timeoutMs / 1000));
+  const deadline = Date.now() + timeoutMs;
+  const maxAttempts = delayMs <= 0 ? COORDINATOR_MAX_SEND_ATTEMPTS : Math.max(COORDINATOR_MAX_SEND_ATTEMPTS, Math.ceil(timeoutMs / 1000));
   let attempt = 0;
   let lastError: unknown;
   while (attempt < maxAttempts && Date.now() <= deadline) {
@@ -181,11 +185,17 @@ async function notifyCoordinator(
       lastError = error;
       if (attempt >= maxAttempts || Date.now() >= deadline) break;
       if (delayMs > 0) {
-        await sleep(Math.min(delayMs * Math.min(attempt, 4), Math.max(1, deadline - Date.now())));
+        await sleep(Math.min(delayMs * Math.min(attempt, COORDINATOR_MAX_BACKOFF_MULTIPLIER), Math.max(1, deadline - Date.now())));
       }
     }
   }
   deps.log.warn(`codenod: failed to update coordinator thread ${coordinatorThreadId}: ${errorMessage(lastError)}`);
+}
+
+function queueCoordinatorNotification(deps: ReviewServiceDeps, threadId: string | null, text: string): void {
+  void notifyCoordinator(deps, threadId, text).catch((error) => {
+    deps.log.warn(`codenod: failed to update coordinator thread ${threadId}: ${errorMessage(error)}`);
+  });
 }
 
 function formatCoordinatorCompletionMessage(
@@ -401,14 +411,14 @@ export function createReviewService(deps: ReviewServiceDeps) {
 
     if (signal.aborted) {
       deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
-      await notifyCoordinator(deps, coordinatorThreadId, 'Review was cancelled.');
+      queueCoordinatorNotification(deps, coordinatorThreadId, 'Review was cancelled.');
       return;
     }
     const succeeded = outcomes.filter((outcome): outcome is ReviewModelOutcome => outcome !== null);
     if (succeeded.length === 0) {
       const errors = deps.store.listRuns(review.id).map((run) => run.error).filter(Boolean);
       deps.store.setReviewStatus(review.id, 'failed', errors[0] ?? 'Every model failed');
-      await notifyCoordinator(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
+      queueCoordinatorNotification(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
       return;
     }
 
@@ -423,7 +433,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
 
     if (coordinatorThreadId) {
       const completionText = formatCoordinatorCompletionMessage(pr, deps.store.getReview(review.id)!, succeeded, clusters);
-      await notifyCoordinator(deps, coordinatorThreadId, completionText);
+      queueCoordinatorNotification(deps, coordinatorThreadId, completionText);
     }
 
     await deps.syncPullRequest(parsePrId(pr.id)).catch((error) => deps.log.warn(`codenod: post-review refresh failed: ${errorMessage(error)}`));
@@ -442,7 +452,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
           deps.log.warn(`codenod: review ${item.reviewId} failed: ${errorMessage(error)}`);
           const coordId = deps.store.getReview(item.reviewId)?.coordinatorThreadId;
           if (coordId) {
-            await notifyCoordinator(deps, coordId, `Code review failed: ${errorMessage(error)}`).catch(() => undefined);
+            queueCoordinatorNotification(deps, coordId, `Code review failed: ${errorMessage(error)}`);
           }
         })
         .finally(() => {

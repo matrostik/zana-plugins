@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { addModelChoice, MAX_REVIEW_MODELS, ProviderModelPicker, removeModelChoice } from '../app/ModelSearchPicker.tsx';
+import { addModelChoice, MAX_REVIEW_MODELS, ModelPriorityPicker, ProviderModelPicker, removeModelChoice } from '../app/ModelSearchPicker.tsx';
 import type { AvailableProvider } from '../app/types.ts';
 import type { ModelChoice } from '../server/types.ts';
 
@@ -17,6 +17,13 @@ const cursor: AvailableProvider = {
     { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol', reasoningLevels: [] },
     { id: 'composer-2', label: 'Composer 2', reasoningLevels: [] }
   ]
+};
+
+const claude: AvailableProvider = {
+  providerId: 'claude-code',
+  displayName: 'Claude Code',
+  error: null,
+  models: [{ id: 'sonnet', label: 'Sonnet', reasoningLevels: [] }]
 };
 
 function Harness({ initial = [] as ModelChoice[], showReasoning = true }) {
@@ -54,5 +61,23 @@ describe('ProviderModelPicker', () => {
     expect((screen.getByLabelText('Reasoning level for grok-4.6') as HTMLSelectElement).value).toBe('high');
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(screen.queryByText('grok-4.6')).toBeNull();
+  });
+});
+
+describe('ModelPriorityPicker', () => {
+  it('commits the first available model as soon as a row provider changes', () => {
+    function Harness() {
+      const [value, setValue] = useState<ModelChoice[]>([{ providerId: 'cursor', model: 'grok-4.6' }]);
+      return <>
+        <ModelPriorityPicker value={value} providers={[cursor, claude]} onChange={setValue} />
+        <output>{JSON.stringify(value)}</output>
+      </>;
+    }
+
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText('Provider for priority 1'), { target: { value: 'claude-code' } });
+
+    expect((screen.getByLabelText('Model for priority 1') as HTMLSelectElement).value).toBe('sonnet');
+    expect(screen.getByText('[{"providerId":"claude-code","model":"sonnet"}]')).toBeTruthy();
   });
 });

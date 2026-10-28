@@ -537,6 +537,11 @@ describe('Organizations & Repos tab repositories', () => {
 });
 
 describe('AI Model tab', () => {
+  async function choosePriorityModel(providerName: string, modelId: string) {
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Provider for priority 1' }), { target: { value: providerName.toLowerCase() } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Model for priority 1' }), { target: { value: modelId } });
+  }
+
   it('shows a loading message while providers are fetched', async () => {
     await renderView(snapshot(), { availableModels: () => new Promise(() => {}) });
     await openTab('AI Model');
@@ -562,8 +567,7 @@ describe('AI Model tab', () => {
   it('saves the picked models and confirms', async () => {
     const { callsTo } = await renderView(snapshot(), { availableModels: () => [cursor] });
     await openTab('AI Model');
-    fireEvent.focus(await screen.findByRole('combobox', { name: 'Search Cursor models' }));
-    fireEvent.click(screen.getByRole('option', { name: 'grok-4.6' }));
+    await choosePriorityModel('Cursor', 'grok-4.6');
     fireEvent.click(screen.getByRole('button', { name: 'Save models (1)' }));
     expect(await screen.findByRole('status')).toBeTruthy();
     expect(callsTo('setModels')).toEqual([{ models: [{ providerId: 'cursor', model: 'grok-4.6' }] }]);
@@ -572,8 +576,7 @@ describe('AI Model tab', () => {
   it('keeps unsaved model picks when another setting is saved', async () => {
     const { callsTo } = await renderView(snapshot(), { config: () => snapshot(), availableModels: () => [cursor] });
     await openTab('AI Model');
-    fireEvent.focus(await screen.findByRole('combobox', { name: 'Search Cursor models' }));
-    fireEvent.click(screen.getByRole('option', { name: 'grok-4.6' }));
+    await choosePriorityModel('Cursor', 'grok-4.6');
     fireEvent.change(screen.getByLabelText('Review workspace'), { target: { value: 'project' } });
     await waitFor(() => expect(callsTo('config').length).toBeGreaterThan(1));
     expect(screen.getByRole('button', { name: 'Save models (1)' })).toBeTruthy();
@@ -587,7 +590,7 @@ describe('AI Model tab', () => {
       }
     });
     await openTab('AI Model');
-    await screen.findByRole('combobox', { name: 'Search Cursor models' });
+    await screen.findByRole('combobox', { name: 'Provider for priority 1' });
     fireEvent.click(screen.getByRole('button', { name: 'Save models (0)' }));
     expect(await screen.findByText('Model is not allowed')).toBeTruthy();
   });

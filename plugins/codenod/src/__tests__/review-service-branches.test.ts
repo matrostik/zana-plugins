@@ -11,6 +11,7 @@ import {
   looksLikeValidReview,
   pickReviewPermissionMode,
   runModelInThread,
+  spawnVisibleWithPriorityFallback,
   type RunModelInput,
   type ThreadsApi,
   type ThreadWaiter
@@ -236,6 +237,59 @@ describe('thread waiter', () => {
     await expect(result).resolves.toBe('done');
   });
 
+  it('rejects a provider failure while the status lookup is still pending', async () => {
+    const { threads } = createFakeThreads();
+    let releaseLookup: (value: { status: string }) => void = () => undefined;
+    threads.get.mockReturnValue(new Promise((resolve) => { releaseLookup = resolve; }));
+    const waiter = createThreadWaiter(threads, { pollMs: 0 });
+    const starting = waiter.waitForStart('thread-1', 1_000);
+    const failure = expect(starting).rejects.toThrow('not configured');
+    await Promise.resolve();
+
+    await waiter.onEvent({ name: 'thread.failed', threadId: 'thread-1', error: new Error('not configured') });
+    releaseLookup({ status: 'running' });
+
+    await failure;
+  });
+
+  it('tries the next model when visible thread startup times out', async () => {
+    const { threads } = createFakeThreads();
+    threads.spawn.mockImplementation(async ({ providerId }) => ({ id: `${providerId}-thread` }));
+    const waiterStartStatuses: Array<'started' | 'pending'> = ['pending', 'started'];
+    const waiter: ThreadWaiter = {
+      onEvent: async () => undefined,
+      waitForOutput: async () => '',
+      waitForStart: vi.fn(async (): Promise<'started' | 'pending'> => waiterStartStatuses.shift() ?? 'started'),
+      pending: () => 0
+    };
+    const models = [
+      { providerId: 'unavailable', model: 'one' },
+      { providerId: 'available', model: 'two' }
+    ];
+
+    const result = await spawnVisibleWithPriorityFallback(threads, waiter, models, {
+      projectId: 'home', prompt: 'Review', title: 'Review', visibility: 'visible'
+    });
+
+    expect(result).toMatchObject({ id: 'available-thread', model: models[1], priority: 2, usedFallback: true });
+    expect(threads.stop).toHaveBeenCalledWith({ threadId: 'unavailable-thread' });
+    expect(threads.archive).toHaveBeenCalledWith({ threadId: 'unavailable-thread' });
+  });
+
+  it('keeps the configured worktree branch name for priority one', async () => {
+    const { threads } = createFakeThreads();
+    const waiter = createThreadWaiter(threads);
+
+    await spawnVisibleWithPriorityFallback(threads, waiter, [{ providerId: 'cursor', model: 'grok' }], {
+      projectId: 'home', prompt: 'Review', title: 'Review', visibility: 'visible',
+      environment: { kind: 'worktree', branchSlug: 'codenod-deep-7', baseBranch: 'main' }
+    });
+
+    expect(threads.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      environment: { kind: 'worktree', branchSlug: 'codenod-deep-7', baseBranch: 'main' }
+    }));
+  });
+
   it('stops the thread and rejects with usage limit error when thread.idle event carries quota message', async () => {
     useFakeClock();
     const { threads, state } = createFakeThreads();
@@ -287,7 +341,7 @@ function createScriptedWaiter(replies: Array<string | Error>) {
     if (next instanceof Error) throw next;
     return next ?? '';
   });
-  const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, pending: () => 0 };
+  const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, waitForStart: async () => 'started', pending: () => 0 };
   return { waiter, waitForOutput };
 }
 
@@ -359,7 +413,7 @@ describe('runModelInThread', () => {
     const waitForOutput = vi.fn<ThreadWaiter['waitForOutput']>(
       (_threadId, args) => new Promise<string>((_resolve, reject) => args?.signal?.addEventListener('abort', () => reject(new Error('Review cancelled'))))
     );
-    const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, pending: () => 0 };
+    const waiter: ThreadWaiter = { onEvent: async () => undefined, waitForOutput, waitForStart: async () => 'started', pending: () => 0 };
     const controller = new AbortController();
 
     const running = runModelInThread(threads, waiter, runInput({ signal: controller.signal }));
@@ -432,6 +486,10 @@ describe('detectUsageLimit and looksLikeValidReview', () => {
   it('ignores normal responses without usage limits', () => {
     expect(detectUsageLimit('The code changes look good and all tests pass.')).toBeNull();
     expect(detectUsageLimit('')).toBeNull();
+  });
+
+  it('ignores loose usage limit wording buried in a long single line', () => {
+    expect(detectUsageLimit(`${'A'.repeat(400)} usage limit reached`)).toBeNull();
   });
 
   it('recognizes valid review analysis and distinguishes it from usage limit errors', () => {
@@ -617,6 +675,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
   const waiter: ThreadWaiter = {
     onEvent: async () => undefined,
     pending: () => 0,
+    waitForStart: async () => 'started',
     waitForOutput: async (threadId, args = {}) => {
       const thread = spawned.find((entry) => entry.id === threadId)!;
       return respond({ model: String(thread.args.model), attempt: args.baseline === undefined ? 0 : 1, signal: args.signal });
@@ -1048,6 +1107,7 @@ describe('review service', () => {
 
     const review = await service.startReview(prRef());
     await settled();
+    await until(() => sendCalls === 3);
 
     expect(sendCalls).toBe(3);
     const coordId = store.getReview(review.id)!.coordinatorThreadId!;
@@ -1064,6 +1124,7 @@ describe('review service', () => {
 
     const review = await service.startReview(prRef());
     await settled();
+    await until(() => threads.send.mock.calls.length > 0);
 
     const coordId = store.getReview(review.id)!.coordinatorThreadId!;
     expect(threads.send).toHaveBeenCalledTimes(1);
@@ -1085,8 +1146,20 @@ describe('review service', () => {
 
     await service.startReview(prRef());
     await settled();
+    await until(() => threads.send.mock.calls.length > 0);
 
     expect(getCalls).toBeGreaterThanOrEqual(2);
+    expect(threads.send).toHaveBeenCalled();
+  });
+
+  it.each(['failed', 'stopped'])('sends coordinator updates when its thread is %s', async (status) => {
+    const { service, threads, settled } = createServiceHarness({ config: { showReviewsOnAgentsBoard: true } });
+    threads.get = vi.fn(async () => ({ status }));
+
+    await service.startReview(prRef());
+    await settled();
+    await until(() => threads.send.mock.calls.length > 0);
+
     expect(threads.send).toHaveBeenCalled();
   });
 });
@@ -1104,3 +1177,297 @@ const EMPTY_SCORES: ReviewScores = {
 };
 
 const STORE_PR_ID = 'github.com/acme/api#1';
+
+function pullRequest(number: number, overrides: Partial<PullRequestRow> = {}): Omit<PullRequestRow, 'syncedAt'> {
+  return {
+    id: `github.com/acme/api#${number}`,
+    host: 'github.com',
+    owner: 'acme',
+    repo: 'api',
+    number,
+    title: `PR ${number}`,
+    author: 'teammate',
+    url: `https://github.com/acme/api/pull/${number}`,
+    state: 'open',
+    isDraft: false,
+    headSha: 'sha1',
+    headRef: 'feat',
+    baseRef: 'main',
+    ciState: 'none',
+    buckets: ['needs-review'],
+    updatedAt: `2026-10-2${number}T00:00:00Z`,
+    ...overrides
+  };
+}
+
+function createTestStore() {
+  let clock = 1_000;
+  const db = createSqliteDatabase();
+  return createStore(db, () => ++clock);
+}
+
+function createRowDatabase(row: Record<string, unknown>): Database {
+  return {
+    prepare: () => ({ all: () => [row], get: () => row, run: () => ({ changes: 0 }) }),
+    migrate() {},
+    transaction<T>(fn: () => T): T {
+      return fn();
+    }
+  };
+}
+
+describe('store', () => {
+  it('inserts repos with defaults and updates only the fields that are given', () => {
+    const store = createTestStore();
+    const repo = { id: 'github.com/acme/api', host: 'github.com', owner: 'acme', name: 'api' };
+
+    const inserted = store.upsertRepo(repo);
+    const enabled = store.upsertRepo({ ...repo, autoReview: true, specGlob: 'docs/**/*.md' });
+    const untouched = store.upsertRepo(repo);
+    const cleared = store.upsertRepo({ ...repo, autoReview: false, specGlob: null });
+    store.upsertRepo({ id: 'github.com/acme/web', host: 'github.com', owner: 'acme', name: 'web', autoReview: true, specGlob: 'specs/*.md' });
+
+    expect(inserted).toMatchObject({ autoReview: false, specGlob: null, addedAt: 1_001 });
+    expect(enabled).toMatchObject({ autoReview: true, specGlob: 'docs/**/*.md', addedAt: 1_001 });
+    expect(untouched).toMatchObject({ autoReview: true, specGlob: 'docs/**/*.md' });
+    expect(cleared).toMatchObject({ autoReview: false, specGlob: null });
+    expect(store.listRepos().map((row) => [row.id, row.autoReview, row.specGlob])).toEqual([
+      ['github.com/acme/api', false, null],
+      ['github.com/acme/web', true, 'specs/*.md']
+    ]);
+    expect(store.removeRepo('github.com/acme/web')).toBe(true);
+    expect(store.removeRepo('github.com/acme/web')).toBe(false);
+    expect(store.getRepo('github.com/acme/web')).toBeNull();
+  });
+
+  it('closes open pull requests that a sync no longer returns', () => {
+    const store = createTestStore();
+    store.upsertPullRequest(pullRequest(1, { isDraft: true }));
+    store.upsertPullRequest(pullRequest(2));
+    store.upsertPullRequest(pullRequest(3, { id: 'ghe.example.com/acme/api#3', host: 'ghe.example.com' }));
+    store.upsertPullRequest(pullRequest(1, { isDraft: true, title: 'Renamed' }));
+
+    const closed = store.closeMissingPullRequests('github.com', new Set([STORE_PR_ID]));
+
+    expect(closed).toBe(1);
+    expect(store.listPullRequests().map((pr) => pr.id).sort()).toEqual(['ghe.example.com/acme/api#3', STORE_PR_ID]);
+    expect(store.getPullRequest(STORE_PR_ID)).toMatchObject({ title: 'Renamed', isDraft: true, buckets: ['needs-review'] });
+    expect(store.getPullRequest('github.com/acme/api#2')).toMatchObject({ state: 'closed', buckets: [] });
+    expect(store.getPullRequest('github.com/acme/api#404')).toBeNull();
+  });
+
+  it('tracks review status, latest reviews per pull request, and interrupted work', () => {
+    const store = createTestStore();
+    const otherPrId = 'github.com/acme/api#2';
+
+    const first = store.createReview({ prId: STORE_PR_ID, headSha: 'sha1', trigger: 'auto' });
+    store.setReviewStatus(first.id, 'running');
+    const running = store.getReview(first.id);
+    store.setReviewStatus(first.id, 'cancelled', 'Cancelled');
+    const second = store.createReview({ prId: STORE_PR_ID, headSha: 'sha2', trigger: 'manual' });
+    const other = store.createReview({ prId: otherPrId, headSha: 'sha9', trigger: 'manual' });
+    const run = store.createRun({ reviewId: second.id, providerId: 'claude-code', model: 'opus' });
+    store.setReviewStatus(other.id, 'completed');
+    const latest = store.latestReviewsByPr();
+
+    expect(first).toMatchObject({ status: 'queued', trigger: 'auto', summary: null, completedAt: null, riskScore: null, hasRequirements: false });
+    expect(running).toMatchObject({ status: 'running', error: null, completedAt: null });
+    expect(store.getReview(first.id)).toMatchObject({ status: 'cancelled', error: 'Cancelled', completedAt: expect.any(Number) });
+    expect(store.hasReviewForHead(STORE_PR_ID, 'sha1')).toBe(false);
+    expect(store.hasReviewForHead(STORE_PR_ID, 'sha2')).toBe(true);
+    expect(store.latestReview(STORE_PR_ID)?.id).toBe(second.id);
+    expect(store.latestReview('github.com/acme/api#404')).toBeNull();
+    expect(store.getReview('missing-review')).toBeNull();
+    expect(latest.get(STORE_PR_ID)?.id).toBe(second.id);
+    expect(latest.get(otherPrId)?.id).toBe(other.id);
+    expect(run.reasoningLevel).toBeNull();
+
+    expect(store.failInterruptedReviews()).toBe(1);
+    expect(store.getReview(second.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('Interrupted') });
+    expect(store.getRun(run.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('Interrupted') });
+    expect(store.getReview(other.id)?.status).toBe('completed');
+  });
+
+  it('updates runs without losing the fields a patch leaves out', () => {
+    const store = createTestStore();
+    const review = store.createReview({ prId: STORE_PR_ID, headSha: 'sha1', trigger: 'manual' });
+    const run = store.createRun({ reviewId: review.id, providerId: 'claude-code', model: 'sonnet', reasoningLevel: 'high' });
+
+    store.updateRun(run.id, { status: 'running', threadId: 'thread-1' });
+    store.updateRun(run.id, { error: 'slow' });
+    const midway = store.getRun(run.id);
+    store.updateRun(run.id, { status: 'failed', error: null });
+    const failed = store.getRun(run.id);
+    store.updateRun('missing-run', { status: 'completed' });
+    store.completeRun(run.id, { summary: 'Fine', issueCount: 2, scores: { ...EMPTY_SCORES, riskScore: 3, coverageNote: 'Thin' } });
+    store.completeReview(review.id, { summary: 'Done', consensusSummary: null, hasRequirements: true, scores: { ...EMPTY_SCORES, riskScore: 5, requirementsScore: 8, requirementsNote: 'Met' } });
+
+    expect(run).toMatchObject({ reasoningLevel: 'high', threadId: null, status: 'queued', issueCount: 0, completedAt: null });
+    expect(midway).toMatchObject({ status: 'running', threadId: 'thread-1', error: 'slow', completedAt: null });
+    expect(failed).toMatchObject({ status: 'failed', threadId: 'thread-1', error: null, completedAt: expect.any(Number) });
+    expect(store.getRun('missing-run')).toBeNull();
+    expect(store.listRuns(review.id)).toEqual([
+      expect.objectContaining({ status: 'completed', summary: 'Fine', issueCount: 2, riskScore: 3, coverageNote: 'Thin', simplicityScore: null, error: null })
+    ]);
+    expect(store.getReview(review.id)).toMatchObject({ status: 'completed', summary: 'Done', hasRequirements: true, riskScore: 5, requirementsScore: 8, requirementsNote: 'Met', consensusSummary: null });
+  });
+
+  it('replaces findings and records dismissals, posts, and posted reviews', () => {
+    const store = createTestStore();
+    const review = store.createReview({ prId: STORE_PR_ID, headSha: 'sha1', trigger: 'manual' });
+    store.replaceFindings(review.id, [
+      { category: 'logic', severity: 'high', file: 'src/a.ts', line: 3, description: 'Null user', suggestion: 'Guard it', agreedBy: ['a', 'b'], confidence: 1 },
+      { category: 'style', severity: 'low', file: 'src/b.ts', line: null, description: 'Naming', suggestion: null, agreedBy: ['a'], confidence: 0.5 }
+    ]);
+    const byDescription = (description: string) => store.listFindings(review.id).find((finding) => finding.description === description)!;
+    const nullUser = byDescription('Null user');
+    const naming = byDescription('Naming');
+
+    store.setFindingDismissed(naming.id, true);
+    store.markFindingsPosted([nullUser.id]);
+    const dismissed = byDescription('Naming');
+    const posted = byDescription('Null user');
+    store.setFindingDismissed(naming.id, false);
+    const restored = byDescription('Naming');
+    store.recordPostedReview({ reviewId: review.id, event: 'COMMENT', githubReviewId: 99, url: 'https://github.com/acme/api/pull/1#review-99', commentCount: 1 });
+    store.recordPostedReview({ reviewId: review.id, event: 'APPROVE', githubReviewId: null, url: null, commentCount: 0 });
+    store.replaceFindings(review.id, []);
+
+    expect(nullUser).toMatchObject({ line: 3, suggestion: 'Guard it', agreedBy: ['a', 'b'], confidence: 1, postedAt: null, dismissed: false });
+    expect(naming).toMatchObject({ line: null, suggestion: null, agreedBy: ['a'], confidence: 0.5 });
+    expect(dismissed).toMatchObject({ dismissed: true, postedAt: null });
+    expect(posted).toMatchObject({ dismissed: false, postedAt: expect.any(Number) });
+    expect(restored.dismissed).toBe(false);
+    expect(store.listFindings(review.id)).toEqual([]);
+    expect(store.listPostedReviews(review.id)).toEqual([
+      { event: 'COMMENT', url: 'https://github.com/acme/api/pull/1#review-99', commentCount: 1, postedAt: expect.any(Number) },
+      { event: 'APPROVE', url: null, commentCount: 0, postedAt: expect.any(Number) }
+    ]);
+  });
+
+  it('maps malformed stored values to safe defaults', () => {
+    const row = {
+      id: 'row-1',
+      review_id: 'review-1',
+      pr_id: 'pr-1',
+      head_sha: 'sha1',
+      status: 'failed',
+      trigger: 'scheduled',
+      provider_id: 'claude-code',
+      model: 'opus',
+      reasoning_level: 7,
+      thread_id: null,
+      summary: 42,
+      issue_count: null,
+      started_at: 5,
+      completed_at: Number.NaN,
+      risk_score: '7',
+      coverage_score: Number.POSITIVE_INFINITY,
+      category: 'logic',
+      severity: 'low',
+      file: 'src/a.ts',
+      line: 'twelve',
+      description: 'Broken',
+      suggestion: null,
+      agreed_by: '["a", 2, null]',
+      confidence: null,
+      posted_at: null,
+      dismissed: 0,
+      host: 'github.com',
+      owner: 'acme',
+      repo: 'api',
+      number: '4',
+      buckets: 'not json',
+      synced_at: 9
+    };
+    const store = createStore(createRowDatabase(row));
+
+    expect(store.getRun('row-1')).toMatchObject({ reasoningLevel: null, threadId: null, summary: null, issueCount: 0, completedAt: null, riskScore: null, coverageScore: null });
+    expect(store.getReview('row-1')).toMatchObject({ trigger: 'manual', summary: null, completedAt: null });
+    expect(store.listFindings('review-1')[0]).toMatchObject({ line: null, agreedBy: ['a'], confidence: 1, postedAt: null, dismissed: false });
+    expect(store.getPullRequest('row-1')).toMatchObject({ number: 4, buckets: [] });
+    for (const buckets of ['{"needs-review":true}', 7]) {
+      expect(createStore(createRowDatabase({ ...row, buckets })).getPullRequest('row-1')?.buckets).toEqual([]);
+    }
+  });
+
+  it('stamps rows with the system clock by default', () => {
+    const before = Date.now();
+    const store = createStore(createSqliteDatabase());
+
+    const review = store.createReview({ prId: STORE_PR_ID, headSha: 'sha1', trigger: 'manual' });
+
+    expect(review.createdAt).toBeGreaterThanOrEqual(before);
+  });
+});
+
+describe('project matcher', () => {
+  it('maps git remotes to projects case-insensitively and skips unusable entries', async () => {
+    const run = vi.fn<CommandRunner>(async (_command, args) => {
+      if (args[1] === '/work/api') return 'origin\thttps://github.com/Acme/API.git (fetch)\norigin\thttps://github.com/Acme/API.git (push)\n\nupstream\tnot-a-remote (fetch)';
+      if (args[1] === '/work/fork') return 'origin\tgit@github.com:acme/api.git (fetch)\nmirror\tgit@ghe.example.com:team/web.git (fetch)';
+      return null;
+    });
+    const listProjects = async (): Promise<ZanaProject[]> => [
+      { id: 'scratch', name: 'Scratch' },
+      { id: 'empty', name: 'Empty', path: '/work/empty' },
+      { id: 'api', name: 'API', path: '/work/api' },
+      { id: 'fork', name: 'Fork', path: '/work/fork' }
+    ];
+    const matcher = createProjectMatcher({ listProjects, run });
+
+    const api = await matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'api' });
+    const web = await matcher.projectForRepo({ host: 'ghe.example.com', owner: 'team', name: 'web' });
+    const missing = await matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'missing' });
+    const projects = await matcher.projects();
+
+    expect(api).toMatchObject({ id: 'api', remote: 'origin' });
+    expect(web).toMatchObject({ id: 'fork', remote: 'mirror' });
+    expect(missing).toBeNull();
+    expect(projects.map((project) => project.id)).toEqual(['scratch', 'empty', 'api', 'fork']);
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(run).toHaveBeenCalledWith('git', ['-C', '/work/api', 'remote', '-v']);
+  });
+
+  it('uses the remote that points at the reviewed repository', async () => {
+    const matcher = createProjectMatcher({
+      listProjects: async () => [{ id: 'fork', name: 'Fork', path: '/work/fork' }],
+      run: async () => 'origin\tgit@github.com:me/api.git (fetch)\nupstream\tgit@github.com:acme/api.git (fetch)\nupstream\tgit@github.com:acme/api.git (push)'
+    });
+
+    await expect(matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'api' })).resolves.toMatchObject({ id: 'fork', remote: 'upstream' });
+    await expect(matcher.projectForRepo({ host: 'github.com', owner: 'me', name: 'api' })).resolves.toMatchObject({ remote: 'origin' });
+  });
+
+  it('caches projects for five minutes and reloads after expiry or invalidation', async () => {
+    let clock = 0;
+    const listProjects = vi.fn(async (): Promise<ZanaProject[]> => [{ id: 'home', name: 'Home' }]);
+    const matcher = createProjectMatcher({ listProjects, run: async () => null, now: () => clock });
+
+    await matcher.projects();
+    clock = 5 * 60_000 - 1;
+    await matcher.projects();
+    const callsWithinTtl = listProjects.mock.calls.length;
+    clock = 5 * 60_000 + 1;
+    await matcher.projects();
+    const callsAfterExpiry = listProjects.mock.calls.length;
+    matcher.invalidate();
+    await matcher.projects();
+
+    expect(callsWithinTtl).toBe(1);
+    expect(callsAfterExpiry).toBe(2);
+    expect(listProjects).toHaveBeenCalledTimes(3);
+  });
+
+  it('treats a failing project listing as having no projects', async () => {
+    const matcher = createProjectMatcher({
+      listProjects: async () => {
+        throw new Error('host unavailable');
+      },
+      run: async () => null
+    });
+
+    expect(await matcher.projects()).toEqual([]);
+    expect(await matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'api' })).toBeNull();
+  });
+});
