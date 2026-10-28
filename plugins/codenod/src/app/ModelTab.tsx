@@ -40,9 +40,7 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
       ) : providers.length === 0 ? (
         <p className="cn-muted">No AI provider is available in Zana. Sign in to one under Settings → Providers.</p>
       ) : (
-        <>
-          <ModelPriorityPicker value={draft} providers={providers} onChange={setDraft} />
-        </>
+        <ModelPriorityPicker value={draft} providers={providers} onChange={setDraft} />
       )}
       <div className="cn-inline">
         <button type="button" className="cn-btn cn-btn-primary" onClick={() => void action.run(() => rpc.call('setModels', { models: draft }))}>

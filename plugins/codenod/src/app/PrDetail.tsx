@@ -104,9 +104,7 @@ function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: M
       {!providers ? (
         <p className="cn-muted">Loading models…</p>
       ) : (
-        <>
-          <ModelPriorityPicker value={chosen} providers={providers} onChange={setChosen} />
-        </>
+        <ModelPriorityPicker value={chosen} providers={providers} onChange={setChosen} />
       )}
       <div className="cn-inline">
         <button type="button" className="cn-btn cn-btn-primary" disabled={chosen.length === 0} onClick={() => props.onRun(chosen)}>
@@ -132,6 +130,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [notice, setNotice] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
+  const [findingSelectionCustomized, setFindingSelectionCustomized] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
@@ -196,6 +195,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   useEffect(() => {
     setFilters({ severity: 'all', category: 'all' });
     setEditingFinding(false);
+    setFindingSelectionCustomized(false);
   }, [prId, reviewId]);
   const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && matchesFinding(finding, filters)) ?? [];
   const selectedFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed) ?? [];
@@ -225,18 +225,13 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const canPost = review?.status === 'completed' && (postableFindings.length > 0 || message.trim().length > 0 || event === 'APPROVE');
 
   const activeFindings = findings.filter((f) => !f.dismissed);
-  const defaultPostIds = findings.filter((f) => !f.dismissed && f.postedAt === null).map((f) => f.id);
-  const isDefaultPostSelection =
-    defaultPostIds.length > 0 &&
-    selectedFindingIds.size === defaultPostIds.length &&
-    defaultPostIds.every((id) => selectedFindingIds.has(id));
   const isAllActive =
     activeFindings.length > 0 &&
     selectedFindingIds.size >= activeFindings.length &&
     activeFindings.every((f) => selectedFindingIds.has(f.id));
   const targetedFindingIds =
-    !isDefaultPostSelection && !isAllActive && selectedFindingIds.size > 0 && selectedFindingIds.size < activeFindings.length
-      ? activeFindings.filter((f) => selectedFindingIds.has(f.id)).map((f) => f.id)
+    findingSelectionCustomized && !isAllActive && selectedFindings.length > 0 && selectedFindings.length < activeFindings.length
+      ? selectedFindings.map((f) => f.id)
       : undefined;
 
   const startReview = (models?: ModelChoice[]) =>
@@ -384,7 +379,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                 <FindingsView key={review.id} rpc={rpc} pr={pr} reviewId={review.id} headSha={review.headSha} stale={review.stale}
                   findings={findings} filters={filters} onFiltersChange={setFilters}
                   onEditingChange={setEditingFinding} disabled={busy !== null}
-                  selectedIds={selectedFindingIds} onSelectionChange={setSelectedFindingIds} onCopyPrompt={() => void copyPrompt()}
+                  selectedIds={selectedFindingIds} onSelectionChange={(next) => { setFindingSelectionCustomized(true); setSelectedFindingIds(next); }} onCopyPrompt={() => void copyPrompt()}
                   onFindingsChange={(next) => {
                     setDetail((current) => current?.review?.id === review.id ? { ...current, findings: next } : current);
                     const eligibleIds = new Set(next.filter((finding) => !finding.dismissed).map((finding) => finding.id));

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import createCodenodPlugin from '../../server.ts';
+import { remediationGateStaleReason } from '../server/cli-and-tools.ts';
 import type { ConfigSnapshot } from '../app/types.ts';
 import type { CommandRunner } from '../server/github/auth.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS } from '../server/review/prompts.ts';
@@ -8,6 +9,28 @@ import type { PrDetail, PrListItem } from '../server/views.ts';
 import { createFakeFetch, createFakeHost, respond, type FakeThread } from './fake-host.ts';
 
 const PATCH = '@@ -1,2 +1,3 @@\n const a = 1;\n+const user = find();\n+user.name.trim();';
+
+describe('remediation gate stale reason', () => {
+  it('distinguishes a superseded review from a changed pull request head', () => {
+    const common = { currentHeadSha: 'sha1', finishedReview: { id: 'finished', headSha: 'sha1' } };
+
+    expect(remediationGateStaleReason({
+      ...common,
+      currentReview: { id: 'newer', headSha: 'sha1', stale: false }
+    })).toBe('Review is stale: a newer review superseded this result');
+    expect(remediationGateStaleReason({
+      ...common,
+      currentHeadSha: 'sha2',
+      currentReview: { id: 'finished', headSha: 'sha1', stale: true }
+    })).toBe('Review is stale: head commit changed during review');
+    expect(remediationGateStaleReason({
+      ...common,
+      currentReview: { id: 'finished', headSha: 'sha1', stale: false }
+    })).toBeNull();
+    expect(remediationGateStaleReason({ ...common, currentReview: null }))
+      .toBe('Review is stale: no current review is available');
+  });
+});
 
 const ANALYSIS = (risk: number, description: string) =>
   JSON.stringify({

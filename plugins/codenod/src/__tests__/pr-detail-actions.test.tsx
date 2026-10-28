@@ -250,6 +250,17 @@ describe('PrDetail review actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Deep Review (1 selected)' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('deepReview', { prId: 'github.com/acme/api#1', findingIds: ['f1'] }));
   });
+
+  it('targets the explicitly selected remaining findings even when they match the default post selection', async () => {
+    const call = makeRpc(completedWithFindings(), { deepReview: () => ({ threadId: 't1' }) });
+    renderDetail(call);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear selection' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select finding in src/login.ts:12' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Deep Review (1 selected)' }));
+
+    await waitFor(() => expect(call).toHaveBeenCalledWith('deepReview', { prId: 'github.com/acme/api#1', findingIds: ['f1'] }));
+  });
 });
 
 describe('PrDetail findings and posting', () => {

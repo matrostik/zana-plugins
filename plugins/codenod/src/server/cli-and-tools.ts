@@ -226,6 +226,26 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
   });
 }
 
+export function remediationGateStaleReason(input: {
+  currentHeadSha: string;
+  currentReview: { id: string; headSha: string; stale: boolean } | null;
+  finishedReview: { id: string; headSha: string };
+}): string | null {
+  if (input.currentHeadSha !== input.finishedReview.headSha) {
+    return 'Review is stale: head commit changed during review';
+  }
+  if (!input.currentReview) {
+    return 'Review is stale: no current review is available';
+  }
+  if (input.currentReview.headSha !== input.currentHeadSha || input.currentReview.stale) {
+    return 'Review is stale: head commit changed during review';
+  }
+  if (input.currentReview.id !== input.finishedReview.id) {
+    return 'Review is stale: a newer review superseded this result';
+  }
+  return null;
+}
+
 export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
   const prParameter = { type: 'string', description: 'Pull request URL, host/owner/repo#123, or owner/repo#123' };
 
@@ -301,11 +321,16 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
       }
       const detail = await app.detail(ref);
       if (record.remediationGate === true) {
-        if (!detail.review || detail.review.id !== finished.id || detail.review.headSha !== detail.pr.headSha || detail.review.stale) {
+        const staleReason = remediationGateStaleReason({
+          currentHeadSha: detail.pr.headSha,
+          currentReview: detail.review,
+          finishedReview: finished
+        });
+        if (staleReason) {
           return {
             reviewId: finished.id,
             status: 'stale',
-            error: 'Review is stale: head commit changed during review',
+            error: staleReason,
             ...(finished.coordinatorThreadId ? { coordinatorThreadId: finished.coordinatorThreadId } : {})
           };
         }

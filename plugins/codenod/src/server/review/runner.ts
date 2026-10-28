@@ -75,19 +75,25 @@ function hasReviewJsonContent(text: string): boolean {
 
 export function detectStructuredProviderError(text: string): string | null {
   try {
-    const json = extractJsonObject(text);
-    if (!json) return null;
+    const candidate = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const json = extractJsonObject(candidate);
+    if (!json || json.trim() !== candidate) return null;
     const data = JSON.parse(json) as Record<string, unknown>;
     if (!data || typeof data !== 'object') return null;
 
-    const errorObj = data.error && typeof data.error === 'object'
+    const hasErrorEnvelope = data.error !== null && typeof data.error === 'object';
+    const knownRootErrorCode = [data.code, data.type].some((value) =>
+      typeof value === 'string' && /(quota|rate.?limit|resource.?exhausted)/i.test(value)
+    );
+    const errorObj = hasErrorEnvelope
       ? (data.error as Record<string, unknown>)
-      : data;
+      : knownRootErrorCode ? data : null;
+    if (!errorObj) return null;
 
-    const code = String(errorObj.code ?? data.code ?? '');
-    const type = String(errorObj.type ?? data.type ?? '');
-    const status = String(errorObj.status ?? data.status ?? '');
-    const message = String(errorObj.message ?? data.message ?? '');
+    const code = String(errorObj.code ?? '');
+    const type = String(errorObj.type ?? '');
+    const status = String(errorObj.status ?? '');
+    const message = String(errorObj.message ?? '');
 
     const combined = `${code} ${type} ${status} ${message}`.trim();
     if (!combined) return null;
@@ -117,6 +123,8 @@ export function detectUsageLimit(text: string, lastAssistantText?: string): stri
 
   const candidate = (lastAssistantText && lastAssistantText.trim().length > 0 ? lastAssistantText : (text.length > 2000 ? text.slice(-2000) : text)).trim();
   if (!candidate || hasReviewJsonContent(candidate)) return null;
+  const standaloneJson = candidate.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (extractJsonObject(standaloneJson)?.trim() === standaloneJson) return null;
   const finalParagraph = candidate.split(/\n\s*\n/).at(-1)?.trim() ?? '';
   const lines = finalParagraph
     .split('\n')
@@ -125,7 +133,7 @@ export function detectUsageLimit(text: string, lastAssistantText?: string): stri
   if (!lines.length) return null;
 
   for (const pattern of USAGE_LIMIT_PATTERNS) {
-    const matchIndex = lines.map((line) => pattern.test(line)).lastIndexOf(true);
+    const matchIndex = lines.map((line) => !/[{}\[\]]/.test(line) && pattern.test(line)).lastIndexOf(true);
     if (matchIndex < 0 || lines[matchIndex].length > 350) continue;
     const start = Math.max(0, matchIndex - 1);
     const end = Math.min(lines.length, matchIndex + 2);
@@ -233,44 +241,54 @@ export function createThreadWaiter(threads: ThreadsApi, options: { pollMs?: numb
       });
     });
     const observedResult = result.then(
-      (value) => ({ value }),
-      (error: unknown) => ({ error })
+      (value) => ({ kind: 'result' as const, value }),
+      (error: unknown) => ({ kind: 'error' as const, error })
     );
     const deadline = Date.now() + timeoutMs;
-    try {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<{ kind: 'timeout' }>((resolve) => {
+      timeoutHandle = setTimeout(() => resolve({ kind: 'timeout' }), Math.max(0, timeoutMs));
+    });
+    const poll = async (): Promise<Awaited<typeof observedResult> | { kind: 'timeout' }> => {
       while (!settled && Date.now() < deadline) {
-        const thread = await threads.get({ threadId }).catch(() => null);
-        if (settled) break;
-        const status = thread?.status?.toLowerCase() ?? '';
+        const lookup = await Promise.race([
+          threads.get({ threadId }).catch(() => null).then((thread) => ({ kind: 'status' as const, thread })),
+          observedResult
+        ]);
+        if (lookup.kind !== 'status') return lookup;
+        if (settled) return observedResult;
+        const status = lookup.thread?.status?.toLowerCase() ?? '';
         if (FAILED_STATUSES.has(status)) {
-          const waiter = startWaiters.get(threadId);
-          startWaiters.delete(threadId);
-          waiter?.reject(new Error(`Thread failed to start with status "${status}"`));
-          break;
+          startWaiters.get(threadId)?.reject(new Error(`Thread failed to start with status "${status}"`));
+          return observedResult;
         }
         if (STOPPED_STATUSES.has(status)) {
-          const waiter = startWaiters.get(threadId);
-          startWaiters.delete(threadId);
-          waiter?.reject(new Error('Thread was stopped before the provider started'));
-          break;
+          startWaiters.get(threadId)?.reject(new Error('Thread was stopped before the provider started'));
+          return observedResult;
         }
         if (DONE_STATUSES.has(status) || status === 'active' || status === 'running') {
-          const waiter = startWaiters.get(threadId);
-          startWaiters.delete(threadId);
-          waiter?.resolve('started');
-          break;
+          startWaiters.get(threadId)?.resolve('started');
+          return observedResult;
         }
-        await sleep(Math.min(250, Math.max(1, deadline - Date.now())));
+        const remaining = deadline - Date.now();
+        const tick = await Promise.race([
+          sleep(Math.min(250, Math.max(1, remaining))).then(() => ({ kind: 'tick' as const })),
+          observedResult
+        ]);
+        if (tick.kind !== 'tick') return tick;
       }
-      if (!settled) {
-        const waiter = startWaiters.get(threadId);
-        startWaiters.delete(threadId);
-        waiter?.resolve('pending');
+      return { kind: 'timeout' };
+    };
+    try {
+      const outcome = await Promise.race([observedResult, timeout, poll()]);
+      if (outcome.kind === 'timeout') {
+        startWaiters.get(threadId)?.resolve('pending');
+        return 'pending';
       }
-      const outcome = await observedResult;
-      if ('error' in outcome) throw outcome.error;
+      if (outcome.kind === 'error') throw outcome.error;
       return outcome.value;
     } finally {
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
       startWaiters.delete(threadId);
     }
   }

@@ -252,6 +252,31 @@ describe('thread waiter', () => {
     await failure;
   });
 
+  it('resolves the startup deadline even if the status lookup never returns', async () => {
+    const { threads } = createFakeThreads();
+    threads.get.mockReturnValue(new Promise(() => undefined));
+    const waiter = createThreadWaiter(threads);
+
+    const outcome = await Promise.race([
+      waiter.waitForStart('thread-1', 5),
+      new Promise<'still waiting'>((resolve) => setTimeout(() => resolve('still waiting'), 25))
+    ]);
+
+    expect(outcome).toBe('pending');
+  });
+
+  it('resolves startup lifecycle events while the status lookup is pending', async () => {
+    const { threads } = createFakeThreads();
+    threads.get.mockReturnValue(new Promise(() => undefined));
+    const waiter = createThreadWaiter(threads);
+    const starting = waiter.waitForStart('thread-1', 5_000);
+    const started = expect(starting).resolves.toBe('started');
+
+    await waiter.onEvent({ name: 'thread.active', threadId: 'thread-1' });
+
+    await started;
+  });
+
   it('tries the next model when visible thread startup times out', async () => {
     const { threads } = createFakeThreads();
     threads.spawn.mockImplementation(async ({ providerId }) => ({ id: `${providerId}-thread` }));
@@ -481,6 +506,13 @@ describe('detectUsageLimit and looksLikeValidReview', () => {
     expect(detectUsageLimit('RESOURCE_EXHAUSTED: quota exceeded for model')).toContain('RESOURCE_EXHAUSTED');
     expect(detectUsageLimit('Rate limit exceeded: quota will reset in 60 seconds')).toContain('Rate limit exceeded');
     expect(detectUsageLimit('{"error": {"code": "insufficient_quota", "message": "quota limit reached"}}')).toContain('insufficient_quota');
+    expect(detectUsageLimit('{"type":"insufficient_quota","message":"quota exceeded"}')).toContain('quota exceeded');
+  });
+
+  it('ignores generic JSON examples and provider envelopes embedded in transcripts', () => {
+    expect(detectUsageLimit('{"message":"rate limit exceeded"}')).toBeNull();
+    expect(detectUsageLimit('Example response: {"error":{"code":"insufficient_quota","message":"quota exceeded"}}'))
+      .toBeNull();
   });
 
   it('ignores normal responses without usage limits', () => {
