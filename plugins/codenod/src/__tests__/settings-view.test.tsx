@@ -103,6 +103,14 @@ describe('SettingsView tabs', () => {
 });
 
 describe('Profile tab', () => {
+  it('restores a non-default prompt after cancelling creation', async () => {
+    await renderView(snapshot({ prompts: [{ id: 'legacy', name: 'Default', instructions: 'Default text' }, { id: 'security', name: 'Security', instructions: 'Check security' }] }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Prompt' }), { target: { value: 'security' } });
+    fireEvent.click(screen.getByRole('button', { name: 'New prompt' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect((screen.getByRole('combobox', { name: 'Prompt' }) as HTMLSelectElement).value).toBe('security');
+    expect((screen.getByRole('textbox', { name: 'Custom review instructions' }) as HTMLTextAreaElement).value).toBe('Check security');
+  });
   it('creates a named prompt without replacing the existing prompt', async () => {
     const { settingsCalls } = await renderView();
     fireEvent.click(screen.getByRole('button', { name: 'New prompt' }));

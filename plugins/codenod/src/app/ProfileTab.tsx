@@ -59,6 +59,7 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
   const [draft, setDraft] = useState(saved);
   const [name, setName] = useState(selected?.name ?? '');
   const [creating, setCreating] = useState(false);
+  const previousSelection = useRef<string | null>(null);
   const action = useSettingsAction(onChanged);
 
   // Resync the draft only when the saved value actually changes, so a config
@@ -86,6 +87,7 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
   }
 
   function startCreating() {
+    previousSelection.current = selectedId;
     setCreating(true);
     setSelectedId(null);
     setName('');
@@ -94,7 +96,7 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
 
   function cancelCreating() {
     setCreating(false);
-    showPrompt(defaultId ?? prompts[0]?.id ?? null);
+    showPrompt(previousSelection.current);
   }
 
   function savePrompt() {

@@ -85,11 +85,9 @@ export function applySettingsPatch(base: CodenodSettings, patch: unknown): Coden
       const selected = next.prompts.find((prompt) => prompt.id === next.defaultPromptId) ?? next.prompts.find((prompt) => prompt.id === 'legacy');
       if (selected) {
         selected.instructions = next.customInstructions;
-        next.defaultPromptId = selected.id;
       }
       else {
         next.prompts.push({ id: 'legacy', name: 'My review instructions', instructions: next.customInstructions });
-        next.defaultPromptId = 'legacy';
       }
     }
   }

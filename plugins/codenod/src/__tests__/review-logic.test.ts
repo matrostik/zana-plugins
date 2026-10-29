@@ -310,3 +310,10 @@ describe('settings store', () => {
   });
 
 });
+import { applySettingsPatch, DEFAULT_SETTINGS } from '../server/settings.ts';
+
+it('keeps the built-in default when legacy instructions are updated', () => {
+  const result = applySettingsPatch({ ...DEFAULT_SETTINGS, defaultPromptId: null }, { customInstructions: 'Updated' });
+  expect(result.defaultPromptId).toBeNull();
+  expect(result.prompts.find((prompt) => prompt.id === 'legacy')?.instructions).toBe('Updated');
+});

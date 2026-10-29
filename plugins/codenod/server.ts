@@ -272,7 +272,10 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     listPullRequests: (bucket) => listPullRequests(store, bucket),
     detail: ensureDetail,
     startReview: (ref, options) => reviews.startReview(ref, options),
-    listPrompts: async () => { const settings = await codenodSettings.load(); return { prompts: settings.prompts.map(({ id, name }) => ({ id, name })), defaultPromptId: settings.defaultPromptId }; },
+    listPrompts: async () => {
+      const settings = await codenodSettings.load();
+      return { prompts: settings.prompts.map(({ id, name }) => ({ id, name })), defaultPromptId: settings.defaultPromptId };
+    },
     waitForReview,
     post: (input) => poster.post(input),
     syncAll: runSync,

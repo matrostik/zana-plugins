@@ -15,7 +15,9 @@ export function useReviewPrompts(rpc: Rpc) {
       .catch((cause) => setError(`Could not load prompts: ${errorText(cause)}`));
   }, [rpc]);
   useEffect(load, [load]);
-  useRealtime('codenod:changed', load);
+  useRealtime('codenod:changed', (payload) => {
+    if (payload && typeof payload === 'object' && 'settings' in payload && payload.settings === true) load();
+  });
   // Fall back to the default when the chosen prompt was deleted.
   useEffect(() => {
     if (typeof promptId === 'string' && !prompts.some((prompt) => prompt.id === promptId)) setPromptId(undefined);

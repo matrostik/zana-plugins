@@ -11,7 +11,7 @@ import {
 } from '../review/prompts.ts';
 import { globMatcher, MAX_SPEC_FILES } from '../review/requirements.ts';
 import { FULL_ACCESS_PERMISSION_MODE, spawnVisibleWithPriorityFallback, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from '../review/runner.ts';
-import { resolvePrompt, resolveRerunSnapshot, type ReviewConfig, type ReviewService, type ReviewTarget } from '../review/service.ts';
+import { resolvePrompt, resolveRerunSnapshot, samePromptSnapshot, type ReviewConfig, type ReviewService, type ReviewTarget } from '../review/service.ts';
 import type {
   ChangedFile,
   LocalReviewSource,
@@ -143,8 +143,9 @@ export function createLocalReviews(deps: LocalReviewDeps) {
    */
   function sameFingerprint(
     snapshot: LocalSnapshotRow,
-    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string; promptSnapshot?: { name: string; instructions: string } }
+    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string; promptSnapshot?: { name: string; instructions: string }; explicitPrompt?: boolean }
   ): boolean {
+    const savedPrompt = deps.store.getReview(snapshot.reviewId)?.promptSnapshot;
     return (
       snapshot.scope === current.scope &&
       snapshot.baseRef === current.baseRef &&
@@ -152,7 +153,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       snapshot.treeSha === current.treeSha &&
       (current.scope === 'branch' || snapshot.headSha === current.headSha) &&
       (current.intent === undefined || (snapshot.intent ?? null) === (current.intent ?? null)) &&
-      (current.promptSnapshot === undefined || JSON.stringify(deps.store.getReview(snapshot.reviewId)?.promptSnapshot) === JSON.stringify(current.promptSnapshot)) &&
+      (current.promptSnapshot === undefined || (!current.explicitPrompt && savedPrompt == null) || samePromptSnapshot(savedPrompt, current.promptSnapshot)) &&
       (current.modelsKey === undefined || reviewModelsKey(snapshot.reviewId) === current.modelsKey)
     );
   }
@@ -201,7 +202,8 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       treeSha: tree.treeSha,
       intent,
       modelsKey: modelsKey(models),
-      promptSnapshot
+      promptSnapshot,
+      explicitPrompt: input.promptId !== undefined || !!input.rerunReviewId
     });
     if (existing) return existing;
 

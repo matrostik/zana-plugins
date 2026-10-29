@@ -32,7 +32,7 @@ export interface CodenodApp {
   syncAll(): Promise<SyncResult>;
   hostStatuses(): Promise<HostStatus[]>;
   configuredModels(): Promise<ModelChoice[]>;
-  listPrompts?(): Promise<{ prompts: Array<{ id: string; name: string }>; defaultPromptId: string | null }>;
+  listPrompts(): Promise<{ prompts: Array<{ id: string; name: string }>; defaultPromptId: string | null }>;
   availableModels(): Promise<AvailableProvider[]>;
   listRepos(): RepoRow[];
   addRepo(input: { host: string; owner: string; name: string; autoReview?: boolean; specGlob?: string | null }): RepoRow;
@@ -173,6 +173,7 @@ async function cliLocalLocation(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: 
 }
 
 async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const prompt = promptFlag(args);
   const asJson = args.flags.has('json');
   const scope = flagString(args, 'scope') ?? 'uncommitted';
   if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch');
@@ -182,7 +183,6 @@ async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?:
   if (failOn && !wait) throw new Error('--fail-on needs --wait');
   const { local, path, location } = await cliLocalLocation(app, args, ctx);
   const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
-  const prompt = flagString(args, 'prompt');
   let review = await local.start({
     projectId: location.projectId,
     worktreePath: location.worktreePath,
@@ -214,6 +214,12 @@ async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?:
   const staleGate = failOn && stale ? ' Files changed while the review ran, so the result is stale; re-run the review.' : '';
   const gate = failOn ? `\n\n${blocking.length} active finding(s) at or above ${failOn}.${staleGate}` : '';
   return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}${gate}` };
+}
+
+function promptFlag(args: ParsedArgs): string | undefined {
+  const value = flagString(args, 'prompt');
+  if (args.flags.has('prompt') && !value?.trim()) throw new Error('--prompt needs an id or builtin');
+  return value;
 }
 
 async function handleShowLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
@@ -268,7 +274,7 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
         };
         switch (command) {
           case 'prompts': {
-            const library = await app.listPrompts?.() ?? { prompts: [], defaultPromptId: null };
+            const library = await app.listPrompts();
             return asJson ? json(library) : { exitCode: 0, stdout: ['builtin — Built-in prompt only', ...library.prompts.map((prompt) => `${prompt.id} — ${prompt.name}${prompt.id === library.defaultPromptId ? ' [default]' : ''}`)].join('\n') };
           }
           case 'list': {
@@ -286,7 +292,7 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
           case 'review': {
             const ref = await prArg();
             const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
-            const prompt = flagString(args, 'prompt');
+            const prompt = promptFlag(args);
             let review = await app.startReview(ref, { models, ...(prompt !== undefined ? { promptId: prompt === 'builtin' ? null : prompt } : {}) });
             if (args.flags.has('wait')) review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
             if (asJson && !args.flags.has('wait')) return json(review);
@@ -395,7 +401,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
     name: 'codenod_list_prompts',
     description: 'List available review prompt IDs and the configured default.',
     parameters: { type: 'object', properties: {} },
-    execute: async () => await app.listPrompts?.() ?? { prompts: [], defaultPromptId: null }
+    execute: async () => await app.listPrompts()
   });
   const prParameter = { type: 'string', description: 'Pull request URL, host/owner/repo#123, or owner/repo#123' };
 

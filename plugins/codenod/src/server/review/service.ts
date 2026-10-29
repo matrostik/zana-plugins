@@ -34,6 +34,10 @@ export function resolvePrompt(config: ReviewConfig, promptId?: string | null): {
   return { name: prompt.name, instructions: prompt.instructions };
 }
 
+export function samePromptSnapshot(a: { name: string; instructions: string } | null | undefined, b: { name: string; instructions: string } | null | undefined): boolean {
+  return a != null && b != null && a.name === b.name && a.instructions === b.instructions;
+}
+
 /** Reads a prompt selection: a string ID, null for built-in only, or undefined for the default. */
 export function parsePromptSelection(value: unknown): string | null | undefined {
   return value === null || typeof value === 'string' ? value : undefined;
@@ -560,7 +564,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
     const running = deps.store.latestReview(pr.id);
     if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) {
       const explicit = options.promptSnapshot !== undefined || options.promptId !== undefined;
-      if (!explicit || running.promptSnapshot == null || JSON.stringify(running.promptSnapshot) === JSON.stringify(promptSnapshot)) return running;
+      if (!explicit || running.promptSnapshot == null || samePromptSnapshot(running.promptSnapshot, promptSnapshot)) return running;
       throw new Error('A review is already running for this pull request with different instructions. Wait for it to finish or cancel it.');
     }
     const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: options.trigger ?? 'manual', promptSnapshot });

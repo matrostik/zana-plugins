@@ -38,6 +38,7 @@ function createApp(overrides: Partial<CodenodApp> = {}) {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const record = (method: string, args: unknown[]) => void calls.push({ method, args });
   const app: CodenodApp = {
+    listPrompts: async () => ({ prompts: [], defaultPromptId: null }),
     defaultHost: async () => 'github.com',
     listPullRequests: (...args) => (record('listPullRequests', args), []),
     detail: async (...args) => (record('detail', args), detailFixture('completed')),
@@ -116,6 +117,10 @@ describe('parseArgs', () => {
 });
 
 describe('codenod cli', () => {
+  it('rejects a prompt flag without a value', async () => {
+    const { cli } = createCli();
+    expect(await cli(['review', 'acme/api#4', '--prompt'])).toMatchObject({ exitCode: 1, stderr: expect.stringContaining('--prompt needs an id or builtin') });
+  });
   it('prints usage with exit code 0 when no command is given', async () => {
     const { cli } = createCli();
     const result = await cli([]);

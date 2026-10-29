@@ -163,6 +163,26 @@ function snapshotRefs(repo: string): string[] {
 }
 
 describe('local reviews', () => {
+  it('reuses a pre-upgrade in-flight review only for an implicit prompt', async () => {
+    const releases: Array<() => void> = [];
+    const harness = createHarness({ respond: () => new Promise((resolve) => releases.push(() => resolve(REPLY))) });
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
+    const first = await harness.start();
+    const getReview = harness.store.getReview.bind(harness.store);
+    const spy = vi.spyOn(harness.store, 'getReview').mockImplementation((id) => {
+      const row = getReview(id);
+      return row && id === first.id ? { ...row, promptSnapshot: null } : row;
+    });
+    const implicit = await harness.start();
+    const explicit = await harness.local.startLocalReview({ projectId: harness.project.id, worktreePath: harness.repo, scope: 'uncommitted', source: 'ui', promptId: null });
+    spy.mockRestore();
+    while (harness.reviews().activeCount() > 0) {
+      releases.splice(0).forEach((release) => release());
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    expect(implicit.id).toBe(first.id);
+    expect(explicit.id).not.toBe(first.id);
+  });
   it('captures the selected local review prompt', async () => {
     const harness = createHarness({ config: { prompts: [{ id: 'security', name: 'Security', instructions: 'Find vulnerabilities' }], defaultPromptId: 'security' } });
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
