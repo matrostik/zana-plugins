@@ -261,6 +261,12 @@ export const CODENOD_STYLES = `
   background: color-mix(in srgb, var(--cn-warn) 10%, var(--cn-card));
   border: 1px solid color-mix(in srgb, var(--cn-warn) 30%, transparent); color: var(--cn-text);
 }
+.cn-model-omitted-notice p { margin: 0 0 4px; }
+.cn-model-omitted-notice ul { margin: 0; padding-left: 18px; }
+.cn-model-omitted-notice li + li { margin-top: 4px; }
+.cn-model-omitted-notice details { margin-top: 2px; }
+.cn-model-omitted-notice summary { cursor: pointer; color: var(--cn-muted); }
+.cn-model-omitted-notice code { overflow-wrap: anywhere; }
 .cn-model-omitted-notice .cn-icon { color: var(--cn-warn); margin-top: 1px; }
 
 .cn-priority-list { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 12px 0 14px; padding: 0; }
