@@ -4,6 +4,13 @@ import type { AvailableProvider } from './types.ts';
 
 export const MAX_REVIEW_MODELS = 5;
 
+function providerAvailabilityMessage(error: string): string {
+  if (/\bENOENT\b/i.test(error)) {
+    return 'its command-line tool couldn’t be found. Check that it’s installed and available to Zana.';
+  }
+  return 'couldn’t be loaded. Check that the provider is configured and available in Zana.';
+}
+
 export function modelKey(providerId: string, model: string): string {
   return `${providerId}\u0000${model}`;
 }
@@ -48,10 +55,20 @@ export function ModelPriorityPicker(props: {
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <span>
-            Providers without available models are omitted: {providers.filter((provider) => provider.models.length === 0 && provider.error)
-              .map((provider) => `${provider.displayName} (${provider.error})`).join('; ')}
-          </span>
+          <div>
+            <p>Some providers couldn’t be loaded, so their models aren’t available right now.</p>
+            <ul>
+              {providers.filter((provider) => provider.models.length === 0 && provider.error).map((provider) => (
+                <li key={provider.providerId}>
+                  <strong>{provider.displayName}</strong> — {providerAvailabilityMessage(provider.error!)}{' '}
+                  <details>
+                    <summary>Technical details</summary>
+                    <code>{provider.error}</code>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       ) : null}
       {value.length > 0 ? (

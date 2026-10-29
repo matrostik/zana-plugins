@@ -58,6 +58,23 @@ describe('model choice helpers', () => {
 });
 
 describe('ModelPriorityPicker', () => {
+  it('explains unavailable providers in plain language and tucks the raw error into details', () => {
+    const unavailable: AvailableProvider = {
+      providerId: 'grok-build',
+      displayName: 'Grok Build',
+      error: 'spawn grok ENOENT',
+      models: []
+    };
+
+    render(<ModelPriorityPicker value={[]} providers={[unavailable]} onChange={() => {}} />);
+
+    expect(screen.getByText('Some providers couldn’t be loaded, so their models aren’t available right now.')).toBeTruthy();
+    expect(screen.getByText('Grok Build')).toBeTruthy();
+    expect(screen.getByText(/its command-line tool couldn’t be found\. Check that it’s installed and available to Zana\./)).toBeTruthy();
+    expect(screen.getByText('Technical details')).toBeTruthy();
+    expect(screen.getByText('spawn grok ENOENT')).toBeTruthy();
+  });
+
   it('commits the first available model as soon as a row provider changes', () => {
     function Harness() {
       const [value, setValue] = useState<ModelChoice[]>([{ providerId: 'cursor', model: 'grok-4.6' }]);
