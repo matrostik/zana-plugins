@@ -715,6 +715,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
   };
   const projects: ProjectMatcher = {
     projectForRepo: async () => (options.repoProject ? { remote: 'origin', ...options.repoProject } : null),
+    reposForProject: async () => [],
     projects: async () => options.projects ?? [{ id: 'home', name: 'Home' }],
     invalidate() {}
   };
@@ -1469,6 +1470,26 @@ describe('project matcher', () => {
 
     await expect(matcher.projectForRepo({ host: 'github.com', owner: 'acme', name: 'api' })).resolves.toMatchObject({ id: 'fork', remote: 'upstream' });
     await expect(matcher.projectForRepo({ host: 'github.com', owner: 'me', name: 'api' })).resolves.toMatchObject({ remote: 'origin' });
+  });
+
+  it('lists every repository a project points at, once each, even when another project claimed it first', async () => {
+    const matcher = createProjectMatcher({
+      listProjects: async () => [
+        { id: 'main', name: 'Main', path: '/work/main' },
+        { id: 'fork', name: 'Fork', path: '/work/fork' }
+      ],
+      run: async (_command, args) =>
+        args[1] === '/work/main'
+          ? 'origin\tgit@github.com:acme/api.git (fetch)'
+          : 'origin\tgit@github.com:me/api.git (fetch)\nupstream\thttps://github.com/Acme/API.git (fetch)\nmirror\tgit@github.com:acme/api.git (fetch)'
+    });
+
+    await expect(matcher.reposForProject('fork')).resolves.toEqual([
+      { host: 'github.com', owner: 'me', name: 'api', remote: 'origin' },
+      { host: 'github.com', owner: 'Acme', name: 'API', remote: 'upstream' }
+    ]);
+    await expect(matcher.reposForProject('main')).resolves.toEqual([{ host: 'github.com', owner: 'acme', name: 'api', remote: 'origin' }]);
+    await expect(matcher.reposForProject('missing')).resolves.toEqual([]);
   });
 
   it('caches projects for five minutes and reloads after expiry or invalidation', async () => {

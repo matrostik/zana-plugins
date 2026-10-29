@@ -311,16 +311,32 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   }
 
   // ── RPC for the panel ────────────────────────────────────────────────
-  zcc.rpc.method('overview', async () => ({
-    prs: listPullRequests(store),
-    hosts: await sync.hostStatuses(),
-    syncing: sync.isSyncing(),
-    lastSyncAt: (await zcc.storage.kv.get<number>('lastSyncAt')) ?? null,
-    autoSyncEnabled: (await codenodSettings.load()).autoSyncEnabled,
-    activeReviews: reviews.activeCount(),
-    hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0,
-    hasWatchedRepos: store.listRepos().length > 0
-  }));
+  zcc.rpc.method('overview', async (args) => {
+    const projectId = asString(asRecord(args), 'projectId');
+    const base = {
+      hosts: await sync.hostStatuses(),
+      syncing: sync.isSyncing(),
+      lastSyncAt: (await zcc.storage.kv.get<number>('lastSyncAt')) ?? null,
+      autoSyncEnabled: (await codenodSettings.load()).autoSyncEnabled,
+      activeReviews: reviews.activeCount(),
+      hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
+    };
+    if (!projectId) return { ...base, prs: listPullRequests(store), hasWatchedRepos: store.listRepos().length > 0 };
+    // A project view lists only pull requests of the repositories its git remotes point at.
+    const watched = new Set(store.listRepos().map((repo) => repo.id.toLowerCase()));
+    const hosts = new Set(base.hosts.map((host) => host.host.toLowerCase()));
+    const projectRepos = (await projects.reposForProject(projectId)).filter((repo) => hosts.has(repo.host.toLowerCase())).map((repo) => {
+      const id = repoId(repo);
+      return { id, host: repo.host, owner: repo.owner, name: repo.name, watched: watched.has(id.toLowerCase()) };
+    });
+    const ids = new Set(projectRepos.map((repo) => repo.id.toLowerCase()));
+    return {
+      ...base,
+      prs: listPullRequests(store).filter((pr) => ids.has(repoId({ host: pr.host, owner: pr.owner, name: pr.repo }).toLowerCase())),
+      hasWatchedRepos: projectRepos.some((repo) => repo.watched),
+      projectRepos
+    };
+  });
 
   zcc.rpc.method('detail', (args) => {
     const id = asString(asRecord(args), 'prId');
@@ -471,11 +487,15 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   });
 
   // ── Local reviews ────────────────────────────────────────────────────
-  zcc.rpc.method('localTargets', async () => ({
-    locations: await local.listLocations(),
-    scopes: LOCAL_SCOPES,
-    hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
-  }));
+  zcc.rpc.method('localTargets', async (args) => {
+    const projectId = asString(asRecord(args), 'projectId');
+    const locations = await local.listLocations(projectId);
+    return {
+      locations,
+      scopes: LOCAL_SCOPES,
+      hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
+    };
+  });
 
   zcc.rpc.method('startLocalReview', async (args) => {
     const record = asRecord(args);

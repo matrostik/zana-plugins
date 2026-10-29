@@ -144,3 +144,74 @@ describe('CodenodPanel', () => {
     expect((await screen.findByRole('tab', { name: /Mine/ })).getAttribute('aria-selected')).toBe('true');
   });
 });
+
+describe('CodenodPanel in a project tab', () => {
+  const repo = (owner: string, watched: boolean) => ({ id: `github.com/${owner}/api`, host: 'github.com', owner, name: 'api', watched });
+
+  it('asks for the project overview and offers to watch each unwatched repository', async () => {
+    answer({ overview: overview({ prs: [], hasWatchedRepos: false, projectRepos: [repo('acme', false), repo('me', true)] }), config: { models: [] }, addRepo: null, refresh: null });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    expect(await screen.findByText("Watch this project's repository to see its pull requests.")).toBeTruthy();
+    expect(sdk.call).toHaveBeenCalledWith('overview', { projectId: 'p1' });
+    const buttons = screen.getAllByRole('button', { name: 'Watch repository' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(sdk.call).toHaveBeenCalledWith('addRepo', { repo: 'github.com/acme/api' }));
+    await waitFor(() => expect(sdk.call).toHaveBeenCalledWith('refresh'));
+    await waitFor(() => expect(sdk.call.mock.calls.filter(([method]) => method === 'overview')).toHaveLength(2));
+  });
+
+  it('opens local changes for a project without a GitHub remote', async () => {
+    answer({ overview: overview({ prs: [], projectRepos: [] }), config: { models: [] }, localTargets: { locations: [], scopes: [], hasModels: true } });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    expect(await screen.findByText('This project has no local checkouts.')).toBeTruthy();
+    expect(sdk.call).toHaveBeenCalledWith('localTargets', { projectId: 'p1' });
+    expect(screen.getByText(/This project has no .*GitHub remote/)).toBeTruthy();
+  });
+
+  it('restores the new project mode and bucket and clears the previous PR selection', async () => {
+    localStorage.setItem('codenod.mode:p2', 'local');
+    localStorage.setItem('codenod.tab:p2', 'watched');
+    answer({ overview: overview({ projectRepos: [repo('acme', true)] }), config: { models: [] }, detail: detail('completed'), localTargets: { locations: [], scopes: [], hasModels: true } });
+    const { rerender } = render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Add login/ }));
+    expect(await screen.findByText('Looks fine')).toBeTruthy();
+    rerender(<CodenodPanel pluginId="codenod" projectId="p2" />);
+    expect(await screen.findByText('This project has no local checkouts.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Pull requests' }));
+    expect(screen.getByRole('tab', { name: /Watched/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByText('Looks fine')).toBeNull();
+    expect(localStorage.getItem('codenod.mode:p1')).toBeNull();
+  });
+
+  it('reloads watched state after add succeeds even when sync fails', async () => {
+    const responses = { overview: overview({ projectRepos: [repo('acme', false)] }), config: { models: [] }, addRepo: null, refresh: new Error('sync failed') };
+    answer(responses);
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    const button = await screen.findByRole('button', { name: 'Watch repository' });
+    responses.overview = overview({ projectRepos: [repo('acme', true)] });
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.queryByText("isn't watched, so its pull requests aren't synced.", { exact: false })).toBeNull());
+    expect(screen.getByText('sync failed')).toBeTruthy();
+  });
+
+  it('shows watching progress only for the repository being added', async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    answer({ overview: overview({ projectRepos: [repo('acme', false), repo('me', false)] }), config: { models: [] }, addRepo: pending, refresh: null });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Watch repository' }))[0]);
+    expect(screen.getAllByRole('button', { name: 'Watching…' })).toHaveLength(1);
+    expect((screen.getByRole('button', { name: 'Watch repository' }) as HTMLButtonElement).disabled).toBe(false);
+    finish();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Watching…' })).toBeNull());
+  });
+
+  it('remembers its mode separately from the global panel', async () => {
+    answer({ overview: overview({ projectRepos: [repo('acme', true)] }), config: { models: [] }, localTargets: { locations: [], scopes: [], hasModels: true } });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Local changes' }));
+    expect(localStorage.getItem('codenod.mode:p1')).toBe('local');
+    expect(localStorage.getItem('codenod.mode')).toBeNull();
+  });
+});

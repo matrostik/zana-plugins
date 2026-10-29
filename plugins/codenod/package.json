@@ -1,6 +1,6 @@
 {
   "name": "@zcc-ext/codenod",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "Ros Haitovich <rhaitovich@salesforce.com>",
   "type": "module",
   "description": "AI pull request review for GitHub and GitHub Enterprise, powered by the AI providers configured in Zana.",
@@ -16,6 +16,11 @@
     },
     "server": "./server.mjs",
     "app": "./app.js",
+    "projectTab": {
+      "label": "CodeNod",
+      "icon": "GitPullRequest",
+      "global": false
+    },
     "skills": [
       "skills"
     ]

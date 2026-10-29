@@ -4,14 +4,15 @@ import type { LocalLocationSummary } from '../server/local/service.ts';
 import type { ModelChoice } from '../server/types.ts';
 import { errorText, relativeTime, scoreTone } from './format.ts';
 import { LocalDetail } from './LocalDetail.tsx';
+import { storageKey } from './storage.ts';
 import type { LocalOverview, Rpc } from './types.ts';
 
 const SELECTED_KEY = 'codenod.localTarget';
 const FOCUS_RELOAD_THROTTLE_MS = 60_000;
 
-function savedSelection(): string | null {
+function savedSelection(projectId?: string): string | null {
   try {
-    return globalThis.localStorage?.getItem(SELECTED_KEY) ?? null;
+    return globalThis.localStorage?.getItem(storageKey(SELECTED_KEY, projectId)) ?? null;
   } catch {
     return null;
   }
@@ -50,22 +51,21 @@ function LocationRow({ location, selected, onSelect }: { location: LocalLocation
   );
 }
 
-export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]; hasModels: boolean; onOpenSettings(): void; reloadToken: number }) {
-  const { rpc } = props;
+export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]; hasModels: boolean; onOpenSettings(): void; reloadToken: number; projectId?: string }) {
+  const { rpc, projectId } = props;
   const [overview, setOverview] = useState<LocalOverview | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(savedSelection);
+  const [selectedId, setSelectedId] = useState<string | null>(() => savedSelection(projectId));
   const [showClean, setShowClean] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    rpc
-      .call('localTargets')
+    (projectId ? rpc.call('localTargets', { projectId }) : rpc.call('localTargets'))
       .then((value) => {
         setOverview(value as LocalOverview);
         setError(null);
       })
       .catch((cause) => setError(errorText(cause)));
-  }, [rpc]);
+  }, [rpc, projectId]);
 
   useEffect(() => {
     load();
@@ -91,7 +91,7 @@ export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]
   const select = (targetId: string) => {
     setSelectedId(targetId);
     try {
-      globalThis.localStorage?.setItem(SELECTED_KEY, targetId);
+      globalThis.localStorage?.setItem(storageKey(SELECTED_KEY, projectId), targetId);
     } catch {
       // Not critical.
     }
@@ -115,12 +115,12 @@ export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]
         </div>
         {error ? <p className="cn-banner cn-banner-error">{error}</p> : null}
         {!overview && !error ? <p className="cn-empty">Looking for checkouts…</p> : null}
-        {overview && locations.length === 0 ? <p className="cn-empty">No checkouts found. Add a project with a local folder in Zana to review its changes.</p> : null}
+        {overview && locations.length === 0 ? <p className="cn-empty">{projectId ? 'This project has no local checkouts.' : 'No checkouts found. Add a project with a local folder in Zana to review its changes.'}</p> : null}
         {overview && locations.length > 0 && visible.length === 0 ? <p className="cn-empty">Every checkout is clean. Turn on Show clean to see them.</p> : null}
         <div className="cn-rows">
           {[...groups].map(([projectName, rows]) => (
             <section key={projectName} aria-label={projectName}>
-              <h3 className="cn-local-group">{projectName}</h3>
+              {projectId ? null : <h3 className="cn-local-group">{projectName}</h3>}
               <ul className="cn-local-rows">
                 {rows.map((location) => (
                   <LocationRow key={location.targetId} location={location} selected={location.targetId === selectedId} onSelect={() => select(location.targetId)} />

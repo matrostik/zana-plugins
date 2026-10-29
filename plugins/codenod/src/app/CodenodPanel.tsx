@@ -5,8 +5,10 @@ import { errorText, relativeTime } from './format.ts';
 import { LocalReviewsView } from './LocalReviewsView.tsx';
 import { PrDetail } from './PrDetail.tsx';
 import { PrList } from './PrList.tsx';
+import { ProjectRepoBanners } from './ProjectRepoBanners.tsx';
 import { Segmented, type SegmentedOption } from './Segmented.tsx';
 import { SettingsView } from './SettingsView.tsx';
+import { storageKey } from './storage.ts';
 import type { ConfigSnapshot, Overview } from './types.ts';
 
 const TAB_KEY = 'codenod.tab';
@@ -19,17 +21,19 @@ const MODES: Array<SegmentedOption<Mode>> = [
   { id: 'local', label: 'Local changes' }
 ];
 
-function initialMode(): Mode {
+/** The saved mode, or null when none was saved so a project without a GitHub remote can default to local changes. */
+function savedMode(projectId?: string): Mode | null {
   try {
-    return globalThis.localStorage?.getItem(MODE_KEY) === 'local' ? 'local' : 'pr';
+    const saved = globalThis.localStorage?.getItem(storageKey(MODE_KEY, projectId));
+    return saved === 'local' || saved === 'pr' ? saved : null;
   } catch {
-    return 'pr';
+    return null;
   }
 }
 
-function initialTab(): PrBucket {
+function initialTab(projectId?: string): PrBucket {
   try {
-    const saved = globalThis.localStorage?.getItem(TAB_KEY);
+    const saved = globalThis.localStorage?.getItem(storageKey(TAB_KEY, projectId));
     if (saved === 'needs-review' || saved === 'mine' || saved === 'watched') return saved;
   } catch {
     // Storage may be unavailable; fall back to the default tab.
@@ -37,22 +41,29 @@ function initialTab(): PrBucket {
   return 'needs-review';
 }
 
-export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string }) {
+type PanelProps = { pluginId: string; subPath?: string; projectId?: string };
+
+export function CodenodPanel(props: PanelProps) {
+  return <CodenodPanelContent key={props.projectId ?? ''} {...props} />;
+}
+
+function CodenodPanelContent({ pluginId, projectId }: PanelProps) {
   const rpc = useRpc();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [models, setModels] = useState<ModelChoice[]>([]);
-  const [tab, setTab] = useState<PrBucket>(initialTab);
+  const [tab, setTab] = useState<PrBucket>(() => initialTab(projectId));
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<'inbox' | 'settings'>('inbox');
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [chosenMode, setMode] = useState<Mode | null>(() => savedMode(projectId));
   const [localReloadToken, setLocalReloadToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const noRemote = overview?.projectRepos?.length === 0;
+  const mode: Mode = chosenMode ?? (noRemote ? 'local' : 'pr');
 
   const load = useCallback(() => {
-    rpc
-      .call('overview')
+    (projectId ? rpc.call('overview', { projectId }) : rpc.call('overview'))
       .then((value) => {
         setOverview(value as Overview);
         setError(null);
@@ -62,7 +73,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
       .call('config')
       .then((value) => setModels((value as ConfigSnapshot).models))
       .catch(() => undefined);
-  }, [rpc]);
+  }, [rpc, projectId]);
 
   useEffect(load, [load]);
   useRealtime('codenod:changed', load);
@@ -87,7 +98,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
   const changeTab = (next: PrBucket) => {
     setTab(next);
     try {
-      globalThis.localStorage?.setItem(TAB_KEY, next);
+      globalThis.localStorage?.setItem(storageKey(TAB_KEY, projectId), next);
     } catch {
       // Not critical.
     }
@@ -96,7 +107,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
   const changeMode = (next: Mode) => {
     setMode(next);
     try {
-      globalThis.localStorage?.setItem(MODE_KEY, next);
+      globalThis.localStorage?.setItem(storageKey(MODE_KEY, projectId), next);
     } catch {
       // Not critical.
     }
@@ -152,6 +163,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
           {hostProblems.map((host) => `${host.host}: ${host.error}`).join(' · ')}
         </p>
       ) : null}
+      {view === 'inbox' ? <ProjectRepoBanners repos={overview?.projectRepos} showWatch={mode === 'pr'} rpc={rpc} onChange={load} /> : null}
 
       {view === 'settings' ? (
         <div className="cn-settings">
@@ -164,6 +176,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
           hasModels={overview?.hasModels ?? models.length > 0}
           onOpenSettings={() => setView('settings')}
           reloadToken={localReloadToken}
+          projectId={projectId}
         />
       ) : (
         <div className="cn-body">
@@ -176,6 +189,7 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
             selectedId={selectedId}
             onSelect={setSelectedId}
             hasWatchedRepos={overview?.hasWatchedRepos ?? false}
+            unwatchedText={projectId ? "Watch this project's repository to see its pull requests." : undefined}
           />
           {selectedId ? (
             <PrDetail

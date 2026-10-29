@@ -21,6 +21,11 @@ function strictSlots(registered: Record<string, Registration[]>) {
       if (typeof registration.component !== 'function') throw new Error('navPanel: component');
       record('navPanel', registration);
     },
+    projectTab(registration: Registration) {
+      if (typeof registration.label !== 'string' || !registration.label) throw new Error('projectTab: label');
+      if (typeof registration.component !== 'function') throw new Error('projectTab: component');
+      record('projectTab', registration);
+    },
     settingsSection(registration: Registration) {
       if (typeof registration.component !== 'function') throw new Error('settingsSection: component');
       record('settingsSection', registration);
@@ -57,5 +62,14 @@ describe('app registration', () => {
     const toPluginPanel = vi.fn();
     (registered.commandPaletteAction[0].run as (ctx: unknown) => void)({ toPluginPanel });
     expect(toPluginPanel).toHaveBeenCalledWith(panelPath);
+
+    expect(registered.projectTab).toHaveLength(1);
+    const tabId = registered.projectTab[0].id;
+    const projectAction = registered.commandPaletteAction[1] as { isAvailable(ctx: unknown): boolean; run(ctx: unknown): void };
+    expect(projectAction.isAvailable({})).toBe(false);
+    expect(projectAction.isAvailable({ projectId: 'p1' })).toBe(true);
+    const toProject = vi.fn();
+    projectAction.run({ projectId: 'p1', toProject });
+    expect(toProject).toHaveBeenCalledWith('p1', { tabId });
   });
 });

@@ -20,6 +20,7 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 6. Open the **AI Model** tab. Under **Review models**, pick one or more models and click **Save models**.
 7. Open the **Organizations & Repos** tab. Add any GitHub Enterprise hosts and click **Save hosts**. Then add at least one repository under **Watched repositories**, and tick **Auto-review** for any that should be reviewed automatically.
 8. Click **Back to pull requests**, then **Refresh**. Open pull requests in those repositories appear under **Needs my review**, **Mine**, and **Watched**.
+9. Inside a Zana project, open the **CodeNod** project tab to see only that project's pull requests and local checkouts. If the project's GitHub repository isn't watched yet, click **Watch repository** there.
 
 ## How To Review a Pull Request
 
@@ -154,7 +155,7 @@ These parts were ported and adapted, mostly unchanged in behavior:
 | --- | --- | --- |
 | AI models | Own AI clients and API keys | Zana providers, through hidden Zana threads |
 | Storage | Postgres / Supabase | Plugin SQLite database (no data import) |
-| App shell | Next.js web app and Electron | One Zana sidebar page and a settings section |
+| App shell | Next.js web app and Electron | One Zana sidebar page, a per-project tab, and a settings section |
 | GitHub sign-in | App-managed tokens | `gh` CLI, Git credential helper, or a secret setting |
 | Requirements | GUS work items | Pull request text, linked GitHub issues, spec files |
 | Notifications | Slack, Teams, in-app | Zana inbox |
@@ -196,6 +197,6 @@ Layout:
 - `src/server/review/` — prompts, context gathering, reply parsing, consensus, and the thread runner
 - `src/server/local/` — Git snapshots and the local review service
 - `src/server/` — database, sync, posting, views, and the CLI and agent tools
-- `src/app/` — the sidebar page, pull request list and detail, and settings UI
+- `src/app/` — the sidebar page and project tab, pull request list and detail, and settings UI
 - `src/__tests__/` — Vitest suites and a fake Zana host
 - `skills/codenod/SKILL.md` — guidance for Zana agents

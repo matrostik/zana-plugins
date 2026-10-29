@@ -127,7 +127,7 @@ function createHarness(options: HarnessOptions = {}) {
     github: {} as GitHubClient,
     threads,
     waiter,
-    projects: { projectForRepo: async () => null, projects: async () => [project], invalidate() {} },
+    projects: { projectForRepo: async () => null, reposForProject: async () => [], projects: async () => [project], invalidate() {} },
     config: async () => config,
     providerPermissionModes: async () => ['read-only', 'full'],
     notify: options.notify,

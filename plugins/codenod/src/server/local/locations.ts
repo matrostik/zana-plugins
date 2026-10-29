@@ -63,8 +63,8 @@ export function createLocationResolver(deps: LocationResolverDeps) {
     return { target, project, worktree };
   }
 
-  async function listLocations(): Promise<LocalLocationSummary[]> {
-    const projects = await projectsWithPath();
+  async function listLocations(projectId?: string): Promise<LocalLocationSummary[]> {
+    const projects = (await projectsWithPath()).filter((project) => !projectId || project.id === projectId);
     const byProject = await worktreesByProject(projects);
     const seen = new Set<string>();
     const locations: LocalLocation[] = [];
