@@ -291,6 +291,28 @@ describe('LocalDetail', () => {
     expect(screen.getByRole('status', { name: 'Review outdated' })).toBeTruthy();
   });
 
+  it('keeps the outdated banner when a later localStatus request fails', async () => {
+    let statusCalls = 0;
+    answer({
+      localDetail: localDetail(),
+      localStatus: () => {
+        statusCalls += 1;
+        if (statusCalls === 1) return fresh(true);
+        throw new Error('rpc unavailable');
+      },
+      localDiff: []
+    });
+    renderDetail();
+
+    expect(await screen.findByRole('status', { name: 'Review outdated' })).toBeTruthy();
+    // Step past the status-check throttle so the focus event issues a second request.
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + 61_000);
+    fireEvent.focus(window);
+    expect(await screen.findByText(/Could not check checkout status: rpc unavailable/)).toBeTruthy();
+    expect(screen.getByRole('status', { name: 'Review outdated' })).toBeTruthy();
+  });
+
   it('warns when the working tree changed and reruns with the reviewed scope', async () => {
     answer({ localDetail: localDetail(), localStatus: fresh(true), localDiff: [], startLocalReview: { id: 'rev-3' } });
     renderDetail();

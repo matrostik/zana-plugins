@@ -242,8 +242,9 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
         .then((value) => {
           if (statusSeq.current === requestId) setStatus(value as LocalReviewStatus);
         })
-        .catch(() => {
-          if (statusSeq.current === requestId) setStatus(null);
+        .catch((cause) => {
+          // Keep the last known freshness so a transient failure does not hide an "outdated" warning.
+          if (statusSeq.current === requestId) setNotice({ kind: 'error', text: `Could not check checkout status: ${errorText(cause)}` });
         });
     },
     [rpc, reviewId, reviewCompleted]
