@@ -272,9 +272,12 @@ export function FindingsView(props: {
 }) {
   const { findings, filters, rpc, contextSource } = props;
   const contextMethod = contextSource.kind === 'pr' ? 'diff' : 'localDiff';
+  const contextPrId = contextSource.kind === 'pr' ? contextSource.pr.id : null;
+  const contextHeadSha = contextSource.kind === 'pr' ? contextSource.headSha : null;
+  const contextReviewId = contextSource.kind === 'local' ? contextSource.reviewId : null;
   const contextArgs = useMemo(
-    () => (contextSource.kind === 'pr' ? { prId: contextSource.pr.id, headSha: contextSource.headSha } : { reviewId: contextSource.reviewId }),
-    [contextSource]
+    () => (contextPrId !== null ? { prId: contextPrId, headSha: contextHeadSha } : { reviewId: contextReviewId }),
+    [contextPrId, contextHeadSha, contextReviewId]
   );
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -124,7 +124,7 @@ export function getLocalDetail(store: Store, targetId: string, reviewId?: string
   const counts = store.countUndismissedFindings(entries.filter((entry) => entry.review.status === 'completed').map((entry) => entry.review.id));
   return {
     target,
-    ...(completed && latest ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
+    ...(latest && latest.id !== review?.id ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
     review,
     snapshot: snapshot
       ? {

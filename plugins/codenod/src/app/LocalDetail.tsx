@@ -196,7 +196,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const [confirmDelete, setConfirmDelete] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
 
-  const navigate = useZccNavigate();
+  const navigate: ReturnType<typeof useZccNavigate> | undefined = useZccNavigate() ?? undefined;
 
   const requestSeq = useRef(0);
   const load = useCallback(() => {
@@ -219,7 +219,9 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
       });
   }, [rpc, location.targetId, viewingId]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
   useRealtime('codenod:changed', (payload) => {
     const record = (payload ?? {}) as { prId?: unknown; targetId?: unknown; finding?: unknown; swept?: unknown };
     if (record.prId === location.targetId || record.targetId === location.targetId || record.finding || record.swept) load();
@@ -344,6 +346,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const selectedFindings = activeFindings.filter((finding) => selectedIds.has(finding.id));
   const allSelected = selectedFindings.length === activeFindings.length;
   const targetedIds = !allSelected && selectedFindings.length > 0 ? selectedFindings.map((finding) => finding.id) : [];
+  const nothingSelected = activeFindings.length > 0 && selectedFindings.length === 0;
   const stale = Boolean(status?.stale) && reviewCompleted;
   const attemptElapsed = attempt ? formatDuration(attempt.createdAt, attempt.completedAt ?? now) : '';
   const viewingOlder = viewingId !== null && detail.history[0]?.id !== viewingId;
@@ -621,13 +624,13 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
         ) : null}
         {review?.status === 'completed' ? (
           <>
-            <button type="button" className="cn-btn" disabled={busy !== null || editingFinding} onClick={() => void deepReview()}>
+            <button type="button" className="cn-btn" disabled={busy !== null || editingFinding || nothingSelected} onClick={() => void deepReview()}>
               {targetedIds.length > 0 ? `Deep Review (${targetedIds.length} selected)` : 'Deep Review in thread'}
             </button>
             <button
               type="button"
               className="cn-btn"
-              disabled={busy !== null || editingFinding || activeFindings.length === 0 || status?.missing === true}
+              disabled={busy !== null || editingFinding || activeFindings.length === 0 || nothingSelected || status?.missing === true}
               onClick={() => void fix(targetedIds, false)}
             >
               {targetedIds.length > 0 ? `Fix ${targetedIds.length} with agent` : 'Fix with agent'}

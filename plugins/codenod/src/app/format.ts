@@ -1,3 +1,5 @@
+import type { SkipReason } from '../server/types.ts';
+
 export function relativeTime(iso: string | number | null | undefined, now = Date.now()): string {
   if (iso === null || iso === undefined || iso === '') return '';
   const time = typeof iso === 'number' ? iso : Date.parse(iso);
@@ -144,7 +146,7 @@ export async function copyTextToClipboard(text: string): Promise<void> {
   }
 }
 
-const SKIP_REASONS: Record<string, string> = {
+const SKIP_REASONS: Record<SkipReason, string> = {
   'possible-secret': 'Possible secret',
   'too-large': 'Too large',
   binary: 'Binary',
@@ -153,8 +155,8 @@ const SKIP_REASONS: Record<string, string> = {
   'over-budget': 'Over the diff size budget'
 };
 
-export function skipReasonText(reason: string): string {
-  return SKIP_REASONS[reason] ?? reason;
+export function skipReasonText(reason: SkipReason | string): string {
+  return (SKIP_REASONS as Record<string, string>)[reason] ?? reason;
 }
 
 export function errorText(error: unknown): string {

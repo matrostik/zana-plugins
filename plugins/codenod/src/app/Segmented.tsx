@@ -5,6 +5,15 @@ export interface SegmentedOption<T extends string> {
   label: string;
 }
 
+export function nextIndex(key: string, current: number, count: number): number | null {
+  const last = count - 1;
+  if (key === 'ArrowRight' || key === 'ArrowDown') return current === last ? 0 : current + 1;
+  if (key === 'ArrowLeft' || key === 'ArrowUp') return current === 0 ? last : current - 1;
+  if (key === 'Home') return 0;
+  if (key === 'End') return last;
+  return null;
+}
+
 /**
  * Pill-style single choice. `tabs` switches views (tablist/tab); `radio` picks a value (radiogroup/radio).
  * Arrow keys, Home, and End move the selection with a roving tab stop.
@@ -23,17 +32,7 @@ export function Segmented<T extends string>(props: {
   const current = Math.max(0, props.options.findIndex((option) => option.id === props.value));
 
   const move = (event: KeyboardEvent<HTMLButtonElement>) => {
-    const last = props.options.length - 1;
-    const next =
-      event.key === 'ArrowRight' || event.key === 'ArrowDown'
-        ? current === last ? 0 : current + 1
-        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
-          ? current === 0 ? last : current - 1
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? last
-              : null;
+    const next = nextIndex(event.key, current, props.options.length);
     if (next === null) return;
     event.preventDefault();
     props.onChange(props.options[next].id);

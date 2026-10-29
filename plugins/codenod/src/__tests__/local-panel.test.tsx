@@ -353,6 +353,40 @@ describe('LocalDetail', () => {
     await waitFor(() => expect(calls('deleteLocalReview')).toEqual([{ reviewId: 'rev-2' }]));
   });
 
+  it('does not send an empty selection as "fix everything" when every finding is deselected', async () => {
+    answer({ localDetail: localDetail(), localStatus: fresh(), localDiff: [] });
+    renderDetail();
+
+    const boxes = await screen.findAllByRole('checkbox', { name: /Select finding/ });
+    fireEvent.click(boxes[0]);
+    expect((screen.getByRole('button', { name: 'Fix with agent' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Deep Review in thread' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(calls('localFix')).toHaveLength(0);
+  });
+
+  it('keeps showing an in-flight review while an older one is selected', async () => {
+    const running = detail('running');
+    const runningReview = { ...running.review!, id: 'rev-3', prId: TARGET_ID, targetKind: 'local' as const };
+    const completedOld = localDetail({ review: { ...localDetail().review!, id: 'rev-1' } });
+    answer({
+      localDetail: (args: Record<string, unknown>) =>
+        args.reviewId === 'rev-1'
+          ? { ...completedOld, review: { ...completedOld.review!, id: 'rev-1' }, latestAttempt: runningReview, latestRuns: running.runs }
+          : { ...localDetail(), latestAttempt: runningReview, latestRuns: running.runs },
+      localStatus: fresh(),
+      localDiff: []
+    });
+    renderDetail();
+
+    const history = await screen.findByText('History (2)').then((el) => el.closest('details')!);
+    fireEvent.click(within(history).getByRole('button', { name: 'View' }));
+    await waitFor(() => expect(calls('localDetail').at(-1)).toEqual({ targetId: TARGET_ID, reviewId: 'rev-1' }));
+
+    expect(await screen.findByText(/Review running · 1\/3 model\(s\) done/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancel review' })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Review changes' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('shows progress with a cancel action while a review runs', async () => {
     const running = detail('running');
     answer({ localDetail: localDetail({ review: { ...running.review!, id: 'rev-2', prId: TARGET_ID, targetKind: 'local' }, runs: running.runs, findings: [] }), cancelReview: { cancelled: true } });

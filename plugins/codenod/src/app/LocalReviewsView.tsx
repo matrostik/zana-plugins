@@ -67,7 +67,9 @@ export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]
       .catch((cause) => setError(errorText(cause)));
   }, [rpc]);
 
-  useEffect(load, [load, props.reloadToken]);
+  useEffect(() => {
+    load();
+  }, [load, props.reloadToken]);
   useRealtime('codenod:changed', (payload) => {
     if (isLocalChange(payload)) load();
   });
