@@ -25,6 +25,10 @@ Like Git Tree, this plugin installs from pre-built artifacts committed alongside
 
 ## Changelog
 
+### 0.1.4
+
+- **Internal**: The review pipeline now runs against a generic review target, with pull requests as the first target. No user-visible change; this prepares for reviewing local changes without a pull request.
+
 ### 0.1.3
 
 - **Agents Board Review Coordinator**: Automated multi-model reviews spawn a single visible Coordinator Thread on Zana's Agents board (1 card per PR review instead of flooding with individual worker threads). Sub-model evaluation runs remain hidden, headless workers.
