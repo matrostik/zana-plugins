@@ -10,6 +10,14 @@ export type ReviewStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canc
 
 export type ReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
 
+export type ReviewTargetKind = 'pr' | 'local';
+
+/** Which local changes a local review covers. */
+export type LocalScope = 'uncommitted' | 'staged' | 'branch';
+
+/** Who started a local review; agent-started reviews stay off the Agents board and Inbox. */
+export type LocalReviewSource = 'ui' | 'cli' | 'agent';
+
 export interface RepoRef {
   host: string;
   owner: string;
@@ -83,6 +91,7 @@ export interface ReviewRow extends ReviewScores {
   hasRequirements: boolean;
   error: string | null;
   trigger: 'manual' | 'auto';
+  targetKind: ReviewTargetKind;
   createdAt: number;
   completedAt: number | null;
   coordinatorThreadId?: string | null;
@@ -141,4 +150,38 @@ export interface ChangedFile {
   additions: number;
   deletions: number;
   patch: string | null;
+}
+
+/** A checked-out branch location (main checkout or git worktree) inside a Zana project. */
+export interface LocalTargetRow {
+  id: string;
+  projectId: string;
+  worktreePath: string;
+  branch: string | null;
+  lastScope: LocalScope | null;
+  lastSeenAt: number;
+  createdAt: number;
+}
+
+export type SkipReason = 'possible-secret' | 'too-large' | 'binary' | 'too-many-files' | 'generated' | 'over-budget';
+
+export interface SkippedFile {
+  path: string;
+  reason: SkipReason;
+}
+
+export interface LocalSnapshotRow {
+  reviewId: string;
+  targetId: string;
+  scope: LocalScope;
+  baseRef: string | null;
+  baseSha: string;
+  headSha: string;
+  snapshotSha: string;
+  treeSha: string;
+  intent: string | null;
+  source: LocalReviewSource;
+  files: ChangedFile[];
+  skipped: SkippedFile[];
+  createdAt: number;
 }

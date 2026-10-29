@@ -13,7 +13,8 @@ Triage and AI-review GitHub pull requests in Zana Command Center using the AI pr
 - **Outdated Reviews**: An amber banner shows the reviewed and current commits, with a Rerun action. Inbox alerts are sent once per detected head commit and survive restarts; failed deliveries retry on a later sync. Previous completed findings remain visible during reruns and after failures or cancellation.
 - **Deep Review**: Open a visible Zana thread with the full pull request context to dig in interactively.
 - **Opt-in Auto-Review**: Per watched repository, review each new head commit automatically (drafts and your own pull requests are skipped).
-- **CLI and Agent Tools**: `zcc codenod` from the terminal, and the `codenod_list_prs`, `codenod_get_review`, and `codenod_review_pr` tools for agents.
+- **Local Reviews**: Review uncommitted, staged, or branch changes in any checkout of a Zana project before a pull request exists. Reviews read an immutable snapshot commit, so your files, index, and branches are never touched.
+- **CLI and Agent Tools**: `zcc codenod` from the terminal, and the `codenod_list_prs`, `codenod_get_review`, `codenod_review_pr`, and `codenod_review_local` tools for agents.
 
 ## GitHub sign-in
 
@@ -24,6 +25,16 @@ CodeNod uses, in order: `gh auth token --hostname <host>`, your Git credential h
 Like Git Tree, this plugin installs from pre-built artifacts committed alongside the source: `server.mjs` (referenced by `zcc.server`) and `app.js` (referenced by `zcc.app`). The TypeScript sources under `src/` plus `server.ts`/`app.tsx` are the source of truth; rebuild with `zcc plugin build` and re-commit the artifacts. Run the tests with `npm test`.
 
 ## Changelog
+
+### 0.2.0
+
+- **Local Reviews**: `zcc codenod review-local` reviews uncommitted (default), staged, or branch changes of the current checkout without a pull request. Each review captures an immutable snapshot commit under `refs/codenod/local/` using a temporary index; reviewers run in a worktree of that snapshot.
+- **Safe File Selection**: Untracked files are included unless gitignored. Secret-looking files, binaries, files over 256 KB, and new files beyond 200 are skipped and listed with a reason.
+- **Requirements Without a PR**: An optional intent note, branch commit messages, and the repository's spec file pattern feed the requirements score.
+- **Staleness**: Results are marked stale when the reviewed files change; starting the same review twice reuses the running one.
+- **Fix and Deep Review Back Ends**: Fix starts a visible thread on the live checkout with normal permission prompts and never commits; it asks first when files changed since the review. Deep Review runs in a worktree of the snapshot.
+- **Agent Pre-PR Review**: `codenod_review_local` reviews the calling thread's checkout quietly and returns blocking findings; the skill documents a 3-round limit and a pre-push hook recipe with `--fail-on`.
+- **Retention**: Keeps 10 reviews per checkout, removes reviews older than 30 days except the latest, and forgets removed worktrees.
 
 ### 0.1.4
 

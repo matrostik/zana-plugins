@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseArgs, parseModelList, registerCli, registerTools, type AvailableProvider, type CodenodApp } from '../server/cli-and-tools.ts';
+import { findingsAtOrAbove, parseArgs, parseModelList, registerCli, registerTools, type AvailableProvider, type CodenodApp, type LocalApp } from '../server/cli-and-tools.ts';
 import type { Store } from '../server/db.ts';
 import type { HostStatus } from '../server/sync.ts';
 import type { ModelChoice, PrRef, PullRequestRow, RepoRow, ReviewRow, ReviewRunRow } from '../server/types.ts';
-import { formatPrDetail, formatPrLine, getPrDetail, listPullRequests, sortFindings, type PrDetail, type PrListItem } from '../server/views.ts';
+import { formatLocalDetail, formatPrDetail, formatPrLine, getPrDetail, listPullRequests, sortFindings, type LocalDetail, type PrDetail, type PrListItem } from '../server/views.ts';
 import { EMPTY_SCORES, detail as detailFixture, finding } from './pr-fixtures.ts';
 
 type CliResult = { exitCode: number; stdout?: string; stderr?: string };
@@ -60,7 +60,7 @@ function createCli(overrides: Partial<CodenodApp> = {}) {
   const { app, calls } = createApp(overrides);
   let runCli: ((argv: string[], ctx: { cwd?: string }) => Promise<CliResult>) | null = null;
   registerCli({ register: (registration) => void (runCli = registration.run) }, app);
-  return { cli: (argv: string[]) => runCli!(argv, {}), calls };
+  return { cli: (argv: string[], ctx: { cwd?: string } = {}) => runCli!(argv, ctx), calls };
 }
 
 function createTools(overrides: Partial<CodenodApp> = {}) {
@@ -506,6 +506,177 @@ describe('codenod agent tools', () => {
       const { tool, ctx } = createTools();
       await expect(tool('codenod_review_pr')(null, ctx())).rejects.toThrow('Cannot parse pull request reference ""');
     });
+  });
+});
+
+const LOCATION = { targetId: 'local:abc', projectId: 'p', worktreePath: '/work/app' };
+
+function localDetail(overrides: Partial<LocalDetail> = {}): LocalDetail {
+  const completed = detailFixture('completed');
+  return {
+    target: { id: LOCATION.targetId, projectId: 'p', worktreePath: '/work/app', branch: 'feat/x', lastScope: 'uncommitted', lastSeenAt: 0, createdAt: 0 },
+    review: review({ id: 'rev-local', prId: LOCATION.targetId, targetKind: 'local' }),
+    snapshot: {
+      scope: 'uncommitted',
+      baseRef: null,
+      baseSha: 'a'.repeat(40),
+      headSha: 'a'.repeat(40),
+      snapshotSha: 'b'.repeat(40),
+      treeSha: 'c'.repeat(40),
+      intent: null,
+      source: 'cli',
+      files: [{ path: 'src/a.ts', status: 'modified', additions: 1, deletions: 0 }],
+      skipped: [{ path: '.env', reason: 'possible-secret' }]
+    },
+    runs: completed.runs,
+    findings: [finding({ severity: 'high' })],
+    history: [],
+    ...overrides
+  };
+}
+
+function createLocal(overrides: Partial<LocalApp> = {}) {
+  const calls: Array<{ method: string; args: unknown[] }> = [];
+  const record = (method: string, args: unknown[]) => void calls.push({ method, args });
+  const local: LocalApp = {
+    locationForPath: async (...args) => (record('locationForPath', args), LOCATION),
+    resolveLocation: async (...args) => (record('resolveLocation', args), LOCATION),
+    start: async (...args) => (record('start', args), review({ id: 'rev-local', status: 'queued', targetKind: 'local' })),
+    detail: (...args) => (record('detail', args), localDetail()),
+    status: async (reviewId) => ({ reviewId, stale: false, missing: false, reviewedTree: 'c', currentTree: 'c' }),
+    threadWorkspacePath: async (...args) => (record('threadWorkspacePath', args), '/work/app/src'),
+    ...overrides
+  };
+  return { local, calls };
+}
+
+describe('local review cli', () => {
+  it('starts a review of the working directory without waiting', async () => {
+    const { local, calls } = createLocal();
+    const { cli } = createCli({ local });
+
+    const result = await cli(['review-local', '--intent', 'Trim names'], { cwd: '/work/app/src' });
+
+    expect(result).toEqual({ exitCode: 0, stdout: 'Local review rev-local queued. Check it with: zcc codenod show-local' });
+    expect(calls).toEqual([
+      { method: 'locationForPath', args: ['/work/app/src'] },
+      { method: 'start', args: [{ projectId: 'p', worktreePath: '/work/app', scope: 'uncommitted', base: null, intent: 'Trim names', models: undefined, source: 'cli' }] }
+    ]);
+  });
+
+  it('exits 1 when --fail-on finds active findings at or above the threshold', async () => {
+    const { local } = createLocal();
+    const { cli } = createCli({ local });
+
+    const blocked = await cli(['review-local', '--path', '/work/app', '--scope', 'branch', '--base', 'origin/main', '--wait', '--fail-on', 'high']);
+    const passed = await cli(['review-local', '--path', '/work/app', '--wait', '--fail-on', 'critical']);
+
+    expect(blocked).toMatchObject({ exitCode: 1, stdout: expect.stringContaining('1 active finding(s) at or above high.') });
+    expect(blocked.stdout).toContain('Skipped: .env (possible secret)');
+    expect(passed).toMatchObject({ exitCode: 0, stdout: expect.stringContaining('0 active finding(s) at or above critical.') });
+  });
+
+  it('exits 1 when the review does not complete and reports staleness in JSON', async () => {
+    const failing = createCli({ local: createLocal().local, waitForReview: async () => review({ id: 'rev-local', status: 'failed', error: 'crashed' }) });
+    const stale = createCli({ local: createLocal({ status: async (reviewId) => ({ reviewId, stale: true, missing: false, reviewedTree: 'c', currentTree: 'd' }) }).local });
+
+    const failed = await failing.cli(['review-local', '--wait'], { cwd: '/work/app' });
+    const json = await stale.cli(['review-local', '--wait', '--json', '--fail-on', 'low'], { cwd: '/work/app' });
+
+    expect(failed.exitCode).toBe(1);
+    expect(json.exitCode).toBe(1);
+    expect(JSON.parse(json.stdout!)).toMatchObject({ stale: true, blockingCount: 1 });
+  });
+
+  it('validates scope, --fail-on, and the working directory', async () => {
+    const { cli } = createCli({ local: createLocal().local });
+
+    await expect(cli(['review-local'])).resolves.toMatchObject({ exitCode: 1, stderr: expect.stringContaining('pass --path') });
+    await expect(cli(['review-local', '--scope', 'all'], { cwd: '/w' })).resolves.toMatchObject({ stderr: expect.stringContaining('--scope must be one of') });
+    await expect(cli(['review-local', '--fail-on', 'nit'], { cwd: '/w' })).resolves.toMatchObject({ stderr: expect.stringContaining('--fail-on must be one of') });
+    await expect(cli(['review-local', '--fail-on', 'high'], { cwd: '/w' })).resolves.toMatchObject({ stderr: expect.stringContaining('--fail-on needs --wait') });
+    await expect(createCli().cli(['show-local'], { cwd: '/w' })).resolves.toMatchObject({ stderr: expect.stringContaining('not available') });
+  });
+
+  it('shows the latest local review of the working directory', async () => {
+    const { local } = createLocal();
+    const { cli } = createCli({ local });
+
+    const result = await cli(['show-local'], { cwd: '/work/app' });
+    const missing = await createCli({ local: createLocal({ detail: () => null }).local }).cli(['show-local'], { cwd: '/work/app' });
+
+    expect(result).toMatchObject({ exitCode: 0, stdout: expect.stringContaining('/work/app · feat/x') });
+    expect(missing).toMatchObject({ exitCode: 1, stderr: expect.stringContaining('No local reviews for /work/app') });
+  });
+});
+
+describe('codenod_review_local', () => {
+  function createLocalTools(localOverrides: Partial<LocalApp> = {}, appOverrides: Partial<CodenodApp> = {}) {
+    const { local, calls } = createLocal(localOverrides);
+    const tools = createTools({ local, ...appOverrides });
+    return { ...tools, calls };
+  }
+
+  it("reviews the calling thread's checkout quietly without waiting", async () => {
+    const { tool, ctx, calls } = createLocalTools();
+
+    const result = await tool('codenod_review_local')({}, ctx());
+
+    expect(result).toEqual({ reviewId: 'rev-local', status: 'queued' });
+    expect(calls).toEqual([
+      { method: 'threadWorkspacePath', args: ['t'] },
+      { method: 'locationForPath', args: ['/work/app/src', 'p'] },
+      { method: 'start', args: [{ projectId: 'p', worktreePath: '/work/app', scope: 'uncommitted', base: null, intent: null, models: undefined, source: 'agent' }] }
+    ]);
+  });
+
+  it('validates an explicit worktree path against the project', async () => {
+    const { tool, ctx, calls } = createLocalTools();
+
+    await tool('codenod_review_local')({ worktreePath: ' /work/other ', scope: 'staged' }, ctx());
+
+    expect(calls[0]).toEqual({ method: 'resolveLocation', args: ['p', '/work/other'] });
+    await expect(tool('codenod_review_local')({ scope: 'everything' }, ctx())).rejects.toThrow('scope must be one of');
+  });
+
+  it("fails clearly when the thread's checkout is unknown", async () => {
+    const { tool, ctx } = createLocalTools({ threadWorkspacePath: async () => null });
+    await expect(tool('codenod_review_local')({}, ctx())).rejects.toThrow("Could not find this thread's checkout");
+  });
+
+  it('returns stale instead of results when files changed during the review', async () => {
+    const { tool, ctx } = createLocalTools({ status: async (reviewId) => ({ reviewId, stale: true, missing: false, reviewedTree: 'c', currentTree: 'd' }) });
+
+    const result = await tool('codenod_review_local')({ wait: true }, ctx());
+
+    expect(result).toMatchObject({ reviewId: 'rev-new', status: 'stale' });
+  });
+
+  it('returns blocking findings with the remediation gate and failures as status', async () => {
+    const gated = createLocalTools();
+    const failed = createLocalTools({}, { waitForReview: async () => review({ id: 'rev-local', status: 'failed', error: 'crashed' }) });
+
+    const result = (await gated.tool('codenod_review_local')({ wait: true, remediationGate: true }, gated.ctx())) as { blockingCount: number };
+    const failure = await failed.tool('codenod_review_local')({ wait: true }, failed.ctx());
+
+    expect(result.blockingCount).toBe(1);
+    expect(failure).toEqual({ reviewId: 'rev-local', status: 'failed', error: 'crashed' });
+  });
+});
+
+describe('local views', () => {
+  it('filters findings by severity threshold and skips dismissed ones', () => {
+    const findings = [finding({ severity: 'critical' }), finding({ severity: 'medium' }), finding({ severity: 'high', dismissed: true })];
+    expect(findingsAtOrAbove(findings, 'high').map((f) => f.severity)).toEqual(['critical']);
+    expect(findingsAtOrAbove(findings, 'low').map((f) => f.severity)).toEqual(['critical', 'medium']);
+  });
+
+  it('formats an unreviewed location, a stale review, and a newer failed attempt', () => {
+    const text = formatLocalDetail(localDetail({ latestAttempt: review({ status: 'failed', error: 'crashed' }) }), { stale: true });
+
+    expect(formatLocalDetail(localDetail({ review: null, snapshot: null }))).toContain('Not reviewed yet');
+    expect(text).toContain('(stale: files changed since this review)');
+    expect(text).toContain('Latest rerun failed: crashed; showing previous completed results.');
   });
 });
 

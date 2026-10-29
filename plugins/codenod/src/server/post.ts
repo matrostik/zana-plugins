@@ -111,6 +111,7 @@ export function createPoster(deps: { store: Store; github: GitHubClient }) {
   async function postOnce(input: PostInput): Promise<PostResult> {
     const review = deps.store.getReview(input.reviewId);
     if (!review) throw new Error(`Review ${input.reviewId} not found`);
+    if (review.targetKind === 'local') throw new Error('Local reviews have no pull request and cannot be posted to GitHub');
     if (review.status !== 'completed') throw new Error('Only completed reviews can be posted');
     const ref = parsePrId(review.prId);
     const pull = await deps.github.getPull(ref);

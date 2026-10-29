@@ -1,5 +1,5 @@
 import type { Store } from './db.ts';
-import type { FindingRow, PrBucket, PullRequestRow, ReviewRow, ReviewRunRow } from './types.ts';
+import type { FindingRow, LocalScope, LocalTargetRow, PrBucket, PullRequestRow, ReviewRow, ReviewRunRow, SkippedFile } from './types.ts';
 
 export interface PrListItem extends PullRequestRow {
   outdated?: boolean;
@@ -73,6 +73,131 @@ export function getPrDetail(store: Store, prId: string): PrDetail | null {
     findings: review ? sortFindings(store.listFindings(review.id)) : [],
     posted: review ? store.listPostedReviews(review.id) : []
   };
+}
+
+export interface LocalSnapshotView {
+  scope: LocalScope;
+  baseRef: string | null;
+  baseSha: string;
+  headSha: string;
+  snapshotSha: string;
+  treeSha: string;
+  intent: string | null;
+  source: string;
+  files: Array<{ path: string; status: string; additions: number; deletions: number }>;
+  skipped: SkippedFile[];
+}
+
+export interface LocalHistoryItem {
+  id: string;
+  status: ReviewRow['status'];
+  riskScore: number | null;
+  createdAt: number;
+  scope: LocalScope | null;
+  baseRef: string | null;
+  findingCount: number;
+}
+
+export interface LocalDetail {
+  target: LocalTargetRow;
+  review: ReviewRow | null;
+  snapshot: LocalSnapshotView | null;
+  /** A newer attempt is separate from the completed results displayed above. */
+  latestAttempt?: ReviewRow;
+  latestRuns?: ReviewRunRow[];
+  runs: ReviewRunRow[];
+  findings: FindingRow[];
+  history: LocalHistoryItem[];
+}
+
+/** The latest completed local review of a target (or the one requested), with newer attempts and history. */
+export function getLocalDetail(store: Store, targetId: string, reviewId?: string): LocalDetail | null {
+  const target = store.getLocalTarget(targetId);
+  if (!target) return null;
+  const entries = store.listLocalReviews(targetId);
+  const latest = entries[0]?.review ?? null;
+  const requested = reviewId ? entries.find((entry) => entry.review.id === reviewId)?.review ?? null : null;
+  if (reviewId && !requested) return null;
+  const completed = !requested && latest && latest.status !== 'completed' ? entries.find((entry) => entry.review.status === 'completed')?.review ?? null : null;
+  const review = requested ?? completed ?? latest;
+  const snapshot = review ? store.getLocalSnapshot(review.id) : null;
+  const counts = store.countUndismissedFindings(entries.filter((entry) => entry.review.status === 'completed').map((entry) => entry.review.id));
+  return {
+    target,
+    ...(completed && latest ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
+    review,
+    snapshot: snapshot
+      ? {
+          scope: snapshot.scope,
+          baseRef: snapshot.baseRef,
+          baseSha: snapshot.baseSha,
+          headSha: snapshot.headSha,
+          snapshotSha: snapshot.snapshotSha,
+          treeSha: snapshot.treeSha,
+          intent: snapshot.intent,
+          source: snapshot.source,
+          files: snapshot.files.map(({ path, status, additions, deletions }) => ({ path, status, additions, deletions })),
+          skipped: snapshot.skipped
+        }
+      : null,
+    runs: review ? store.listRuns(review.id) : [],
+    findings: review ? sortFindings(store.listFindings(review.id)) : [],
+    history: entries.map(({ review: item, snapshot: itemSnapshot }) => ({
+      id: item.id,
+      status: item.status,
+      riskScore: item.riskScore,
+      createdAt: item.createdAt,
+      scope: itemSnapshot?.scope ?? null,
+      baseRef: itemSnapshot?.baseRef ?? null,
+      findingCount: counts.get(item.id) ?? 0
+    }))
+  };
+}
+
+const SKIP_REASON_LABELS: Record<SkippedFile['reason'], string> = {
+  'possible-secret': 'possible secret',
+  'too-large': 'too large',
+  binary: 'binary',
+  'too-many-files': 'too many new files',
+  generated: 'generated or lockfile',
+  'over-budget': 'over the diff size budget'
+};
+
+export function skipReasonLabel(reason: SkippedFile['reason']): string {
+  return SKIP_REASON_LABELS[reason] ?? reason;
+}
+
+export function formatLocalDetail(detail: LocalDetail, options: { stale?: boolean } = {}): string {
+  const { target, review, snapshot, runs, findings } = detail;
+  const lines = [`${target.worktreePath} · ${target.branch ?? 'detached HEAD'}`];
+  if (!review || !snapshot) {
+    lines.push('Not reviewed yet. Run: zcc codenod review-local');
+    return lines.join('\n');
+  }
+  lines.push(
+    `Scope ${snapshot.scope}${snapshot.baseRef ? ` vs ${snapshot.baseRef}` : ''} · snapshot ${snapshot.snapshotSha.slice(0, 12)} · ${snapshot.files.length} file(s) reviewed`,
+    '',
+    `Review ${review.status}${options.stale ? ' (stale: files changed since this review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`
+  );
+  if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing previous completed results.`);
+  if (review.error) lines.push(`Error: ${review.error}`);
+  if (snapshot.skipped.length > 0) {
+    lines.push(`Skipped: ${snapshot.skipped.slice(0, 20).map((file) => `${file.path} (${skipReasonLabel(file.reason)})`).join(', ')}${snapshot.skipped.length > 20 ? ', …' : ''}`);
+  }
+  if (review.status === 'completed') {
+    lines.push(
+      `Risk ${score(review.riskScore)} · Coverage ${score(review.coverageScore)} · Requirements ${review.hasRequirements ? score(review.requirementsScore) : 'N/A (no stated requirements)'} · Simplicity ${score(review.simplicityScore)} · Stability ${score(review.stabilityScore)}`,
+      '',
+      review.consensusSummary ?? review.summary ?? ''
+    );
+    const visible = findings.filter((finding) => !finding.dismissed);
+    lines.push('', `Findings (${visible.length}):`);
+    for (const finding of visible) {
+      lines.push(`- ${finding.id.slice(0, 8)} [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''}`, `  ${finding.description}`);
+      if (finding.suggestion) lines.push(`  Fix: ${finding.suggestion}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 function score(value: number | null, max = 10): string {
