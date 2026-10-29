@@ -122,9 +122,14 @@ export function getLocalDetail(store: Store, targetId: string, reviewId?: string
   const review = requested ?? completed ?? latest;
   const snapshot = review ? store.getLocalSnapshot(review.id) : null;
   const counts = store.countUndismissedFindings(entries.filter((entry) => entry.review.status === 'completed').map((entry) => entry.review.id));
+  const hasAttempt = Boolean(
+    latest &&
+      latest.id !== review?.id &&
+      (!requested ? latest.status !== 'completed' : latest.status === 'queued' || latest.status === 'running')
+  );
   return {
     target,
-    ...(completed && latest ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
+    ...(hasAttempt ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
     review,
     snapshot: snapshot
       ? {

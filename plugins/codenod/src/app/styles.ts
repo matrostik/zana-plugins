@@ -187,20 +187,26 @@ export const CODENOD_STYLES = `
 
 /* Settings Layout */
 .cn-settings { padding: 24px 28px; overflow: auto; flex: 1; max-width: 900px; width: 100%; margin: 0 auto; }
-.cn-settings-tabs {
-  display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 24px;
+.cn-segmented, .cn-settings-tabs {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px;
   background: color-mix(in srgb, var(--cn-card) 60%, var(--cn-bg));
   border: 1px solid var(--cn-border); border-radius: 8px;
 }
-.cn-settings-tabs .cn-tab {
+.cn-settings-tabs { margin-bottom: 24px; }
+.cn-segmented .cn-tab, .cn-settings-tabs .cn-tab {
   appearance: none; background: transparent; border: none; border-bottom: none;
   color: var(--cn-muted); padding: 7px 16px; font: inherit; font-size: 13px; font-weight: 500;
   border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
 }
+.cn-segmented .cn-tab:hover:not([aria-selected="true"]):not([aria-checked="true"]):not(:disabled),
 .cn-settings-tabs .cn-tab:hover:not([aria-selected="true"]) { color: var(--cn-text); background: var(--cn-hover); }
-.cn-settings-tabs .cn-tab[aria-selected="true"] {
+.cn-segmented .cn-tab[aria-selected="true"], .cn-segmented .cn-tab[aria-checked="true"], .cn-settings-tabs .cn-tab[aria-selected="true"] {
   color: var(--cn-text); background: var(--cn-card); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16); font-weight: 600;
 }
+.cn-segmented .cn-tab:disabled { opacity: 0.5; cursor: default; }
+.cn-segmented .cn-tab:focus-visible { outline: 2px solid var(--cn-accent); outline-offset: -2px; }
+.cn-mode-switch { padding: 2px; gap: 2px; }
+.cn-mode-switch .cn-tab { padding: 4px 12px; font-size: 12px; }
 .cn-settings-panel[hidden] { display: none; }
 
 .cn-section {
@@ -393,6 +399,26 @@ export const CODENOD_STYLES = `
 .cn-selected-model { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .cn-selected-model-name { display: inline-flex; flex: 1; min-width: 150px; flex-direction: column; gap: 2px; }
 
+/* Local changes */
+.cn-list-tools { padding: 8px; border-bottom: 1px solid var(--cn-border); }
+.cn-local-group {
+  margin: 0; padding: 10px 12px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--cn-muted);
+}
+.cn-local-rows { list-style: none; margin: 0; padding: 0; }
+.cn-local-form { margin-top: 12px; }
+.cn-field-wide { align-items: stretch; }
+.cn-field .cn-input { max-width: 420px; width: 100%; }
+.cn-local-summary-badge { margin-left: 8px; }
+.cn-skipped-list { list-style: none; margin: 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--cn-border); }
+.cn-skipped-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; overflow-wrap: anywhere; }
+.cn-local-history { margin: 0; border-width: 1px 0 0; border-radius: 0; overflow-x: auto; }
+.cn-local-history tr[aria-current="true"] td { background: var(--cn-selected); }
+.cn-visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 .cn-spinner {
   width: 12px; height: 12px; flex: none; border-radius: 50%;
   border: 2px solid var(--cn-border-strong); border-top-color: var(--cn-accent);
@@ -409,6 +435,11 @@ export const CODENOD_STYLES = `
   .cn-settings { padding: 14px 12px; }
   .cn-priority-row, .cn-priority-add-row { flex-direction: column; align-items: stretch; }
   .cn-priority-controls { justify-content: flex-end; }
+  .cn-toolbar { flex-wrap: wrap; }
+  .cn-field .cn-input, .cn-field .cn-select { max-width: none; }
+  .cn-local-form .cn-segmented { display: flex; }
+  .cn-local-form .cn-segmented .cn-tab { flex: 1 1 auto; }
+  .cn-actions { align-items: stretch; }
 }
 `;
 

@@ -41,6 +41,22 @@ CodeNod can review work in progress, even before you commit it. Your files, stag
 
 Prerequisites: the folder is a Zana project (or a `git worktree` of one), and at least one review model is picked in CodeNod settings.
 
+### From the CodeNod page
+
+1. Open **CodeNod** and choose **Local changes** in the switch at the top.
+2. Pick a checkout on the left. Checkouts are grouped by project and show how many files changed. Clean checkouts are hidden until you tick **Show clean**.
+3. Under **Review local changes**, choose a scope: **Uncommitted**, **Staged**, or **Branch vs base** (optionally type a base branch).
+4. Optionally describe the change under **Intent** so CodeNod can score requirements.
+5. Click **Review changes**. A green **Snapshot taken** pill appears, then the review progress.
+6. Read the scores and findings as for a pull request. **N files not reviewed** lists anything skipped and why.
+
+**Expected result**: the latest review for the checkout, with **Rerun**, **Deep Review in thread**, **Fix with agent**, and **Delete review**. Earlier reviews are under **History**; click **View** to open one.
+
+- If you edit files after the review, an amber **Working tree changed since this review** banner appears. Click **Review outdated — Rerun**.
+- **Fix with agent** opens a visible thread that edits your checkout with your usual permission prompts. It never commits. If files changed since the review, CodeNod asks before starting. Click **Re-review** when the agent finishes.
+
+### From the terminal
+
 1. Open a terminal in the project folder or one of its worktrees.
 2. Run `zcc codenod review-local --wait`. This reviews every change since your last commit, including new files.
    - Add `--scope staged` to review only what you staged with `git add`.

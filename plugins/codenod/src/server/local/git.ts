@@ -142,7 +142,7 @@ export async function listWorktrees(git: GitRunner, repoPath: string): Promise<W
       flush();
       continue;
     }
-    if (field.startsWith('worktree ')) current.path = field.slice('worktree '.length);
+    if (field.startsWith('worktree ')) current.path = resolve(field.slice('worktree '.length));
     else if (field.startsWith('HEAD ')) current.head = field.slice('HEAD '.length);
     else if (field.startsWith('branch ')) current.branch = field.slice('branch '.length).replace(/^refs\/heads\//, '');
     else if (field === 'bare' || field.startsWith('prunable')) current.skip = true;

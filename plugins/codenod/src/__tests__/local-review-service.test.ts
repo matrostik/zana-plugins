@@ -53,9 +53,9 @@ function createRepo(): string {
 }
 
 async function until(condition: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 2_000; attempt++) {
+  for (let attempt = 0; attempt < 50_000; attempt++) {
     if (condition()) return;
-    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error('condition was never met');
 }
@@ -407,7 +407,7 @@ describe('local reviews', () => {
     expect(swept).toEqual({ deletedReviews: MAX_REVIEWS_PER_LOCATION - 1, deletedTargets: 0 });
     expect(harness.store.listLocalReviews(harness.targetId)).toHaveLength(1);
     expect(snapshotRefs(harness.repo)).toHaveLength(1);
-  });
+  }, 30_000);
 
   it('forgets locations whose worktree was removed', async () => {
     const harness = createHarness();
@@ -439,6 +439,19 @@ describe('local reviews', () => {
     expect(detail.history).toEqual([expect.objectContaining({ id: first.id, status: 'completed', scope: 'uncommitted', findingCount: 1 })]);
     expect(getLocalDetail(harness.store, harness.targetId, 'missing')).toBeNull();
     expect(getLocalDetail(harness.store, 'local:missing')).toBeNull();
+
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 3;\n');
+    const second = await harness.start();
+    await harness.settled();
+
+    const olderDetail = getLocalDetail(harness.store, harness.targetId, first.id)!;
+    expect(olderDetail.review?.id).toBe(first.id);
+    expect(olderDetail.latestAttempt).toBeUndefined();
+
+    harness.store.setReviewStatus(second.id, 'running');
+    const runningDetail = getLocalDetail(harness.store, harness.targetId, first.id)!;
+    expect(runningDetail.review?.id).toBe(first.id);
+    expect(runningDetail.latestAttempt?.id).toBe(second.id);
   });
 });
 

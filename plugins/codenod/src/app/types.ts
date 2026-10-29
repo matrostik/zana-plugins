@@ -1,4 +1,5 @@
-import type { ModelChoice, RepoRow } from '../server/types.ts';
+import type { LocalLocationSummary } from '../server/local/service.ts';
+import type { LocalScope, ModelChoice, RepoRow } from '../server/types.ts';
 import type { CodenodSettings } from '../server/settings.ts';
 import type { HostStatus, ViewerProfile } from '../server/sync.ts';
 import type { PrListItem } from '../server/views.ts';
@@ -16,6 +17,12 @@ export interface Overview {
   activeReviews: number;
   hasModels: boolean;
   hasWatchedRepos: boolean;
+}
+
+export interface LocalOverview {
+  locations: LocalLocationSummary[];
+  scopes: LocalScope[];
+  hasModels: boolean;
 }
 
 export interface ConfigSnapshot {

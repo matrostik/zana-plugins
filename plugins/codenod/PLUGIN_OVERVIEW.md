@@ -26,6 +26,14 @@ Like Git Tree, this plugin installs from pre-built artifacts committed alongside
 
 ## Changelog
 
+### 0.2.1
+
+- **Local Changes Page**: A **Pull requests | Local changes** switch in the toolbar, remembered between visits. Checkouts are grouped by project with changed-file counts, latest risk, and a **Show clean** toggle.
+- **Review Form**: Pick Uncommitted, Staged, or Branch vs base, an optional base branch and intent note, and override models for one review.
+- **Local Results**: Scores, findings with code context from the snapshot, per-model runs, reviewed files, skipped files with reasons, and a History table. No GitHub posting controls.
+- **Stale and Fix Flow**: An amber banner with tree hashes when files changed since the review; Fix with agent asks first when stale, then offers Re-review. Deep Review and Delete review are on the action bar.
+- **Shared Segmented Control**: The settings tab pill is generalized for the mode switch and the scope selector, with arrow-key, Home, and End navigation.
+
 ### 0.2.0
 
 - **Local Reviews**: `zcc codenod review-local` reviews uncommitted (default), staged, or branch changes of the current checkout without a pull request. Each review captures an immutable snapshot commit under `refs/codenod/local/` using a temporary index; reviewers run in a worktree of that snapshot.
