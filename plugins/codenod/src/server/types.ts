@@ -95,6 +95,7 @@ export interface ReviewRow extends ReviewScores {
   createdAt: number;
   completedAt: number | null;
   coordinatorThreadId?: string | null;
+  promptSnapshot?: { name: string; instructions: string } | null;
 }
 
 export interface ReviewRunRow extends ReviewScores {

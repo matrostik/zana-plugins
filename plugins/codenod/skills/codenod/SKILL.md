@@ -16,10 +16,10 @@ Pull requests are referenced as a URL (`https://github.com/acme/api/pull/42`), `
 ```bash
 zcc codenod list [--tab needs-review|mine|watched] [--json]
 zcc codenod sync
-zcc codenod review <pr> [--models provider:model[@reasoning],...] [--wait] [--json]
+zcc codenod review <pr> [--models provider:model[@reasoning],...] [--prompt id|builtin] [--wait] [--json]
 zcc codenod show <pr> [--json]
 zcc codenod post <pr> --yes [--findings all|id,id] [--message "..."]
-zcc codenod review-local [--path dir] [--scope uncommitted|staged|branch] [--base origin/main] [--intent "..."] [--models ...] [--wait] [--fail-on critical|high|medium|low] [--json]
+zcc codenod review-local [--path dir] [--scope uncommitted|staged|branch] [--base origin/main] [--intent "..."] [--models ...] [--prompt id|builtin] [--wait] [--fail-on critical|high|medium|low] [--json]
 zcc codenod show-local [--path dir] [--json]
 zcc codenod repos [list | add <owner/repo> [--auto] [--spec "docs/**/*.md"] | remove <host/owner/repo>]
 zcc codenod models [--json]
@@ -33,6 +33,8 @@ Run `zcc codenod models` to see the `provider:model` ids accepted by `--models`.
 ## Local Reviews
 
 `review-local` reviews a checkout of a Zana project without a pull request. It defaults to the current directory, which must be a checked-out location (the main checkout or a `git worktree`) of a registered project.
+
+Use `zcc codenod prompts` or `codenod_list_prompts` to discover prompt IDs. Pass `--prompt <id>` or the agent tool's `promptId` to override the configured default; use `--prompt builtin` or `promptId: null` for built-in instructions only.
 
 - `--scope uncommitted` (default): every change since HEAD, including new files that are not gitignored.
 - `--scope staged`: only what `git add` staged.

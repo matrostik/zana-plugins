@@ -5,6 +5,7 @@ import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
 import { ModelPriorityPicker } from './ModelSearchPicker.tsx';
+import { PromptSelector, useReviewPrompts } from './PromptSelector.tsx';
 import type { AvailableProvider, Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'diff';
@@ -123,6 +124,7 @@ export function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(mo
 }
 
 export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defaultModels: ModelChoice[]; hasModels: boolean; onOpenSettings(): void }) {
+  const { prompts, error: promptsError, promptId, setPromptId } = useReviewPrompts(props.rpc);
   const { rpc, prId } = props;
   const [detail, setDetail] = useState<PrDetailData | null>(null);
   const [tab, setTab] = useState<DetailTab>('findings');
@@ -233,10 +235,10 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
       ? selectedFindings.map((f) => f.id)
       : undefined;
 
-  const startReview = (models?: ModelChoice[]) =>
+  const startReview = (models?: ModelChoice[], rerun = false) =>
     act('review', async () => {
       setPickerOpen(false);
-      await rpc.call('startReview', { prId: pr.id, ...(models ? { models } : {}) });
+      await rpc.call('startReview', { prId: pr.id, ...(models ? { models } : {}), ...(rerun && review?.promptSnapshot ? { rerunReviewId: review.id } : promptId !== undefined ? { promptId } : {}) });
       load();
     });
 
@@ -314,6 +316,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
         </header>
 
         {notice ? <p className={`cn-banner ${notice.kind === 'error' ? 'cn-banner-error' : ''}`} role="status">{notice.text}</p> : null}
+        <PromptSelector prompts={prompts} error={promptsError} value={promptId} onChange={setPromptId} />
+        {review?.promptSnapshot ? <details><summary>Review prompt: {review.promptSnapshot.name}</summary><pre className="cn-prompt-text">{review.promptSnapshot.instructions || 'Built-in prompt only'}</pre></details> : null}
         {!props.hasModels ? (
           <p className="cn-banner">
             No review model is selected yet.{' '}
@@ -448,6 +452,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             <button type="button" className={`cn-btn ${review?.stale ? 'cn-btn-warn' : 'cn-btn-primary'}`} disabled={busy !== null || !props.hasModels} onClick={() => void startReview()}>
               {review?.stale ? 'Review outdated — Rerun' : review ? 'Re-review' : 'Review'}
             </button>
+            {review?.promptSnapshot ? <button type="button" className="cn-btn" disabled={busy !== null || !props.hasModels} onClick={() => void startReview(undefined, true)}>Rerun with previous prompt</button> : null}
             <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => setPickerOpen((open) => !open)} aria-expanded={pickerOpen}>
               Models…
             </button>

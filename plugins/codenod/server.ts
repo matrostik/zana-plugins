@@ -12,7 +12,7 @@ import { createProjectMatcher } from './src/server/projects.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
 import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, spawnVisibleWithPriorityFallback, type ThreadsApi } from './src/server/review/runner.ts';
 import { fetchPullRequestHead } from './src/server/review/workspace.ts';
-import { CHANGED_EVENT, createReviewService, type ReviewConfig } from './src/server/review/service.ts';
+import { CHANGED_EVENT, createReviewService, parsePromptSelection, resolveRerunSnapshot, type ReviewConfig } from './src/server/review/service.ts';
 import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
 import { createSyncService } from './src/server/sync.ts';
 import type { ModelChoice, PrBucket, ReviewEvent, ReviewRow } from './src/server/types.ts';
@@ -95,6 +95,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     return {
       models: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)),
       customInstructions: values.customInstructions || null,
+      prompts: values.prompts,
+      defaultPromptId: values.defaultPromptId,
       fallbackProjectId: values.fallbackProjectId,
       workspaceMode: values.workspaceMode,
       maxConcurrent: values.maxConcurrentReviews,
@@ -270,6 +272,10 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     listPullRequests: (bucket) => listPullRequests(store, bucket),
     detail: ensureDetail,
     startReview: (ref, options) => reviews.startReview(ref, options),
+    listPrompts: async () => {
+      const settings = await codenodSettings.load();
+      return { prompts: settings.prompts.map(({ id, name }) => ({ id, name })), defaultPromptId: settings.defaultPromptId };
+    },
     waitForReview,
     post: (input) => poster.post(input),
     syncAll: runSync,
@@ -355,7 +361,9 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   zcc.rpc.method('startReview', async (args) => {
     const record = asRecord(args);
     const models = sanitizeModels(record.models);
-    return reviews.startReview(parsePrId(asString(record, 'prId')), { models: models.length > 0 ? models : undefined });
+    const id = asString(record, 'prId');
+    const promptSnapshot = resolveRerunSnapshot(store, asString(record, 'rerunReviewId'), id);
+    return reviews.startReview(parsePrId(id), { models: models.length > 0 ? models : undefined, promptId: parsePromptSelection(record.promptId), promptSnapshot });
   });
 
   zcc.rpc.method('cancelReview', (args) => ({ cancelled: reviews.cancelReview(asString(asRecord(args), 'reviewId')) }));
@@ -508,6 +516,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       scope,
       base: asString(record, 'base') || null,
       intent: asString(record, 'intent') || null,
+      promptId: parsePromptSelection(record.promptId),
+      rerunReviewId: asString(record, 'rerunReviewId') || undefined,
       models: models.length > 0 ? models : undefined,
       source: 'ui'
     });

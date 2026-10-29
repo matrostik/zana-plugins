@@ -1028,6 +1028,38 @@ describe('review service', () => {
     expect(store.getReview(afterCompletion.id)).toMatchObject({ status: 'completed', trigger: 'manual' });
   });
 
+  it('starts a separate review for explicit instructions when the old snapshot is unavailable', async () => {
+    const gate = createGate();
+    const { db, service, settled } = createServiceHarness({ respond: gate.respond });
+
+    const first = await service.startReview(prRef());
+    await until(() => gate.waiting() === 1);
+    expect((await service.startReview(prRef(), { trigger: 'auto' })).id).toBe(first.id);
+    // Reviews recorded before prompt snapshots existed have none.
+    db.prepare('UPDATE reviews SET prompt_name = NULL, prompt_instructions = NULL WHERE id = ?').run(first.id);
+    const explicit = await service.startReview(prRef(), { promptId: null });
+    expect(explicit.id).not.toBe(first.id);
+    gate.release();
+    await until(() => gate.waiting() > 0);
+    gate.release();
+    await settled();
+  });
+
+  it('reuses matching explicit instructions and starts a separate review for different ones', async () => {
+    const gate = createGate();
+    const { service, settled } = createServiceHarness({ respond: gate.respond });
+    const first = await service.startReview(prRef());
+    await until(() => gate.waiting() === 1);
+    const matching = await service.startReview(prRef(), { promptSnapshot: first.promptSnapshot! });
+    const different = await service.startReview(prRef(), { promptId: null });
+    expect(matching.id).toBe(first.id);
+    expect(different.id).not.toBe(first.id);
+    gate.release();
+    await until(() => gate.waiting() > 0);
+    gate.release();
+    await settled();
+  });
+
   it('runs no more reviews at once than the concurrency limit allows', async () => {
     const gate = createGate();
     const { service, store, spawned, settled } = createServiceHarness({ config: { maxConcurrent: 1 }, respond: gate.respond });
@@ -1287,6 +1319,12 @@ describe('store', () => {
     expect(store.getPullRequest(STORE_PR_ID)).toMatchObject({ title: 'Renamed', isDraft: true, buckets: ['needs-review'] });
     expect(store.getPullRequest('github.com/acme/api#2')).toMatchObject({ state: 'closed', buckets: [] });
     expect(store.getPullRequest('github.com/acme/api#404')).toBeNull();
+  });
+
+  it('persists the prompt snapshot with a review', () => {
+    const store = createTestStore();
+    const review = store.createReview({ prId: STORE_PR_ID, headSha: 'sha1', trigger: 'manual', promptSnapshot: { name: 'Security', instructions: 'Find vulnerabilities' } });
+    expect(store.getReview(review.id)?.promptSnapshot).toEqual({ name: 'Security', instructions: 'Find vulnerabilities' });
   });
 
   it('tracks review status, latest reviews per pull request, and interrupted work', () => {

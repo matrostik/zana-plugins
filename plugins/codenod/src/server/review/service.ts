@@ -15,12 +15,40 @@ export type WorkspaceMode = 'worktree' | 'project' | 'diff-only';
 export interface ReviewConfig {
   models: ModelChoice[];
   customInstructions: string | null;
+  prompts?: Array<{ id: string; name: string; instructions: string }>;
+  defaultPromptId?: string | null;
   fallbackProjectId: string | null;
   workspaceMode: WorkspaceMode;
   maxConcurrent: number;
   timeoutMs: number;
   archiveThreads: boolean;
   showReviewsOnAgentsBoard: boolean;
+}
+
+export function resolvePrompt(config: ReviewConfig, promptId?: string | null): { name: string; instructions: string } {
+  if (!config.prompts && promptId === undefined) return { name: 'My review instructions', instructions: config.customInstructions ?? '' };
+  const id = promptId === undefined ? config.defaultPromptId : promptId;
+  if (id == null) return { name: 'Built-in prompt only', instructions: '' };
+  const prompt = config.prompts?.find((item) => item.id === id);
+  if (!prompt) throw new Error(`Prompt ${id} was not found`);
+  return { name: prompt.name, instructions: prompt.instructions };
+}
+
+export function samePromptSnapshot(a: { name: string; instructions: string } | null | undefined, b: { name: string; instructions: string } | null | undefined): boolean {
+  return a != null && b != null && a.name === b.name && a.instructions === b.instructions;
+}
+
+/** Reads a prompt selection: a string ID, null for built-in only, or undefined for the default. */
+export function parsePromptSelection(value: unknown): string | null | undefined {
+  return value === null || typeof value === 'string' ? value : undefined;
+}
+
+/** The prompt snapshot of the review being rerun, or undefined when this is not a rerun. */
+export function resolveRerunSnapshot(store: Pick<Store, 'getReview'>, reviewId: string | null | undefined, targetId: string): { name: string; instructions: string } | undefined {
+  if (!reviewId) return undefined;
+  const previous = store.getReview(reviewId);
+  if (!previous || previous.prId !== targetId || !previous.promptSnapshot) throw new Error('Original review prompt is unavailable');
+  return previous.promptSnapshot;
 }
 
 export interface ReviewServiceDeps {
@@ -417,11 +445,11 @@ export function createReviewService(deps: ReviewServiceDeps) {
           deps.store.setReviewStatus(review.id, 'cancelled', `Pull request moved to ${gathered.pull.head.sha.slice(0, 12)} before this review started`);
           changed({ prId: pr.id, reviewId: review.id });
           const current = await deps.syncPullRequest(ref);
-          if (!signal.aborted && current.headSha !== review.headSha) await startReview(ref, { models: item.models, trigger: item.trigger });
+          if (!signal.aborted && current.headSha !== review.headSha) await startReview(ref, { models: item.models, trigger: item.trigger, promptSnapshot: review.promptSnapshot ?? undefined });
           return null;
         }
         const workspace = await resolveWorkspace(pr, review.headSha, config);
-        const promptContext = { ...gathered.prompt, customInstructions: config.customInstructions, hasWorkspace: workspace.hasWorkspace };
+        const promptContext = { ...gathered.prompt, customInstructions: review.promptSnapshot?.instructions ?? config.customInstructions, hasWorkspace: workspace.hasWorkspace };
         return { workspace, prompt: getFullReviewPrompt(promptContext), hasRequirements: hasRequirementsContext(promptContext) };
       },
       async afterComplete() {
@@ -529,12 +557,16 @@ export function createReviewService(deps: ReviewServiceDeps) {
   }
 
   /** Refreshes the PR from GitHub, records a queued review for its head commit, and schedules it. */
-  async function startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto' } = {}): Promise<ReviewRow> {
+  async function startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto'; promptId?: string | null; promptSnapshot?: { name: string; instructions: string } } = {}): Promise<ReviewRow> {
     const models = await resolveModels(options.models);
+    const promptSnapshot = options.promptSnapshot ?? resolvePrompt(await deps.config(), options.promptId);
     const pr = await deps.syncPullRequest(ref);
     const running = deps.store.latestReview(pr.id);
-    if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) return running;
-    const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: options.trigger ?? 'manual' });
+    if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) {
+      const explicit = options.promptSnapshot !== undefined || options.promptId !== undefined;
+      if (!explicit || samePromptSnapshot(running.promptSnapshot, promptSnapshot)) return running;
+    }
+    const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: options.trigger ?? 'manual', promptSnapshot });
     enqueueReview(review, models);
     return review;
   }

@@ -169,7 +169,9 @@ export const MIGRATIONS: readonly string[] = [
     skipped_json TEXT NOT NULL DEFAULT '[]',
     created_at INTEGER NOT NULL
   )`,
-  `CREATE INDEX IF NOT EXISTS local_snapshots_target ON local_snapshots(target_id, created_at)`
+  `CREATE INDEX IF NOT EXISTS local_snapshots_target ON local_snapshots(target_id, created_at)`,
+  `ALTER TABLE reviews ADD COLUMN prompt_name TEXT`,
+  `ALTER TABLE reviews ADD COLUMN prompt_instructions TEXT`
 ];
 
 type Row = Record<string, unknown>;
@@ -272,6 +274,7 @@ function toReview(row: Row): ReviewRow {
     createdAt: Number(row.created_at),
     completedAt: num(row.completed_at),
     coordinatorThreadId: str(row.coordinator_thread_id),
+    promptSnapshot: typeof row.prompt_name === 'string' && typeof row.prompt_instructions === 'string' ? { name: row.prompt_name, instructions: row.prompt_instructions } : null,
     ...scoresFromRow(row)
   };
 }
@@ -446,16 +449,18 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return closed;
     },
 
-    createReview(input: { prId: string; headSha: string; trigger: 'manual' | 'auto'; targetKind?: ReviewTargetKind }): ReviewRow {
+    createReview(input: { prId: string; headSha: string; trigger: 'manual' | 'auto'; targetKind?: ReviewTargetKind; promptSnapshot?: { name: string; instructions: string } }): ReviewRow {
       const id = newId();
-      db.prepare('INSERT INTO reviews (id, pr_id, head_sha, status, trigger, target_kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      db.prepare('INSERT INTO reviews (id, pr_id, head_sha, status, trigger, target_kind, created_at, prompt_name, prompt_instructions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
         id,
         input.prId,
         input.headSha,
         'queued',
         input.trigger,
         input.targetKind ?? 'pr',
-        now()
+        now(),
+        input.promptSnapshot?.name ?? null,
+        input.promptSnapshot?.instructions ?? null
       );
       return this.getReview(id)!;
     },

@@ -11,7 +11,7 @@ import {
 } from '../review/prompts.ts';
 import { globMatcher, MAX_SPEC_FILES } from '../review/requirements.ts';
 import { FULL_ACCESS_PERMISSION_MODE, spawnVisibleWithPriorityFallback, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from '../review/runner.ts';
-import type { ReviewConfig, ReviewService, ReviewTarget } from '../review/service.ts';
+import { resolvePrompt, resolveRerunSnapshot, samePromptSnapshot, type ReviewConfig, type ReviewService, type ReviewTarget } from '../review/service.ts';
 import type {
   ChangedFile,
   LocalReviewSource,
@@ -55,6 +55,8 @@ export interface StartLocalReviewInput {
   base?: string | null;
   intent?: string | null;
   models?: ModelChoice[];
+  promptId?: string | null;
+  rerunReviewId?: string;
   source: LocalReviewSource;
 }
 
@@ -141,8 +143,9 @@ export function createLocalReviews(deps: LocalReviewDeps) {
    */
   function sameFingerprint(
     snapshot: LocalSnapshotRow,
-    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string }
+    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string; promptSnapshot?: { name: string; instructions: string }; explicitPrompt?: boolean }
   ): boolean {
+    const savedPrompt = deps.store.getReview(snapshot.reviewId)?.promptSnapshot;
     return (
       snapshot.scope === current.scope &&
       snapshot.baseRef === current.baseRef &&
@@ -150,6 +153,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       snapshot.treeSha === current.treeSha &&
       (current.scope === 'branch' || snapshot.headSha === current.headSha) &&
       (current.intent === undefined || (snapshot.intent ?? null) === (current.intent ?? null)) &&
+      (current.promptSnapshot === undefined || (!current.explicitPrompt && savedPrompt == null) || samePromptSnapshot(savedPrompt, current.promptSnapshot)) &&
       (current.modelsKey === undefined || reviewModelsKey(snapshot.reviewId) === current.modelsKey)
     );
   }
@@ -184,6 +188,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
 
   async function startAt(location: LocalLocation, input: StartLocalReviewInput): Promise<ReviewRow> {
     const intent = input.intent?.trim() ? input.intent.trim().slice(0, MAX_INTENT_CHARS) : null;
+    const promptSnapshot = resolveRerunSnapshot(deps.store, input.rerunReviewId, location.target.id) ?? resolvePrompt(await deps.config(), input.promptId);
     const models = await deps.reviews().resolveModels(input.models);
     const path = location.worktree.path;
     const { headSha, base, baseSha } = await diffBase(path, input.scope, input.base?.trim() || null);
@@ -196,11 +201,13 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       headSha,
       treeSha: tree.treeSha,
       intent,
-      modelsKey: modelsKey(models)
+      modelsKey: modelsKey(models),
+      promptSnapshot,
+      explicitPrompt: input.promptId !== undefined || !!input.rerunReviewId
     });
     if (existing) return existing;
 
-    const review = deps.store.createReview({ prId: location.target.id, headSha: tree.headSha, trigger: 'manual', targetKind: 'local' });
+    const review = deps.store.createReview({ prId: location.target.id, headSha: tree.headSha, trigger: 'manual', targetKind: 'local', promptSnapshot });
     try {
       const snapshotSha = await commitSnapshot(deps.git, path, tree, input.scope, review.id);
       const prepared = prepareLocalFiles(await diffFiles(deps.git, path, baseSha, snapshotSha), tree.skipped);
@@ -288,7 +295,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
           files: snapshot.files,
           skippedFiles: snapshot.skipped.map((file) => file.path),
           specFiles: await specFiles(project.id, snapshot, target.worktreePath),
-          customInstructions: config.customInstructions,
+          customInstructions: current.promptSnapshot?.instructions ?? config.customInstructions,
           hasWorkspace: workspace.hasWorkspace
         };
         if (signal.aborted) {

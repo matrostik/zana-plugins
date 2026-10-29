@@ -38,6 +38,7 @@ function createApp(overrides: Partial<CodenodApp> = {}) {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const record = (method: string, args: unknown[]) => void calls.push({ method, args });
   const app: CodenodApp = {
+    listPrompts: async () => ({ prompts: [], defaultPromptId: null }),
     defaultHost: async () => 'github.com',
     listPullRequests: (...args) => (record('listPullRequests', args), []),
     detail: async (...args) => (record('detail', args), detailFixture('completed')),
@@ -90,6 +91,13 @@ describe('parseModelList', () => {
   });
 });
 
+it('lists prompt IDs for CLI selection', async () => {
+  const { cli } = createCli({ listPrompts: async () => ({ prompts: [{ id: 'security', name: 'Security' }], defaultPromptId: 'security' }) });
+  const result = await cli(['prompts']);
+  expect(result.stdout).toContain('security');
+  expect(result.stdout).toContain('Security');
+});
+
 describe('parseArgs', () => {
   it('separates positionals from inline, spaced, and boolean flags', () => {
     const parsed = parseArgs(['acme/api#4', '--tab=mine', '--models', 'a:b', '--wait', '--json']);
@@ -109,6 +117,10 @@ describe('parseArgs', () => {
 });
 
 describe('codenod cli', () => {
+  it('rejects a prompt flag without a value', async () => {
+    const { cli } = createCli();
+    expect(await cli(['review', 'acme/api#4', '--prompt'])).toMatchObject({ exitCode: 1, stderr: expect.stringContaining('--prompt needs an id or builtin') });
+  });
   it('prints usage with exit code 0 when no command is given', async () => {
     const { cli } = createCli();
     const result = await cli([]);
@@ -466,6 +478,11 @@ describe('codenod agent tools', () => {
   });
 
   describe('codenod_review_pr', () => {
+    it('passes a requested prompt to the review', async () => {
+      const { tool, ctx, calls } = createTools();
+      await tool('codenod_review_pr')({ pr: 'acme/api#4', promptId: 'security' }, ctx());
+      expect(calls[0].args[1]).toMatchObject({ promptId: 'security' });
+    });
     it('starts a review with configured models and returns its id and status', async () => {
       const { tool, ctx, calls } = createTools();
       const result = await tool('codenod_review_pr')({ pr: 'acme/api#4' }, ctx());
