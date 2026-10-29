@@ -90,6 +90,13 @@ describe('parseModelList', () => {
   });
 });
 
+it('lists prompt IDs for CLI selection', async () => {
+  const { cli } = createCli({ listPrompts: async () => ({ prompts: [{ id: 'security', name: 'Security' }], defaultPromptId: 'security' }) });
+  const result = await cli(['prompts']);
+  expect(result.stdout).toContain('security');
+  expect(result.stdout).toContain('Security');
+});
+
 describe('parseArgs', () => {
   it('separates positionals from inline, spaced, and boolean flags', () => {
     const parsed = parseArgs(['acme/api#4', '--tab=mine', '--models', 'a:b', '--wait', '--json']);
@@ -466,6 +473,11 @@ describe('codenod agent tools', () => {
   });
 
   describe('codenod_review_pr', () => {
+    it('passes a requested prompt to the review', async () => {
+      const { tool, ctx, calls } = createTools();
+      await tool('codenod_review_pr')({ pr: 'acme/api#4', promptId: 'security' }, ctx());
+      expect(calls[0].args[1]).toMatchObject({ promptId: 'security' });
+    });
     it('starts a review with configured models and returns its id and status', async () => {
       const { tool, ctx, calls } = createTools();
       const result = await tool('codenod_review_pr')({ pr: 'acme/api#4' }, ctx());

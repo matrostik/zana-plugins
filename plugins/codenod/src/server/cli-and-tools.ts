@@ -1,5 +1,6 @@
 import { parsePrRef, parseRepoRef, repoId } from './github/refs.ts';
 import { isLocalScope, type LocalReviewStatus, type StartLocalReviewInput } from './local/service.ts';
+import { parsePromptSelection } from './review/service.ts';
 import type { HostStatus, SyncResult } from './sync.ts';
 import type { FindingRow, ModelChoice, PrBucket, PrRef, RepoRow, ReviewEvent, ReviewRow, Severity } from './types.ts';
 import { errorMessage } from './util.ts';
@@ -25,12 +26,13 @@ export interface CodenodApp {
   defaultHost(): Promise<string>;
   listPullRequests(bucket?: PrBucket): PrListItem[];
   detail(ref: PrRef): Promise<PrDetail>;
-  startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto' }): Promise<ReviewRow>;
+  startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto'; promptId?: string | null }): Promise<ReviewRow>;
   waitForReview(reviewId: string, timeoutMs: number): Promise<ReviewRow>;
   post(input: { reviewId: string; findingIds: string[]; event: ReviewEvent; body?: string }): Promise<{ url: string | null; commentCount: number; publishedCount: number }>;
   syncAll(): Promise<SyncResult>;
   hostStatuses(): Promise<HostStatus[]>;
   configuredModels(): Promise<ModelChoice[]>;
+  listPrompts?(): Promise<{ prompts: Array<{ id: string; name: string }>; defaultPromptId: string | null }>;
   availableModels(): Promise<AvailableProvider[]>;
   listRepos(): RepoRow[];
   addRepo(input: { host: string; owner: string; name: string; autoReview?: boolean; specGlob?: string | null }): RepoRow;
@@ -180,6 +182,7 @@ async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?:
   if (failOn && !wait) throw new Error('--fail-on needs --wait');
   const { local, path, location } = await cliLocalLocation(app, args, ctx);
   const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
+  const prompt = flagString(args, 'prompt');
   let review = await local.start({
     projectId: location.projectId,
     worktreePath: location.worktreePath,
@@ -187,6 +190,7 @@ async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?:
     base: flagString(args, 'base') ?? null,
     intent: flagString(args, 'intent') ?? null,
     models,
+    ...(prompt !== undefined ? { promptId: prompt === 'builtin' ? null : prompt } : {}),
     source: 'cli'
   });
   if (!wait) {
@@ -238,17 +242,18 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
     commands: [
       { name: 'list', summary: 'List pull requests in the CodeNod inbox', usage: 'zcc codenod list [--tab needs-review|mine|watched] [--json]' },
       { name: 'sync', summary: 'Sync pull requests from GitHub now', usage: 'zcc codenod sync' },
-      { name: 'review', summary: 'Start an AI review of a pull request', usage: 'zcc codenod review <pr> [--models provider:model,...] [--wait] [--json]' },
+      { name: 'review', summary: 'Start an AI review of a pull request', usage: 'zcc codenod review <pr> [--models provider:model,...] [--prompt id|builtin] [--wait] [--json]' },
       { name: 'show', summary: 'Show the latest review of a pull request', usage: 'zcc codenod show <pr> [--json]' },
       { name: 'post', summary: 'Post review findings to GitHub as comments', usage: 'zcc codenod post <pr> --yes [--findings all|id,id] [--message "..."]' },
       {
         name: 'review-local',
         summary: 'AI-review local changes (uncommitted, staged, or branch) without a pull request',
-        usage: 'zcc codenod review-local [--path dir] [--scope uncommitted|staged|branch] [--base ref] [--intent "..."] [--models ...] [--wait] [--fail-on high] [--json]'
+        usage: 'zcc codenod review-local [--path dir] [--scope uncommitted|staged|branch] [--base ref] [--intent "..."] [--models ...] [--prompt id|builtin] [--wait] [--fail-on high] [--json]'
       },
       { name: 'show-local', summary: 'Show the latest local review of a checkout', usage: 'zcc codenod show-local [--path dir] [--json]' },
       { name: 'repos', summary: 'List, add, or remove watched repositories', usage: 'zcc codenod repos [list|add|remove]' },
       { name: 'models', summary: 'Show configured review models and available provider:model ids', usage: 'zcc codenod models [--json]' },
+      { name: 'prompts', summary: 'List review prompt IDs', usage: 'zcc codenod prompts [--json]' },
       { name: 'auth', summary: 'Show GitHub sign-in status per host', usage: 'zcc codenod auth' }
     ],
     async run(argv, ctx) {
@@ -262,6 +267,10 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
           return parsePrRef(raw, await app.defaultHost());
         };
         switch (command) {
+          case 'prompts': {
+            const library = await app.listPrompts?.() ?? { prompts: [], defaultPromptId: null };
+            return asJson ? json(library) : { exitCode: 0, stdout: ['builtin — Built-in prompt only', ...library.prompts.map((prompt) => `${prompt.id} — ${prompt.name}${prompt.id === library.defaultPromptId ? ' [default]' : ''}`)].join('\n') };
+          }
           case 'list': {
             const tab = flagString(args, 'tab') as PrBucket | undefined;
             if (tab && !BUCKETS.includes(tab)) throw new Error(`--tab must be one of ${BUCKETS.join(', ')}`);
@@ -277,7 +286,8 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
           case 'review': {
             const ref = await prArg();
             const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
-            let review = await app.startReview(ref, { models });
+            const prompt = flagString(args, 'prompt');
+            let review = await app.startReview(ref, { models, ...(prompt !== undefined ? { promptId: prompt === 'builtin' ? null : prompt } : {}) });
             if (args.flags.has('wait')) review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
             if (asJson && !args.flags.has('wait')) return json(review);
             if (asJson) return { ...json(await app.detail(ref)), exitCode: review.status === 'completed' ? 0 : 1 };
@@ -381,6 +391,12 @@ export function remediationGateStaleReason(input: {
 }
 
 export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
+  agents.registerTool({
+    name: 'codenod_list_prompts',
+    description: 'List available review prompt IDs and the configured default.',
+    parameters: { type: 'object', properties: {} },
+    execute: async () => await app.listPrompts?.() ?? { prompts: [], defaultPromptId: null }
+  });
   const prParameter = { type: 'string', description: 'Pull request URL, host/owner/repo#123, or owner/repo#123' };
 
   agents.registerTool({
@@ -423,6 +439,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
       type: 'object',
       properties: {
         pr: prParameter,
+        promptId: { type: ['string', 'null'], description: 'Prompt ID from CodeNod settings; null selects built-in prompt only' },
         models: {
           type: 'array',
           description: 'Optional models to use instead of the configured defaults',
@@ -438,10 +455,10 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
       required: ['pr']
     },
     execute: async (input, ctx) => {
-      const record = (input ?? {}) as { pr?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
+      const record = (input ?? {}) as { pr?: unknown; models?: unknown; promptId?: unknown; wait?: unknown; remediationGate?: unknown };
       const ref = parsePrRef(String(record.pr ?? ''), await app.defaultHost());
       const models = toolModels(record.models);
-      const review = await app.startReview(ref, { models });
+      const review = await app.startReview(ref, { models, promptId: parsePromptSelection(record.promptId) });
       if (record.wait !== true || ctx.signal.aborted) {
         return { reviewId: review.id, status: review.status, ...(review.coordinatorThreadId ? { coordinatorThreadId: review.coordinatorThreadId } : {}) };
       }
@@ -484,6 +501,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
         scope: { type: 'string', enum: ['uncommitted', 'staged', 'branch'], description: 'uncommitted (default): working tree vs HEAD incl. new files; staged: index vs HEAD; branch: everything since the base branch' },
         base: { type: 'string', description: 'Base branch for scope "branch" (defaults to the remote default branch)' },
         intent: { type: 'string', description: 'What the change is meant to do; used to score requirements' },
+        promptId: { type: ['string', 'null'], description: 'Prompt ID from CodeNod settings; null selects built-in prompt only' },
         worktreePath: { type: 'string', description: "Another checked-out location of this thread's project to review instead of this thread's checkout" },
         models: {
           type: 'array',
@@ -500,7 +518,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
     },
     execute: async (input, ctx) => {
       const local = requireLocal(app);
-      const record = (input ?? {}) as { scope?: unknown; base?: unknown; intent?: unknown; worktreePath?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
+      const record = (input ?? {}) as { scope?: unknown; base?: unknown; intent?: unknown; worktreePath?: unknown; promptId?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
       const scope = record.scope === undefined ? 'uncommitted' : String(record.scope);
       if (!isLocalScope(scope)) throw new Error('scope must be one of uncommitted, staged, branch');
       let location: LocalLocationRef;
@@ -519,6 +537,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
         base: typeof record.base === 'string' ? record.base : null,
         intent: typeof record.intent === 'string' ? record.intent : null,
         models,
+        promptId: parsePromptSelection(record.promptId),
         source: 'agent'
       });
       if (record.wait !== true || ctx.signal.aborted) return { reviewId: review.id, status: review.status };

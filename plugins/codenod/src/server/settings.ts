@@ -5,6 +5,8 @@ import { asOptionalNumber, asRecord } from './util.ts';
 
 export interface CodenodSettings {
   customInstructions: string;
+  prompts: ReviewPrompt[];
+  defaultPromptId: string | null;
   /** GitHub Enterprise hosts; github.com is always included and never stored. */
   githubHosts: string[];
   autoSyncEnabled: boolean;
@@ -16,6 +18,8 @@ export interface CodenodSettings {
   archiveReviewThreads: boolean;
   showReviewsOnAgentsBoard: boolean;
 }
+
+export interface ReviewPrompt { id: string; name: string; instructions: string }
 
 type HostSettingValues = Record<string, string | number | boolean | undefined>;
 
@@ -33,9 +37,13 @@ export const SETTING_LIMITS = {
   reviewTimeoutMinutes: { min: 3, max: 90 }
 } as const;
 const MAX_HOSTS = 20;
+/** IDs that prompt selectors and the CLI use as control values. */
+const RESERVED_PROMPT_IDS: string[] = ['builtin', '__default', '__builtin'];
 
 export const DEFAULT_SETTINGS: CodenodSettings = {
   customInstructions: DEFAULT_REVIEW_INSTRUCTIONS,
+  prompts: [{ id: 'legacy', name: 'My review instructions', instructions: DEFAULT_REVIEW_INSTRUCTIONS }],
+  defaultPromptId: 'legacy',
   githubHosts: [],
   autoSyncEnabled: true,
   syncIntervalMinutes: 5,
@@ -67,13 +75,43 @@ export function sanitizeHosts(value: unknown): string[] {
 /** Applies a partial update on top of `base`, ignoring unknown keys and clamping numbers. */
 export function applySettingsPatch(base: CodenodSettings, patch: unknown): CodenodSettings {
   const record = asRecord(patch);
-  const next = { ...base, githubHosts: [...base.githubHosts] };
+  const next = { ...base, githubHosts: [...base.githubHosts], prompts: base.prompts.map((prompt) => ({ ...prompt })) };
   if (typeof record.customInstructions === 'string') {
     if (record.customInstructions.length > MAX_CUSTOM_INSTRUCTIONS_CHARS) {
       throw new Error(`Custom review instructions are limited to ${MAX_CUSTOM_INSTRUCTIONS_CHARS} characters`);
     }
     next.customInstructions = record.customInstructions.trim();
+    if (!('prompts' in record)) {
+      const selected = next.prompts.find((prompt) => prompt.id === next.defaultPromptId) ?? next.prompts.find((prompt) => prompt.id === 'legacy');
+      if (selected) {
+        selected.instructions = next.customInstructions;
+        next.defaultPromptId = selected.id;
+      }
+      else {
+        next.prompts.push({ id: 'legacy', name: 'My review instructions', instructions: next.customInstructions });
+        next.defaultPromptId = 'legacy';
+      }
+    }
   }
+  if ('prompts' in record) {
+    if (!Array.isArray(record.prompts)) throw new Error('Prompts must be an array');
+    const ids = new Set<string>();
+    next.prompts = record.prompts.map((item: unknown) => {
+      const prompt = asRecord(item);
+      if (typeof prompt.id !== 'string' || !prompt.id.trim() || ids.has(prompt.id)) throw new Error('Each prompt needs a unique ID');
+      if (RESERVED_PROMPT_IDS.includes(prompt.id)) throw new Error(`Prompt ID ${prompt.id} is reserved`);
+      if (typeof prompt.name !== 'string' || !prompt.name.trim()) throw new Error('Each prompt needs a name');
+      if (typeof prompt.instructions !== 'string' || prompt.instructions.length > MAX_CUSTOM_INSTRUCTIONS_CHARS) throw new Error(`Custom review instructions are limited to ${MAX_CUSTOM_INSTRUCTIONS_CHARS} characters`);
+      ids.add(prompt.id);
+      return { id: prompt.id, name: prompt.name.trim(), instructions: prompt.instructions.trim() };
+    });
+  }
+  if ('defaultPromptId' in record) {
+    if (record.defaultPromptId !== null && typeof record.defaultPromptId !== 'string') throw new Error('Invalid default prompt');
+    next.defaultPromptId = record.defaultPromptId as string | null;
+  }
+  if (next.defaultPromptId !== null && !next.prompts.some((prompt) => prompt.id === next.defaultPromptId)) throw new Error('Default prompt does not exist');
+  next.customInstructions = next.prompts.find((prompt) => prompt.id === next.defaultPromptId)?.instructions ?? '';
   if ('githubHosts' in record) next.githubHosts = sanitizeHosts(record.githubHosts);
   if (typeof record.autoSyncEnabled === 'boolean') next.autoSyncEnabled = record.autoSyncEnabled;
   for (const key of Object.keys(SETTING_LIMITS) as Array<keyof typeof SETTING_LIMITS>) {

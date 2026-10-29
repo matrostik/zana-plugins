@@ -3,10 +3,18 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it } from 'vitest';
 import { groupReposByOrganization } from '../app/ReposTab.tsx';
 import { SettingsView } from '../app/SettingsView.tsx';
+import { PromptSelector } from '../app/PromptSelector.tsx';
 import type { ConfigSnapshot } from '../app/types.ts';
 import type { RepoRow } from '../server/types.ts';
 
 afterEach(cleanup);
+
+it('offers prompt overrides without changing the default', () => {
+  let selected: string | null | undefined;
+  render(<PromptSelector prompts={[{ id: 'security', name: 'Security', instructions: 'Check security' }]} value={undefined} onChange={(value) => { selected = value; }} />);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Review prompt' }), { target: { value: 'security' } });
+  expect(selected).toBe('security');
+});
 
 const DEFAULT_INSTRUCTIONS = '- Skip nitpicks.';
 
@@ -25,6 +33,8 @@ function snapshot(overrides: Partial<ConfigSnapshot['settings']> = {}): ConfigSn
     profiles: [{ host: 'github.com', login: 'me', name: 'Mona Lisa', email: null, avatarUrl: null }],
     settings: {
       customInstructions: 'Be strict',
+      prompts: [{ id: 'legacy', name: 'My review instructions', instructions: 'Be strict' }],
+      defaultPromptId: 'legacy',
       githubHosts: ['ghe.example.com'],
       syncIntervalMinutes: 5,
       maxConcurrentReviews: 2,
@@ -93,6 +103,25 @@ describe('SettingsView tabs', () => {
 });
 
 describe('Profile tab', () => {
+  it('creates a named prompt without replacing the existing prompt', async () => {
+    const { settingsCalls } = await renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'New prompt' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prompt name' }), { target: { value: 'Security' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom review instructions' }), { target: { value: 'Find vulnerabilities' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save instructions' }));
+    await waitFor(() => expect(settingsCalls()).toContainEqual(expect.objectContaining({ prompts: expect.arrayContaining([
+      expect.objectContaining({ name: 'My review instructions', instructions: 'Be strict' }),
+      expect.objectContaining({ name: 'Security', instructions: 'Find vulnerabilities' })
+    ]) })));
+  });
+  it('restores the selected prompt when creation is cancelled', async () => {
+    await renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'New prompt' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect((screen.getByRole('textbox', { name: 'Prompt name' }) as HTMLInputElement).value).toBe('My review instructions');
+    expect((screen.getByRole('textbox', { name: 'Custom review instructions' }) as HTMLTextAreaElement).value).toBe('Be strict');
+    expect((screen.getByRole('button', { name: 'New prompt' }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it('shows GitHub identity per host', async () => {
     await renderView();
     expect(screen.getByText('Mona Lisa')).toBeTruthy();
@@ -109,7 +138,7 @@ describe('Profile tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
     expect(box.value).toBe(DEFAULT_INSTRUCTIONS);
     fireEvent.click(save);
-    await waitFor(() => expect(settingsCalls()).toEqual([{ customInstructions: DEFAULT_INSTRUCTIONS }]));
+    await waitFor(() => expect(settingsCalls()).toEqual([{ prompts: [{ id: 'legacy', name: 'My review instructions', instructions: DEFAULT_INSTRUCTIONS }] }]));
     expect(await screen.findByRole('status')).toBeTruthy();
 
     fireEvent.change(box, { target: { value: 'x'.repeat(51) } });

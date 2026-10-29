@@ -238,6 +238,37 @@ describe('post payload', () => {
 });
 
 describe('settings store', () => {
+  it('migrates existing instructions into the default prompt library', async () => {
+    const settings = createSettingsStore({
+      kv: {
+        get: async <T>(key: string) => (key === 'settingsMigrated' ? true : { customInstructions: 'Review security' }) as T,
+        set: async () => {}
+      },
+      readHostValues: async () => ({})
+    });
+    const loaded = await settings.load();
+    expect(loaded).toMatchObject({
+      prompts: [{ id: 'legacy', name: 'My review instructions', instructions: 'Review security' }],
+      defaultPromptId: 'legacy'
+    });
+  });
+  it('rejects deleting the selected default without choosing a replacement', async () => {
+    const settings = createSettingsStore({
+      kv: { get: async <T>(key: string) => (key === 'settingsMigrated' ? true : {}) as T, set: async () => {} },
+      readHostValues: async () => ({})
+    });
+    await expect(settings.update({ prompts: [] })).rejects.toThrow('Default prompt does not exist');
+    await expect(settings.update({ prompts: [], defaultPromptId: null })).resolves.toMatchObject({ customInstructions: '', defaultPromptId: null });
+  });
+  it('rejects prompt IDs reserved for selector and CLI control values', async () => {
+    const settings = createSettingsStore({
+      kv: { get: async <T>(key: string) => (key === 'settingsMigrated' ? true : {}) as T, set: async () => {} },
+      readHostValues: async () => ({})
+    });
+    for (const id of ['builtin', '__default', '__builtin']) {
+      await expect(settings.update({ prompts: [{ id, name: 'X', instructions: '' }], defaultPromptId: null })).rejects.toThrow(`Prompt ID ${id} is reserved`);
+    }
+  });
   it('applies concurrent updates on top of each other', async () => {
     let saved: unknown = {};
     const settings = createSettingsStore({

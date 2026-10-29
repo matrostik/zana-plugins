@@ -1028,6 +1028,21 @@ describe('review service', () => {
     expect(store.getReview(afterCompletion.id)).toMatchObject({ status: 'completed', trigger: 'manual' });
   });
 
+  it('reuses an in-flight review unless the caller explicitly asks for different instructions', async () => {
+    const gate = createGate();
+    const { db, service, settled } = createServiceHarness({ respond: gate.respond });
+
+    const first = await service.startReview(prRef());
+    await until(() => gate.waiting() === 1);
+    await expect(service.startReview(prRef(), { promptId: null })).rejects.toThrow(/different instructions/);
+    expect((await service.startReview(prRef(), { trigger: 'auto' })).id).toBe(first.id);
+    // Reviews recorded before prompt snapshots existed have none.
+    db.prepare('UPDATE reviews SET prompt_name = NULL, prompt_instructions = NULL WHERE id = ?').run(first.id);
+    expect((await service.startReview(prRef(), { promptId: null })).id).toBe(first.id);
+    gate.release();
+    await settled();
+  });
+
   it('runs no more reviews at once than the concurrency limit allows', async () => {
     const gate = createGate();
     const { service, store, spawned, settled } = createServiceHarness({ config: { maxConcurrent: 1 }, respond: gate.respond });
@@ -1287,6 +1302,12 @@ describe('store', () => {
     expect(store.getPullRequest(STORE_PR_ID)).toMatchObject({ title: 'Renamed', isDraft: true, buckets: ['needs-review'] });
     expect(store.getPullRequest('github.com/acme/api#2')).toMatchObject({ state: 'closed', buckets: [] });
     expect(store.getPullRequest('github.com/acme/api#404')).toBeNull();
+  });
+
+  it('persists the prompt snapshot with a review', () => {
+    const store = createTestStore();
+    const review = store.createReview({ prId: STORE_PR_ID, headSha: 'sha1', trigger: 'manual', promptSnapshot: { name: 'Security', instructions: 'Find vulnerabilities' } });
+    expect(store.getReview(review.id)?.promptSnapshot).toEqual({ name: 'Security', instructions: 'Find vulnerabilities' });
   });
 
   it('tracks review status, latest reviews per pull request, and interrupted work', () => {

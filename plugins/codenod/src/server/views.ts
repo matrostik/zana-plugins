@@ -186,6 +186,7 @@ export function formatLocalDetail(detail: LocalDetail, options: { stale?: boolea
     `Review ${review.status}${options.stale ? ' (stale: files changed since this review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`
   );
   if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing previous completed results.`);
+  if (review.promptSnapshot) lines.push(`Review prompt: ${review.promptSnapshot.name}`);
   if (review.error) lines.push(`Error: ${review.error}`);
   if (snapshot.skipped.length > 0) {
     lines.push(`Skipped: ${snapshot.skipped.slice(0, 20).map((file) => `${file.path} (${skipReasonLabel(file.reason)})`).join(', ')}${snapshot.skipped.length > 20 ? ', …' : ''}`);
@@ -228,6 +229,7 @@ export function formatPrDetail(detail: PrDetail): string {
     return lines.join('\n');
   }
   lines.push(`Review ${review.status}${review.stale ? ' (stale: new commits since review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`);
+  if (review.promptSnapshot) lines.push(`Review prompt: ${review.promptSnapshot.name}`);
   if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status} at ${detail.latestAttempt.headSha}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing previous completed results.`);
   if (review.error) lines.push(`Error: ${review.error}`);
   if (review.status === 'completed') {

@@ -52,28 +52,84 @@ function AccountsSection({ config }: { config: ConfigSnapshot }) {
 }
 
 function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnapshot; onChanged(): void }) {
-  const saved = config.settings.customInstructions;
+  const prompts = config.settings.prompts;
+  const [selectedId, setSelectedId] = useState<string | null>(config.settings.defaultPromptId ?? prompts[0]?.id ?? null);
+  const selected = prompts.find((prompt) => prompt.id === selectedId);
+  const saved = selected?.instructions ?? '';
   const [draft, setDraft] = useState(saved);
+  const [name, setName] = useState(selected?.name ?? '');
+  const [creating, setCreating] = useState(false);
   const action = useSettingsAction(onChanged);
 
   // Resync the draft only when the saved value actually changes, so a config
   // reload that leaves it unchanged never clobbers an in-flight edit.
-  const lastSaved = useRef(saved);
+  const lastSaved = useRef(`${selectedId}:${saved}:${selected?.name ?? ''}`);
   useEffect(() => {
-    if (lastSaved.current === saved) return;
-    lastSaved.current = saved;
+    const key = `${selectedId}:${saved}:${selected?.name ?? ''}`;
+    if (lastSaved.current === key || creating) return;
+    lastSaved.current = key;
     setDraft(saved);
-  }, [saved]);
+    setName(selected?.name ?? '');
+  }, [saved, selectedId, selected?.name, creating]);
 
-  const isDirty = draft.trim() !== saved;
+  const isDirty = creating || draft.trim() !== saved || name.trim() !== (selected?.name ?? '');
   const maxChars = config.maxInstructionsChars;
   const isTooLong = draft.length > maxChars;
+  const defaultId = config.settings.defaultPromptId;
+
+  /** Switches the editor to a prompt and loads its saved name and instructions. */
+  function showPrompt(id: string | null) {
+    const prompt = prompts.find((item) => item.id === id);
+    setSelectedId(id);
+    setName(prompt?.name ?? '');
+    setDraft(prompt?.instructions ?? '');
+  }
+
+  function startCreating() {
+    setCreating(true);
+    setSelectedId(null);
+    setName('');
+    setDraft('');
+  }
+
+  function cancelCreating() {
+    setCreating(false);
+    showPrompt(defaultId ?? prompts[0]?.id ?? null);
+  }
+
+  function savePrompt() {
+    const id = creating ? crypto.randomUUID() : selectedId;
+    if (!id) return;
+    const entry = { id, name: name.trim(), instructions: draft.trim() };
+    const updated = creating ? [...prompts, entry] : prompts.map((prompt) => prompt.id === id ? entry : prompt);
+    void action.run(async () => { await rpc.call('setSettings', { prompts: updated }); setCreating(false); setSelectedId(id); });
+  }
+
+  function deleteSelected() {
+    if (!selected) return;
+    const remaining = prompts.filter((prompt) => prompt.id !== selected.id);
+    void action.run(async () => { await rpc.call('setSettings', { prompts: remaining }); setSelectedId(defaultId ?? remaining[0]?.id ?? null); });
+  }
 
   return (
     <section className="cn-section" aria-labelledby="cn-instructions-heading">
       <h3 id="cn-instructions-heading">Custom review instructions</h3>
-      <p className="cn-muted cn-small">Added to every review after CodeNod’s built-in prompt. Leave empty to use the built-in prompt only.</p>
+      <p className="cn-muted cn-small">Manage the instructions available for reviews and choose a default.</p>
       {action.error ? <p className="cn-banner cn-banner-error">{action.error}</p> : null}
+      <div className="cn-inline">
+        <label>Prompt <select aria-label="Prompt" value={creating ? '' : selectedId ?? ''} disabled={isDirty && !creating} onChange={(event) => { setCreating(false); setSelectedId(event.target.value || null); }}>
+          <option value="" disabled>Select a prompt</option>
+          {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
+        </select></label>
+        <button type="button" className="cn-btn" disabled={isDirty} onClick={startCreating}>New prompt</button>
+        {creating ? <button type="button" className="cn-btn" onClick={cancelCreating}>Cancel</button> : null}
+        {!creating && isDirty ? <button type="button" className="cn-btn" onClick={() => { setDraft(saved); setName(selected?.name ?? ''); }}>Discard changes</button> : null}
+      </div>
+      <label>Default prompt <select aria-label="Default prompt" value={defaultId ?? ''} onChange={(event) => void action.run(() => rpc.call('setSettings', { defaultPromptId: event.target.value || null }))}>
+        <option value="">Built-in prompt only</option>
+        {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
+      </select></label>
+      <label>Prompt name <input aria-label="Prompt name" value={name} onChange={(event) => setName(event.target.value)} /></label>
       <textarea
         className="cn-textarea cn-instructions"
         aria-label="Custom review instructions"
@@ -85,11 +141,12 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
         <button
           type="button"
           className="cn-btn cn-btn-primary"
-          disabled={!isDirty || isTooLong}
-          onClick={() => void action.run(() => rpc.call('setSettings', { customInstructions: draft }))}
+          disabled={!isDirty || isTooLong || !name.trim()}
+          onClick={savePrompt}
         >
           Save instructions
         </button>
+        {!creating && selected ? <button type="button" className="cn-btn" disabled={selected.id === defaultId} title={selected.id === defaultId ? 'Choose another default before deleting' : undefined} onClick={deleteSelected}>Delete prompt</button> : null}
         <button type="button" className="cn-btn" disabled={draft === config.defaultInstructions} onClick={() => setDraft(config.defaultInstructions)}>
           Reset to default
         </button>

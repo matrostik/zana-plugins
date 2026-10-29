@@ -7,6 +7,7 @@ import { copyTextToClipboard, errorText, formatDuration, formatLocalFindingsProm
 import { FindingsView, type FindingFilters } from './FindingsView.tsx';
 import { DiffFiles, isActive, ModelPicker, ScoreChip, useNow } from './PrDetail.tsx';
 import { Segmented, type SegmentedOption } from './Segmented.tsx';
+import { PromptSelector, useReviewPrompts } from './PromptSelector.tsx';
 import type { Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'files';
@@ -175,6 +176,7 @@ function LocalHistory({ history, currentId, onView }: { history: LocalHistoryIte
 }
 
 export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; defaultModels: ModelChoice[]; hasModels: boolean; onOpenSettings(): void; reloadToken?: number }) {
+  const { prompts, error: promptsError, promptId, setPromptId } = useReviewPrompts(props.rpc);
   const { rpc, location } = props;
   const formId = useId();
   const [detail, setDetail] = useState<LocalDetailData | null>(null);
@@ -323,6 +325,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
         scope: override?.scope ?? scope,
         base: override ? override.base : scope === 'branch' ? base.trim() || null : null,
         intent: override ? override.intent : intent.trim() || null,
+        ...(override && detail?.review?.promptSnapshot ? { rerunReviewId: detail.review.id } : promptId !== undefined ? { promptId } : {}),
         ...(models ? { models } : {})
       });
       setViewingId(null);
@@ -454,6 +457,8 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
               />
             </div>
           </div>
+          <PromptSelector prompts={prompts} error={promptsError} value={promptId} onChange={setPromptId} />
+          {review?.promptSnapshot ? <details><summary>Review prompt: {review.promptSnapshot.name}</summary><pre className="cn-prompt-text">{review.promptSnapshot.instructions || 'Built-in prompt only'}</pre></details> : null}
           <div className="cn-inline">
             <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || !props.hasModels || reviewing || status?.missing === true} onClick={() => void startReview()}>
               {busy === 'review' ? (

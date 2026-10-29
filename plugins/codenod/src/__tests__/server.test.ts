@@ -526,7 +526,7 @@ describe('codenod server', () => {
     expect(models.stdout).toContain('Configured: claude-code:opus, claude-code:sonnet@high');
     expect(models.stdout).toContain('  claude-code:opus');
 
-    expect(host.tools.map((tool) => tool.name).sort()).toEqual(['codenod_get_review', 'codenod_list_prs', 'codenod_review_local', 'codenod_review_pr']);
+    expect(host.tools.map((tool) => tool.name).sort()).toEqual(['codenod_get_review', 'codenod_list_prompts', 'codenod_list_prs', 'codenod_review_local', 'codenod_review_pr']);
     const listed = (await host.tools.find((tool) => tool.name === 'codenod_list_prs')!.execute({}, {})) as Array<{ pr: string }>;
     expect(listed[0].pr).toBe(PR_ID);
 
@@ -557,6 +557,8 @@ describe('codenod settings', () => {
     const first = await config(host);
     expect(first.settings).toEqual({
       customInstructions: 'Be strict',
+      prompts: [{ id: 'legacy', name: 'My review instructions', instructions: 'Be strict' }],
+      defaultPromptId: 'legacy',
       githubHosts: ['git.example.com'],
       autoSyncEnabled: true,
       syncIntervalMinutes: 10,
@@ -607,6 +609,26 @@ describe('codenod settings', () => {
     await host.callRpc('setSettings', { customInstructions: '   ' });
     await reviewToCompletion(host);
     expect(String([...host.threads.values()][0].args.prompt)).not.toContain('Custom Review Instructions');
+  });
+
+  it('captures and uses the prompt selected for a review', async () => {
+    const { host } = await setup();
+    await host.callRpc('setSettings', { prompts: [{ id: 'security', name: 'Security', instructions: 'Look for vulnerabilities' }], defaultPromptId: 'security' });
+    await host.callRpc('setModels', { models: MODELS });
+    await host.callRpc('refresh');
+    const review = await host.callRpc('startReview', { prId: PR_ID, promptId: 'security' }) as { promptSnapshot: unknown };
+    expect(review.promptSnapshot).toEqual({ name: 'Security', instructions: 'Look for vulnerabilities' });
+    await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (detail) => detail.review?.status === 'completed');
+    expect(String([...host.threads.values()].find((thread) => thread.args.visibility === 'hidden')?.args.prompt)).toContain('Look for vulnerabilities');
+  });
+
+  it('reruns with the original prompt after it has been edited', async () => {
+    const { host } = await setup();
+    await host.callRpc('setSettings', { prompts: [{ id: 'security', name: 'Security', instructions: 'Original instructions' }], defaultPromptId: 'security' });
+    const detail = await reviewToCompletion(host);
+    await host.callRpc('setSettings', { prompts: [{ id: 'security', name: 'Security', instructions: 'Changed instructions' }] });
+    const review = await host.callRpc('startReview', { prId: PR_ID, rerunReviewId: detail.review!.id }) as { promptSnapshot: unknown };
+    expect(review.promptSnapshot).toEqual({ name: 'Security', instructions: 'Original instructions' });
   });
 
   it('validates, clamps, and persists updates from the panel', async () => {

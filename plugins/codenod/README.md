@@ -91,8 +91,10 @@ Prerequisites: the folder is a Zana project (or a `git worktree` of one), and at
 - **Several GitHub hosts at once**: github.com and any number of GitHub Enterprise hosts.
 - **Opt-in auto-review** per watched repository: once per new commit, skipping drafts and your own pull requests.
 - **Local reviews** of uncommitted, staged, or branch changes, before a pull request exists.
-- **Command line**: `zcc codenod list | sync | review | show | post | review-local | show-local | repos | models | auth`.
-- **Agent tools**: `codenod_list_prs`, `codenod_get_review`, `codenod_review_pr`, and `codenod_review_local`, so Zana agents can check and start reviews.
+- **Command line**: `zcc codenod list | sync | review | show | post | review-local | show-local | repos | models | prompts | auth`.
+- **Agent tools**: `codenod_list_prs`, `codenod_get_review`, `codenod_list_prompts`, `codenod_review_pr`, and `codenod_review_local`, so Zana agents can check and start reviews.
+
+Create named review prompts and choose a default in CodeNod settings. For a single review, choose a prompt on the review screen, or run `zcc codenod prompts` to find IDs and pass `--prompt <id>` to `review` or `review-local`. Use `--prompt builtin` for built-in instructions only. Agent tools accept the same selection as `promptId` (use `null` for built-in only). Each review records the prompt text used, so reruns can preserve it even after the library changes.
 
 ## Safety
 

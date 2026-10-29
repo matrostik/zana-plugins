@@ -33,6 +33,8 @@ function snapshot(overrides: Partial<ConfigSnapshot> = {}, settings: Partial<Con
     profiles: [{ host: 'github.com', login: 'me', name: 'Mona Lisa', email: null, avatarUrl: null }],
     settings: {
       customInstructions: 'Be strict',
+      prompts: [{ id: 'legacy', name: 'My review instructions', instructions: 'Be strict' }],
+      defaultPromptId: 'legacy',
       githubHosts: ['ghe.example.com'],
       syncIntervalMinutes: 5,
       maxConcurrentReviews: 2,

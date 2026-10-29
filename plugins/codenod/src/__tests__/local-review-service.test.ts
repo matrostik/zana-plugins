@@ -163,6 +163,14 @@ function snapshotRefs(repo: string): string[] {
 }
 
 describe('local reviews', () => {
+  it('captures the selected local review prompt', async () => {
+    const harness = createHarness({ config: { prompts: [{ id: 'security', name: 'Security', instructions: 'Find vulnerabilities' }], defaultPromptId: 'security' } });
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
+    const review = await harness.start();
+    await harness.settled();
+    expect(review.promptSnapshot).toEqual({ name: 'Security', instructions: 'Find vulnerabilities' });
+    expect(harness.spawned.some((thread) => String(thread.args.prompt).includes('Find vulnerabilities'))).toBe(true);
+  });
   it('reviews uncommitted changes in a worktree of the immutable snapshot without touching the checkout', async () => {
     const harness = createHarness();
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
