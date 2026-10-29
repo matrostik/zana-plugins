@@ -33,6 +33,8 @@ Like Git Tree, this plugin installs from pre-built artifacts committed alongside
 - **Watch From the Project**: When a project's repository isn't watched, the tab shows a **Watch repository** button per remote, then syncs. Projects without a GitHub remote open on Local changes.
 - **Per-Project Memory**: The project tab remembers its mode, bucket, and selected checkout separately from the global page.
 - **Command Palette**: "CodeNod: Review this project" opens the tab for the current project.
+- **Project isolation**: Switching projects restores the destination's preferences and checkout selection. Local checkout discovery scans only that project's worktrees, and repository prompts use configured GitHub hosts.
+- **Repository banners**: Projects without a configured GitHub remote show an explanation in Local changes. Watch progress is tracked per repository, and watched state reloads even if sync fails.
 
 ### 0.2.1
 

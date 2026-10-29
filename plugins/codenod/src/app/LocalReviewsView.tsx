@@ -4,18 +4,15 @@ import type { LocalLocationSummary } from '../server/local/service.ts';
 import type { ModelChoice } from '../server/types.ts';
 import { errorText, relativeTime, scoreTone } from './format.ts';
 import { LocalDetail } from './LocalDetail.tsx';
+import { storageKey } from './storage.ts';
 import type { LocalOverview, Rpc } from './types.ts';
 
 const SELECTED_KEY = 'codenod.localTarget';
 const FOCUS_RELOAD_THROTTLE_MS = 60_000;
 
-function selectionKey(projectId?: string): string {
-  return projectId ? `${SELECTED_KEY}:${projectId}` : SELECTED_KEY;
-}
-
 function savedSelection(projectId?: string): string | null {
   try {
-    return globalThis.localStorage?.getItem(selectionKey(projectId)) ?? null;
+    return globalThis.localStorage?.getItem(storageKey(SELECTED_KEY, projectId)) ?? null;
   } catch {
     return null;
   }
@@ -94,7 +91,7 @@ export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]
   const select = (targetId: string) => {
     setSelectedId(targetId);
     try {
-      globalThis.localStorage?.setItem(selectionKey(projectId), targetId);
+      globalThis.localStorage?.setItem(storageKey(SELECTED_KEY, projectId), targetId);
     } catch {
       // Not critical.
     }

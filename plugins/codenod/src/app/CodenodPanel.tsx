@@ -5,9 +5,11 @@ import { errorText, relativeTime } from './format.ts';
 import { LocalReviewsView } from './LocalReviewsView.tsx';
 import { PrDetail } from './PrDetail.tsx';
 import { PrList } from './PrList.tsx';
+import { ProjectRepoBanners } from './ProjectRepoBanners.tsx';
 import { Segmented, type SegmentedOption } from './Segmented.tsx';
 import { SettingsView } from './SettingsView.tsx';
-import type { ConfigSnapshot, Overview, ProjectRepoStatus } from './types.ts';
+import { storageKey } from './storage.ts';
+import type { ConfigSnapshot, Overview } from './types.ts';
 
 const TAB_KEY = 'codenod.tab';
 const MODE_KEY = 'codenod.mode';
@@ -18,11 +20,6 @@ const MODES: Array<SegmentedOption<Mode>> = [
   { id: 'pr', label: 'Pull requests' },
   { id: 'local', label: 'Local changes' }
 ];
-
-/** Project tabs remember their own mode and bucket, separate from the global panel. */
-export function storageKey(base: string, projectId?: string): string {
-  return projectId ? `${base}:${projectId}` : base;
-}
 
 /** The saved mode, or null when none was saved so a project without a GitHub remote can default to local changes. */
 function savedMode(projectId?: string): Mode | null {
@@ -44,7 +41,13 @@ function initialTab(projectId?: string): PrBucket {
   return 'needs-review';
 }
 
-export function CodenodPanel({ pluginId, projectId }: { pluginId: string; subPath?: string; projectId?: string }) {
+type PanelProps = { pluginId: string; subPath?: string; projectId?: string };
+
+export function CodenodPanel(props: PanelProps) {
+  return <CodenodPanelContent key={props.projectId ?? ''} {...props} />;
+}
+
+function CodenodPanelContent({ pluginId, projectId }: PanelProps) {
   const rpc = useRpc();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [models, setModels] = useState<ModelChoice[]>([]);
@@ -55,7 +58,6 @@ export function CodenodPanel({ pluginId, projectId }: { pluginId: string; subPat
   const [chosenMode, setMode] = useState<Mode | null>(() => savedMode(projectId));
   const [localReloadToken, setLocalReloadToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const noRemote = overview?.projectRepos?.length === 0;
   const mode: Mode = chosenMode ?? (noRemote ? 'local' : 'pr');
@@ -111,19 +113,6 @@ export function CodenodPanel({ pluginId, projectId }: { pluginId: string; subPat
     }
   };
 
-  const watch = async (repo: ProjectRepoStatus) => {
-    setWatching(true);
-    try {
-      await rpc.call('addRepo', { repo: repo.id });
-      await rpc.call('refresh');
-      load();
-    } catch (cause) {
-      setError(errorText(cause));
-    } finally {
-      setWatching(false);
-    }
-  };
-
   const refresh = async () => {
     if (mode === 'local') {
       setLocalReloadToken((token) => token + 1);
@@ -141,7 +130,6 @@ export function CodenodPanel({ pluginId, projectId }: { pluginId: string; subPat
   };
 
   const hostProblems = overview?.hosts.filter((host) => host.error) ?? [];
-  const unwatched = overview?.projectRepos?.filter((repo) => !repo.watched) ?? [];
 
   return (
     <div className="cn-root">
@@ -175,21 +163,7 @@ export function CodenodPanel({ pluginId, projectId }: { pluginId: string; subPat
           {hostProblems.map((host) => `${host.host}: ${host.error}`).join(' · ')}
         </p>
       ) : null}
-      {view === 'inbox' && mode === 'pr' && noRemote ? (
-        <p className="cn-banner">This project has no GitHub remote, so there are no pull requests to show. Local changes can still be reviewed.</p>
-      ) : null}
-      {view === 'inbox' && mode === 'pr'
-        ? unwatched.map((repo) => (
-            <div key={repo.id} className="cn-banner cn-banner-watch">
-              <span>
-                <code>{repo.owner}/{repo.name}</code> isn't watched, so its pull requests aren't synced.
-              </span>
-              <button type="button" className="cn-btn cn-btn-primary" disabled={watching} onClick={() => void watch(repo)}>
-                {watching ? 'Watching…' : 'Watch repository'}
-              </button>
-            </div>
-          ))
-        : null}
+      {view === 'inbox' ? <ProjectRepoBanners repos={overview?.projectRepos} showWatch={mode === 'pr'} rpc={rpc} onChange={load} /> : null}
 
       {view === 'settings' ? (
         <div className="cn-settings">

@@ -6,6 +6,9 @@ import type { CommandRunner } from '../server/github/auth.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS } from '../server/review/prompts.ts';
 import type { FetchLike } from '../server/github/client.ts';
 import type { PrDetail, PrListItem } from '../server/views.ts';
+import type { GitRunner } from '../server/local/git.ts';
+import type { LocalOverview, Overview } from '../app/types.ts';
+import { resolve } from 'node:path';
 import { createFakeFetch, createFakeHost, respond, type FakeThread } from './fake-host.ts';
 
 const PATCH = '@@ -1,2 +1,3 @@\n const a = 1;\n+const user = find();\n+user.name.trim();';
@@ -109,12 +112,13 @@ async function setup(
     settings?: Record<string, string | number | boolean>;
     projects?: Array<{ id: string; name: string; path?: string }>;
     run?: CommandRunner;
+    git?: GitRunner;
   } = {}
 ) {
   const state = { headSha: 'sha1' };
   const github = githubFixture(state);
   const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval, settings: options.settings, projects: options.projects });
-  await createCodenodPlugin(host.zcc, { run: options.run ?? run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
+  await createCodenodPlugin(host.zcc, { run: options.run ?? run, git: options.git, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
   return { host, github, state };
 }
 
@@ -142,6 +146,39 @@ async function reviewToCompletion(host: Awaited<ReturnType<typeof setup>>['host'
 }
 
 describe('codenod server', () => {
+  it('only offers project remotes on configured GitHub hosts', async () => {
+    const { host } = await setup({
+      projects: [{ id: 'app', name: 'App', path: '/work/app' }],
+      run: async (command, args) => command === 'git'
+        ? 'origin\thttps://gitlab.com/acme/api.git (fetch)\nenterprise\tgit@unconfigured.example:acme/api.git (fetch)'
+        : run(command, args)
+    });
+    expect(await host.callRpc('overview', { projectId: 'app' })).toMatchObject({ projectRepos: [], prs: [], hasWatchedRepos: false });
+    await host.callRpc('setSettings', { githubHosts: ['github.com', 'unconfigured.example'] });
+    const overview = await host.callRpc('overview', { projectId: 'app' }) as Overview;
+    expect(overview.projectRepos?.map((repo) => repo.host)).toEqual(['unconfigured.example']);
+  });
+
+  it('scans only the requested project before discovering worktrees and counting changes', async () => {
+    const git = vi.fn<GitRunner>(async (cwd, args) => ({ code: 0, stdout: args[0] === 'worktree'
+      ? `worktree ${cwd}\0HEAD ${'a'.repeat(40)}\0branch refs/heads/main\0\0`
+      : ' M a.ts\0' }));
+    const { host } = await setup({ projects: [
+      { id: 'app', name: 'App', path: resolve('/work/app') },
+      { id: 'other', name: 'Other', path: resolve('/work/other') }
+    ], git });
+    // Plugin startup also sweeps retained worktrees; measure the RPC scan separately.
+    await vi.waitFor(() => expect(git.mock.calls.filter(([, args]) => args[0] === 'worktree')).toHaveLength(2));
+    git.mockClear();
+    const overview = await host.callRpc('localTargets', { projectId: 'app' }) as LocalOverview;
+    expect(overview.locations).toMatchObject([{ projectId: 'app', changedFiles: 1 }]);
+    expect(git.mock.calls.map(([cwd]) => cwd)).toEqual([resolve('/work/app'), resolve('/work/app')]);
+    git.mockClear();
+    expect(await host.callRpc('localTargets', { projectId: 'missing' })).toMatchObject({ locations: [] });
+    expect(git).not.toHaveBeenCalled();
+    expect((await host.callRpc('localTargets') as LocalOverview).locations).toHaveLength(2);
+  });
+
   it('refuses code context from a different PR head than the reviewed commit', async () => {
     const { host, state } = await setup();
     await reviewToCompletion(host);

@@ -140,6 +140,20 @@ describe('Pull requests | Local changes switch', () => {
     hasModels: true
   };
 
+  it('restores the saved checkout when switching projects on the mounted panel', async () => {
+    localStorage.setItem('codenod.mode:app', 'local');
+    localStorage.setItem('codenod.mode:web', 'local');
+    localStorage.setItem('codenod.localTarget:web', 'local:web');
+    answer({ overview, config: { models: [] }, localTargets: (args: Record<string, unknown>) => ({ ...locals, locations: locals.locations.filter((item) => item.projectId === args.projectId) }), localDetail: localDetail(), localStatus: fresh() });
+    const { rerender } = render(<CodenodPanel pluginId="codenod" projectId="app" />);
+    fireEvent.click(await screen.findByRole('button', { name: /feat\/login/ }));
+    expect(localStorage.getItem('codenod.localTarget:app')).toBe(TARGET_ID);
+    rerender(<CodenodPanel pluginId="codenod" projectId="web" />);
+    const selected = await screen.findByRole('button', { name: /fix\/nav/ });
+    expect(selected.getAttribute('aria-current')).toBe('true');
+    expect(screen.queryByRole('button', { name: /feat\/login/ })).toBeNull();
+  });
+
   it('switches modes with the keyboard, remembers the choice, and groups checkouts by project', async () => {
     answer({ overview, config: { models: [] }, localTargets: locals });
     const { unmount } = render(<CodenodPanel pluginId="codenod" />);

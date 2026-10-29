@@ -324,7 +324,8 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     if (!projectId) return { ...base, prs: listPullRequests(store), hasWatchedRepos: store.listRepos().length > 0 };
     // A project view lists only pull requests of the repositories its git remotes point at.
     const watched = new Set(store.listRepos().map((repo) => repo.id.toLowerCase()));
-    const projectRepos = (await projects.reposForProject(projectId)).map((repo) => {
+    const hosts = new Set(base.hosts.map((host) => host.host.toLowerCase()));
+    const projectRepos = (await projects.reposForProject(projectId)).filter((repo) => hosts.has(repo.host.toLowerCase())).map((repo) => {
       const id = repoId(repo);
       return { id, host: repo.host, owner: repo.owner, name: repo.name, watched: watched.has(id.toLowerCase()) };
     });
@@ -488,9 +489,9 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   // ── Local reviews ────────────────────────────────────────────────────
   zcc.rpc.method('localTargets', async (args) => {
     const projectId = asString(asRecord(args), 'projectId');
-    const locations = await local.listLocations();
+    const locations = await local.listLocations(projectId);
     return {
-      locations: projectId ? locations.filter((location) => location.projectId === projectId) : locations,
+      locations,
       scopes: LOCAL_SCOPES,
       hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
     };
