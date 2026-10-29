@@ -138,12 +138,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
-  let navigate: ReturnType<typeof useZccNavigate> | null = null;
-  try {
-    navigate = useZccNavigate();
-  } catch {
-    navigate = null;
-  }
+  const navigate = useZccNavigate();
 
   const requestSeq = useRef(0);
   const load = useCallback(() => {

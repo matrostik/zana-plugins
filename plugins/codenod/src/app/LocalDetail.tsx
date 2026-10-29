@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { LocalLocationSummary, LocalReviewStatus } from '../server/local/service.ts';
-import type { ChangedFile, LocalScope, ModelChoice } from '../server/types.ts';
-import type { LocalDetail as LocalDetailData } from '../server/views.ts';
+import type { ChangedFile, LocalScope, ModelChoice, ReviewRunRow } from '../server/types.ts';
+import type { LocalDetail as LocalDetailData, LocalHistoryItem, LocalSnapshotView } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatLocalFindingsPrompt, relativeTime, scoreTone, skipReasonText } from './format.ts';
 import { FindingsView, type FindingFilters } from './FindingsView.tsx';
 import { DiffFiles, isActive, ModelPicker, ScoreChip, useNow } from './PrDetail.tsx';
@@ -47,6 +47,7 @@ function LocalFiles({ rpc, reviewId }: { rpc: Rpc; reviewId: string }) {
   useEffect(() => {
     let cancelled = false;
     setFiles(null);
+    setError(null);
     rpc
       .call('localDiff', { reviewId })
       .then((value) => !cancelled && setFiles(value as ChangedFile[]))
@@ -60,7 +61,120 @@ function LocalFiles({ rpc, reviewId }: { rpc: Rpc; reviewId: string }) {
   return <DiffFiles files={files} />;
 }
 
-export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; defaultModels: ModelChoice[]; hasModels: boolean; onOpenSettings(): void }) {
+type NavLike = ReturnType<typeof useZccNavigate>;
+
+function ModelRunsTable({ runs, now, navigate }: { runs: ReviewRunRow[]; now: number; navigate: NavLike }) {
+  return (
+    <table className="cn-table">
+      <thead>
+        <tr>
+          <th scope="col">Model</th>
+          <th scope="col">Status</th>
+          <th scope="col">Time</th>
+          <th scope="col">Risk</th>
+          <th scope="col">Issues</th>
+          <th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {runs.map((run) => (
+          <tr key={run.id}>
+            <td className="cn-mono">
+              {run.providerId}/{run.model}
+            </td>
+            <td>{run.status}</td>
+            <td className="cn-mono">{run.status === 'queued' ? '–' : formatDuration(run.startedAt, run.completedAt ?? now)}</td>
+            <td>{run.riskScore ?? '–'}</td>
+            <td>{run.status === 'completed' ? run.issueCount : '–'}</td>
+            <td>
+              {run.error ?? run.summary ?? ''}
+              {run.threadId && navigate?.toThread ? (
+                <>
+                  {' '}
+                  <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(run.threadId!)}>
+                    Open thread
+                  </button>
+                </>
+              ) : null}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function SkippedFiles({ skipped }: { skipped: LocalSnapshotView['skipped'] }) {
+  const secretSkipped = skipped.some((file) => file.reason === 'possible-secret');
+  return (
+    <details className="cn-prompt">
+      <summary>
+        {skipped.length} file{skipped.length === 1 ? '' : 's'} not reviewed
+        {secretSkipped ? <span className="cn-badge cn-badge-danger cn-local-summary-badge">Possible secret skipped</span> : null}
+      </summary>
+      <ul className="cn-skipped-list">
+        {skipped.map((file) => (
+          <li key={file.path} className="cn-skipped-item">
+            <span className="cn-mono">{file.path}</span>
+            <span className={`cn-badge ${file.reason === 'possible-secret' ? 'cn-badge-danger' : 'cn-badge-muted'}`}>{skipReasonText(file.reason)}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function LocalHistory({ history, currentId, onView }: { history: LocalHistoryItem[]; currentId: string | null; onView(id: string): void }) {
+  return (
+    <details className="cn-prompt">
+      <summary>History ({history.length})</summary>
+      <div className="cn-table-wrap cn-local-history">
+        <table className="cn-table">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Risk</th>
+              <th scope="col">Findings</th>
+              <th scope="col">Status</th>
+              <th scope="col">
+                <span className="cn-visually-hidden">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((item) => {
+              const tone = scoreTone(item.riskScore, 'risk');
+              return (
+                <tr key={item.id} aria-current={item.id === currentId ? 'true' : undefined}>
+                  <td>{relativeTime(item.createdAt)}</td>
+                  <td>
+                    {scopeLabel(item.scope)}
+                    {item.baseRef ? <span className="cn-muted cn-small"> vs {item.baseRef}</span> : null}
+                  </td>
+                  <td>{item.riskScore === null ? '–' : <span className={`cn-badge ${tone ? `cn-badge-${tone}` : ''}`}>{item.riskScore}/10</span>}</td>
+                  <td>{item.status === 'completed' ? item.findingCount : '–'}</td>
+                  <td>{item.status}</td>
+                  <td>
+                    {item.id === currentId ? (
+                      <span className="cn-muted cn-small">Showing</span>
+                    ) : (
+                      <button type="button" className="cn-btn cn-small" onClick={() => onView(item.id)}>
+                        View
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
+export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; defaultModels: ModelChoice[]; hasModels: boolean; onOpenSettings(): void; reloadToken?: number }) {
   const { rpc, location } = props;
   const formId = useId();
   const [detail, setDetail] = useState<LocalDetailData | null>(null);
@@ -82,12 +196,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const [confirmDelete, setConfirmDelete] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
 
-  let navigate: ReturnType<typeof useZccNavigate> | null = null;
-  try {
-    navigate = useZccNavigate();
-  } catch {
-    navigate = null;
-  }
+  const navigate = useZccNavigate();
 
   const requestSeq = useRef(0);
   const load = useCallback(() => {
@@ -119,15 +228,21 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const reviewId = detail?.review?.id ?? null;
   const reviewCompleted = detail?.review?.status === 'completed';
   const lastStatusCheck = useRef(0);
+  const statusSeq = useRef(0);
   const checkStatus = useCallback(
     (force = false) => {
       if (!reviewId || !reviewCompleted) return;
       if (!force && Date.now() - lastStatusCheck.current < STATUS_CHECK_THROTTLE_MS) return;
       lastStatusCheck.current = Date.now();
+      const requestId = ++statusSeq.current;
       rpc
         .call('localStatus', { reviewId })
-        .then((value) => setStatus(value as LocalReviewStatus))
-        .catch(() => setStatus(null));
+        .then((value) => {
+          if (statusSeq.current === requestId) setStatus(value as LocalReviewStatus);
+        })
+        .catch(() => {
+          if (statusSeq.current === requestId) setStatus(null);
+        });
     },
     [rpc, reviewId, reviewCompleted]
   );
@@ -146,6 +261,14 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
       document.removeEventListener('visibilitychange', resume);
     };
   }, [checkStatus]);
+
+  const reloadToken = props.reloadToken;
+  const initialToken = useRef(reloadToken);
+  useEffect(() => {
+    if (reloadToken === initialToken.current) return;
+    load();
+    checkStatus(true);
+  }, [reloadToken, load, checkStatus]);
 
   useEffect(() => {
     setFilters({ severity: 'all', category: 'all' });
@@ -264,8 +387,6 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
       setNotice({ kind: 'error', text: `Could not copy findings: ${errorText(cause)}` });
     }
   };
-
-  const secretSkipped = snapshot?.skipped.some((file) => file.reason === 'possible-secret') ?? false;
 
   return (
     <section className="cn-detail" aria-label={`Local changes in ${label}`}>
@@ -477,113 +598,15 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                   />
                 )
               ) : null}
-              {tab === 'models' ? (
-                <table className="cn-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Model</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Time</th>
-                      <th scope="col">Risk</th>
-                      <th scope="col">Issues</th>
-                      <th scope="col">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attemptRuns.map((run) => (
-                      <tr key={run.id}>
-                        <td className="cn-mono">
-                          {run.providerId}/{run.model}
-                        </td>
-                        <td>{run.status}</td>
-                        <td className="cn-mono">{run.status === 'queued' ? '–' : formatDuration(run.startedAt, run.completedAt ?? now)}</td>
-                        <td>{run.riskScore ?? '–'}</td>
-                        <td>{run.status === 'completed' ? run.issueCount : '–'}</td>
-                        <td>
-                          {run.error ?? run.summary ?? ''}
-                          {run.threadId && navigate?.toThread ? (
-                            <>
-                              {' '}
-                              <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(run.threadId!)}>
-                                Open thread
-                              </button>
-                            </>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : null}
+              {tab === 'models' ? <ModelRunsTable runs={attemptRuns} now={now} navigate={navigate} /> : null}
               {tab === 'files' ? <LocalFiles rpc={rpc} reviewId={review.id} /> : null}
             </div>
 
-            {snapshot && snapshot.skipped.length > 0 ? (
-              <details className="cn-prompt">
-                <summary>
-                  {snapshot.skipped.length} file{snapshot.skipped.length === 1 ? '' : 's'} not reviewed
-                  {secretSkipped ? <span className="cn-badge cn-badge-danger cn-local-summary-badge">Possible secret skipped</span> : null}
-                </summary>
-                <ul className="cn-skipped-list">
-                  {snapshot.skipped.map((file) => (
-                    <li key={file.path} className="cn-skipped-item">
-                      <span className="cn-mono">{file.path}</span>
-                      <span className={`cn-badge ${file.reason === 'possible-secret' ? 'cn-badge-danger' : 'cn-badge-muted'}`}>{skipReasonText(file.reason)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
+            {snapshot && snapshot.skipped.length > 0 ? <SkippedFiles skipped={snapshot.skipped} /> : null}
           </>
         )}
 
-        {detail.history.length > 0 ? (
-          <details className="cn-prompt">
-            <summary>History ({detail.history.length})</summary>
-            <div className="cn-table-wrap cn-local-history">
-              <table className="cn-table">
-                <thead>
-                  <tr>
-                    <th scope="col">When</th>
-                    <th scope="col">Scope</th>
-                    <th scope="col">Risk</th>
-                    <th scope="col">Findings</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">
-                      <span className="cn-visually-hidden">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.history.map((item) => {
-                    const tone = scoreTone(item.riskScore, 'risk');
-                    return (
-                      <tr key={item.id} aria-current={item.id === review?.id ? 'true' : undefined}>
-                        <td>{relativeTime(item.createdAt)}</td>
-                        <td>
-                          {scopeLabel(item.scope)}
-                          {item.baseRef ? <span className="cn-muted cn-small"> vs {item.baseRef}</span> : null}
-                        </td>
-                        <td>{item.riskScore === null ? '–' : <span className={`cn-badge ${tone ? `cn-badge-${tone}` : ''}`}>{item.riskScore}/10</span>}</td>
-                        <td>{item.status === 'completed' ? item.findingCount : '–'}</td>
-                        <td>{item.status}</td>
-                        <td>
-                          {item.id === review?.id ? (
-                            <span className="cn-muted cn-small">Showing</span>
-                          ) : (
-                            <button type="button" className="cn-btn cn-small" onClick={() => setViewingId(item.id)}>
-                              View
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        ) : null}
+        {detail.history.length > 0 ? <LocalHistory history={detail.history} currentId={review?.id ?? null} onView={setViewingId} /> : null}
       </div>
 
       <div className="cn-actions">

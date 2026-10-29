@@ -136,6 +136,7 @@ export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]
           defaultModels={props.defaultModels}
           hasModels={overview?.hasModels ?? props.hasModels}
           onOpenSettings={props.onOpenSettings}
+          reloadToken={props.reloadToken}
         />
       ) : (
         <div className="cn-detail">

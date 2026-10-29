@@ -73,6 +73,19 @@ function fresh(stale = false): LocalReviewStatus {
   return { reviewId: 'rev-2', stale, missing: false, reviewedTree: 'd'.repeat(40), currentTree: stale ? 'e'.repeat(40) : 'd'.repeat(40) };
 }
 
+const LOGIN_PATCH = '@@ -10,3 +10,4 @@\n const a = 1;\n const b = 2;\n+  const token = getToken();\n const c = 3;';
+const LOGIN_DIFF = [{ path: 'src/login.ts', status: 'modified', additions: 1, deletions: 0, patch: LOGIN_PATCH }];
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function answer(responses: Record<string, unknown | ((args: Record<string, unknown>) => unknown)>) {
   sdk.call.mockImplementation(async (method: string, args?: unknown) => {
     const response = responses[method];
@@ -154,7 +167,7 @@ describe('Pull requests | Local changes switch', () => {
     expect((await screen.findByRole('tab', { name: 'Local changes' })).getAttribute('aria-selected')).toBe('true');
   });
 
-  it('opens the selected checkout and reloads the list on Refresh', async () => {
+  it('opens the selected checkout and reloads the list and its status on Refresh', async () => {
     answer({ overview, config: { models: [] }, localTargets: locals, localDetail: localDetail(), localStatus: fresh() });
     localStorage.setItem('codenod.mode', 'local');
     render(<CodenodPanel pluginId="codenod" />);
@@ -162,8 +175,13 @@ describe('Pull requests | Local changes switch', () => {
     fireEvent.click(await screen.findByRole('button', { name: /fix\/nav/ }));
     expect(await screen.findByRole('region', { name: /Local changes in Web · fix\/nav/ })).toBeTruthy();
     expect(localStorage.getItem('codenod.localTarget')).toBe('local:web');
+    await waitFor(() => expect(calls('localDetail')).toHaveLength(1));
+    await waitFor(() => expect(calls('localStatus')).toHaveLength(1));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => expect(calls('localTargets')).toHaveLength(2));
+    // Refresh re-checks the open checkout's detail and freshness, not just the list.
+    await waitFor(() => expect(calls('localDetail')).toHaveLength(2));
+    await waitFor(() => expect(calls('localStatus')).toHaveLength(2));
     expect(calls('refresh')).toHaveLength(0);
   });
 });
@@ -195,8 +213,12 @@ describe('LocalDetail', () => {
     expect(screen.queryByLabelText('Base branch')).toBeNull();
   });
 
-  it('shows results without any GitHub posting controls, with skipped files and history', async () => {
-    answer({ localDetail: (args: Record<string, unknown>) => localDetail(args.reviewId === 'rev-1' ? { review: { ...localDetail().review!, id: 'rev-1' } } : {}), localStatus: fresh(), localDiff: [] });
+  it('shows results with snapshot code context, reviewed files, no GitHub controls, skipped files and history', async () => {
+    answer({
+      localDetail: (args: Record<string, unknown>) => localDetail(args.reviewId === 'rev-1' ? { review: { ...localDetail().review!, id: 'rev-1' } } : {}),
+      localStatus: fresh(),
+      localDiff: LOGIN_DIFF
+    });
     renderDetail();
 
     expect(await screen.findByText('Looks fine')).toBeTruthy();
@@ -204,6 +226,17 @@ describe('LocalDetail', () => {
     expect(screen.queryByText(/to GitHub/)).toBeNull();
     expect(screen.queryByText(/unposted/)).toBeNull();
     expect(screen.queryByRole('link', { name: /GitHub/ })).toBeNull();
+
+    // The finding renders code context pulled from the reviewed snapshot (localDiff RPC).
+    const snippet = await screen.findByRole('region', { name: 'Code context for src/login.ts:12' });
+    expect(within(snippet).getByText('const token = getToken();')).toBeTruthy();
+    expect(screen.queryByText('Code context unavailable for this finding.')).toBeNull();
+    expect(calls('localDiff').at(-1)).toEqual({ reviewId: 'rev-2' });
+
+    // The Files tab reads the same reviewed snapshot.
+    fireEvent.click(screen.getByRole('tab', { name: 'Files (1)' }));
+    const fileSection = await screen.findByRole('region', { name: 'Diff of src/login.ts' });
+    expect(within(fileSection).getByText(/const token = getToken\(\);/)).toBeTruthy();
 
     expect(screen.getByText('2 files not reviewed')).toBeTruthy();
     expect(screen.getByText('Possible secret skipped')).toBeTruthy();
@@ -216,6 +249,46 @@ describe('LocalDetail', () => {
     await waitFor(() => expect(calls('localDetail').at(-1)).toEqual({ targetId: TARGET_ID, reviewId: 'rev-1' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Show latest' }));
     await waitFor(() => expect(calls('localDetail').at(-1)).toEqual({ targetId: TARGET_ID }));
+  });
+
+  it('surfaces a context error when the snapshot diff fails and recovers on the next review', async () => {
+    answer({ localDetail: localDetail(), localStatus: fresh(), localDiff: new Error('snapshot unreadable') });
+    renderDetail();
+
+    expect(await screen.findByText('Looks fine')).toBeTruthy();
+    expect(await screen.findByText(/Could not load code context: snapshot unreadable/)).toBeTruthy();
+
+    // The Files tab reports its own error without crashing the panel.
+    fireEvent.click(screen.getByRole('tab', { name: 'Files (1)' }));
+    expect(await screen.findByText('snapshot unreadable')).toBeTruthy();
+  });
+
+  it('ignores a stale localStatus response that resolves after switching reviews', async () => {
+    const rev2Status = deferred<LocalReviewStatus>();
+    const rev1Status = deferred<LocalReviewStatus>();
+    const statusByReview: Record<string, Promise<LocalReviewStatus>> = { 'rev-2': rev2Status.promise, 'rev-1': rev1Status.promise };
+    answer({
+      localDetail: (args: Record<string, unknown>) => localDetail(args.reviewId === 'rev-1' ? { review: { ...localDetail().review!, id: 'rev-1' } } : {}),
+      localStatus: (args: Record<string, unknown>) => statusByReview[args.reviewId as string] ?? fresh(),
+      localDiff: []
+    });
+    renderDetail();
+
+    await screen.findByText('Looks fine');
+    const history = screen.getByText('History (2)').closest('details')!;
+    fireEvent.click(within(history).getByRole('button', { name: 'View' }));
+    // Now viewing the older rev-1, whose status is stale.
+    await waitFor(() => expect(calls('localDetail').at(-1)).toEqual({ targetId: TARGET_ID, reviewId: 'rev-1' }));
+    await waitFor(() => expect(calls('localStatus').some((args) => args.reviewId === 'rev-1')).toBe(true));
+
+    // The current review (rev-1) resolves first as stale; the previous request for rev-2 resolves later as fresh.
+    rev1Status.resolve({ reviewId: 'rev-1', stale: true, missing: false, reviewedTree: 'd'.repeat(40), currentTree: 'f'.repeat(40) });
+    expect(await screen.findByRole('status', { name: 'Review outdated' })).toBeTruthy();
+    rev2Status.resolve(fresh(false));
+
+    // The late rev-2 response must not clear the stale banner for the review on screen.
+    await waitFor(() => expect(calls('localDetail').at(-1)).toEqual({ targetId: TARGET_ID, reviewId: 'rev-1' }));
+    expect(screen.getByRole('status', { name: 'Review outdated' })).toBeTruthy();
   });
 
   it('warns when the working tree changed and reruns with the reviewed scope', async () => {

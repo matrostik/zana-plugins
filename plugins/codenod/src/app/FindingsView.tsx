@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { ChangedFile, FindingRow, IssueCategory, PullRequestRow, Severity } from '../server/types.ts';
 import { errorText } from './format.ts';
 import type { Rpc } from './types.ts';
@@ -272,8 +272,10 @@ export function FindingsView(props: {
 }) {
   const { findings, filters, rpc, contextSource } = props;
   const contextMethod = contextSource.kind === 'pr' ? 'diff' : 'localDiff';
-  const contextArgs = contextSource.kind === 'pr' ? { prId: contextSource.pr.id, headSha: contextSource.headSha } : { reviewId: contextSource.reviewId };
-  const contextKey = JSON.stringify(contextArgs);
+  const contextArgs = useMemo(
+    () => (contextSource.kind === 'pr' ? { prId: contextSource.pr.id, headSha: contextSource.headSha } : { reviewId: contextSource.reviewId }),
+    [contextSource]
+  );
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -294,7 +296,7 @@ export function FindingsView(props: {
     setLoading(!props.stale && needsContext);
     if (!props.stale && needsContext)
       void rpc
-        .call(contextMethod, JSON.parse(contextKey))
+        .call(contextMethod, contextArgs)
         .then((value) => {
           if (!cancelled) setFiles(Array.isArray(value) ? (value as ChangedFile[]) : []);
         })
@@ -307,7 +309,7 @@ export function FindingsView(props: {
     return () => {
       cancelled = true;
     };
-  }, [rpc, contextMethod, contextKey, props.stale, needsContext]);
+  }, [rpc, contextMethod, contextArgs, props.stale, needsContext]);
 
   const active = findings.filter((finding) => !finding.dismissed);
   const visible = active.filter((finding) => matchesFinding(finding, filters));
