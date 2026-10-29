@@ -2,13 +2,30 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRealtime, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ModelChoice, PrBucket } from '../server/types.ts';
 import { errorText, relativeTime } from './format.ts';
+import { LocalReviewsView } from './LocalReviewsView.tsx';
 import { PrDetail } from './PrDetail.tsx';
 import { PrList } from './PrList.tsx';
+import { Segmented, type SegmentedOption } from './Segmented.tsx';
 import { SettingsView } from './SettingsView.tsx';
 import type { ConfigSnapshot, Overview } from './types.ts';
 
 const TAB_KEY = 'codenod.tab';
+const MODE_KEY = 'codenod.mode';
 const FOCUS_SYNC_THROTTLE_MS = 60_000;
+
+type Mode = 'pr' | 'local';
+const MODES: Array<SegmentedOption<Mode>> = [
+  { id: 'pr', label: 'Pull requests' },
+  { id: 'local', label: 'Local changes' }
+];
+
+function initialMode(): Mode {
+  try {
+    return globalThis.localStorage?.getItem(MODE_KEY) === 'local' ? 'local' : 'pr';
+  } catch {
+    return 'pr';
+  }
+}
 
 function initialTab(): PrBucket {
   try {
@@ -28,6 +45,8 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<'inbox' | 'settings'>('inbox');
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [localReloadToken, setLocalReloadToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +93,20 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
     }
   };
 
+  const changeMode = (next: Mode) => {
+    setMode(next);
+    try {
+      globalThis.localStorage?.setItem(MODE_KEY, next);
+    } catch {
+      // Not critical.
+    }
+  };
+
   const refresh = async () => {
+    if (mode === 'local') {
+      setLocalReloadToken((token) => token + 1);
+      return;
+    }
     setRefreshing(true);
     try {
       await rpc.call('refresh');
@@ -92,7 +124,8 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
     <div className="cn-root">
       <div className="cn-toolbar">
         <h1>CodeNod</h1>
-        {overview?.lastSyncAt ? <span className="cn-muted cn-small">Synced {relativeTime(overview.lastSyncAt)}</span> : null}
+        {view === 'inbox' ? <Segmented label="Review source" options={MODES} value={mode} onChange={changeMode} className="cn-mode-switch" /> : null}
+        {mode === 'pr' && overview?.lastSyncAt ? <span className="cn-muted cn-small">Synced {relativeTime(overview.lastSyncAt)}</span> : null}
         {overview && overview.autoSyncEnabled === false ? (
           <span className="cn-badge cn-badge-muted" title="Automatic repository sync is disabled">
             Auto-sync off
@@ -105,16 +138,16 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
         ) : null}
         <span className="cn-spacer" />
         {view === 'inbox' ? (
-          <button type="button" className="cn-btn" disabled={refreshing || overview?.syncing} onClick={() => void refresh()}>
-            {refreshing || overview?.syncing ? 'Syncing…' : 'Refresh'}
+          <button type="button" className="cn-btn" disabled={mode === 'pr' && (refreshing || overview?.syncing)} onClick={() => void refresh()}>
+            {mode === 'pr' && (refreshing || overview?.syncing) ? 'Syncing…' : 'Refresh'}
           </button>
         ) : null}
         <button type="button" className="cn-btn" aria-pressed={view === 'settings'} onClick={() => setView(view === 'settings' ? 'inbox' : 'settings')}>
-          {view === 'settings' ? 'Back to pull requests' : 'Settings'}
+          {view === 'settings' ? (mode === 'local' ? 'Back to local changes' : 'Back to pull requests') : 'Settings'}
         </button>
       </div>
       {error ? <p className="cn-banner cn-banner-error">{error}</p> : null}
-      {view === 'inbox' && hostProblems.length > 0 ? (
+      {view === 'inbox' && mode === 'pr' && hostProblems.length > 0 ? (
         <p className="cn-banner cn-banner-error">
           {hostProblems.map((host) => `${host.host}: ${host.error}`).join(' · ')}
         </p>
@@ -124,6 +157,14 @@ export function CodenodPanel({ pluginId }: { pluginId: string; subPath?: string 
         <div className="cn-settings">
           <SettingsView rpc={rpc} />
         </div>
+      ) : mode === 'local' ? (
+        <LocalReviewsView
+          rpc={rpc}
+          defaultModels={models}
+          hasModels={overview?.hasModels ?? models.length > 0}
+          onOpenSettings={() => setView('settings')}
+          reloadToken={localReloadToken}
+        />
       ) : (
         <div className="cn-body">
           <PrList

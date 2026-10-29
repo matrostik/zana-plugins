@@ -77,16 +77,25 @@ export function sanitizePromptText(text: string): string {
     .join('\n');
 }
 
-export function formatFindingsPrompt(input: {
-  owner: string; repo: string; number: number; title: string; headSha: string;
-  findings: Array<{ severity: string; category: string; file: string; line: number | null; description: string; suggestion: string | null; agreedBy: string[] }>;
-}): string {
+type PromptFinding = { severity: string; category: string; file: string; line: number | null; description: string; suggestion: string | null; agreedBy: string[] };
+
+export function formatFindingsPrompt(input: { owner: string; repo: string; number: number; title: string; headSha: string; findings: PromptFinding[] }): string {
   const owner = sanitizeSingleLine(input.owner);
   const repo = sanitizeSingleLine(input.repo);
   const title = sanitizeSingleLine(input.title);
   const headSha = sanitizeSingleLine(input.headSha);
   const header = [`${PROMPT_LABELS.headerPrefix} ${owner}/${repo}#${input.number}: ${title}`, `${PROMPT_LABELS.commitPrefix} ${headSha}`];
-  const entries = input.findings.map((finding, index) => {
+  return [...header, '', formatFindingEntries(input.findings)].join('\n');
+}
+
+/** Same format as `formatFindingsPrompt`, for a local review identified by its checkout label and snapshot commit. */
+export function formatLocalFindingsPrompt(input: { label: string; snapshotSha: string; findings: PromptFinding[] }): string {
+  const header = [`${PROMPT_LABELS.headerPrefix} local changes in ${sanitizeSingleLine(input.label)}`, `${PROMPT_LABELS.commitPrefix} ${sanitizeSingleLine(input.snapshotSha)}`];
+  return [...header, '', formatFindingEntries(input.findings)].join('\n');
+}
+
+function formatFindingEntries(findings: PromptFinding[]): string {
+  const entries = findings.map((finding, index) => {
     const cleanFile = sanitizeSingleLine(finding.file);
     const location = finding.line === null ? cleanFile : `${cleanFile}:${finding.line}`;
     const severityLabel = SEVERITY_NAMES[finding.severity.toLowerCase()] ?? finding.severity.toUpperCase();
@@ -100,7 +109,7 @@ export function formatFindingsPrompt(input: {
       `${PROMPT_LABELS.findingEndPrefix} ${index + 1} ---`
     ].join('\n');
   });
-  return [...header, '', entries.join('\n\n')].join('\n');
+  return entries.join('\n\n');
 }
 
 function copyWithDocumentCommand(text: string): boolean {
@@ -133,6 +142,19 @@ export async function copyTextToClipboard(text: string): Promise<void> {
   } catch (cause) {
     throw new Error(`Clipboard access was denied and the built-in copy command failed: ${errorText(cause)}`);
   }
+}
+
+const SKIP_REASONS: Record<string, string> = {
+  'possible-secret': 'Possible secret',
+  'too-large': 'Too large',
+  binary: 'Binary',
+  'too-many-files': 'Too many new files',
+  generated: 'Generated or lockfile',
+  'over-budget': 'Over the diff size budget'
+};
+
+export function skipReasonText(reason: string): string {
+  return SKIP_REASONS[reason] ?? reason;
 }
 
 export function errorText(error: unknown): string {

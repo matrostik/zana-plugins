@@ -503,6 +503,13 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
 
   zcc.rpc.method('localStatus', (args) => local.status(asString(asRecord(args), 'reviewId')));
 
+  zcc.rpc.method('localDiff', (args) => {
+    const reviewId = asString(asRecord(args), 'reviewId');
+    const snapshot = store.getLocalSnapshot(reviewId);
+    if (!snapshot) throw new Error(`Local review ${reviewId} not found`);
+    return snapshot.files;
+  });
+
   zcc.rpc.method('localFileContext', async (args) => {
     const record = asRecord(args);
     return { content: await local.fileAt(asString(record, 'reviewId'), asString(record, 'path')) };
