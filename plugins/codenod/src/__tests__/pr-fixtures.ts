@@ -67,6 +67,7 @@ export function detail(status: ReviewStatus, timing: { createdAt: number; comple
       hasRequirements: false,
       error: status === 'failed' ? 'boom' : null,
       trigger: 'manual',
+      targetKind: 'pr',
       createdAt: timing.createdAt,
       completedAt: timing.completedAt,
       stale: false

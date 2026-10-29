@@ -35,6 +35,35 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 
 Use **Deep Review in thread** to open a normal, visible Zana thread with the pull request loaded, when you want to dig in interactively.
 
+## How To Review Local Changes Before a Pull Request
+
+CodeNod can review work in progress, even before you commit it. Your files, staging area, and branches are never changed.
+
+Prerequisites: the folder is a Zana project (or a `git worktree` of one), and at least one review model is picked in CodeNod settings.
+
+1. Open a terminal in the project folder or one of its worktrees.
+2. Run `zcc codenod review-local --wait`. This reviews every change since your last commit, including new files.
+   - Add `--scope staged` to review only what you staged with `git add`.
+   - Add `--scope branch` to review everything since your branch left the main branch (use `--base origin/develop` for another base).
+   - Add `--intent "What the change should do"` so CodeNod can score requirements.
+3. Wait for the review to finish. It prints scores, skipped files, and findings.
+4. Run `zcc codenod show-local` at any time to see the latest results again. If you edited files since, the results are marked **stale**.
+
+**Expected result**: scores and findings like a pull request review. Files that look like secrets (such as `.env` or private keys), binaries, and very large new files are skipped and listed so you know what was not reviewed.
+
+**Tips**
+
+- Zana agents can do the same with the `codenod_review_local` tool, so an agent can check its own work before opening a pull request.
+- To gate pushes, add a pre-push Git hook that runs `zcc codenod review-local --scope branch --wait --fail-on high`. See `skills/codenod/SKILL.md` for a ready-made script.
+- Local reviews can't be posted to GitHub. Open a pull request and review it there when you want comments on GitHub.
+
+**Troubleshooting**
+
+- **"does not belong to a Zana project"**: add the folder as a project in Zana first.
+- **"No uncommitted changes to review"**: there is nothing to review in that scope. Try `--scope branch`.
+- **"Base branch … does not exist" or "Could not find a default base branch"**: pass an existing branch with `--base`, for example `--base origin/main`.
+- **"This branch has no commits yet"**: make a first commit, then review.
+
 ## What You Get
 
 - **Review inbox** with three lists: pull requests waiting for your review, your own, and every open PR in watched repositories. The inbox only includes repositories you add. Each row shows CI state and the latest review.
@@ -44,12 +73,14 @@ Use **Deep Review in thread** to open a normal, visible Zana thread with the pul
 - **Requirements from GitHub**: taken from the pull request title and description, up to 3 linked issues, and optional spec files per repository (for example `docs/**/*.md`). When nothing is stated, the requirements score shows N/A instead of guessing.
 - **Several GitHub hosts at once**: github.com and any number of GitHub Enterprise hosts.
 - **Opt-in auto-review** per watched repository: once per new commit, skipping drafts and your own pull requests.
-- **Command line**: `zcc codenod list | sync | review | show | post | repos | models | auth`.
-- **Agent tools**: `codenod_list_prs`, `codenod_get_review`, and `codenod_review_pr`, so Zana agents can check and start reviews.
+- **Local reviews** of uncommitted, staged, or branch changes, before a pull request exists.
+- **Command line**: `zcc codenod list | sync | review | show | post | review-local | show-local | repos | models | auth`.
+- **Agent tools**: `codenod_list_prs`, `codenod_get_review`, `codenod_review_pr`, and `codenod_review_local`, so Zana agents can check and start reviews.
 
 ## Safety
 
 - Reviews run unattended in hidden Zana threads with each provider's full-access permission mode, so they never stop on an approval prompt. Providers without a full-access mode can't be used for reviews. When the repository is a Zana project, the review gets its own fresh worktree, so your working copy is never touched. Otherwise the model reviews the diff only.
+- Local reviews read a snapshot commit built with a temporary Git index, so your files, staging area, and branches are untouched. Changed files that look like secrets are left out of the snapshot, and reviewers read a copy of the snapshot rather than your live folder.
 - Pull request text, comments, and linked issues are treated as untrusted input and sanitized before they reach the model.
 - Posting comments takes an explicit click (or `--yes` on the command line).
 - Approve and Request changes need a Zana-signed confirmation tied to the exact commit you reviewed. They are refused if new commits arrived since the review. Agents and the command line cannot approve.
@@ -147,6 +178,7 @@ Layout:
 - `server.ts` — plugin entry: settings, RPC methods, sync schedule, and wiring
 - `src/server/github/` — host parsing, token resolution, and the GitHub REST client
 - `src/server/review/` — prompts, context gathering, reply parsing, consensus, and the thread runner
+- `src/server/local/` — Git snapshots and the local review service
 - `src/server/` — database, sync, posting, views, and the CLI and agent tools
 - `src/app/` — the sidebar page, pull request list and detail, and settings UI
 - `src/__tests__/` — Vitest suites and a fake Zana host

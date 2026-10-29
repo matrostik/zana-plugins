@@ -4,6 +4,8 @@ import { createStore, type Database } from './src/server/db.ts';
 import { createTokenResolver, runCommand, type CommandRunner } from './src/server/github/auth.ts';
 import { createGitHubClient, type FetchLike } from './src/server/github/client.ts';
 import { DEFAULT_HOST, parseHostList, parsePrId, parsePrRef, parseRepoRef, prId, repoId } from './src/server/github/refs.ts';
+import { runGit, type GitRunner } from './src/server/local/git.ts';
+import { createLocalReviews, isLocalScope, LOCAL_SCOPES } from './src/server/local/service.ts';
 import { createOutdatedNotifier } from './src/server/outdated.ts';
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
@@ -16,10 +18,11 @@ import { createSyncService } from './src/server/sync.ts';
 import type { ModelChoice, PrBucket, ReviewEvent, ReviewRow } from './src/server/types.ts';
 import { mergeCatalogModels } from './src/server/models-catalog.ts';
 import { asRecord, asString, asStringArray, errorMessage, sleep } from './src/server/util.ts';
-import { getPrDetail, listPullRequests } from './src/server/views.ts';
+import { getLocalDetail, getPrDetail, listPullRequests } from './src/server/views.ts';
 
 export interface CodenodPluginDeps {
   run?: CommandRunner;
+  git?: GitRunner;
   fetch?: FetchLike;
   now?: () => number;
   pollMs?: number;
@@ -27,6 +30,7 @@ export interface CodenodPluginDeps {
 
 const MODELS_KEY = 'reviewModels';
 const SYNC_TICK_CRON = '* * * * *';
+const LOCAL_SWEEP_CRON = '17 3 * * *';
 const REVIEW_EVENTS: ReviewEvent[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
 const BUCKETS: PrBucket[] = ['needs-review', 'mine', 'watched'];
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
@@ -133,12 +137,33 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     return pr;
   }
 
+  const local = createLocalReviews({
+    store,
+    git: deps.git ?? runGit,
+    listProjects: () => zcc.sdk.projects.list(),
+    config: reviewConfig,
+    reviews: () => reviews,
+    threads,
+    waiter,
+    specGlobForProject: async (projectId) => {
+      for (const repo of store.listRepos()) {
+        if (!repo.specGlob) continue;
+        if ((await projects.projectForRepo({ host: repo.host, owner: repo.owner, name: repo.name }))?.id === projectId) return repo.specGlob;
+      }
+      return null;
+    },
+    publish,
+    log: zcc.log,
+    now
+  });
+
   const reviews = createReviewService({
     store,
     github,
     threads,
     waiter,
     projects,
+    localReviewTarget: (review) => local.reviewTarget(review),
     config: reviewConfig,
     providerPermissionModes: async (providerId) =>
       (await zcc.sdk.providers.list()).find((provider) => provider.id === providerId)?.capabilities?.permissionModes,
@@ -195,6 +220,33 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     await runSync().catch((error) => zcc.log.warn(`codenod: sync failed: ${errorMessage(error)}`));
   });
 
+  const sweepLocalReviews = () =>
+    local.sweep().catch((error) => {
+      zcc.log.warn(`codenod: local review cleanup failed: ${errorMessage(error)}`);
+      return null;
+    });
+  zcc.background.schedule(LOCAL_SWEEP_CRON, async () => {
+    await sweepLocalReviews();
+  });
+  void sweepLocalReviews();
+
+  async function threadWorkspacePath(threadId: string): Promise<string | null> {
+    const thread = await zcc.sdk.threads.get({ threadId }).catch(() => null);
+    if (!thread) return null;
+    const environments = (zcc.sdk as { environments?: { get?: (args: { environmentId: string }) => Promise<{ path: string | null }> } }).environments;
+    if (thread.environmentId && environments?.get) {
+      const environment = await environments.get({ environmentId: thread.environmentId }).catch(() => null);
+      if (environment?.path) return environment.path;
+    }
+    return (await zcc.sdk.projects.list()).find((project) => project.id === thread.projectId)?.path ?? null;
+  }
+
+  const locationRef = (location: Awaited<ReturnType<typeof local.resolveLocation>>) => ({
+    targetId: location.target.id,
+    projectId: location.project.id,
+    worktreePath: location.worktree.path
+  });
+
   async function waitForReview(reviewId: string, timeoutMs: number): Promise<ReviewRow> {
     const deadline = now() + timeoutMs;
     for (;;) {
@@ -234,6 +286,14 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
       const removed = store.removeRepo(id);
       publish(CHANGED_EVENT, { repos: true });
       return removed;
+    },
+    local: {
+      locationForPath: async (path, projectId) => locationRef(await local.locationForPath(path, projectId)),
+      resolveLocation: async (projectId, worktreePath) => locationRef(await local.resolveLocation(projectId, worktreePath)),
+      start: (input) => local.startLocalReview(input),
+      detail: (targetId, reviewId) => getLocalDetail(store, targetId, reviewId),
+      status: (reviewId) => local.status(reviewId),
+      threadWorkspacePath
     }
   };
 
@@ -408,6 +468,59 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     });
     store.recordPrThread(pr.id, spawned.id, 'deep');
     return { threadId: spawned.id, projectId, priority: spawned.priority, model: spawned.model, usedFallback: spawned.usedFallback };
+  });
+
+  // ── Local reviews ────────────────────────────────────────────────────
+  zcc.rpc.method('localTargets', async () => ({
+    locations: await local.listLocations(),
+    scopes: LOCAL_SCOPES,
+    hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
+  }));
+
+  zcc.rpc.method('startLocalReview', async (args) => {
+    const record = asRecord(args);
+    const scope = asString(record, 'scope') || 'uncommitted';
+    if (!isLocalScope(scope)) throw new Error(`Unknown scope ${scope}`);
+    const models = sanitizeModels(record.models);
+    return local.startLocalReview({
+      projectId: asString(record, 'projectId'),
+      worktreePath: asString(record, 'worktreePath'),
+      scope,
+      base: asString(record, 'base') || null,
+      intent: asString(record, 'intent') || null,
+      models: models.length > 0 ? models : undefined,
+      source: 'ui'
+    });
+  });
+
+  zcc.rpc.method('localDetail', (args) => {
+    const record = asRecord(args);
+    const targetId = asString(record, 'targetId');
+    const detail = getLocalDetail(store, targetId, asString(record, 'reviewId') || undefined);
+    if (!detail) throw new Error(`Local review target ${targetId} not found`);
+    return detail;
+  });
+
+  zcc.rpc.method('localStatus', (args) => local.status(asString(asRecord(args), 'reviewId')));
+
+  zcc.rpc.method('localFileContext', async (args) => {
+    const record = asRecord(args);
+    return { content: await local.fileAt(asString(record, 'reviewId'), asString(record, 'path')) };
+  });
+
+  zcc.rpc.method('localDeepReview', (args) => {
+    const record = asRecord(args);
+    return local.deepReview(asString(record, 'reviewId'), asStringArray(record, 'findingIds'));
+  });
+
+  zcc.rpc.method('localFix', (args) => {
+    const record = asRecord(args);
+    return local.fix(asString(record, 'reviewId'), asStringArray(record, 'findingIds'), record.force === true);
+  });
+
+  zcc.rpc.method('deleteLocalReview', async (args) => {
+    await local.deleteReview(asString(asRecord(args), 'reviewId'));
+    return { ok: true };
   });
 
   zcc.rpc.method('config', async () => ({
