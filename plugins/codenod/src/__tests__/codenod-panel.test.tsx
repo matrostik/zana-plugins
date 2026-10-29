@@ -144,3 +144,35 @@ describe('CodenodPanel', () => {
     expect((await screen.findByRole('tab', { name: /Mine/ })).getAttribute('aria-selected')).toBe('true');
   });
 });
+
+describe('CodenodPanel in a project tab', () => {
+  const repo = (owner: string, watched: boolean) => ({ id: `github.com/${owner}/api`, host: 'github.com', owner, name: 'api', watched });
+
+  it('asks for the project overview and offers to watch each unwatched repository', async () => {
+    answer({ overview: overview({ prs: [], hasWatchedRepos: false, projectRepos: [repo('acme', false), repo('me', true)] }), config: { models: [] }, addRepo: null, refresh: null });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    expect(await screen.findByText("Watch this project's repository to see its pull requests.")).toBeTruthy();
+    expect(sdk.call).toHaveBeenCalledWith('overview', { projectId: 'p1' });
+    const buttons = screen.getAllByRole('button', { name: 'Watch repository' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(sdk.call).toHaveBeenCalledWith('addRepo', { repo: 'github.com/acme/api' }));
+    await waitFor(() => expect(sdk.call).toHaveBeenCalledWith('refresh'));
+    await waitFor(() => expect(sdk.call.mock.calls.filter(([method]) => method === 'overview')).toHaveLength(2));
+  });
+
+  it('opens local changes for a project without a GitHub remote', async () => {
+    answer({ overview: overview({ prs: [], projectRepos: [] }), config: { models: [] }, localTargets: { locations: [], scopes: [], hasModels: true } });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    expect(await screen.findByText('This project has no local checkouts.')).toBeTruthy();
+    expect(sdk.call).toHaveBeenCalledWith('localTargets', { projectId: 'p1' });
+  });
+
+  it('remembers its mode separately from the global panel', async () => {
+    answer({ overview: overview({ projectRepos: [repo('acme', true)] }), config: { models: [] }, localTargets: { locations: [], scopes: [], hasModels: true } });
+    render(<CodenodPanel pluginId="codenod" projectId="p1" />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Local changes' }));
+    expect(localStorage.getItem('codenod.mode:p1')).toBe('local');
+    expect(localStorage.getItem('codenod.mode')).toBeNull();
+  });
+});

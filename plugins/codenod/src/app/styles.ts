@@ -174,6 +174,7 @@ export const CODENOD_STYLES = `
 .cn-banner-warn strong, .cn-banner-warn code { color: var(--cn-warn); }
 .cn-banner-warn p { margin: 6px 0 0; }
 .cn-banner-warn code { overflow-wrap: anywhere; }
+.cn-banner-watch { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cn-banner-error { border-color: var(--cn-danger); background: color-mix(in srgb, var(--cn-danger) 10%, var(--cn-card)); color: var(--cn-text); }
 .cn-table { width: 100%; border-collapse: collapse; }
 .cn-table th, .cn-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--cn-border); vertical-align: middle; }
@@ -261,13 +262,13 @@ export const CODENOD_STYLES = `
   background: color-mix(in srgb, var(--cn-warn) 10%, var(--cn-card));
   border: 1px solid color-mix(in srgb, var(--cn-warn) 30%, transparent); color: var(--cn-text);
 }
+.cn-model-omitted-notice .cn-icon { color: var(--cn-warn); margin-top: 1px; }
 .cn-model-omitted-notice p { margin: 0 0 4px; }
 .cn-model-omitted-notice ul { margin: 0; padding-left: 18px; }
 .cn-model-omitted-notice li + li { margin-top: 4px; }
 .cn-model-omitted-notice details { margin-top: 2px; }
 .cn-model-omitted-notice summary { cursor: pointer; color: var(--cn-muted); }
 .cn-model-omitted-notice code { overflow-wrap: anywhere; }
-.cn-model-omitted-notice .cn-icon { color: var(--cn-warn); margin-top: 1px; }
 
 .cn-priority-list { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 12px 0 14px; padding: 0; }
 .cn-priority-row {

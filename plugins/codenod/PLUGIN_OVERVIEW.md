@@ -13,6 +13,7 @@ Triage and AI-review GitHub pull requests in Zana Command Center using the AI pr
 - **Outdated Reviews**: An amber banner shows the reviewed and current commits, with a Rerun action. Inbox alerts are sent once per detected head commit and survive restarts; failed deliveries retry on a later sync. Previous completed findings remain visible during reruns and after failures or cancellation.
 - **Deep Review**: Open a visible Zana thread with the full pull request context to dig in interactively.
 - **Opt-in Auto-Review**: Per watched repository, review each new head commit automatically (drafts and your own pull requests are skipped).
+- **Project Tab**: A **CodeNod** tab inside each Zana project shows only the pull requests of the repositories that project's git remotes point at, and only its own checkouts. Unwatched project repositories get a one-click **Watch repository** prompt.
 - **Local Reviews**: Review uncommitted, staged, or branch changes in any checkout of a Zana project before a pull request exists. Reviews read an immutable snapshot commit, so your files, index, and branches are never touched.
 - **CLI and Agent Tools**: `zcc codenod` from the terminal, and the `codenod_list_prs`, `codenod_get_review`, `codenod_review_pr`, and `codenod_review_local` tools for agents.
 
@@ -25,6 +26,13 @@ CodeNod uses, in order: `gh auth token --hostname <host>`, your Git credential h
 Like Git Tree, this plugin installs from pre-built artifacts committed alongside the source: `server.mjs` (referenced by `zcc.server`) and `app.js` (referenced by `zcc.app`). The TypeScript sources under `src/` plus `server.ts`/`app.tsx` are the source of truth; rebuild with `zcc plugin build` and re-commit the artifacts. Run the tests with `npm test`.
 
 ## Changelog
+
+### 0.2.2
+
+- **Project Tab**: CodeNod now also opens as a tab inside each project, alongside the global sidebar page. Pull requests are limited to the repositories the project's fetch remotes point at, and Local changes to the project's own checkouts.
+- **Watch From the Project**: When a project's repository isn't watched, the tab shows a **Watch repository** button per remote, then syncs. Projects without a GitHub remote open on Local changes.
+- **Per-Project Memory**: The project tab remembers its mode, bucket, and selected checkout separately from the global page.
+- **Command Palette**: "CodeNod: Review this project" opens the tab for the current project.
 
 ### 0.2.1
 

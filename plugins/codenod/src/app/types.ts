@@ -17,6 +17,16 @@ export interface Overview {
   activeReviews: number;
   hasModels: boolean;
   hasWatchedRepos: boolean;
+  /** Present when the overview is scoped to a project: the GitHub repositories its remotes point at. */
+  projectRepos?: ProjectRepoStatus[];
+}
+
+export interface ProjectRepoStatus {
+  id: string;
+  host: string;
+  owner: string;
+  name: string;
+  watched: boolean;
 }
 
 export interface LocalOverview {

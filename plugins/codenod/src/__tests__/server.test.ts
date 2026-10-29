@@ -103,12 +103,18 @@ function reply(thread: FakeThread, prompt: string): string {
 }
 
 async function setup(
-  options: { consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>; reply?: typeof reply; settings?: Record<string, string | number | boolean> } = {}
+  options: {
+    consumeApproval?: (input: { token: string; binding: unknown }) => Promise<boolean>;
+    reply?: typeof reply;
+    settings?: Record<string, string | number | boolean>;
+    projects?: Array<{ id: string; name: string; path?: string }>;
+    run?: CommandRunner;
+  } = {}
 ) {
   const state = { headSha: 'sha1' };
   const github = githubFixture(state);
-  const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval, settings: options.settings });
-  await createCodenodPlugin(host.zcc, { run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
+  const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval, settings: options.settings, projects: options.projects });
+  await createCodenodPlugin(host.zcc, { run: options.run ?? run, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
   return { host, github, state };
 }
 
@@ -202,6 +208,40 @@ describe('codenod server', () => {
     expect(overview.prs).toEqual([]);
     const detail = (await host.callRpc('detail', { prId: PR_ID })) as PrDetail;
     expect(detail.pr.state).toBe('closed');
+  });
+
+  it('scopes the overview to the repositories a project points at', async () => {
+    const remotes: Record<string, string> = {
+      '/work/api': 'origin\tgit@github.com:me/api.git (fetch)\nupstream\tgit@github.com:acme/api.git (fetch)\nupstream\tgit@github.com:acme/api.git (push)',
+      '/work/web': 'origin\thttps://github.com/acme/web.git (fetch)'
+    };
+    const { host } = await setup({
+      projects: [
+        { id: 'api', name: 'API', path: '/work/api' },
+        { id: 'web', name: 'Web', path: '/work/web' },
+        { id: 'scratch', name: 'Scratch', path: '/work/scratch' }
+      ],
+      run: async (command, args) => (command === 'git' ? remotes[args[1]] ?? null : run(command, args))
+    });
+    await host.callRpc('addRepo', { repo: 'acme/api' });
+    await host.callRpc('refresh');
+    type ScopedOverview = { prs: PrListItem[]; hasWatchedRepos: boolean; projectRepos?: Array<{ id: string; watched: boolean }> };
+
+    const api = (await host.callRpc('overview', { projectId: 'api' })) as ScopedOverview;
+    expect(api.prs.map((pr) => pr.id)).toEqual([PR_ID]);
+    expect(api.hasWatchedRepos).toBe(true);
+    expect(api.projectRepos).toEqual([
+      { id: 'github.com/me/api', host: 'github.com', owner: 'me', name: 'api', watched: false },
+      { id: 'github.com/acme/api', host: 'github.com', owner: 'acme', name: 'api', watched: true }
+    ]);
+
+    const web = (await host.callRpc('overview', { projectId: 'web' })) as ScopedOverview;
+    expect(web).toMatchObject({ prs: [], hasWatchedRepos: false, projectRepos: [{ id: 'github.com/acme/web', watched: false }] });
+    expect(((await host.callRpc('overview', { projectId: 'scratch' })) as ScopedOverview).projectRepos).toEqual([]);
+
+    const global = (await host.callRpc('overview')) as ScopedOverview;
+    expect(global.prs).toHaveLength(1);
+    expect(global.projectRepos).toBeUndefined();
   });
 
   it('runs a multi-model review in hidden threads with consensus', async () => {
