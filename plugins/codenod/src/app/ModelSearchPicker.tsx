@@ -21,6 +21,7 @@ export function moveModelChoice(current: ModelChoice[], index: number, offset: -
   [next[index], next[target]] = [next[target], next[index]];
   return next;
 }
+
 export function ModelPriorityPicker(props: {
   value: ModelChoice[];
   providers: AvailableProvider[];
@@ -41,10 +42,17 @@ export function ModelPriorityPicker(props: {
       <h4 id="cn-model-priority-heading">Review model priority</h4>
       <p className="cn-muted cn-small">Models run together for consensus. Priority 1 is tried first for coordinator and Deep Review threads.</p>
       {providers.some((provider) => provider.models.length === 0 && provider.error) ? (
-        <p className="cn-muted cn-small">
-          Providers without available models are omitted: {providers.filter((provider) => provider.models.length === 0 && provider.error)
-            .map((provider) => `${provider.displayName} (${provider.error})`).join('; ')}
-        </p>
+        <div className="cn-model-omitted-notice">
+          <svg className="cn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>
+            Providers without available models are omitted: {providers.filter((provider) => provider.models.length === 0 && provider.error)
+              .map((provider) => `${provider.displayName} (${provider.error})`).join('; ')}
+          </span>
+        </div>
       ) : null}
       {value.length > 0 ? (
         <ol className="cn-priority-list">
@@ -73,9 +81,15 @@ export function ModelPriorityPicker(props: {
           onCancel={value.length > 0 ? () => setAddingModel(false) : undefined}
         />
       ) : canAddModel ? (
-        <button type="button" className="cn-btn cn-small" onClick={() => setAddingModel(true)}>Add model</button>
+        <button type="button" className="cn-btn-add-model" onClick={() => setAddingModel(true)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span>Add model</span>
+        </button>
       ) : null}
-      {!selectableProviders.length ? <p className="cn-muted cn-small">No providers currently have available models.</p> : null}
+      {!selectableProviders.length ? <p className="cn-muted cn-small" style={{ marginTop: 8 }}>No providers currently have available models.</p> : null}
     </section>
   );
 }
@@ -110,10 +124,19 @@ function PriorityRow(props: {
     ? { ...choice, ...(reasoningLevel ? { reasoningLevel } : { reasoningLevel: undefined }) }
     : choice));
 
+  const isCoordinator = index === 0;
+
   return (
-    <li className="cn-priority-row">
-      <span className="cn-priority-rank">{index + 1}</span>
-      <label className="cn-field">
+    <li className={`cn-priority-row ${isCoordinator ? 'cn-priority-coordinator' : ''}`}>
+      <div className="cn-priority-rank-wrap">
+        <span
+          className={`cn-priority-rank ${isCoordinator ? 'cn-priority-rank-first' : ''}`}
+          title={isCoordinator ? 'Priority 1 (Coordinator)' : `Priority ${index + 1}`}
+        >
+          {index + 1}
+        </span>
+      </div>
+      <label className="cn-field cn-priority-provider-field">
         <span className="cn-muted cn-small">Provider</span>
         <select className="cn-select" aria-label={`Provider for priority ${index + 1}`} value={item.providerId} onChange={(event) => changeProvider(event.target.value)}>
           {providerOptions.map((option) => <option key={option.providerId} value={option.providerId}>{option.displayName}</option>)}
@@ -122,7 +145,7 @@ function PriorityRow(props: {
           ) : null}
         </select>
       </label>
-      <label className="cn-field">
+      <label className="cn-field cn-priority-model-field">
         <span className="cn-muted cn-small">Model</span>
         <select className="cn-select" aria-label={`Model for priority ${index + 1}`} value={item.model} disabled={!provider || modelOptions.length === 0} onChange={(event) => changeModel(event.target.value)}>
           {!provider?.models.some((model) => model.id === item.model) ? <option value={item.model} disabled>{item.model} (unavailable)</option> : null}
@@ -130,18 +153,54 @@ function PriorityRow(props: {
         </select>
       </label>
       {catalog?.reasoningLevels.length ? (
-        <label className="cn-field">
+        <label className="cn-field cn-priority-reasoning-field">
           <span className="cn-muted cn-small">Reasoning</span>
-          <select className="cn-select cn-small" aria-label={`Reasoning level for ${catalog.label}`} value={item.reasoningLevel ?? ''} onChange={(event) => changeReasoning(event.target.value)}>
+          <select className="cn-select" aria-label={`Reasoning level for ${catalog.label}`} value={item.reasoningLevel ?? ''} onChange={(event) => changeReasoning(event.target.value)}>
             <option value="">Default</option>
             {catalog.reasoningLevels.map((level) => <option key={level} value={level}>{level}</option>)}
           </select>
         </label>
       ) : null}
       <span className="cn-priority-controls">
-        <button type="button" className="cn-btn cn-small" aria-label={`Move priority ${index + 1} up`} disabled={index === 0} onClick={() => onChange(moveModelChoice(value, index, -1))}>Move up</button>
-        <button type="button" className="cn-btn cn-small" aria-label={`Move priority ${index + 1} down`} disabled={index === value.length - 1} onClick={() => onChange(moveModelChoice(value, index, 1))}>Move down</button>
-        <button type="button" className="cn-btn cn-small" aria-label={`Remove priority ${index + 1}`} onClick={() => onChange(value.filter((_, choiceIndex) => choiceIndex !== index))}>Remove</button>
+        <button
+          type="button"
+          className="cn-btn cn-priority-btn"
+          aria-label={`Move priority ${index + 1} up`}
+          title="Move up"
+          disabled={index === 0}
+          onClick={() => onChange(moveModelChoice(value, index, -1))}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+          <span className="cn-btn-label">Move up</span>
+        </button>
+        <button
+          type="button"
+          className="cn-btn cn-priority-btn"
+          aria-label={`Move priority ${index + 1} down`}
+          title="Move down"
+          disabled={index === value.length - 1}
+          onClick={() => onChange(moveModelChoice(value, index, 1))}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          <span className="cn-btn-label">Move down</span>
+        </button>
+        <button
+          type="button"
+          className="cn-btn cn-priority-btn cn-priority-btn-remove"
+          aria-label={`Remove priority ${index + 1}`}
+          title="Remove"
+          onClick={() => onChange(value.filter((_, choiceIndex) => choiceIndex !== index))}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          <span className="cn-btn-label">Remove</span>
+        </button>
       </span>
     </li>
   );
@@ -166,23 +225,31 @@ function AddPriorityRow(props: {
   };
 
   return (
-    <div className="cn-priority-row cn-priority-add-row">
-      <span className="cn-priority-rank">{priority}</span>
-      <label className="cn-field">
+    <div className="cn-priority-add-row">
+      <div className="cn-priority-rank-wrap">
+        <span className="cn-priority-rank cn-priority-rank-add" title={`Priority ${priority}`}>
+          {priority}
+        </span>
+      </div>
+      <label className="cn-field cn-priority-provider-field">
         <span className="cn-muted cn-small">Provider</span>
         <select className="cn-select" aria-label={`Provider for priority ${priority}`} value={providerId} onChange={(event) => setProviderId(event.target.value)}>
           <option value="">Choose a provider…</option>
           {providers.map((candidate) => <option key={candidate.providerId} value={candidate.providerId}>{candidate.displayName}</option>)}
         </select>
       </label>
-      <label className="cn-field">
+      <label className="cn-field cn-priority-model-field">
         <span className="cn-muted cn-small">Model</span>
         <select className="cn-select" aria-label={`Model for priority ${priority}`} value="" disabled={!provider} onChange={(event) => selectModel(event.target.value)}>
           <option value="">Choose a model…</option>
           {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
         </select>
       </label>
-      {onCancel ? <button type="button" className="cn-btn cn-small" onClick={onCancel}>Cancel</button> : null}
+      {onCancel ? (
+        <button type="button" className="cn-btn cn-small" onClick={onCancel} style={{ marginBottom: 1 }}>
+          Cancel
+        </button>
+      ) : null}
     </div>
   );
 }

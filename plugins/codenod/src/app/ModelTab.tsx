@@ -42,11 +42,18 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
       ) : (
         <ModelPriorityPicker value={draft} providers={providers} onChange={setDraft} />
       )}
-      <div className="cn-inline">
+      <div className="cn-inline" style={{ marginTop: 16 }}>
         <button type="button" className="cn-btn cn-btn-primary" onClick={() => void action.run(() => rpc.call('setModels', { models: draft }))}>
           Save models ({draft.length})
         </button>
-        {action.saved ? <span className="cn-muted" role="status">Saved</span> : null}
+        {action.saved ? (
+          <span className="cn-status-saved" role="status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Saved
+          </span>
+        ) : null}
       </div>
     </section>
   );
@@ -61,6 +68,9 @@ function ExecutionSection({ rpc, config, onChanged }: { rpc: Rpc; config: Config
   return (
     <section className="cn-section" aria-labelledby="cn-execution-heading">
       <h3 id="cn-execution-heading">Review execution</h3>
+      <p className="cn-muted cn-small">
+        Fine-tune review timeouts, concurrency limits, workspace isolation, and board visibility.
+      </p>
       {error ? <p className="cn-banner cn-banner-error">{error}</p> : null}
       <div className="cn-fields">
         <NumberSetting
@@ -108,16 +118,25 @@ function ExecutionSection({ rpc, config, onChanged }: { rpc: Rpc; config: Config
             Used when no Zana project matches the pull request repository.
           </span>
         </div>
-        <label className="cn-check">
-          <input type="checkbox" checked={settings.archiveReviewThreads} onChange={(event) => save({ archiveReviewThreads: event.target.checked })} />
-          Archive hidden review threads when done
-        </label>
-        <label className="cn-check">
-          <input type="checkbox" checked={settings.showReviewsOnAgentsBoard} onChange={(event) => save({ showReviewsOnAgentsBoard: event.target.checked })} />
-          Show review coordinator on Agents board
-        </label>
+        <div className="cn-checkbox-group">
+          <label className="cn-check">
+            <input type="checkbox" checked={settings.archiveReviewThreads} onChange={(event) => save({ archiveReviewThreads: event.target.checked })} />
+            <span>Archive hidden review threads when done</span>
+          </label>
+          <label className="cn-check">
+            <input type="checkbox" checked={settings.showReviewsOnAgentsBoard} onChange={(event) => save({ showReviewsOnAgentsBoard: event.target.checked })} />
+            <span>Show review coordinator on Agents board</span>
+          </label>
+        </div>
       </div>
-      {saved ? <span className="cn-muted" role="status">Saved</span> : null}
+      {saved ? (
+        <span className="cn-status-saved" role="status" style={{ marginTop: 8 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Saved
+        </span>
+      ) : null}
     </section>
   );
 }
