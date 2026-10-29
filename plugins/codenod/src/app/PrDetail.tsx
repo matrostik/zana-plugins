@@ -11,11 +11,11 @@ type DetailTab = 'findings' | 'models' | 'diff';
 
 const TICK_MS = 1000;
 
-function isActive(status: string | undefined): boolean {
+export function isActive(status: string | undefined): boolean {
   return status === 'queued' || status === 'running';
 }
 
-function useNow(ticking: boolean): number {
+export function useNow(ticking: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     setNow(Date.now());
@@ -32,7 +32,7 @@ const EVENT_LABELS: Record<ReviewEvent, string> = {
   REQUEST_CHANGES: 'Request changes'
 };
 
-function ScoreChip({ label, value, kind, note }: { label: string; value: number | null; kind: 'risk' | 'quality'; note?: string | null }) {
+export function ScoreChip({ label, value, kind, note }: { label: string; value: number | null; kind: 'risk' | 'quality'; note?: string | null }) {
   const tone = scoreTone(value, kind);
   return (
     <div className="cn-score" title={note ?? undefined}>
@@ -58,6 +58,10 @@ function DiffView({ rpc, prId }: { rpc: Rpc; prId: string }) {
   }, [rpc, prId]);
   if (error) return <p className="cn-banner cn-banner-error">{error}</p>;
   if (!files) return <p className="cn-muted">Loading diff…</p>;
+  return <DiffFiles files={files} />;
+}
+
+export function DiffFiles({ files }: { files: ChangedFile[] }) {
   return (
     <div>
       {files.map((file) => (
@@ -88,7 +92,7 @@ function DiffView({ rpc, prId }: { rpc: Rpc; prId: string }) {
   );
 }
 
-function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: ModelChoice[]): void; onClose(): void }) {
+export function ModelPicker(props: { rpc: Rpc; defaults: ModelChoice[]; onRun(models: ModelChoice[]): void; onClose(): void }) {
   const [providers, setProviders] = useState<AvailableProvider[] | null>(null);
   const [chosen, setChosen] = useState<ModelChoice[]>(props.defaults);
   const [error, setError] = useState<string | null>(null);
@@ -134,12 +138,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
 
-  let navigate: ReturnType<typeof useZccNavigate> | null = null;
-  try {
-    navigate = useZccNavigate();
-  } catch {
-    navigate = null;
-  }
+  const navigate: ReturnType<typeof useZccNavigate> | undefined = useZccNavigate() ?? undefined;
 
   const requestSeq = useRef(0);
   const load = useCallback(() => {
@@ -376,7 +375,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             <div role="tabpanel" className="cn-section">
               {tab === 'findings' ? (
                 findings.length === 0 && review.status !== 'completed' ? <p className="cn-empty">Findings appear when the review completes.</p> :
-                <FindingsView key={review.id} rpc={rpc} pr={pr} reviewId={review.id} headSha={review.headSha} stale={review.stale}
+                <FindingsView key={review.id} rpc={rpc} contextSource={{ kind: 'pr', pr, headSha: review.headSha }} reviewId={review.id} stale={review.stale}
                   findings={findings} filters={filters} onFiltersChange={setFilters}
                   onEditingChange={setEditingFinding} disabled={busy !== null}
                   selectedIds={selectedFindingIds} onSelectionChange={(next) => { setFindingSelectionCustomized(true); setSelectedFindingIds(next); }} onCopyPrompt={() => void copyPrompt()}

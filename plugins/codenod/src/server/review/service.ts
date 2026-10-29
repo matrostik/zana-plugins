@@ -36,6 +36,8 @@ export interface ReviewServiceDeps {
   complete?: (args: { instructions: string; prompt: string }) => Promise<{ text: string }>;
   notify?: (args: { projectId: string; text: string }) => Promise<void>;
   syncPullRequest: (ref: PrRef) => Promise<PullRequestRow>;
+  /** Builds the target of a review whose `targetKind` is `local`. */
+  localReviewTarget?: (review: ReviewRow) => ReviewTarget;
   publish: (event: string, payload: unknown) => void;
   log: { info(message: string): void; warn(message: string): void };
   coordinatorRetryDelayMs?: number;
@@ -78,6 +80,8 @@ export interface PreparedReview {
 
 export interface ReviewTarget {
   subject: ReviewSubject;
+  /** Skips the Agents board coordinator and the Inbox notification. */
+  quiet?: boolean;
   /** Gathers context and resolves the workspace. Returns null when the review was cancelled or superseded. */
   prepare(review: ReviewRow, config: ReviewConfig, signal: AbortSignal): Promise<PreparedReview | null>;
   afterComplete(): Promise<void>;
@@ -427,6 +431,10 @@ export function createReviewService(deps: ReviewServiceDeps) {
   }
 
   function targetFor(review: ReviewRow, item: QueuedReview): ReviewTarget {
+    if (review.targetKind === 'local') {
+      if (!deps.localReviewTarget) throw new Error('Local reviews are not available');
+      return deps.localReviewTarget(review);
+    }
     const pr = deps.store.getPullRequest(review.prId);
     if (!pr) throw new Error(`Pull request ${review.prId} is not in the CodeNod database`);
     return pullRequestTarget(pr, item);
@@ -444,7 +452,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
     const config = await deps.config();
     const prepared = await target.prepare(review, config, signal);
     if (!prepared) return;
-    if (config.showReviewsOnAgentsBoard) {
+    if (config.showReviewsOnAgentsBoard && !target.quiet) {
       coordinatorThreadId = await setupCoordinator(deps, subject, review, prepared.workspace.projectId, item.models, changed);
     }
 
@@ -478,7 +486,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
     }
 
     await target.afterComplete();
-    await sendReviewNotification(deps, subject, review.id, prepared.workspace.projectId, succeeded, clusters, item.models.length);
+    if (!target.quiet) await sendReviewNotification(deps, subject, review.id, prepared.workspace.projectId, succeeded, clusters, item.models.length);
   }
 
   async function pump(): Promise<void> {
@@ -505,24 +513,38 @@ export function createReviewService(deps: ReviewServiceDeps) {
     }
   }
 
+  /** The given models, or the configured ones, capped at five. */
+  async function resolveModels(requested?: ModelChoice[]): Promise<ModelChoice[]> {
+    const config = await deps.config();
+    const models = (requested && requested.length > 0 ? requested : config.models).slice(0, 5);
+    if (models.length === 0) throw new Error('No review model is configured. Pick at least one model in CodeNod settings.');
+    return models;
+  }
+
+  /** Schedules an already recorded review. */
+  function enqueueReview(review: ReviewRow, models: ModelChoice[]): void {
+    queue.push({ reviewId: review.id, models, trigger: review.trigger });
+    changed({ prId: review.prId, reviewId: review.id });
+    void pump();
+  }
+
   /** Refreshes the PR from GitHub, records a queued review for its head commit, and schedules it. */
   async function startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto' } = {}): Promise<ReviewRow> {
-    const config = await deps.config();
-    const models = (options.models && options.models.length > 0 ? options.models : config.models).slice(0, 5);
-    if (models.length === 0) throw new Error('No review model is configured. Pick at least one model in CodeNod settings.');
+    const models = await resolveModels(options.models);
     const pr = await deps.syncPullRequest(ref);
     const running = deps.store.latestReview(pr.id);
     if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) return running;
-    const trigger = options.trigger ?? 'manual';
-    const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger });
-    queue.push({ reviewId: review.id, models, trigger });
-    changed({ prId: pr.id, reviewId: review.id });
-    void pump();
+    const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: options.trigger ?? 'manual' });
+    enqueueReview(review, models);
     return review;
   }
 
   return {
     startReview,
+    resolveModels,
+    enqueueReview,
+
+    isActive: (reviewId: string) => active.has(reviewId) || queue.some((item) => item.reviewId === reviewId),
 
     cancelReview(reviewId: string): boolean {
       const queuedIndex = queue.findIndex((item) => item.reviewId === reviewId);

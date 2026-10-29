@@ -1,13 +1,20 @@
 import type {
+  ChangedFile,
   CiState,
   FindingRow,
+  LocalReviewSource,
+  LocalScope,
+  LocalSnapshotRow,
+  LocalTargetRow,
   PrBucket,
   PullRequestRow,
   RepoRow,
   ReviewRow,
   ReviewRunRow,
   ReviewScores,
-  ReviewStatus
+  ReviewStatus,
+  ReviewTargetKind,
+  SkippedFile
 } from './types.ts';
 import { newId } from './util.ts';
 
@@ -136,7 +143,33 @@ export const MIGRATIONS: readonly string[] = [
     kind TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     PRIMARY KEY (pr_id, thread_id)
-  )`
+  )`,
+  `ALTER TABLE reviews ADD COLUMN target_kind TEXT NOT NULL DEFAULT 'pr'`,
+  `CREATE TABLE IF NOT EXISTS local_targets (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    worktree_path TEXT NOT NULL,
+    branch TEXT,
+    last_scope TEXT,
+    last_seen_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS local_snapshots (
+    review_id TEXT PRIMARY KEY,
+    target_id TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    base_ref TEXT,
+    base_sha TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    snapshot_sha TEXT NOT NULL,
+    tree_sha TEXT NOT NULL,
+    intent TEXT,
+    source TEXT NOT NULL,
+    files_json TEXT NOT NULL DEFAULT '[]',
+    skipped_json TEXT NOT NULL DEFAULT '[]',
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS local_snapshots_target ON local_snapshots(target_id, created_at)`
 ];
 
 type Row = Record<string, unknown>;
@@ -231,6 +264,7 @@ function toReview(row: Row): ReviewRow {
     headSha: String(row.head_sha),
     status: String(row.status) as ReviewStatus,
     trigger: row.trigger === 'auto' ? 'auto' : 'manual',
+    targetKind: row.target_kind === 'local' ? 'local' : 'pr',
     summary: str(row.summary),
     consensusSummary: str(row.consensus_summary),
     hasRequirements: Boolean(row.has_requirements),
@@ -257,6 +291,53 @@ function toRun(row: Row): ReviewRunRow {
     startedAt: Number(row.started_at),
     completedAt: num(row.completed_at),
     ...scoresFromRow(row)
+  };
+}
+
+const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch'];
+const LOCAL_SOURCES: readonly LocalReviewSource[] = ['ui', 'cli', 'agent'];
+
+function localScope(value: unknown): LocalScope | null {
+  return LOCAL_SCOPES.includes(value as LocalScope) ? (value as LocalScope) : null;
+}
+
+function jsonList<T>(value: unknown): T[] {
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function toLocalTarget(row: Row): LocalTargetRow {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    worktreePath: String(row.worktree_path),
+    branch: str(row.branch),
+    lastScope: localScope(row.last_scope),
+    lastSeenAt: Number(row.last_seen_at),
+    createdAt: Number(row.created_at)
+  };
+}
+
+function toLocalSnapshot(row: Row): LocalSnapshotRow {
+  return {
+    reviewId: String(row.review_id),
+    targetId: String(row.target_id),
+    scope: localScope(row.scope) ?? 'uncommitted',
+    baseRef: str(row.base_ref),
+    baseSha: String(row.base_sha),
+    headSha: String(row.head_sha),
+    snapshotSha: String(row.snapshot_sha),
+    treeSha: String(row.tree_sha),
+    intent: str(row.intent),
+    source: LOCAL_SOURCES.includes(row.source as LocalReviewSource) ? (row.source as LocalReviewSource) : 'ui',
+    files: jsonList<ChangedFile>(row.files_json),
+    skipped: jsonList<SkippedFile>(row.skipped_json),
+    createdAt: Number(row.created_at)
   };
 }
 
@@ -365,17 +446,86 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return closed;
     },
 
-    createReview(input: { prId: string; headSha: string; trigger: 'manual' | 'auto' }): ReviewRow {
+    createReview(input: { prId: string; headSha: string; trigger: 'manual' | 'auto'; targetKind?: ReviewTargetKind }): ReviewRow {
       const id = newId();
-      db.prepare('INSERT INTO reviews (id, pr_id, head_sha, status, trigger, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+      db.prepare('INSERT INTO reviews (id, pr_id, head_sha, status, trigger, target_kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
         id,
         input.prId,
         input.headSha,
         'queued',
         input.trigger,
+        input.targetKind ?? 'pr',
         now()
       );
       return this.getReview(id)!;
+    },
+
+    /** Removes a review with its runs, findings, posted records, and local snapshot. */
+    deleteReview(id: string): void {
+      db.transaction(() => {
+        db.prepare('DELETE FROM findings WHERE review_id = ?').run(id);
+        db.prepare('DELETE FROM review_runs WHERE review_id = ?').run(id);
+        db.prepare('DELETE FROM posted_reviews WHERE review_id = ?').run(id);
+        db.prepare('DELETE FROM local_snapshots WHERE review_id = ?').run(id);
+        db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
+      });
+    },
+
+    upsertLocalTarget(input: { id: string; projectId: string; worktreePath: string; branch: string | null }): LocalTargetRow {
+      db.prepare(
+        `INSERT INTO local_targets (id, project_id, worktree_path, branch, last_seen_at, created_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET branch = excluded.branch, last_seen_at = excluded.last_seen_at`
+      ).run(input.id, input.projectId, input.worktreePath, input.branch, now(), now());
+      return this.getLocalTarget(input.id)!;
+    },
+
+    getLocalTarget(id: string): LocalTargetRow | null {
+      const row = db.prepare('SELECT * FROM local_targets WHERE id = ?').get(id) as Row | undefined;
+      return row ? toLocalTarget(row) : null;
+    },
+
+    listLocalTargets(): LocalTargetRow[] {
+      return (db.prepare('SELECT * FROM local_targets ORDER BY project_id, worktree_path').all() as Row[]).map(toLocalTarget);
+    },
+
+    setLocalTargetScope(id: string, scope: LocalScope): void {
+      db.prepare('UPDATE local_targets SET last_scope = ? WHERE id = ?').run(scope, id);
+    },
+
+    deleteLocalTarget(id: string): void {
+      db.prepare('DELETE FROM local_targets WHERE id = ?').run(id);
+    },
+
+    recordLocalSnapshot(snapshot: Omit<LocalSnapshotRow, 'createdAt'>): void {
+      db.prepare(
+        `INSERT INTO local_snapshots (review_id, target_id, scope, base_ref, base_sha, head_sha, snapshot_sha, tree_sha, intent, source, files_json, skipped_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        snapshot.reviewId,
+        snapshot.targetId,
+        snapshot.scope,
+        snapshot.baseRef,
+        snapshot.baseSha,
+        snapshot.headSha,
+        snapshot.snapshotSha,
+        snapshot.treeSha,
+        snapshot.intent,
+        snapshot.source,
+        JSON.stringify(snapshot.files),
+        JSON.stringify(snapshot.skipped),
+        now()
+      );
+    },
+
+    getLocalSnapshot(reviewId: string): LocalSnapshotRow | null {
+      const row = db.prepare('SELECT * FROM local_snapshots WHERE review_id = ?').get(reviewId) as Row | undefined;
+      return row ? toLocalSnapshot(row) : null;
+    },
+
+    /** Local reviews of a target, newest first. */
+    listLocalReviews(targetId: string): Array<{ review: ReviewRow; snapshot: LocalSnapshotRow | null }> {
+      const rows = db.prepare("SELECT * FROM reviews WHERE pr_id = ? AND target_kind = 'local' ORDER BY created_at DESC, rowid DESC").all(targetId) as Row[];
+      return rows.map((row) => ({ review: toReview(row), snapshot: this.getLocalSnapshot(String(row.id)) }));
     },
 
     getReview(id: string): ReviewRow | null {

@@ -449,7 +449,7 @@ describe('codenod server', () => {
     expect(models.stdout).toContain('Configured: claude-code:opus, claude-code:sonnet@high');
     expect(models.stdout).toContain('  claude-code:opus');
 
-    expect(host.tools.map((tool) => tool.name).sort()).toEqual(['codenod_get_review', 'codenod_list_prs', 'codenod_review_pr']);
+    expect(host.tools.map((tool) => tool.name).sort()).toEqual(['codenod_get_review', 'codenod_list_prs', 'codenod_review_local', 'codenod_review_pr']);
     const listed = (await host.tools.find((tool) => tool.name === 'codenod_list_prs')!.execute({}, {})) as Array<{ pr: string }>;
     expect(listed[0].pr).toBe(PR_ID);
 

@@ -1,9 +1,11 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { ChangedFile, FindingRow, IssueCategory, PullRequestRow, Severity } from '../server/types.ts';
 import { errorText } from './format.ts';
 import type { Rpc } from './types.ts';
 
 export type FindingFilters = { severity: Severity | 'all'; category: IssueCategory | 'all' };
+/** Where code context comes from: the pull request diff at the reviewed head, or a local review's snapshot. */
+export type FindingsContextSource = { kind: 'pr'; pr: PullRequestRow; headSha: string } | { kind: 'local'; reviewId: string };
 export const SEVERITIES: Record<Severity, string> = { critical: 'Critical', high: 'Error', medium: 'Warning', low: 'Info' };
 const CATEGORIES: Record<IssueCategory, string> = { security: 'Security', performance: 'Performance', logic: 'Logic', style: 'Style' };
 const DEFAULT_EXPANDED_FILES = 3;
@@ -255,9 +257,8 @@ function FindingCard(props: {
 
 export function FindingsView(props: {
   rpc: Rpc;
-  pr: PullRequestRow;
+  contextSource: FindingsContextSource;
   reviewId: string;
-  headSha: string;
   stale: boolean;
   findings: FindingRow[];
   filters: FindingFilters;
@@ -269,7 +270,15 @@ export function FindingsView(props: {
   onSelectionChange(ids: Set<string>): void;
   onCopyPrompt(): void;
 }) {
-  const { findings, filters, rpc } = props;
+  const { findings, filters, rpc, contextSource } = props;
+  const contextMethod = contextSource.kind === 'pr' ? 'diff' : 'localDiff';
+  const contextPrId = contextSource.kind === 'pr' ? contextSource.pr.id : null;
+  const contextHeadSha = contextSource.kind === 'pr' ? contextSource.headSha : null;
+  const contextReviewId = contextSource.kind === 'local' ? contextSource.reviewId : null;
+  const contextArgs = useMemo(
+    () => (contextPrId !== null ? { prId: contextPrId, headSha: contextHeadSha } : { reviewId: contextReviewId }),
+    [contextPrId, contextHeadSha, contextReviewId]
+  );
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -290,7 +299,7 @@ export function FindingsView(props: {
     setLoading(!props.stale && needsContext);
     if (!props.stale && needsContext)
       void rpc
-        .call('diff', { prId: props.pr.id, headSha: props.headSha })
+        .call(contextMethod, contextArgs)
         .then((value) => {
           if (!cancelled) setFiles(Array.isArray(value) ? (value as ChangedFile[]) : []);
         })
@@ -303,7 +312,7 @@ export function FindingsView(props: {
     return () => {
       cancelled = true;
     };
-  }, [rpc, props.pr.id, props.headSha, props.stale, needsContext]);
+  }, [rpc, contextMethod, contextArgs, props.stale, needsContext]);
 
   const active = findings.filter((finding) => !finding.dismissed);
   const visible = active.filter((finding) => matchesFinding(finding, filters));
@@ -457,9 +466,11 @@ export function FindingsView(props: {
             </button>
           ) : null}
           <span className="cn-spacer" />
-          <span className="cn-small cn-muted">
-            {visible.filter((f) => f.postedAt !== null).length} posted · {visible.filter((f) => f.postedAt === null).length} unposted
-          </span>
+          {contextSource.kind === 'pr' ? (
+            <span className="cn-small cn-muted">
+              {visible.filter((f) => f.postedAt !== null).length} posted · {visible.filter((f) => f.postedAt === null).length} unposted
+            </span>
+          ) : null}
         </div>
       </div>
       {undoIds.length ? (
@@ -477,14 +488,14 @@ export function FindingsView(props: {
         </p>
       ) : null}
       {contextError ? <p className="cn-small cn-muted">Could not load code context: {contextError}</p> : null}
-      {props.stale && active.length ? <p className="cn-small cn-muted">Re-run the outdated review to see current code context.</p> : null}
+      {props.stale && active.length && contextSource.kind === 'pr' ? <p className="cn-small cn-muted">Re-run the outdated review to see current code context.</p> : null}
       {!visible.length ? (
         <p className="cn-empty">
           {!findings.length ? 'No issues found.' : !active.length ? 'All findings dismissed.' : 'No findings match the selected filters.'}
         </p>
       ) : null}
       {[...groups].map(([file, rows]) => {
-        const fileUrl = githubBlobUrl(props.pr.host, props.pr.owner, props.pr.repo, props.headSha, file);
+        const fileUrl = contextSource.kind === 'pr' ? githubBlobUrl(contextSource.pr.host, contextSource.pr.owner, contextSource.pr.repo, contextSource.headSha, file) : null;
         return (
           <section className="cn-file-group" key={file} aria-label={`Findings in ${file}`}>
             <div className="cn-file-header">

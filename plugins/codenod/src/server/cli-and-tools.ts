@@ -1,8 +1,25 @@
 import { parsePrRef, parseRepoRef, repoId } from './github/refs.ts';
+import { isLocalScope, type LocalReviewStatus, type StartLocalReviewInput } from './local/service.ts';
 import type { HostStatus, SyncResult } from './sync.ts';
-import type { ModelChoice, PrBucket, PrRef, RepoRow, ReviewEvent, ReviewRow } from './types.ts';
+import type { FindingRow, ModelChoice, PrBucket, PrRef, RepoRow, ReviewEvent, ReviewRow, Severity } from './types.ts';
 import { errorMessage } from './util.ts';
-import { formatPrDetail, formatPrLine, type PrDetail, type PrListItem } from './views.ts';
+import { formatLocalDetail, formatPrDetail, formatPrLine, type LocalDetail, type PrDetail, type PrListItem } from './views.ts';
+
+export interface LocalLocationRef {
+  targetId: string;
+  projectId: string;
+  worktreePath: string;
+}
+
+export interface LocalApp {
+  locationForPath(path: string, projectId?: string): Promise<LocalLocationRef>;
+  resolveLocation(projectId: string, worktreePath: string): Promise<LocalLocationRef>;
+  start(input: StartLocalReviewInput): Promise<ReviewRow>;
+  detail(targetId: string, reviewId?: string): LocalDetail | null;
+  status(reviewId: string): Promise<LocalReviewStatus>;
+  /** Checkout path of an agent thread's environment, falling back to its project path. */
+  threadWorkspacePath(threadId: string): Promise<string | null>;
+}
 
 export interface CodenodApp {
   defaultHost(): Promise<string>;
@@ -18,6 +35,40 @@ export interface CodenodApp {
   listRepos(): RepoRow[];
   addRepo(input: { host: string; owner: string; name: string; autoReview?: boolean; specGlob?: string | null }): RepoRow;
   removeRepo(id: string): boolean;
+  local?: LocalApp;
+}
+
+const SEVERITY_RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
+function isSeverity(value: string): value is Severity {
+  return value in SEVERITY_RANK;
+}
+
+/** Active findings at or above `threshold`. */
+export function findingsAtOrAbove(findings: FindingRow[], threshold: Severity): FindingRow[] {
+  return findings.filter((finding) => !finding.dismissed && SEVERITY_RANK[finding.severity] <= SEVERITY_RANK[threshold]);
+}
+
+function blockingSummary(findings: FindingRow[]) {
+  const blocking = findingsAtOrAbove(findings, 'high');
+  return {
+    blockingCount: blocking.length,
+    blockingFindings: blocking.map((f) => ({
+      id: f.id,
+      severity: f.severity,
+      category: f.category,
+      file: f.file,
+      line: f.line,
+      description: f.description,
+      suggestion: f.suggestion,
+      agreedBy: f.agreedBy
+    }))
+  };
+}
+
+function requireLocal(app: CodenodApp): LocalApp {
+  if (!app.local) throw new Error('Local reviews are not available');
+  return app.local;
 }
 
 export interface AvailableProvider {
@@ -99,12 +150,85 @@ const USAGE = `Usage:
   zcc codenod review <pr-url|owner/repo#123> [--models provider:model,...] [--wait] [--json]
   zcc codenod show <pr-url|owner/repo#123> [--json]
   zcc codenod post <pr-url|owner/repo#123> --yes [--findings all|id,id] [--message "..."]
+  zcc codenod review-local [--path dir] [--scope uncommitted|staged|branch] [--base origin/main] [--intent "..."] [--models provider:model,...] [--wait] [--fail-on critical|high|medium|low] [--json]
+  zcc codenod show-local [--path dir] [--json]
   zcc codenod repos [list | add <owner/repo|host/owner/repo> [--auto] [--spec "docs/**/*.md"] | remove <host/owner/repo>]
   zcc codenod models [--json]
   zcc codenod auth`;
 
 function json(value: unknown) {
   return { exitCode: 0, stdout: JSON.stringify(value, null, 2) };
+}
+
+type CliResult = { exitCode: number; stdout?: string; stderr?: string };
+
+/** The checkout a local command targets: `--path`, else the terminal's working directory. */
+async function cliLocalLocation(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined) {
+  const local = requireLocal(app);
+  const path = flagString(args, 'path') ?? ctx?.cwd;
+  if (!path) throw new Error('Run this inside a project checkout or pass --path');
+  return { local, path, location: await local.locationForPath(path) };
+}
+
+async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const asJson = args.flags.has('json');
+  const scope = flagString(args, 'scope') ?? 'uncommitted';
+  if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch');
+  const failOn = flagString(args, 'fail-on');
+  if (failOn !== undefined && !isSeverity(failOn)) throw new Error('--fail-on must be one of critical, high, medium, low');
+  const wait = args.flags.has('wait');
+  if (failOn && !wait) throw new Error('--fail-on needs --wait');
+  const { local, path, location } = await cliLocalLocation(app, args, ctx);
+  const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
+  let review = await local.start({
+    projectId: location.projectId,
+    worktreePath: location.worktreePath,
+    scope,
+    base: flagString(args, 'base') ?? null,
+    intent: flagString(args, 'intent') ?? null,
+    models,
+    source: 'cli'
+  });
+  if (!wait) {
+    if (asJson) return json(review);
+    return { exitCode: 0, stdout: `Local review ${review.id} ${review.status}. Check it with: zcc codenod show-local${flagString(args, 'path') ? ` --path ${path}` : ''}` };
+  }
+  review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+  const detail = local.detail(location.targetId, review.id);
+  if (!detail) throw new Error(`Local review ${review.id} not found`);
+  const completed = review.status === 'completed';
+  const stale = completed ? (await local.status(review.id)).stale : false;
+  const blocking = completed && failOn ? findingsAtOrAbove(detail.findings, failOn) : [];
+  // A gate must not pass on findings for files that changed while the review ran.
+  const exitCode = !completed || blocking.length > 0 || (failOn !== undefined && stale) ? 1 : 0;
+  if (asJson) return { ...json({ ...detail, stale, ...(failOn ? { blockingCount: blocking.length } : {}) }), exitCode };
+  // A review that did not complete has no gate to report; show why it ended instead of claiming the gate passed.
+  if (!completed) {
+    const reason = review.error ?? `Review ${review.status}.`;
+    return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}\n\nReview did not complete (${review.status}): ${reason}` };
+  }
+  const staleGate = failOn && stale ? ' Files changed while the review ran, so the result is stale; re-run the review.' : '';
+  const gate = failOn ? `\n\n${blocking.length} active finding(s) at or above ${failOn}.${staleGate}` : '';
+  return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}${gate}` };
+}
+
+async function handleShowLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const { local, location } = await cliLocalLocation(app, args, ctx);
+  const detail = local.detail(location.targetId);
+  if (!detail) throw new Error(`No local reviews for ${location.worktreePath}`);
+  const stale = detail.review?.status === 'completed' ? (await local.status(detail.review.id)).stale : false;
+  return args.flags.has('json') ? json({ ...detail, stale }) : { exitCode: 0, stdout: formatLocalDetail(detail, { stale }) };
+}
+
+/** Well-formed `models` tool input; entries without a non-empty provider and model string are dropped. */
+function toolModels(raw: unknown): ModelChoice[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
+  return raw.flatMap((entry) => {
+    const model = (entry ?? {}) as { providerId?: unknown; model?: unknown; reasoningLevel?: unknown };
+    if (!nonEmpty(model.providerId) || !nonEmpty(model.model)) return [];
+    return [{ providerId: model.providerId, model: model.model, ...(nonEmpty(model.reasoningLevel) ? { reasoningLevel: model.reasoningLevel } : {}) }];
+  });
 }
 
 export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
@@ -117,11 +241,17 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
       { name: 'review', summary: 'Start an AI review of a pull request', usage: 'zcc codenod review <pr> [--models provider:model,...] [--wait] [--json]' },
       { name: 'show', summary: 'Show the latest review of a pull request', usage: 'zcc codenod show <pr> [--json]' },
       { name: 'post', summary: 'Post review findings to GitHub as comments', usage: 'zcc codenod post <pr> --yes [--findings all|id,id] [--message "..."]' },
+      {
+        name: 'review-local',
+        summary: 'AI-review local changes (uncommitted, staged, or branch) without a pull request',
+        usage: 'zcc codenod review-local [--path dir] [--scope uncommitted|staged|branch] [--base ref] [--intent "..."] [--models ...] [--wait] [--fail-on high] [--json]'
+      },
+      { name: 'show-local', summary: 'Show the latest local review of a checkout', usage: 'zcc codenod show-local [--path dir] [--json]' },
       { name: 'repos', summary: 'List, add, or remove watched repositories', usage: 'zcc codenod repos [list|add|remove]' },
       { name: 'models', summary: 'Show configured review models and available provider:model ids', usage: 'zcc codenod models [--json]' },
       { name: 'auth', summary: 'Show GitHub sign-in status per host', usage: 'zcc codenod auth' }
     ],
-    async run(argv) {
+    async run(argv, ctx) {
       const [command, ...rest] = argv;
       const args = parseArgs(rest);
       const asJson = args.flags.has('json');
@@ -175,6 +305,10 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
             const skipped = findingIds.length - result.publishedCount;
             return { exitCode: 0, stdout: `Posted ${result.publishedCount} finding(s), ${result.commentCount} inline.${skipped > 0 ? ` ${skipped} selected finding(s) were left unposted (GitHub review body size limit).` : ''}${result.url ? `\n${result.url}` : ''}` };
           }
+          case 'review-local':
+            return await handleReviewLocal(app, args, ctx);
+          case 'show-local':
+            return await handleShowLocal(app, args, ctx);
           case 'repos': {
             const [sub = 'list', target] = args.positional;
             if (sub === 'list') {
@@ -306,11 +440,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
     execute: async (input, ctx) => {
       const record = (input ?? {}) as { pr?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
       const ref = parsePrRef(String(record.pr ?? ''), await app.defaultHost());
-      const models = Array.isArray(record.models)
-        ? record.models
-            .filter((model): model is ModelChoice => Boolean(model && typeof model === 'object' && 'providerId' in model && 'model' in model))
-            .map((model) => ({ providerId: String(model.providerId), model: String(model.model), ...(model.reasoningLevel ? { reasoningLevel: String(model.reasoningLevel) } : {}) }))
-        : undefined;
+      const models = toolModels(record.models);
       const review = await app.startReview(ref, { models });
       if (record.wait !== true || ctx.signal.aborted) {
         return { reviewId: review.id, status: review.status, ...(review.coordinatorThreadId ? { coordinatorThreadId: review.coordinatorThreadId } : {}) };
@@ -334,24 +464,72 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
             ...(finished.coordinatorThreadId ? { coordinatorThreadId: finished.coordinatorThreadId } : {})
           };
         }
-        const blocking = detail.findings.filter((f) => !f.dismissed && (f.severity === 'critical' || f.severity === 'high'));
         return {
           ...detail,
-          blockingCount: blocking.length,
-          blockingFindings: blocking.map((f) => ({
-            id: f.id,
-            severity: f.severity,
-            category: f.category,
-            file: f.file,
-            line: f.line,
-            description: f.description,
-            suggestion: f.suggestion,
-            agreedBy: f.agreedBy
-          })),
+          ...blockingSummary(detail.findings),
           coordinatorThreadId: detail.review?.coordinatorThreadId ?? null
         };
       }
       return detail;
+    }
+  });
+
+  agents.registerTool({
+    name: 'codenod_review_local',
+    description:
+      "Review local changes that are not a pull request yet with CodeNod's multi-model AI review. By default reviews this thread's own checkout. Never posts to GitHub and never modifies files. With wait and remediationGate, returns blocking (critical/high) findings to fix before opening a pull request; returns status \"stale\" if files changed during the review.",
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['uncommitted', 'staged', 'branch'], description: 'uncommitted (default): working tree vs HEAD incl. new files; staged: index vs HEAD; branch: everything since the base branch' },
+        base: { type: 'string', description: 'Base branch for scope "branch" (defaults to the remote default branch)' },
+        intent: { type: 'string', description: 'What the change is meant to do; used to score requirements' },
+        worktreePath: { type: 'string', description: "Another checked-out location of this thread's project to review instead of this thread's checkout" },
+        models: {
+          type: 'array',
+          description: 'Optional models to use instead of the configured defaults',
+          items: {
+            type: 'object',
+            properties: { providerId: { type: 'string' }, model: { type: 'string' }, reasoningLevel: { type: 'string' } },
+            required: ['providerId', 'model']
+          }
+        },
+        wait: { type: 'boolean', description: 'Wait for the review to finish (can take several minutes)' },
+        remediationGate: { type: 'boolean', description: 'Include structured blockingCount and blockingFindings in the response' }
+      }
+    },
+    execute: async (input, ctx) => {
+      const local = requireLocal(app);
+      const record = (input ?? {}) as { scope?: unknown; base?: unknown; intent?: unknown; worktreePath?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
+      const scope = record.scope === undefined ? 'uncommitted' : String(record.scope);
+      if (!isLocalScope(scope)) throw new Error('scope must be one of uncommitted, staged, branch');
+      let location: LocalLocationRef;
+      if (typeof record.worktreePath === 'string' && record.worktreePath.trim()) {
+        location = await local.resolveLocation(ctx.projectId, record.worktreePath.trim());
+      } else {
+        const path = await local.threadWorkspacePath(ctx.threadId);
+        if (!path) throw new Error("Could not find this thread's checkout. Pass worktreePath.");
+        location = await local.locationForPath(path, ctx.projectId);
+      }
+      const models = toolModels(record.models);
+      const review = await local.start({
+        projectId: location.projectId,
+        worktreePath: location.worktreePath,
+        scope,
+        base: typeof record.base === 'string' ? record.base : null,
+        intent: typeof record.intent === 'string' ? record.intent : null,
+        models,
+        source: 'agent'
+      });
+      if (record.wait !== true || ctx.signal.aborted) return { reviewId: review.id, status: review.status };
+      const finished = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+      if (finished.status !== 'completed') return { reviewId: finished.id, status: finished.status, error: finished.error };
+      if ((await local.status(finished.id)).stale) {
+        return { reviewId: finished.id, status: 'stale', error: 'Files changed during the review. Run codenod_review_local again on the current files.' };
+      }
+      const detail = local.detail(location.targetId, finished.id);
+      if (!detail) throw new Error(`Local review ${finished.id} not found`);
+      return record.remediationGate === true ? { ...detail, ...blockingSummary(detail.findings) } : detail;
     }
   });
 }
