@@ -454,7 +454,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
             </div>
           </div>
           <div className="cn-inline">
-            <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || !props.hasModels || reviewing} onClick={() => void startReview()}>
+            <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || !props.hasModels || reviewing || status?.missing === true} onClick={() => void startReview()}>
               {busy === 'review' ? (
                 <span className="cn-inline">
                   <span className="cn-spinner" aria-hidden="true" />
@@ -464,7 +464,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                 'Review changes'
               )}
             </button>
-            <button type="button" className="cn-btn" disabled={busy !== null || reviewing} aria-expanded={pickerOpen} onClick={() => setPickerOpen((open) => !open)}>
+            <button type="button" className="cn-btn" disabled={busy !== null || reviewing || status?.missing === true} aria-expanded={pickerOpen} onClick={() => setPickerOpen((open) => !open)}>
               Models…
             </button>
             {snapshotTaken ? (
@@ -510,12 +510,12 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                 Review {attempt!.status} · {attemptRuns.filter((run) => run.status === 'completed').length}/{attemptRuns.length} model(s) done · {attemptElapsed}
               </p>
             ) : null}
-            {attempt?.status === 'failed' ? (
+            {attempt?.status === 'failed' && (!viewingOlder || review.status === 'failed') ? (
               <p className="cn-banner cn-banner-error">
                 Review failed after {attemptElapsed}: {attempt.error}
               </p>
             ) : null}
-            {detail.latestAttempt?.status === 'cancelled' ? <p className="cn-banner">Rerun cancelled. Showing the previous completed review.</p> : null}
+            {!viewingOlder && detail.latestAttempt?.status === 'cancelled' ? <p className="cn-banner">Rerun cancelled. Showing the previous completed review.</p> : null}
             {confirmFix ? (
               <div className="cn-banner cn-banner-warn" role="group" aria-label="Confirm fix">
                 <strong>{confirmFix.reason}</strong>
@@ -538,7 +538,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                     Open fix thread
                   </button>
                 ) : null}
-                <button type="button" className="cn-btn cn-small" disabled={busy !== null || reviewing} onClick={() => void rerun()}>
+                <button type="button" className="cn-btn cn-small" disabled={busy !== null || reviewing || status?.missing === true} onClick={() => void rerun()}>
                   Re-review
                 </button>
               </p>
@@ -570,7 +570,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
             <div className="cn-tabs" role="tablist" aria-label="Review details">
               {(['findings', 'models', 'files'] as DetailTab[]).map((id) => (
                 <button key={id} type="button" role="tab" className="cn-tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-                  {id === 'findings' ? `Findings (${activeFindings.length})` : id === 'models' ? `Models (${attemptRuns.length})` : `Files (${snapshot?.files.length ?? 0})`}
+                  {id === 'findings' ? `Findings (${activeFindings.length})` : id === 'models' ? `Models (${runs.length})` : `Files (${snapshot?.files.length ?? 0})`}
                 </button>
               ))}
             </div>
@@ -601,7 +601,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                   />
                 )
               ) : null}
-              {tab === 'models' ? <ModelRunsTable runs={attemptRuns} now={now} navigate={navigate} /> : null}
+              {tab === 'models' ? <ModelRunsTable runs={runs} now={now} navigate={navigate} /> : null}
               {tab === 'files' ? <LocalFiles rpc={rpc} reviewId={review.id} /> : null}
             </div>
 
@@ -618,7 +618,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
             Cancel review
           </button>
         ) : review ? (
-          <button type="button" className={`cn-btn ${stale ? 'cn-btn-warn' : ''}`} disabled={busy !== null || !props.hasModels} onClick={() => void rerun()}>
+          <button type="button" className={`cn-btn ${stale ? 'cn-btn-warn' : ''}`} disabled={busy !== null || !props.hasModels || status?.missing === true} onClick={() => void rerun()}>
             {stale ? 'Review outdated — Rerun' : 'Rerun'}
           </button>
         ) : null}

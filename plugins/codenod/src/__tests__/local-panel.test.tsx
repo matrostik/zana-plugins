@@ -398,4 +398,47 @@ describe('LocalDetail', () => {
     await waitFor(() => expect(calls('cancelReview')).toEqual([{ reviewId: 'rev-2' }]));
     expect(calls('localStatus')).toHaveLength(0);
   });
+
+  it('shows the displayed review runs in the Models tab and avoids showing latest attempt errors', async () => {
+    const rev2 = localDetail();
+    const rev1Runs = [
+      { id: 'run-1', reviewId: 'rev-1', providerId: 'claude', model: 'opus', status: 'completed' as const, startedAt: NOW - 3600000, completedAt: NOW - 3590000, riskScore: 8, coverageScore: null, coverageNote: null, requirementsScore: null, requirementsNote: null, simplicityScore: null, simplicityNote: null, stabilityScore: null, stabilityNote: null, issueCount: 4, summary: 'Older run', error: null, threadId: null },
+      { id: 'run-2', reviewId: 'rev-1', providerId: 'openai', model: 'gpt-4', status: 'completed' as const, startedAt: NOW - 3600000, completedAt: NOW - 3590000, riskScore: 8, coverageScore: null, coverageNote: null, requirementsScore: null, requirementsNote: null, simplicityScore: null, simplicityNote: null, stabilityScore: null, stabilityNote: null, issueCount: 4, summary: 'Older run 2', error: null, threadId: null }
+    ];
+    answer({
+      localDetail: (args: Record<string, unknown>) =>
+        args.reviewId === 'rev-1'
+          ? { ...rev2, review: { ...rev2.review!, id: 'rev-1', status: 'completed' as const }, runs: rev1Runs, latestAttempt: { ...rev2.review!, id: 'rev-2', status: 'failed' as const, error: 'boom' }, latestRuns: rev2.runs }
+          : rev2,
+      localStatus: fresh(),
+      localDiff: []
+    });
+    renderDetail();
+
+    const history = await screen.findByText('History (2)').then((el) => el.closest('details')!);
+    fireEvent.click(within(history).getByRole('button', { name: 'View' }));
+    await waitFor(() => expect(calls('localDetail').at(-1)).toEqual({ targetId: TARGET_ID, reviewId: 'rev-1' }));
+
+    const modelsTab = await screen.findByRole('tab', { name: 'Models (2)' });
+    expect(modelsTab).toBeTruthy();
+    fireEvent.click(modelsTab);
+    expect(await screen.findByText('claude/opus')).toBeTruthy();
+    expect(screen.getByText('openai/gpt-4')).toBeTruthy();
+    expect(screen.queryByText(/Review failed after/)).toBeNull();
+  });
+
+  it('disables rerun and review actions when the checkout is missing', async () => {
+    answer({
+      localDetail: localDetail(),
+      localStatus: { reviewId: 'rev-2', stale: true, missing: true, reviewedTree: 'd'.repeat(40), currentTree: null },
+      localDiff: []
+    });
+    renderDetail();
+
+    expect(await screen.findByText(/This checkout can no longer be read/)).toBeTruthy();
+    const rerunButton = screen.getByRole('button', { name: 'Review outdated — Rerun' }) as HTMLButtonElement;
+    expect(rerunButton.disabled).toBe(true);
+    const reviewChanges = screen.getByRole('button', { name: 'Review changes' }) as HTMLButtonElement;
+    expect(reviewChanges.disabled).toBe(true);
+  });
 });
