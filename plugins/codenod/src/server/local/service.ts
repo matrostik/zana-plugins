@@ -32,6 +32,7 @@ import {
   commitSnapshot,
   deleteSnapshotRef,
   diffFiles,
+  headCommit,
   isSecretLike,
   listWorktrees,
   mergeBase,
@@ -230,29 +231,64 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     throw new Error(`${top} does not belong to a Zana project${projectId ? ` (${projectId})` : ''}. Register it as a project first.`);
   }
 
-  function activeReviewFor(targetId: string, scope: LocalScope, baseRef: string | null, treeSha: string): ReviewRow | null {
+  /** Diff base of a scope: HEAD for uncommitted and staged, the merge base with the base branch for branch reviews. */
+  async function diffBase(path: string, scope: LocalScope, baseRef: string | null): Promise<{ headSha: string; base: { ref: string; sha: string } | null; baseSha: string }> {
+    const headSha = await headCommit(deps.git, path);
+    if (scope !== 'branch') return { headSha, base: null, baseSha: headSha };
+    const base = await resolveBase(deps.git, path, baseRef);
+    return { headSha, base, baseSha: await mergeBase(deps.git, path, base.sha, headSha) };
+  }
+
+  /** Same reviewed content: a branch review ignores new commits that leave its diff unchanged, the other scopes diff against HEAD. */
+  function sameFingerprint(snapshot: LocalSnapshotRow, current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string }): boolean {
+    return (
+      snapshot.scope === current.scope &&
+      snapshot.baseRef === current.baseRef &&
+      snapshot.baseSha === current.baseSha &&
+      snapshot.treeSha === current.treeSha &&
+      (current.scope === 'branch' || snapshot.headSha === current.headSha)
+    );
+  }
+
+  function activeReviewFor(targetId: string, fingerprint: Parameters<typeof sameFingerprint>[1]): ReviewRow | null {
     for (const { review, snapshot } of deps.store.listLocalReviews(targetId)) {
       if (review.status !== 'queued' && review.status !== 'running') continue;
-      if (snapshot && snapshot.scope === scope && snapshot.baseRef === baseRef && snapshot.treeSha === treeSha) return review;
+      if (snapshot && sameFingerprint(snapshot, fingerprint)) return review;
     }
     return null;
   }
 
+  const startQueues = new Map<string, Promise<unknown>>();
+
+  /** Runs starts of one location one at a time, so identical concurrent requests dedupe to a single review. */
+  function serializedPerTarget<T>(targetId: string, work: () => Promise<T>): Promise<T> {
+    const previous = startQueues.get(targetId) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(work);
+    startQueues.set(targetId, run);
+    return run.finally(() => {
+      if (startQueues.get(targetId) === run) startQueues.delete(targetId);
+    });
+  }
+
   async function startLocalReview(input: StartLocalReviewInput): Promise<ReviewRow> {
     if (!isLocalScope(input.scope)) throw new Error(`Unknown scope ${String(input.scope)}. Use uncommitted, staged, or branch.`);
-    const intent = input.intent?.trim() ? input.intent.trim().slice(0, MAX_INTENT_CHARS) : null;
     const location = await resolveLocation(input.projectId, input.worktreePath);
+    return serializedPerTarget(location.target.id, () => startAt(location, input));
+  }
+
+  async function startAt(location: LocalLocation, input: StartLocalReviewInput): Promise<ReviewRow> {
+    const intent = input.intent?.trim() ? input.intent.trim().slice(0, MAX_INTENT_CHARS) : null;
     const models = await deps.reviews().resolveModels(input.models);
     const path = location.worktree.path;
-    const base = input.scope === 'branch' ? await resolveBase(deps.git, path, input.base?.trim() || null) : null;
-    const tree = await snapshotTree(deps.git, path, input.scope);
-    const existing = activeReviewFor(location.target.id, input.scope, base?.ref ?? null, tree.treeSha);
+    const { headSha, base, baseSha } = await diffBase(path, input.scope, input.base?.trim() || null);
+    const tree = await snapshotTree(deps.git, path, input.scope, { baseSha });
+    if (tree.headSha !== headSha) throw new Error('HEAD moved while taking the snapshot. Try again.');
+    const existing = activeReviewFor(location.target.id, { scope: input.scope, baseRef: base?.ref ?? null, baseSha, headSha, treeSha: tree.treeSha });
     if (existing) return existing;
 
     const review = deps.store.createReview({ prId: location.target.id, headSha: tree.headSha, trigger: 'manual', targetKind: 'local' });
     try {
       const snapshotSha = await commitSnapshot(deps.git, path, tree, input.scope, review.id);
-      const baseSha = base ? await mergeBase(deps.git, path, base.sha, snapshotSha) : tree.headSha;
       const prepared = prepareLocalFiles(await diffFiles(deps.git, path, baseSha, snapshotSha), tree.skipped);
       if (prepared.files.length === 0) {
         throw new Error(
@@ -325,14 +361,11 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         if (!(await commitExists(deps.git, target.worktreePath, snapshot.snapshotSha))) {
           throw new Error('The snapshot of this local review is missing from the repository');
         }
-        // An unmanaged thread runs in the project folder, so it only sees the reviewed files when that folder is the reviewed checkout.
-        const liveCheckout = config.workspaceMode === 'project' && isWithin(await canonicalPath(project.path), await canonicalPath(target.worktreePath));
+        // Always the snapshot, never the live checkout: it holds the reviewed files only, without later edits or excluded secrets.
         const workspace: { projectId: string; environment?: SpawnEnvironment; hasWorkspace: boolean } =
           config.workspaceMode === 'diff-only'
             ? { projectId: project.id, hasWorkspace: false }
-            : liveCheckout
-              ? { projectId: project.id, environment: { kind: 'unmanaged' }, hasWorkspace: true }
-              : { projectId: project.id, environment: { kind: 'worktree', baseBranch: snapshot.snapshotSha, branchSlug: `codenod-local-${current.id.slice(0, 8)}` }, hasWorkspace: true };
+            : { projectId: project.id, environment: { kind: 'worktree', baseBranch: snapshot.snapshotSha, branchSlug: `codenod-local-${current.id.slice(0, 8)}` }, hasWorkspace: true };
         const context = {
           projectName: project.name,
           branch: target.branch,
@@ -360,11 +393,18 @@ export function createLocalReviews(deps: LocalReviewDeps) {
 
   async function status(reviewId: string): Promise<LocalReviewStatus> {
     const { snapshot, target } = snapshotFor(reviewId);
-    const current = await snapshotTree(deps.git, target.worktreePath, snapshot.scope).catch(() => null);
+    const head = await headCommit(deps.git, target.worktreePath).catch(() => null);
+    if (head === null) return { reviewId, stale: true, missing: true, reviewedTree: snapshot.treeSha, currentTree: null };
+    const base = await diffBase(target.worktreePath, snapshot.scope, snapshot.baseRef).catch(() => null);
+    const current = base ? await snapshotTree(deps.git, target.worktreePath, snapshot.scope, { baseSha: base.baseSha }).catch(() => null) : null;
+    const fresh =
+      base !== null &&
+      current !== null &&
+      sameFingerprint(snapshot, { scope: snapshot.scope, baseRef: base.base?.ref ?? null, baseSha: base.baseSha, headSha: current.headSha, treeSha: current.treeSha });
     return {
       reviewId,
-      stale: current?.treeSha !== snapshot.treeSha,
-      missing: current === null,
+      stale: !fresh,
+      missing: false,
       reviewedTree: snapshot.treeSha,
       currentTree: current?.treeSha ?? null
     };

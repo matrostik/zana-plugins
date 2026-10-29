@@ -25,8 +25,9 @@ const MAX_OUTPUT_BYTES = 32 * 1024 * 1024;
 const DIFF_CONCURRENCY = 6;
 const BINARY_SNIFF_BYTES = 8_000;
 
-export const MAX_UNTRACKED_FILES = 200;
-export const MAX_UNTRACKED_BYTES = 256 * 1024;
+/** Limits on files a snapshot adds relative to its base, whether untracked, staged, or committed on the branch. */
+export const MAX_NEW_FILES = 200;
+export const MAX_NEW_FILE_BYTES = 256 * 1024;
 export const MAX_DIFF_FILES = 300;
 export const MAX_FILE_READ_CHARS = 1_000_000;
 export const SNAPSHOT_REF_PREFIX = 'refs/codenod/local/';
@@ -158,6 +159,7 @@ export async function changedPathCount(git: GitRunner, worktreePath: string): Pr
   let count = 0;
   for (let index = 0; index < fields.length; index++) {
     count++;
+    // A rename or copy in either the index (X) or worktree (Y) column is followed by its original path as a separate field.
     if (/^[RC]/.test(fields[index]) || /^.[RC]/.test(fields[index])) index++;
   }
   return count;
@@ -168,7 +170,7 @@ export async function repoTopLevel(git: GitRunner, path: string): Promise<string
   return result.code === 0 ? result.stdout.trim() || null : null;
 }
 
-async function headCommit(git: GitRunner, worktreePath: string): Promise<string> {
+export async function headCommit(git: GitRunner, worktreePath: string): Promise<string> {
   const result = await git(worktreePath, ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']);
   const sha = result.stdout.trim();
   if (result.code !== 0 || !SHA_PATTERN.test(sha)) throw new Error('This branch has no commits yet. Commit once before reviewing local changes.');
@@ -220,7 +222,7 @@ async function selectUntracked(git: GitRunner, worktreePath: string, env: Record
     const info = await lstat(absolute).catch(() => null);
     if (!info) continue;
     if (!info.isSymbolicLink()) {
-      if (info.size > MAX_UNTRACKED_BYTES) {
+      if (info.size > MAX_NEW_FILE_BYTES) {
         skipped.push({ path, reason: 'too-large' });
         continue;
       }
@@ -229,7 +231,7 @@ async function selectUntracked(git: GitRunner, worktreePath: string, env: Record
         continue;
       }
     }
-    if (include.length >= MAX_UNTRACKED_FILES) {
+    if (include.length >= MAX_NEW_FILES) {
       skipped.push({ path, reason: 'too-many-files' });
       continue;
     }
@@ -244,12 +246,93 @@ export interface SnapshotTree {
   skipped: SkippedFile[];
 }
 
+interface IndexChange {
+  path: string;
+  baseMode: string;
+  baseSha: string;
+  mode: string;
+  sha: string;
+  status: string;
+}
+
+const NULL_MODE = '000000';
+const GITLINK_MODE = '160000';
+const SYMLINK_MODE = '120000';
+
+/** Index entries that differ from `baseSha`, from `git diff-index --raw -z`. */
+async function indexChanges(git: GitRunner, worktreePath: string, env: Record<string, string>, baseSha: string): Promise<IndexChange[]> {
+  const out = await must(git, worktreePath, ['diff-index', '--cached', '--no-renames', '--no-abbrev', '-z', baseSha], 'diff-index', { env });
+  const fields = out.split('\0');
+  const changes: IndexChange[] = [];
+  for (let index = 0; index + 1 < fields.length; index += 2) {
+    const [baseMode, mode, base, sha, status] = fields[index].replace(/^:/, '').split(' ');
+    if (!status) continue;
+    changes.push({ path: fields[index + 1], baseMode, baseSha: base, mode, sha, status: status[0] });
+  }
+  return changes;
+}
+
+async function blobSizes(git: GitRunner, worktreePath: string, shas: string[]): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  if (shas.length === 0) return sizes;
+  const out = await must(git, worktreePath, ['cat-file', '--batch-check=%(objectname) %(objectsize)'], 'cat-file', { input: `${shas.join('\n')}\n` });
+  for (const line of out.split('\n')) {
+    const [sha, size] = line.split(' ');
+    if (sha && size && /^\d+$/.test(size)) sizes.set(sha, Number(size));
+  }
+  return sizes;
+}
+
+/**
+ * Resets index entries that must not reach a reviewer back to `baseSha`: changed secret-looking files,
+ * and new files over the size or count limits. Covers tracked, staged, and branch-committed changes alike.
+ */
+async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: Record<string, string>, baseSha: string): Promise<SkippedFile[]> {
+  const changes = await indexChanges(git, worktreePath, env, baseSha);
+  const skipped: SkippedFile[] = [];
+  const excluded: IndexChange[] = [];
+  const additions: IndexChange[] = [];
+  for (const change of changes) {
+    if (isSecretLike(change.path)) {
+      skipped.push({ path: change.path, reason: 'possible-secret' });
+      excluded.push(change);
+    } else if (change.status === 'A') {
+      additions.push(change);
+    }
+  }
+  const sizes = await blobSizes(
+    git,
+    worktreePath,
+    additions.filter((change) => change.mode !== GITLINK_MODE && change.mode !== SYMLINK_MODE).map((change) => change.sha)
+  );
+  let kept = 0;
+  for (const change of additions.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))) {
+    if ((sizes.get(change.sha) ?? 0) > MAX_NEW_FILE_BYTES) {
+      skipped.push({ path: change.path, reason: 'too-large' });
+      excluded.push(change);
+    } else if (kept >= MAX_NEW_FILES) {
+      skipped.push({ path: change.path, reason: 'too-many-files' });
+      excluded.push(change);
+    } else {
+      kept++;
+    }
+  }
+  if (excluded.length > 0) {
+    const entries = excluded.map((change) => (change.baseMode === NULL_MODE ? `0 ${'0'.repeat(change.baseSha.length)}\t${change.path}` : `${change.baseMode} ${change.baseSha}\t${change.path}`));
+    await must(git, worktreePath, ['update-index', '-z', '--index-info'], 'update-index', { env, input: `${entries.join('\0')}\0` });
+  }
+  return skipped;
+}
+
 /**
  * Hashes the reviewable state of a worktree into a git tree without touching its index or files.
  * The tree hash doubles as a content fingerprint for staleness checks.
+ * `baseSha` is the commit the review diffs against (HEAD unless given); unsafe changes relative to it are left out.
  */
-export async function snapshotTree(git: GitRunner, worktreePath: string, scope: LocalScope): Promise<SnapshotTree> {
+export async function snapshotTree(git: GitRunner, worktreePath: string, scope: LocalScope, options: { baseSha?: string } = {}): Promise<SnapshotTree> {
   const headSha = await headCommit(git, worktreePath);
+  const baseSha = options.baseSha ?? headSha;
+  assertSha(baseSha);
   return withTempIndex(git, worktreePath, async (env) => {
     let skipped: SkippedFile[] = [];
     if (scope !== 'staged') {
@@ -264,6 +347,7 @@ export async function snapshotTree(git: GitRunner, worktreePath: string, scope: 
         });
       }
     }
+    skipped = [...skipped, ...(await excludeUnsafeChanges(git, worktreePath, env, baseSha))];
     const treeSha = (await must(git, worktreePath, ['write-tree'], 'write-tree', { env })).trim();
     return { headSha, treeSha, skipped };
   });

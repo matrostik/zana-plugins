@@ -12,7 +12,7 @@ import {
   isSafeRef,
   isSecretLike,
   listWorktrees,
-  MAX_UNTRACKED_BYTES,
+  MAX_NEW_FILE_BYTES,
   mergeBase,
   readFileAt,
   resolveBase,
@@ -72,7 +72,7 @@ describe('local git snapshot', () => {
   it('skips secrets, large files, and binaries from the snapshot and reports why', async () => {
     const repo = createRepo();
     writeFileSync(join(repo, '.env.local'), 'TOKEN=abc\n');
-    writeFileSync(join(repo, 'big.txt'), 'x'.repeat(MAX_UNTRACKED_BYTES + 1));
+    writeFileSync(join(repo, 'big.txt'), 'x'.repeat(MAX_NEW_FILE_BYTES + 1));
     writeFileSync(join(repo, 'blob.dat'), Buffer.from([1, 0, 2, 3]));
     writeFileSync(join(repo, 'ok.ts'), 'ok\n');
 
@@ -84,6 +84,61 @@ describe('local git snapshot', () => {
       { path: 'big.txt', reason: 'too-large' },
       { path: 'blob.dat', reason: 'binary' }
     ]);
+    expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
+  });
+
+  it('keeps changed tracked and staged secrets at their base version in every scope', async () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, 'secret.json'), '{"v":1}\n');
+    sh(repo, 'add', 'secret.json');
+    sh(repo, 'commit', '-q', '-m', 'add secret');
+    writeFileSync(join(repo, 'secret.json'), '{"v":2}\n');
+    writeFileSync(join(repo, '.env'), 'TOKEN=staged\n');
+    writeFileSync(join(repo, 'a.ts'), 'const a = 6;\n');
+    sh(repo, 'add', 'secret.json', '.env', 'a.ts');
+
+    for (const scope of ['uncommitted', 'staged'] as const) {
+      const tree = await snapshotTree(runGit, repo, scope);
+      const snapshotSha = await commitSnapshot(runGit, repo, tree, scope, REVIEW_ID);
+
+      expect(tree.skipped).toEqual([
+        { path: '.env', reason: 'possible-secret' },
+        { path: 'secret.json', reason: 'possible-secret' }
+      ]);
+      expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['a.ts']);
+      expect(await readFileAt(runGit, repo, snapshotSha, 'secret.json')).toBe('{"v":1}\n');
+      expect(await readFileAt(runGit, repo, snapshotSha, '.env')).toBeNull();
+    }
+    expect(sh(repo, 'diff', '--cached', '--name-only')).toBe('.env\na.ts\nsecret.json\n');
+  });
+
+  it('leaves out secrets committed on the branch when diffing against the merge base', async () => {
+    const repo = createRepo();
+    sh(repo, 'switch', '-q', '-c', 'feature');
+    writeFileSync(join(repo, 'id_rsa'), 'PRIVATE\n');
+    writeFileSync(join(repo, 'c.ts'), 'c\n');
+    sh(repo, 'add', 'id_rsa', 'c.ts');
+    sh(repo, 'commit', '-q', '-m', 'Add c');
+    const base = await resolveBase(runGit, repo, 'main');
+    const baseSha = await mergeBase(runGit, repo, base.sha, sh(repo, 'rev-parse', 'HEAD').trim());
+
+    const tree = await snapshotTree(runGit, repo, 'branch', { baseSha });
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'branch', REVIEW_ID);
+
+    expect(tree.skipped).toEqual([{ path: 'id_rsa', reason: 'possible-secret' }]);
+    expect((await diffFiles(runGit, repo, baseSha, snapshotSha)).map((file) => file.path)).toEqual(['c.ts']);
+  });
+
+  it('applies the new-file size limit to staged additions', async () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, 'big.txt'), 'x'.repeat(MAX_NEW_FILE_BYTES + 1));
+    writeFileSync(join(repo, 'ok.ts'), 'ok\n');
+    sh(repo, 'add', 'big.txt', 'ok.ts');
+
+    const tree = await snapshotTree(runGit, repo, 'staged');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'staged', REVIEW_ID);
+
+    expect(tree.skipped).toEqual([{ path: 'big.txt', reason: 'too-large' }]);
     expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
   });
 

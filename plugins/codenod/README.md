@@ -80,7 +80,7 @@ Prerequisites: the folder is a Zana project (or a `git worktree` of one), and at
 ## Safety
 
 - Reviews run unattended in hidden Zana threads with each provider's full-access permission mode, so they never stop on an approval prompt. Providers without a full-access mode can't be used for reviews. When the repository is a Zana project, the review gets its own fresh worktree, so your working copy is never touched. Otherwise the model reviews the diff only.
-- Local reviews read a snapshot commit built with a temporary Git index, so your files, staging area, and branches are untouched. Secret-looking files are never sent to a model.
+- Local reviews read a snapshot commit built with a temporary Git index, so your files, staging area, and branches are untouched. Changed files that look like secrets are left out of the snapshot, and reviewers read a copy of the snapshot rather than your live folder.
 - Pull request text, comments, and linked issues are treated as untrusted input and sanitized before they reach the model.
 - Posting comments takes an explicit click (or `--yes` on the command line).
 - Approve and Request changes need a Zana-signed confirmation tied to the exact commit you reviewed. They are refused if new commits arrived since the review. Agents and the command line cannot approve.
