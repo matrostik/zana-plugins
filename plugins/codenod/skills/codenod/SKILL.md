@@ -39,9 +39,9 @@ Run `zcc codenod models` to see the `provider:model` ids accepted by `--models`.
 - `--scope branch`: everything since the merge base with `--base` (defaults to the remote's default branch), including uncommitted work.
 - `--intent` states what the change is meant to do; with branch commit messages and the repository's spec files it drives the requirements score.
 
-CodeNod reviews an immutable snapshot commit (kept under `refs/codenod/local/`) and never changes the user's files, index, or branches. Files that look like secrets (`.env*`, keys, certificates, `*credentials*`, `*secret*`), binaries, new files over 256 KB, and new files beyond the first 200 are skipped and listed. Local reviews can never be posted to GitHub.
+CodeNod reviews an immutable snapshot commit (kept under `refs/codenod/local/`) and never changes the user's files, index, or branches. Changed files that look like secrets (`.env*`, keys, certificates, `*credentials*`, `*secret*`) are kept at their base version, whether untracked, staged, or committed on the branch. Binaries, new files over 256 KB, and new files beyond the first 200 are also skipped; all skipped files are listed. Reviewers read a worktree of the snapshot, never the live checkout. Local reviews can never be posted to GitHub.
 
-`--fail-on <severity>` (needs `--wait`) exits 1 when an active finding is at or above that severity, and also when the review does not complete.
+`--fail-on <severity>` (needs `--wait`) exits 1 when an active finding is at or above that severity, when the review does not complete, and when files changed while it ran (stale).
 
 ## Agent Tools
 

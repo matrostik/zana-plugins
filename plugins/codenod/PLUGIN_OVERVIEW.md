@@ -37,9 +37,9 @@ Like Git Tree, this plugin installs from pre-built artifacts committed alongside
 ### 0.2.0
 
 - **Local Reviews**: `zcc codenod review-local` reviews uncommitted (default), staged, or branch changes of the current checkout without a pull request. Each review captures an immutable snapshot commit under `refs/codenod/local/` using a temporary index; reviewers run in a worktree of that snapshot.
-- **Safe File Selection**: Untracked files are included unless gitignored. Secret-looking files, binaries, files over 256 KB, and new files beyond 200 are skipped and listed with a reason.
+- **Safe File Selection**: Untracked files are included unless gitignored. Changed secret-looking files (untracked, tracked, staged, or committed on the branch) stay at their base version in the snapshot. Binaries, new files over 256 KB, and new files beyond 200 are skipped too, and every skipped file is listed with a reason. Reviewers always read a worktree of the snapshot, never the live checkout.
 - **Requirements Without a PR**: An optional intent note, branch commit messages, and the repository's spec file pattern feed the requirements score.
-- **Staleness**: Results are marked stale when the reviewed files change; starting the same review twice reuses the running one.
+- **Staleness**: Results are marked stale when the reviewed files, the commit they sit on, or the branch's merge base change. Starting the same review twice, even at the same moment, reuses the running one. `--fail-on` also fails on a stale result.
 - **Fix and Deep Review Back Ends**: Fix starts a visible thread on the live checkout with normal permission prompts and never commits; it asks first when files changed since the review. Deep Review runs in a worktree of the snapshot.
 - **Agent Pre-PR Review**: `codenod_review_local` reviews the calling thread's checkout quietly and returns blocking findings; the skill documents a 3-round limit and a pre-push hook recipe with `--fail-on`.
 - **Retention**: Keeps 10 reviews per checkout, removes reviews older than 30 days except the latest, and forgets removed worktrees.

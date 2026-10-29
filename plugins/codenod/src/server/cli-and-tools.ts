@@ -160,6 +160,72 @@ function json(value: unknown) {
   return { exitCode: 0, stdout: JSON.stringify(value, null, 2) };
 }
 
+type CliResult = { exitCode: number; stdout?: string; stderr?: string };
+
+/** The checkout a local command targets: `--path`, else the terminal's working directory. */
+async function cliLocalLocation(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined) {
+  const local = requireLocal(app);
+  const path = flagString(args, 'path') ?? ctx?.cwd;
+  if (!path) throw new Error('Run this inside a project checkout or pass --path');
+  return { local, path, location: await local.locationForPath(path) };
+}
+
+async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const asJson = args.flags.has('json');
+  const scope = flagString(args, 'scope') ?? 'uncommitted';
+  if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch');
+  const failOn = flagString(args, 'fail-on');
+  if (failOn !== undefined && !isSeverity(failOn)) throw new Error('--fail-on must be one of critical, high, medium, low');
+  const wait = args.flags.has('wait');
+  if (failOn && !wait) throw new Error('--fail-on needs --wait');
+  const { local, path, location } = await cliLocalLocation(app, args, ctx);
+  const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
+  let review = await local.start({
+    projectId: location.projectId,
+    worktreePath: location.worktreePath,
+    scope,
+    base: flagString(args, 'base') ?? null,
+    intent: flagString(args, 'intent') ?? null,
+    models,
+    source: 'cli'
+  });
+  if (!wait) {
+    if (asJson) return json(review);
+    return { exitCode: 0, stdout: `Local review ${review.id} ${review.status}. Check it with: zcc codenod show-local${flagString(args, 'path') ? ` --path ${path}` : ''}` };
+  }
+  review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+  const detail = local.detail(location.targetId, review.id);
+  if (!detail) throw new Error(`Local review ${review.id} not found`);
+  const completed = review.status === 'completed';
+  const stale = completed ? (await local.status(review.id)).stale : false;
+  const blocking = completed && failOn ? findingsAtOrAbove(detail.findings, failOn) : [];
+  // A gate must not pass on findings for files that changed while the review ran.
+  const exitCode = !completed || blocking.length > 0 || (failOn !== undefined && stale) ? 1 : 0;
+  if (asJson) return { ...json({ ...detail, stale, ...(failOn ? { blockingCount: blocking.length } : {}) }), exitCode };
+  const staleGate = failOn && stale ? ' Files changed while the review ran, so the result is stale; re-run the review.' : '';
+  const gate = failOn ? `\n\n${blocking.length} active finding(s) at or above ${failOn}.${staleGate}` : '';
+  return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}${gate}` };
+}
+
+async function handleShowLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const { local, location } = await cliLocalLocation(app, args, ctx);
+  const detail = local.detail(location.targetId);
+  if (!detail) throw new Error(`No local reviews for ${location.worktreePath}`);
+  const stale = detail.review?.status === 'completed' ? (await local.status(detail.review.id)).stale : false;
+  return args.flags.has('json') ? json({ ...detail, stale }) : { exitCode: 0, stdout: formatLocalDetail(detail, { stale }) };
+}
+
+/** Well-formed `models` tool input; entries without a non-empty provider and model string are dropped. */
+function toolModels(raw: unknown): ModelChoice[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
+  return raw.flatMap((entry) => {
+    const model = (entry ?? {}) as { providerId?: unknown; model?: unknown; reasoningLevel?: unknown };
+    if (!nonEmpty(model.providerId) || !nonEmpty(model.model)) return [];
+    return [{ providerId: model.providerId, model: model.model, ...(nonEmpty(model.reasoningLevel) ? { reasoningLevel: model.reasoningLevel } : {}) }];
+  });
+}
+
 export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
   cli.register({
     name: 'codenod',
@@ -234,52 +300,10 @@ export function registerCli(cli: CliRegistrar, app: CodenodApp): void {
             const skipped = findingIds.length - result.publishedCount;
             return { exitCode: 0, stdout: `Posted ${result.publishedCount} finding(s), ${result.commentCount} inline.${skipped > 0 ? ` ${skipped} selected finding(s) were left unposted (GitHub review body size limit).` : ''}${result.url ? `\n${result.url}` : ''}` };
           }
-          case 'review-local': {
-            const local = requireLocal(app);
-            const path = flagString(args, 'path') ?? ctx?.cwd;
-            if (!path) throw new Error('Run this inside a project checkout or pass --path');
-            const scope = flagString(args, 'scope') ?? 'uncommitted';
-            if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch');
-            const failOn = flagString(args, 'fail-on');
-            if (failOn !== undefined && !isSeverity(failOn)) throw new Error('--fail-on must be one of critical, high, medium, low');
-            const wait = args.flags.has('wait');
-            if (failOn && !wait) throw new Error('--fail-on needs --wait');
-            const location = await local.locationForPath(path);
-            const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
-            let review = await local.start({
-              projectId: location.projectId,
-              worktreePath: location.worktreePath,
-              scope,
-              base: flagString(args, 'base') ?? null,
-              intent: flagString(args, 'intent') ?? null,
-              models,
-              source: 'cli'
-            });
-            if (!wait) {
-              if (asJson) return json(review);
-              return { exitCode: 0, stdout: `Local review ${review.id} ${review.status}. Check it with: zcc codenod show-local${flagString(args, 'path') ? ` --path ${path}` : ''}` };
-            }
-            review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
-            const detail = local.detail(location.targetId, review.id);
-            if (!detail) throw new Error(`Local review ${review.id} not found`);
-            const completed = review.status === 'completed';
-            const stale = completed ? (await local.status(review.id)).stale : false;
-            const blocking = completed && failOn ? findingsAtOrAbove(detail.findings, failOn as Severity) : [];
-            const exitCode = !completed || blocking.length > 0 ? 1 : 0;
-            if (asJson) return { ...json({ ...detail, stale, ...(failOn ? { blockingCount: blocking.length } : {}) }), exitCode };
-            const gate = failOn ? `\n\n${blocking.length} active finding(s) at or above ${failOn}.` : '';
-            return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}${gate}` };
-          }
-          case 'show-local': {
-            const local = requireLocal(app);
-            const path = flagString(args, 'path') ?? ctx?.cwd;
-            if (!path) throw new Error('Run this inside a project checkout or pass --path');
-            const location = await local.locationForPath(path);
-            const detail = local.detail(location.targetId);
-            if (!detail) throw new Error(`No local reviews for ${location.worktreePath}`);
-            const stale = detail.review?.status === 'completed' ? (await local.status(detail.review.id)).stale : false;
-            return asJson ? json({ ...detail, stale }) : { exitCode: 0, stdout: formatLocalDetail(detail, { stale }) };
-          }
+          case 'review-local':
+            return await handleReviewLocal(app, args, ctx);
+          case 'show-local':
+            return await handleShowLocal(app, args, ctx);
           case 'repos': {
             const [sub = 'list', target] = args.positional;
             if (sub === 'list') {
@@ -411,11 +435,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
     execute: async (input, ctx) => {
       const record = (input ?? {}) as { pr?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
       const ref = parsePrRef(String(record.pr ?? ''), await app.defaultHost());
-      const models = Array.isArray(record.models)
-        ? record.models
-            .filter((model): model is ModelChoice => Boolean(model && typeof model === 'object' && 'providerId' in model && 'model' in model))
-            .map((model) => ({ providerId: String(model.providerId), model: String(model.model), ...(model.reasoningLevel ? { reasoningLevel: String(model.reasoningLevel) } : {}) }))
-        : undefined;
+      const models = toolModels(record.models);
       const review = await app.startReview(ref, { models });
       if (record.wait !== true || ctx.signal.aborted) {
         return { reviewId: review.id, status: review.status, ...(review.coordinatorThreadId ? { coordinatorThreadId: review.coordinatorThreadId } : {}) };
@@ -486,11 +506,7 @@ export function registerTools(agents: ToolRegistrar, app: CodenodApp): void {
         if (!path) throw new Error("Could not find this thread's checkout. Pass worktreePath.");
         location = await local.locationForPath(path, ctx.projectId);
       }
-      const models = Array.isArray(record.models)
-        ? record.models
-            .filter((model): model is ModelChoice => Boolean(model && typeof model === 'object' && 'providerId' in model && 'model' in model))
-            .map((model) => ({ providerId: String(model.providerId), model: String(model.model), ...(model.reasoningLevel ? { reasoningLevel: String(model.reasoningLevel) } : {}) }))
-        : undefined;
+      const models = toolModels(record.models);
       const review = await local.start({
         projectId: location.projectId,
         worktreePath: location.worktreePath,

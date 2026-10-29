@@ -193,7 +193,7 @@ describe('local reviews', () => {
     const harness = createHarness({ respond: () => new Promise((resolve) => releases.push(() => resolve(REPLY))) });
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
 
-    const first = await harness.start();
+    const [first, simultaneous] = await Promise.all([harness.start(), harness.start()]);
     const again = await harness.start();
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 3;\n');
     const edited = await harness.start();
@@ -202,6 +202,7 @@ describe('local reviews', () => {
     releases.splice(0).forEach((release) => release());
     await harness.settled();
 
+    expect(simultaneous.id).toBe(first.id);
     expect(again.id).toBe(first.id);
     expect(edited.id).not.toBe(first.id);
     expect(staged).toBe('No staged changes to review.');
@@ -232,17 +233,17 @@ describe('local reviews', () => {
     await expect(harness.start('branch', { base: 'main;rm -rf' })).rejects.toThrow();
   });
 
-  it('uses the live checkout in project mode and no workspace in diff-only mode', async () => {
+  it('reviews the snapshot rather than the live checkout in project mode and uses no workspace in diff-only mode', async () => {
     const project = createHarness({ config: { workspaceMode: 'project' } });
     const diffOnly = createHarness({ config: { workspaceMode: 'diff-only' } });
     for (const harness of [project, diffOnly]) writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
 
-    await project.start();
+    const projectReview = await project.start();
     await diffOnly.start();
     await project.settled();
     await diffOnly.settled();
 
-    expect(project.spawned[0].args.environment).toEqual({ kind: 'unmanaged' });
+    expect(project.spawned[0].args.environment).toMatchObject({ kind: 'worktree', baseBranch: project.store.getLocalSnapshot(projectReview.id)!.snapshotSha });
     expect(diffOnly.spawned[0].args.environment).toBeUndefined();
     expect(String(diffOnly.spawned[0].args.prompt)).toContain('There is no checkout');
   });
@@ -306,8 +307,13 @@ describe('local reviews', () => {
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 9;\n');
     const stale = await harness.local.status(review.id);
 
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
+    sh(harness.repo, 'commit', '-q', '-am', 'Commit the reviewed change');
+    const committed = await harness.local.status(review.id);
+
     expect(fresh).toMatchObject({ stale: false, missing: false });
     expect(stale).toMatchObject({ stale: true, missing: false });
+    expect(committed).toMatchObject({ stale: true, missing: false, currentTree: fresh.currentTree });
     await expect(harness.local.fileAt(review.id, 'a.ts')).resolves.toBe('const a = 2;\n');
     await expect(harness.local.fileAt(review.id, '../etc/passwd')).rejects.toThrow(/not part of this review/);
     await expect(createPoster({ store: harness.store, github: {} as GitHubClient }).post({ reviewId: review.id, findingIds: [], event: 'COMMENT' })).rejects.toThrow(

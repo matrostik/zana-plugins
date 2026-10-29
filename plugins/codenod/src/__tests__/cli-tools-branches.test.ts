@@ -476,7 +476,7 @@ describe('codenod agent tools', () => {
     it('keeps only well-formed model entries', async () => {
       const { tool, ctx, calls } = createTools();
       await tool('codenod_review_pr')(
-        { pr: 'acme/api#4', models: [{ providerId: 'claude-code', model: 'opus', reasoningLevel: 'high' }, { providerId: 'codex', model: 'gpt-5' }, null, 'opus', { providerId: 'x' }] },
+        { pr: 'acme/api#4', models: [{ providerId: 'claude-code', model: 'opus', reasoningLevel: 'high' }, { providerId: 'codex', model: 'gpt-5' }, null, 'opus', { providerId: 'x' }, { providerId: 7, model: 'opus' }, { providerId: 'codex', model: '  ' }] },
         ctx()
       );
       expect(calls[0].args[1]).toEqual({ models: [{ providerId: 'claude-code', model: 'opus', reasoningLevel: 'high' }, { providerId: 'codex', model: 'gpt-5' }] });
@@ -586,6 +586,17 @@ describe('local review cli', () => {
     expect(failed.exitCode).toBe(1);
     expect(json.exitCode).toBe(1);
     expect(JSON.parse(json.stdout!)).toMatchObject({ stale: true, blockingCount: 1 });
+  });
+
+  it('fails a --fail-on gate on a stale review even without blocking findings', async () => {
+    const stale = createCli({ local: createLocal({ status: async (reviewId) => ({ reviewId, stale: true, missing: false, reviewedTree: 'c', currentTree: 'd' }) }).local });
+
+    const gated = await stale.cli(['review-local', '--wait', '--fail-on', 'critical'], { cwd: '/work/app' });
+    const ungated = await stale.cli(['review-local', '--wait'], { cwd: '/work/app' });
+
+    expect(gated).toMatchObject({ exitCode: 1, stdout: expect.stringContaining('the result is stale; re-run the review.') });
+    expect(gated.stdout).toContain('0 active finding(s) at or above critical.');
+    expect(ungated.exitCode).toBe(0);
   });
 
   it('validates scope, --fail-on, and the working directory', async () => {
