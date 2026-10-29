@@ -152,7 +152,8 @@ const SKIP_REASONS: Record<SkipReason, string> = {
   binary: 'Binary',
   'too-many-files': 'Too many new files',
   generated: 'Generated or lockfile',
-  'over-budget': 'Over the diff size budget'
+  'over-budget': 'Over the diff size budget',
+  symlink: 'Symlink'
 };
 
 export function skipReasonText(reason: SkipReason | string): string {

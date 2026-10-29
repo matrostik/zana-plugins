@@ -159,8 +159,10 @@ export async function changedPathCount(git: GitRunner, worktreePath: string): Pr
   let count = 0;
   for (let index = 0; index < fields.length; index++) {
     count++;
-    // A rename or copy in either the index (X) or worktree (Y) column is followed by its original path as a separate field.
-    if (/^[RC]/.test(fields[index]) || /^.[RC]/.test(fields[index])) index++;
+    // Each record is a two-char XY status followed by the path. A rename or copy in either
+    // the index (X) or worktree (Y) column emits the original path as a separate field.
+    const status = fields[index].slice(0, 2);
+    if (status[0] === 'R' || status[0] === 'C' || status[1] === 'R' || status[1] === 'C') index++;
   }
   return count;
 }
@@ -182,13 +184,16 @@ async function withTempIndex<T>(git: GitRunner, worktreePath: string, work: (env
   const env = { ...LITERAL_PATHSPECS, GIT_INDEX_FILE: join(dir, 'index') };
   try {
     const gitPath = (await must(git, worktreePath, ['rev-parse', '--git-path', 'index'], 'rev-parse')).trim();
+    const source = isAbsolute(gitPath) ? gitPath : resolve(worktreePath, gitPath);
     try {
-      const source = isAbsolute(gitPath) ? gitPath : resolve(worktreePath, gitPath);
       await copyFile(source, env.GIT_INDEX_FILE);
       // Git trusts cached stat data only for entries older than the index file; a fresh copy mtime would hide same-size edits.
       const { atime, mtime } = await stat(source);
       await utimes(env.GIT_INDEX_FILE, atime, mtime);
-    } catch {
+    } catch (error) {
+      // Only an absent index (a repo that has never staged anything) is a legitimate empty start.
+      // Any other failure must surface rather than silently degrade a staged review to HEAD-vs-HEAD.
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
       await must(git, worktreePath, ['read-tree', 'HEAD'], 'read-tree', { env });
     }
     return await work(env);
@@ -221,15 +226,17 @@ async function selectUntracked(git: GitRunner, worktreePath: string, env: Record
     const absolute = resolve(worktreePath, path);
     const info = await lstat(absolute).catch(() => null);
     if (!info) continue;
-    if (!info.isSymbolicLink()) {
-      if (info.size > MAX_NEW_FILE_BYTES) {
-        skipped.push({ path, reason: 'too-large' });
-        continue;
-      }
-      if (await looksBinary(absolute).catch(() => true)) {
-        skipped.push({ path, reason: 'binary' });
-        continue;
-      }
+    if (info.isSymbolicLink()) {
+      skipped.push({ path, reason: 'symlink' });
+      continue;
+    }
+    if (info.size > MAX_NEW_FILE_BYTES) {
+      skipped.push({ path, reason: 'too-large' });
+      continue;
+    }
+    if (await looksBinary(absolute).catch(() => true)) {
+      skipped.push({ path, reason: 'binary' });
+      continue;
     }
     if (include.length >= MAX_NEW_FILES) {
       skipped.push({ path, reason: 'too-many-files' });
@@ -283,9 +290,23 @@ async function blobSizes(git: GitRunner, worktreePath: string, shas: string[]): 
   return sizes;
 }
 
+/** Paths among the staged changes that git considers binary, from a single `diff-index --numstat` call. */
+async function binaryPaths(git: GitRunner, worktreePath: string, env: Record<string, string>, baseSha: string): Promise<Set<string>> {
+  const binary = new Set<string>();
+  const out = await must(git, worktreePath, ['diff-index', '--cached', '--no-renames', '--numstat', '-z', baseSha], 'diff-index', { env });
+  // With --no-renames each -z record is one NUL-terminated field `<added>\t<deleted>\t<path>`;
+  // binary files report `-` for both counts.
+  for (const record of out.split('\0').filter(Boolean)) {
+    const [added, deleted, ...rest] = record.split('\t');
+    if (added === '-' && deleted === '-' && rest.length > 0) binary.add(rest.join('\t'));
+  }
+  return binary;
+}
+
 /**
  * Resets index entries that must not reach a reviewer back to `baseSha`: changed secret-looking files,
- * and new files over the size or count limits. Covers tracked, staged, and branch-committed changes alike.
+ * symlinks (whose targets could point outside the snapshot), and new files over the size or count limits.
+ * Covers tracked, staged, and branch-committed changes alike.
  */
 async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: Record<string, string>, baseSha: string): Promise<SkippedFile[]> {
   const changes = await indexChanges(git, worktreePath, env, baseSha);
@@ -296,19 +317,23 @@ async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: R
     if (isSecretLike(change.path)) {
       skipped.push({ path: change.path, reason: 'possible-secret' });
       excluded.push(change);
+    } else if (change.mode === SYMLINK_MODE) {
+      skipped.push({ path: change.path, reason: 'symlink' });
+      excluded.push(change);
     } else if (change.status === 'A') {
       additions.push(change);
     }
   }
-  const sizes = await blobSizes(
-    git,
-    worktreePath,
-    additions.filter((change) => change.mode !== GITLINK_MODE && change.mode !== SYMLINK_MODE).map((change) => change.sha)
-  );
+  const blobShas = additions.filter((change) => change.mode !== GITLINK_MODE).map((change) => change.sha);
+  const sizes = await blobSizes(git, worktreePath, blobShas);
+  const binary = await binaryPaths(git, worktreePath, env, baseSha);
   let kept = 0;
   for (const change of additions.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))) {
     if ((sizes.get(change.sha) ?? 0) > MAX_NEW_FILE_BYTES) {
       skipped.push({ path: change.path, reason: 'too-large' });
+      excluded.push(change);
+    } else if (binary.has(change.path)) {
+      skipped.push({ path: change.path, reason: 'binary' });
       excluded.push(change);
     } else if (kept >= MAX_NEW_FILES) {
       skipped.push({ path: change.path, reason: 'too-many-files' });
@@ -325,7 +350,9 @@ async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: R
 }
 
 /**
- * Hashes the reviewable state of a worktree into a git tree without touching its index or files.
+ * Hashes the reviewable state of a worktree into a git tree.
+ * Safety invariant: the user's real index and working tree are never mutated. All staging happens against a
+ * throwaway index via GIT_INDEX_FILE in a temp dir (see withTempIndex), so write-tree observes only that copy.
  * The tree hash doubles as a content fingerprint for staleness checks.
  * `baseSha` is the commit the review diffs against (HEAD unless given); unsafe changes relative to it are left out.
  */
@@ -433,10 +460,20 @@ export async function diffFiles(git: GitRunner, worktreePath: string, from: stri
   return mapWithConcurrency(entries, DIFF_CONCURRENCY, async (entry, index) => {
     const path = entry.paths[entry.paths.length - 1];
     if (index >= MAX_DIFF_FILES) return { path, status: entry.status, additions: 0, deletions: 0, patch: null };
-    const result = await git(worktreePath, ['diff', '--no-color', '--no-ext-diff', '-M', '-U3', from, to, '--', ...entry.paths], { env: LITERAL_PATHSPECS });
+    // Scope to the destination path only. Rename detection runs before pathspec filtering, so the rename's own
+    // hunks are kept while an unrelated file recreated at the source path cannot leak into this patch.
+    const result = await git(worktreePath, ['diff', '--no-color', '--no-ext-diff', '-M', '-U3', from, to, '--', path], { env: LITERAL_PATHSPECS });
     const patch = result.code === 0 ? hunksOnly(result.stdout) : null;
     return { path, status: entry.status, ...countLines(patch), patch };
   });
+}
+
+/** All file paths in the tree of commit `sha`, so unchanged files are discoverable too. */
+export async function listTreeFiles(git: GitRunner, worktreePath: string, sha: string): Promise<string[]> {
+  assertSha(sha);
+  const result = await git(worktreePath, ['ls-tree', '-r', '--name-only', '-z', sha]);
+  if (result.code !== 0) return [];
+  return result.stdout.split('\0').filter(Boolean);
 }
 
 /** File text at `sha`, or null when it does not exist there. */

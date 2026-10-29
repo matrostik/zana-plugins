@@ -163,7 +163,7 @@ export interface LocalTargetRow {
   createdAt: number;
 }
 
-export type SkipReason = 'possible-secret' | 'too-large' | 'binary' | 'too-many-files' | 'generated' | 'over-budget';
+export type SkipReason = 'possible-secret' | 'too-large' | 'binary' | 'too-many-files' | 'generated' | 'over-budget' | 'symlink';
 
 export interface SkippedFile {
   path: string;

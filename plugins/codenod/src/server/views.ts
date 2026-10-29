@@ -165,7 +165,8 @@ const SKIP_REASON_LABELS: Record<SkippedFile['reason'], string> = {
   binary: 'binary',
   'too-many-files': 'too many new files',
   generated: 'generated or lockfile',
-  'over-budget': 'over the diff size budget'
+  'over-budget': 'over the diff size budget',
+  symlink: 'symlink'
 };
 
 export function skipReasonLabel(reason: SkippedFile['reason']): string {

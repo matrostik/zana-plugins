@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
-import { realpath } from 'node:fs/promises';
-import { basename, sep } from 'node:path';
+import { sep } from 'node:path';
 import type { Store } from '../db.ts';
 import type { ZanaProject } from '../projects.ts';
 import { isReviewable, prepareDiff } from '../review/diff.ts';
@@ -24,9 +22,8 @@ import type {
   ReviewRow,
   SkippedFile
 } from '../types.ts';
-import { errorMessage, mapWithConcurrency } from '../util.ts';
+import { errorMessage } from '../util.ts';
 import {
-  changedPathCount,
   commitExists,
   commitMessages,
   commitSnapshot,
@@ -34,47 +31,22 @@ import {
   diffFiles,
   headCommit,
   isSecretLike,
-  listWorktrees,
+  listTreeFiles,
   mergeBase,
   readFileAt,
-  repoTopLevel,
   resolveBase,
   snapshotTree,
-  type GitRunner,
-  type WorktreeInfo
+  type GitRunner
 } from './git.ts';
+import { createLocationResolver, type LocalLocation, type LocalLocationSummary } from './locations.ts';
+import { isLocalScope, localLabel, localTargetId, SCOPE_TITLES } from './target.ts';
 
-export const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch'];
+export { isLocalScope, localLabel, localTargetId, LOCAL_SCOPES } from './target.ts';
+export type { LocalLocation, LocalLocationSummary } from './locations.ts';
+
 export const MAX_REVIEWS_PER_LOCATION = 10;
 export const LOCAL_REVIEW_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const MAX_INTENT_CHARS = 2_000;
-const STATUS_CONCURRENCY = 4;
-/** Worktrees CodeNod creates for its own reviewer and Deep Review threads. */
-const CODENOD_BRANCH_PATTERN = /^zcc\/codenod-/;
-
-const SCOPE_TITLES: Record<LocalScope, string> = {
-  uncommitted: 'Uncommitted changes',
-  staged: 'Staged changes',
-  branch: 'Branch changes'
-};
-
-export interface LocalLocation {
-  target: LocalTargetRow;
-  project: ZanaProject & { path: string };
-  worktree: WorktreeInfo;
-}
-
-export interface LocalLocationSummary {
-  targetId: string;
-  projectId: string;
-  projectName: string;
-  worktreePath: string;
-  branch: string | null;
-  isMain: boolean;
-  changedFiles: number | null;
-  lastScope: LocalScope | null;
-  latest: Pick<ReviewRow, 'id' | 'status' | 'riskScore' | 'createdAt'> | null;
-}
 
 export interface StartLocalReviewInput {
   projectId: string;
@@ -110,18 +82,6 @@ export interface LocalReviewDeps {
   now?: () => number;
 }
 
-export function localTargetId(projectId: string, worktreePath: string): string {
-  return `local:${createHash('sha256').update(`${projectId}\0${worktreePath}`).digest('hex').slice(0, 20)}`;
-}
-
-export function isLocalScope(value: unknown): value is LocalScope {
-  return LOCAL_SCOPES.includes(value as LocalScope);
-}
-
-export function localLabel(target: Pick<LocalTargetRow, 'worktreePath' | 'branch'>, scope?: LocalScope): string {
-  return `${basename(target.worktreePath)} · ${target.branch ?? 'detached HEAD'}${scope ? ` (${scope})` : ''}`;
-}
-
 /** Splits changed files into reviewable ones and skipped ones with a reason. */
 export function prepareLocalFiles(files: ChangedFile[], untrackedSkipped: SkippedFile[]): { files: ChangedFile[]; skipped: SkippedFile[] } {
   const skipped: SkippedFile[] = [...untrackedSkipped];
@@ -140,10 +100,6 @@ export function prepareLocalFiles(files: ChangedFile[], untrackedSkipped: Skippe
   return { files: prepared.files, skipped };
 }
 
-async function canonicalPath(path: string): Promise<string> {
-  return realpath(path).catch(() => path);
-}
-
 function isWithin(child: string, parent: string): boolean {
   return child === parent || child.startsWith(parent.endsWith(sep) ? parent : `${parent}${sep}`);
 }
@@ -151,85 +107,8 @@ function isWithin(child: string, parent: string): boolean {
 export function createLocalReviews(deps: LocalReviewDeps) {
   const now = deps.now ?? Date.now;
   const changed = (payload: Record<string, unknown>) => deps.publish('codenod:changed', { local: true, ...payload });
-
-  async function projectsWithPath(): Promise<Array<ZanaProject & { path: string }>> {
-    return (await deps.listProjects()).filter((project): project is ZanaProject & { path: string } => Boolean(project.path));
-  }
-
-  /** Checked-out locations per project; a project whose git listing fails maps to null. */
-  async function worktreesByProject(projects: Array<ZanaProject & { path: string }>): Promise<Map<string, WorktreeInfo[] | null>> {
-    const result = new Map<string, WorktreeInfo[] | null>();
-    for (const project of projects) {
-      result.set(project.id, await listWorktrees(deps.git, project.path).catch(() => null));
-    }
-    return result;
-  }
-
-  function toLocation(project: ZanaProject & { path: string }, worktree: WorktreeInfo): LocalLocation {
-    const target = deps.store.upsertLocalTarget({
-      id: localTargetId(project.id, worktree.path),
-      projectId: project.id,
-      worktreePath: worktree.path,
-      branch: worktree.branch
-    });
-    return { target, project, worktree };
-  }
-
-  async function listLocations(): Promise<LocalLocationSummary[]> {
-    const projects = await projectsWithPath();
-    const byProject = await worktreesByProject(projects);
-    const seen = new Set<string>();
-    const locations: LocalLocation[] = [];
-    for (const project of projects) {
-      for (const worktree of byProject.get(project.id) ?? []) {
-        if (seen.has(worktree.path) || (worktree.branch && CODENOD_BRANCH_PATTERN.test(worktree.branch))) continue;
-        seen.add(worktree.path);
-        locations.push(toLocation(project, worktree));
-      }
-    }
-    const counts = await mapWithConcurrency(locations, STATUS_CONCURRENCY, (location) => changedPathCount(deps.git, location.worktree.path));
-    return locations.map((location, index) => {
-      const latest = deps.store.listLocalReviews(location.target.id)[0]?.review ?? null;
-      return {
-        targetId: location.target.id,
-        projectId: location.project.id,
-        projectName: location.project.name,
-        worktreePath: location.worktree.path,
-        branch: location.worktree.branch,
-        isMain: location.worktree.isMain,
-        changedFiles: counts[index],
-        lastScope: location.target.lastScope,
-        latest: latest ? { id: latest.id, status: latest.status, riskScore: latest.riskScore, createdAt: latest.createdAt } : null
-      };
-    });
-  }
-
-  /** Validates that `worktreePath` is a checked-out location of the project; arbitrary paths are refused. */
-  async function resolveLocation(projectId: string, worktreePath: string): Promise<LocalLocation> {
-    const project = (await projectsWithPath()).find((candidate) => candidate.id === projectId);
-    if (!project) throw new Error(`Project ${projectId} has no local checkout`);
-    const wanted = await canonicalPath(worktreePath);
-    const worktrees = await listWorktrees(deps.git, project.path);
-    for (const worktree of worktrees) {
-      if ((await canonicalPath(worktree.path)) === wanted) return toLocation(project, worktree);
-    }
-    throw new Error(`${worktreePath} is not a checked-out location of project ${project.name}`);
-  }
-
-  /** Finds the project location that contains `path`, for example a terminal's working directory. */
-  async function locationForPath(path: string, projectId?: string): Promise<LocalLocation> {
-    const top = await repoTopLevel(deps.git, path);
-    if (!top) throw new Error(`${path} is not inside a git checkout`);
-    const wanted = await canonicalPath(top);
-    const projects = (await projectsWithPath()).filter((project) => !projectId || project.id === projectId);
-    for (const project of projects) {
-      const worktrees = await listWorktrees(deps.git, project.path).catch(() => [] as WorktreeInfo[]);
-      for (const worktree of worktrees) {
-        if ((await canonicalPath(worktree.path)) === wanted) return toLocation(project, worktree);
-      }
-    }
-    throw new Error(`${top} does not belong to a Zana project${projectId ? ` (${projectId})` : ''}. Register it as a project first.`);
-  }
+  const locations = createLocationResolver(deps);
+  const { canonicalPath, projectsWithPath, worktreesByProject, listLocations, resolveLocation, locationForPath, projectFor } = locations;
 
   /** Diff base of a scope: HEAD for uncommitted and staged, the merge base with the base branch for branch reviews. */
   async function diffBase(path: string, scope: LocalScope, baseRef: string | null): Promise<{ headSha: string; base: { ref: string; sha: string } | null; baseSha: string }> {
@@ -239,14 +118,39 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return { headSha, base, baseSha: await mergeBase(deps.git, path, base.sha, headSha) };
   }
 
-  /** Same reviewed content: a branch review ignores new commits that leave its diff unchanged, the other scopes diff against HEAD. */
-  function sameFingerprint(snapshot: LocalSnapshotRow, current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string }): boolean {
+  /** Models requested for in-flight reviews, keyed by review id. Runs are only created once a review starts executing. */
+  const inflightModelsKey = new Map<string, string>();
+
+  /** Stable key for a set of models, so dedup treats the same reviewers requested in any order as equal. */
+  function modelsKey(models: ReadonlyArray<{ providerId: string; model: string; reasoningLevel?: string | null }>): string {
+    return models
+      .map((model) => `${model.providerId}:${model.model}${model.reasoningLevel ? `@${model.reasoningLevel}` : ''}`)
+      .sort()
+      .join(',');
+  }
+
+  /** The requested models for a review: the recorded in-flight key while queued, else its created runs. */
+  function reviewModelsKey(reviewId: string): string {
+    return inflightModelsKey.get(reviewId) ?? modelsKey(deps.store.listRuns(reviewId));
+  }
+
+  /**
+   * Same reviewed content and request: a branch review ignores new commits that leave its diff unchanged,
+   * the other scopes diff against HEAD. Intent and the resolved models are part of the identity so a second
+   * request with different reviewers or requirements starts its own review rather than reusing the first.
+   */
+  function sameFingerprint(
+    snapshot: LocalSnapshotRow,
+    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string }
+  ): boolean {
     return (
       snapshot.scope === current.scope &&
       snapshot.baseRef === current.baseRef &&
       snapshot.baseSha === current.baseSha &&
       snapshot.treeSha === current.treeSha &&
-      (current.scope === 'branch' || snapshot.headSha === current.headSha)
+      (current.scope === 'branch' || snapshot.headSha === current.headSha) &&
+      (current.intent === undefined || (snapshot.intent ?? null) === (current.intent ?? null)) &&
+      (current.modelsKey === undefined || reviewModelsKey(snapshot.reviewId) === current.modelsKey)
     );
   }
 
@@ -263,7 +167,9 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   /** Runs starts of one location one at a time, so identical concurrent requests dedupe to a single review. */
   function serializedPerTarget<T>(targetId: string, work: () => Promise<T>): Promise<T> {
     const previous = startQueues.get(targetId) ?? Promise.resolve();
-    const run = previous.catch(() => undefined).then(work);
+    // Promise.resolve().then(work) converts a synchronous throw from `work` into a rejection,
+    // so the keyed cleanup in `finally` always runs for this entry.
+    const run = previous.catch(() => undefined).then(() => work());
     startQueues.set(targetId, run);
     return run.finally(() => {
       if (startQueues.get(targetId) === run) startQueues.delete(targetId);
@@ -283,7 +189,15 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const { headSha, base, baseSha } = await diffBase(path, input.scope, input.base?.trim() || null);
     const tree = await snapshotTree(deps.git, path, input.scope, { baseSha });
     if (tree.headSha !== headSha) throw new Error('HEAD moved while taking the snapshot. Try again.');
-    const existing = activeReviewFor(location.target.id, { scope: input.scope, baseRef: base?.ref ?? null, baseSha, headSha, treeSha: tree.treeSha });
+    const existing = activeReviewFor(location.target.id, {
+      scope: input.scope,
+      baseRef: base?.ref ?? null,
+      baseSha,
+      headSha,
+      treeSha: tree.treeSha,
+      intent,
+      modelsKey: modelsKey(models)
+    });
     if (existing) return existing;
 
     const review = deps.store.createReview({ prId: location.target.id, headSha: tree.headSha, trigger: 'manual', targetKind: 'local' });
@@ -317,6 +231,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       throw error;
     }
     deps.store.setLocalTargetScope(location.target.id, input.scope);
+    inflightModelsKey.set(review.id, modelsKey(models));
     deps.reviews().enqueueReview(review, models);
     await pruneTarget(location.target, path).catch((error) => deps.log.warn(`codenod: local review cleanup failed: ${errorMessage(error)}`));
     return deps.store.getReview(review.id) ?? review;
@@ -331,17 +246,14 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return { review, snapshot, target };
   }
 
-  async function projectFor(target: LocalTargetRow): Promise<ZanaProject & { path: string }> {
-    const project = (await projectsWithPath()).find((candidate) => candidate.id === target.projectId);
-    if (!project) throw new Error(`Project ${target.projectId} is no longer available`);
-    return project;
-  }
-
   async function specFiles(projectId: string, snapshot: LocalSnapshotRow, path: string): Promise<SpecFileContext[]> {
     const glob = (await deps.specGlobForProject?.(projectId).catch(() => null)) ?? null;
     if (!glob?.trim()) return [];
     const matches = globMatcher(glob);
-    const paths = snapshot.files.filter((file) => file.status !== 'removed' && matches(file.path)).map((file) => file.path).slice(0, MAX_SPEC_FILES);
+    // Enumerate from the snapshot tree so an unchanged specification still supplies requirements context,
+    // not only specs that happen to be among the changed files.
+    const tree = await listTreeFiles(deps.git, path, snapshot.snapshotSha).catch(() => [] as string[]);
+    const paths = tree.filter((filePath) => matches(filePath)).slice(0, MAX_SPEC_FILES);
     const specs = await Promise.all(
       paths.map(async (specPath) => {
         const content = await readFileAt(deps.git, path, snapshot.snapshotSha, specPath).catch(() => null);
@@ -386,6 +298,8 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         return { workspace, prompt: getFullLocalReviewPrompt(context), hasRequirements: hasLocalRequirementsContext(context) };
       },
       async afterComplete() {
+        // Once runs exist, dedup can read models from them; drop the in-flight hint to avoid unbounded growth.
+        inflightModelsKey.delete(review.id);
         changed({ targetId: target.id, reviewId: review.id });
       }
     };
@@ -418,6 +332,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   }
 
   async function removeReview(reviewId: string, repoPath: string): Promise<void> {
+    inflightModelsKey.delete(reviewId);
     deps.store.deleteReview(reviewId);
     await deleteSnapshotRef(deps.git, repoPath, reviewId);
   }
