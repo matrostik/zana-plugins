@@ -202,6 +202,11 @@ async function handleReviewLocal(app: CodenodApp, args: ParsedArgs, ctx: { cwd?:
   // A gate must not pass on findings for files that changed while the review ran.
   const exitCode = !completed || blocking.length > 0 || (failOn !== undefined && stale) ? 1 : 0;
   if (asJson) return { ...json({ ...detail, stale, ...(failOn ? { blockingCount: blocking.length } : {}) }), exitCode };
+  // A review that did not complete has no gate to report; show why it ended instead of claiming the gate passed.
+  if (!completed) {
+    const reason = review.error ?? `Review ${review.status}.`;
+    return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}\n\nReview did not complete (${review.status}): ${reason}` };
+  }
   const staleGate = failOn && stale ? ' Files changed while the review ran, so the result is stale; re-run the review.' : '';
   const gate = failOn ? `\n\n${blocking.length} active finding(s) at or above ${failOn}.${staleGate}` : '';
   return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}${gate}` };

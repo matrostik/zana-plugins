@@ -31,6 +31,7 @@ import {
   diffFiles,
   headCommit,
   isSecretLike,
+  listTreeFiles,
   mergeBase,
   readFileAt,
   resolveBase,
@@ -117,14 +118,39 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return { headSha, base, baseSha: await mergeBase(deps.git, path, base.sha, headSha) };
   }
 
-  /** Same reviewed content: a branch review ignores new commits that leave its diff unchanged, the other scopes diff against HEAD. */
-  function sameFingerprint(snapshot: LocalSnapshotRow, current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string }): boolean {
+  /** Models requested for in-flight reviews, keyed by review id. Runs are only created once a review starts executing. */
+  const inflightModelsKey = new Map<string, string>();
+
+  /** Stable key for a set of models, so dedup treats the same reviewers requested in any order as equal. */
+  function modelsKey(models: ReadonlyArray<{ providerId: string; model: string; reasoningLevel?: string | null }>): string {
+    return models
+      .map((model) => `${model.providerId}:${model.model}${model.reasoningLevel ? `@${model.reasoningLevel}` : ''}`)
+      .sort()
+      .join(',');
+  }
+
+  /** The requested models for a review: the recorded in-flight key while queued, else its created runs. */
+  function reviewModelsKey(reviewId: string): string {
+    return inflightModelsKey.get(reviewId) ?? modelsKey(deps.store.listRuns(reviewId));
+  }
+
+  /**
+   * Same reviewed content and request: a branch review ignores new commits that leave its diff unchanged,
+   * the other scopes diff against HEAD. Intent and the resolved models are part of the identity so a second
+   * request with different reviewers or requirements starts its own review rather than reusing the first.
+   */
+  function sameFingerprint(
+    snapshot: LocalSnapshotRow,
+    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string }
+  ): boolean {
     return (
       snapshot.scope === current.scope &&
       snapshot.baseRef === current.baseRef &&
       snapshot.baseSha === current.baseSha &&
       snapshot.treeSha === current.treeSha &&
-      (current.scope === 'branch' || snapshot.headSha === current.headSha)
+      (current.scope === 'branch' || snapshot.headSha === current.headSha) &&
+      (current.intent === undefined || (snapshot.intent ?? null) === (current.intent ?? null)) &&
+      (current.modelsKey === undefined || reviewModelsKey(snapshot.reviewId) === current.modelsKey)
     );
   }
 
@@ -141,7 +167,9 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   /** Runs starts of one location one at a time, so identical concurrent requests dedupe to a single review. */
   function serializedPerTarget<T>(targetId: string, work: () => Promise<T>): Promise<T> {
     const previous = startQueues.get(targetId) ?? Promise.resolve();
-    const run = previous.catch(() => undefined).then(work);
+    // Promise.resolve().then(work) converts a synchronous throw from `work` into a rejection,
+    // so the keyed cleanup in `finally` always runs for this entry.
+    const run = previous.catch(() => undefined).then(() => work());
     startQueues.set(targetId, run);
     return run.finally(() => {
       if (startQueues.get(targetId) === run) startQueues.delete(targetId);
@@ -161,7 +189,15 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const { headSha, base, baseSha } = await diffBase(path, input.scope, input.base?.trim() || null);
     const tree = await snapshotTree(deps.git, path, input.scope, { baseSha });
     if (tree.headSha !== headSha) throw new Error('HEAD moved while taking the snapshot. Try again.');
-    const existing = activeReviewFor(location.target.id, { scope: input.scope, baseRef: base?.ref ?? null, baseSha, headSha, treeSha: tree.treeSha });
+    const existing = activeReviewFor(location.target.id, {
+      scope: input.scope,
+      baseRef: base?.ref ?? null,
+      baseSha,
+      headSha,
+      treeSha: tree.treeSha,
+      intent,
+      modelsKey: modelsKey(models)
+    });
     if (existing) return existing;
 
     const review = deps.store.createReview({ prId: location.target.id, headSha: tree.headSha, trigger: 'manual', targetKind: 'local' });
@@ -195,6 +231,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       throw error;
     }
     deps.store.setLocalTargetScope(location.target.id, input.scope);
+    inflightModelsKey.set(review.id, modelsKey(models));
     deps.reviews().enqueueReview(review, models);
     await pruneTarget(location.target, path).catch((error) => deps.log.warn(`codenod: local review cleanup failed: ${errorMessage(error)}`));
     return deps.store.getReview(review.id) ?? review;
@@ -213,7 +250,10 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const glob = (await deps.specGlobForProject?.(projectId).catch(() => null)) ?? null;
     if (!glob?.trim()) return [];
     const matches = globMatcher(glob);
-    const paths = snapshot.files.filter((file) => file.status !== 'removed' && matches(file.path)).map((file) => file.path).slice(0, MAX_SPEC_FILES);
+    // Enumerate from the snapshot tree so an unchanged specification still supplies requirements context,
+    // not only specs that happen to be among the changed files.
+    const tree = await listTreeFiles(deps.git, path, snapshot.snapshotSha).catch(() => [] as string[]);
+    const paths = tree.filter((filePath) => matches(filePath)).slice(0, MAX_SPEC_FILES);
     const specs = await Promise.all(
       paths.map(async (specPath) => {
         const content = await readFileAt(deps.git, path, snapshot.snapshotSha, specPath).catch(() => null);
@@ -258,6 +298,8 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         return { workspace, prompt: getFullLocalReviewPrompt(context), hasRequirements: hasLocalRequirementsContext(context) };
       },
       async afterComplete() {
+        // Once runs exist, dedup can read models from them; drop the in-flight hint to avoid unbounded growth.
+        inflightModelsKey.delete(review.id);
         changed({ targetId: target.id, reviewId: review.id });
       }
     };
@@ -290,6 +332,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   }
 
   async function removeReview(reviewId: string, repoPath: string): Promise<void> {
+    inflightModelsKey.delete(reviewId);
     deps.store.deleteReview(reviewId);
     await deleteSnapshotRef(deps.git, repoPath, reviewId);
   }

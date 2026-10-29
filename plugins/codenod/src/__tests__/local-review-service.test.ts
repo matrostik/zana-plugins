@@ -209,6 +209,25 @@ describe('local reviews', () => {
     expect(harness.store.listLocalReviews(harness.targetId).map(({ review }) => review.status)).toEqual(['completed', 'completed']);
   });
 
+  it('starts a separate review when the intent differs for the same files', async () => {
+    const releases: Array<() => void> = [];
+    const harness = createHarness({ respond: () => new Promise((resolve) => releases.push(() => resolve(REPLY))) });
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
+
+    const first = await harness.start('uncommitted', { intent: 'Check auth' });
+    const sameIntent = await harness.start('uncommitted', { intent: 'Check auth' });
+    const otherIntent = await harness.start('uncommitted', { intent: 'Check perf' });
+    // Release reviewer responses as they arrive until both distinct reviews have finished.
+    while (harness.reviews().activeCount() > 0) {
+      if (releases.length > 0) releases.splice(0).forEach((release) => release());
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    expect(sameIntent.id).toBe(first.id);
+    expect(otherIntent.id).not.toBe(first.id);
+    expect(harness.store.listLocalReviews(harness.targetId)).toHaveLength(2);
+  });
+
   it('refuses an empty change and leaves no review or snapshot behind', async () => {
     const harness = createHarness();
 

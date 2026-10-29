@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -11,8 +11,10 @@ import {
   diffFiles,
   isSafeRef,
   isSecretLike,
+  listTreeFiles,
   listWorktrees,
   MAX_NEW_FILE_BYTES,
+  MAX_NEW_FILES,
   mergeBase,
   readFileAt,
   resolveBase,
@@ -169,6 +171,65 @@ describe('local git snapshot', () => {
     expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
   });
 
+  it('skips a staged binary addition with a non-secret name', async () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, 'blob.dat'), Buffer.from([1, 0, 2, 3]));
+    writeFileSync(join(repo, 'ok.ts'), 'ok\n');
+    sh(repo, 'add', 'blob.dat', 'ok.ts');
+
+    const tree = await snapshotTree(runGit, repo, 'staged');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'staged', REVIEW_ID);
+
+    expect(tree.skipped).toEqual([{ path: 'blob.dat', reason: 'binary' }]);
+    expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
+    expect(await readFileAt(runGit, repo, snapshotSha, 'blob.dat')).toBeNull();
+  });
+
+  it('caps the number of new staged files and reports the overflow', async () => {
+    const repo = createRepo();
+    const total = MAX_NEW_FILES + 3;
+    for (let index = 0; index < total; index++) writeFileSync(join(repo, `n${String(index).padStart(4, '0')}.ts`), `const n = ${index};\n`);
+    sh(repo, 'add', '.');
+
+    const tree = await snapshotTree(runGit, repo, 'staged');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'staged', REVIEW_ID);
+
+    expect(tree.skipped.filter((file) => file.reason === 'too-many-files')).toHaveLength(3);
+    expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).length).toBe(MAX_NEW_FILES);
+  }, 30_000);
+
+  it('attributes a renamed file patch to the destination only when the source path is recreated', async () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, 'src.ts'), 'original line one\noriginal line two\n');
+    sh(repo, 'add', 'src.ts');
+    sh(repo, 'commit', '-q', '-m', 'add src');
+    sh(repo, 'mv', 'src.ts', 'dst.ts');
+    writeFileSync(join(repo, 'src.ts'), 'BRAND NEW UNRELATED CONTENT\n');
+    sh(repo, 'add', 'src.ts', 'dst.ts');
+
+    const tree = await snapshotTree(runGit, repo, 'staged');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'staged', REVIEW_ID);
+    const files = await diffFiles(runGit, repo, tree.headSha, snapshotSha);
+
+    const dst = files.find((file) => file.path === 'dst.ts')!;
+    expect(dst.patch ?? '').not.toContain('BRAND NEW UNRELATED CONTENT');
+  });
+
+  it('lists every file in the snapshot tree, including unchanged ones', async () => {
+    const repo = createRepo();
+    // An unchanged spec committed earlier must still be discoverable alongside a new working change.
+    mkdirSync(join(repo, 'docs'), { recursive: true });
+    writeFileSync(join(repo, 'docs', 'spec.md'), '# Spec\n');
+    sh(repo, 'add', 'docs/spec.md');
+    sh(repo, 'commit', '-q', '-m', 'add spec');
+    writeFileSync(join(repo, 'a.ts'), 'const a = 9;\n');
+
+    const tree = await snapshotTree(runGit, repo, 'uncommitted');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'uncommitted', REVIEW_ID);
+
+    expect(await listTreeFiles(runGit, repo, snapshotSha)).toEqual(expect.arrayContaining(['a.ts', 'docs/spec.md']));
+  });
+
   it('reviews only the staged changes in staged scope', async () => {
     const repo = createRepo();
     writeFileSync(join(repo, 'a.ts'), 'const a = 3;\n');
@@ -235,6 +296,16 @@ describe('local git snapshot', () => {
     ]);
     expect(await changedPathCount(runGit, linked)).toBe(2);
     expect(await changedPathCount(runGit, repo)).toBe(0);
+  });
+
+  it('counts a staged rename as a single changed path', async () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, 'orig.ts'), 'const orig = 1;\n');
+    sh(repo, 'add', 'orig.ts');
+    sh(repo, 'commit', '-q', '-m', 'add orig');
+    sh(repo, 'mv', 'orig.ts', 'renamed.ts');
+
+    expect(await changedPathCount(runGit, repo)).toBe(1);
   });
 
   it('refuses to snapshot a branch without commits and deletes snapshot refs', async () => {
