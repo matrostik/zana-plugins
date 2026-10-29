@@ -103,6 +103,16 @@ describe('SettingsView tabs', () => {
 });
 
 describe('Profile tab', () => {
+  it('restores a selected prompt when leaving creation through the selector', async () => {
+    await renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'New prompt' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prompt name' }), { target: { value: 'Draft' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom review instructions' }), { target: { value: 'Draft instructions' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Prompt' }), { target: { value: 'legacy' } });
+    expect((screen.getByRole('textbox', { name: 'Prompt name' }) as HTMLInputElement).value).toBe('My review instructions');
+    expect((screen.getByRole('textbox', { name: 'Custom review instructions' }) as HTMLTextAreaElement).value).toBe('Be strict');
+    expect((screen.getByRole('button', { name: 'Save instructions' }) as HTMLButtonElement).disabled).toBe(true);
+  });
   it('restores a non-default prompt after cancelling creation', async () => {
     await renderView(snapshot({ prompts: [{ id: 'legacy', name: 'Default', instructions: 'Default text' }, { id: 'security', name: 'Security', instructions: 'Check security' }] }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Prompt' }), { target: { value: 'security' } });

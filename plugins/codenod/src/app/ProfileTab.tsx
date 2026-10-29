@@ -119,7 +119,7 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
       <p className="cn-muted cn-small">Manage the instructions available for reviews and choose a default.</p>
       {action.error ? <p className="cn-banner cn-banner-error">{action.error}</p> : null}
       <div className="cn-inline">
-        <label>Prompt <select aria-label="Prompt" value={creating ? '' : selectedId ?? ''} disabled={isDirty && !creating} onChange={(event) => { setCreating(false); setSelectedId(event.target.value || null); }}>
+        <label>Prompt <select aria-label="Prompt" value={creating ? '' : selectedId ?? ''} disabled={isDirty && !creating} onChange={(event) => { setCreating(false); showPrompt(event.target.value || null); }}>
           <option value="" disabled>Select a prompt</option>
           {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
         </select></label>

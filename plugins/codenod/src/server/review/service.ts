@@ -564,8 +564,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
     const running = deps.store.latestReview(pr.id);
     if (running && (running.status === 'queued' || running.status === 'running') && running.headSha === pr.headSha) {
       const explicit = options.promptSnapshot !== undefined || options.promptId !== undefined;
-      if (!explicit || running.promptSnapshot == null || samePromptSnapshot(running.promptSnapshot, promptSnapshot)) return running;
-      throw new Error('A review is already running for this pull request with different instructions. Wait for it to finish or cancel it.');
+      if (!explicit || samePromptSnapshot(running.promptSnapshot, promptSnapshot)) return running;
     }
     const review = deps.store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: options.trigger ?? 'manual', promptSnapshot });
     enqueueReview(review, models);

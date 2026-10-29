@@ -1028,17 +1028,34 @@ describe('review service', () => {
     expect(store.getReview(afterCompletion.id)).toMatchObject({ status: 'completed', trigger: 'manual' });
   });
 
-  it('reuses an in-flight review unless the caller explicitly asks for different instructions', async () => {
+  it('starts a separate review for explicit instructions when the old snapshot is unavailable', async () => {
     const gate = createGate();
     const { db, service, settled } = createServiceHarness({ respond: gate.respond });
 
     const first = await service.startReview(prRef());
     await until(() => gate.waiting() === 1);
-    await expect(service.startReview(prRef(), { promptId: null })).rejects.toThrow(/different instructions/);
     expect((await service.startReview(prRef(), { trigger: 'auto' })).id).toBe(first.id);
     // Reviews recorded before prompt snapshots existed have none.
     db.prepare('UPDATE reviews SET prompt_name = NULL, prompt_instructions = NULL WHERE id = ?').run(first.id);
-    expect((await service.startReview(prRef(), { promptId: null })).id).toBe(first.id);
+    const explicit = await service.startReview(prRef(), { promptId: null });
+    expect(explicit.id).not.toBe(first.id);
+    gate.release();
+    await until(() => gate.waiting() > 0);
+    gate.release();
+    await settled();
+  });
+
+  it('reuses matching explicit instructions and starts a separate review for different ones', async () => {
+    const gate = createGate();
+    const { service, settled } = createServiceHarness({ respond: gate.respond });
+    const first = await service.startReview(prRef());
+    await until(() => gate.waiting() === 1);
+    const matching = await service.startReview(prRef(), { promptSnapshot: first.promptSnapshot! });
+    const different = await service.startReview(prRef(), { promptId: null });
+    expect(matching.id).toBe(first.id);
+    expect(different.id).not.toBe(first.id);
+    gate.release();
+    await until(() => gate.waiting() > 0);
     gate.release();
     await settled();
   });

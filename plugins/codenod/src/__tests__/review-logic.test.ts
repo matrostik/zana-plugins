@@ -5,7 +5,7 @@ import { extractJsonObject, parseAnalysis } from '../server/review/parse.ts';
 import { getFullReviewPrompt, getReviewPrompt, hasRequirementsContext, sanitizeUntrusted, type ReviewPromptContext } from '../server/review/prompts.ts';
 import { extractLinkedIssues, globMatcher, referencedSpecPaths } from '../server/review/requirements.ts';
 import { buildReviewPayload } from '../server/post.ts';
-import { createSettingsStore } from '../server/settings.ts';
+import { applySettingsPatch, createSettingsStore, DEFAULT_SETTINGS } from '../server/settings.ts';
 import type { FindingRow, ParsedIssue } from '../server/types.ts';
 
 const PATCH = '@@ -1,3 +1,4 @@\n line1\n-old\n+new\n+added\n line3';
@@ -238,6 +238,11 @@ describe('post payload', () => {
 });
 
 describe('settings store', () => {
+  it('keeps the built-in default when legacy instructions are updated', () => {
+    const result = applySettingsPatch({ ...DEFAULT_SETTINGS, defaultPromptId: null }, { customInstructions: 'Updated' });
+    expect(result.defaultPromptId).toBeNull();
+    expect(result.prompts.find((prompt) => prompt.id === 'legacy')?.instructions).toBe('Updated');
+  });
   it('migrates existing instructions into the default prompt library', async () => {
     const settings = createSettingsStore({
       kv: {
@@ -309,11 +314,4 @@ describe('settings store', () => {
     expect(saved).toMatchObject({ autoSyncEnabled: true });
   });
 
-});
-import { applySettingsPatch, DEFAULT_SETTINGS } from '../server/settings.ts';
-
-it('keeps the built-in default when legacy instructions are updated', () => {
-  const result = applySettingsPatch({ ...DEFAULT_SETTINGS, defaultPromptId: null }, { customInstructions: 'Updated' });
-  expect(result.defaultPromptId).toBeNull();
-  expect(result.prompts.find((prompt) => prompt.id === 'legacy')?.instructions).toBe('Updated');
 });
