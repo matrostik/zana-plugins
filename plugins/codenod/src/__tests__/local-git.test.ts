@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -85,6 +85,33 @@ describe('local git snapshot', () => {
       { path: 'blob.dat', reason: 'binary' }
     ]);
     expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
+  });
+
+  it('skips untracked symlinks so their targets never reach the snapshot', async () => {
+    const repo = createRepo();
+    symlinkSync('/etc/passwd', join(repo, 'link'));
+    writeFileSync(join(repo, 'ok.ts'), 'ok\n');
+
+    const tree = await snapshotTree(runGit, repo, 'uncommitted');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'uncommitted', REVIEW_ID);
+
+    expect(tree.skipped).toEqual([{ path: 'link', reason: 'symlink' }]);
+    expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
+    expect(await readFileAt(runGit, repo, snapshotSha, 'link')).toBeNull();
+  });
+
+  it('skips staged symlinks so their targets never reach the snapshot', async () => {
+    const repo = createRepo();
+    symlinkSync('/etc/passwd', join(repo, 'link'));
+    writeFileSync(join(repo, 'ok.ts'), 'ok\n');
+    sh(repo, 'add', 'link', 'ok.ts');
+
+    const tree = await snapshotTree(runGit, repo, 'staged');
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'staged', REVIEW_ID);
+
+    expect(tree.skipped).toEqual([{ path: 'link', reason: 'symlink' }]);
+    expect((await diffFiles(runGit, repo, tree.headSha, snapshotSha)).map((file) => file.path)).toEqual(['ok.ts']);
+    expect(await readFileAt(runGit, repo, snapshotSha, 'link')).toBeNull();
   });
 
   it('keeps changed tracked and staged secrets at their base version in every scope', async () => {

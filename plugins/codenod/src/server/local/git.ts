@@ -221,15 +221,17 @@ async function selectUntracked(git: GitRunner, worktreePath: string, env: Record
     const absolute = resolve(worktreePath, path);
     const info = await lstat(absolute).catch(() => null);
     if (!info) continue;
-    if (!info.isSymbolicLink()) {
-      if (info.size > MAX_NEW_FILE_BYTES) {
-        skipped.push({ path, reason: 'too-large' });
-        continue;
-      }
-      if (await looksBinary(absolute).catch(() => true)) {
-        skipped.push({ path, reason: 'binary' });
-        continue;
-      }
+    if (info.isSymbolicLink()) {
+      skipped.push({ path, reason: 'symlink' });
+      continue;
+    }
+    if (info.size > MAX_NEW_FILE_BYTES) {
+      skipped.push({ path, reason: 'too-large' });
+      continue;
+    }
+    if (await looksBinary(absolute).catch(() => true)) {
+      skipped.push({ path, reason: 'binary' });
+      continue;
     }
     if (include.length >= MAX_NEW_FILES) {
       skipped.push({ path, reason: 'too-many-files' });
@@ -285,7 +287,8 @@ async function blobSizes(git: GitRunner, worktreePath: string, shas: string[]): 
 
 /**
  * Resets index entries that must not reach a reviewer back to `baseSha`: changed secret-looking files,
- * and new files over the size or count limits. Covers tracked, staged, and branch-committed changes alike.
+ * symlinks (whose targets could point outside the snapshot), and new files over the size or count limits.
+ * Covers tracked, staged, and branch-committed changes alike.
  */
 async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: Record<string, string>, baseSha: string): Promise<SkippedFile[]> {
   const changes = await indexChanges(git, worktreePath, env, baseSha);
@@ -296,6 +299,9 @@ async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: R
     if (isSecretLike(change.path)) {
       skipped.push({ path: change.path, reason: 'possible-secret' });
       excluded.push(change);
+    } else if (change.mode === SYMLINK_MODE) {
+      skipped.push({ path: change.path, reason: 'symlink' });
+      excluded.push(change);
     } else if (change.status === 'A') {
       additions.push(change);
     }
@@ -303,7 +309,7 @@ async function excludeUnsafeChanges(git: GitRunner, worktreePath: string, env: R
   const sizes = await blobSizes(
     git,
     worktreePath,
-    additions.filter((change) => change.mode !== GITLINK_MODE && change.mode !== SYMLINK_MODE).map((change) => change.sha)
+    additions.filter((change) => change.mode !== GITLINK_MODE).map((change) => change.sha)
   );
   let kept = 0;
   for (const change of additions.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))) {

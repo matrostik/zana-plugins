@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
-import { realpath } from 'node:fs/promises';
-import { basename, sep } from 'node:path';
+import { sep } from 'node:path';
 import type { Store } from '../db.ts';
 import type { ZanaProject } from '../projects.ts';
 import { isReviewable, prepareDiff } from '../review/diff.ts';
@@ -24,9 +22,8 @@ import type {
   ReviewRow,
   SkippedFile
 } from '../types.ts';
-import { errorMessage, mapWithConcurrency } from '../util.ts';
+import { errorMessage } from '../util.ts';
 import {
-  changedPathCount,
   commitExists,
   commitMessages,
   commitSnapshot,
@@ -34,47 +31,21 @@ import {
   diffFiles,
   headCommit,
   isSecretLike,
-  listWorktrees,
   mergeBase,
   readFileAt,
-  repoTopLevel,
   resolveBase,
   snapshotTree,
-  type GitRunner,
-  type WorktreeInfo
+  type GitRunner
 } from './git.ts';
+import { createLocationResolver, type LocalLocation, type LocalLocationSummary } from './locations.ts';
+import { isLocalScope, localLabel, localTargetId, SCOPE_TITLES } from './target.ts';
 
-export const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch'];
+export { isLocalScope, localLabel, localTargetId, LOCAL_SCOPES } from './target.ts';
+export type { LocalLocation, LocalLocationSummary } from './locations.ts';
+
 export const MAX_REVIEWS_PER_LOCATION = 10;
 export const LOCAL_REVIEW_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const MAX_INTENT_CHARS = 2_000;
-const STATUS_CONCURRENCY = 4;
-/** Worktrees CodeNod creates for its own reviewer and Deep Review threads. */
-const CODENOD_BRANCH_PATTERN = /^zcc\/codenod-/;
-
-const SCOPE_TITLES: Record<LocalScope, string> = {
-  uncommitted: 'Uncommitted changes',
-  staged: 'Staged changes',
-  branch: 'Branch changes'
-};
-
-export interface LocalLocation {
-  target: LocalTargetRow;
-  project: ZanaProject & { path: string };
-  worktree: WorktreeInfo;
-}
-
-export interface LocalLocationSummary {
-  targetId: string;
-  projectId: string;
-  projectName: string;
-  worktreePath: string;
-  branch: string | null;
-  isMain: boolean;
-  changedFiles: number | null;
-  lastScope: LocalScope | null;
-  latest: Pick<ReviewRow, 'id' | 'status' | 'riskScore' | 'createdAt'> | null;
-}
 
 export interface StartLocalReviewInput {
   projectId: string;
@@ -110,18 +81,6 @@ export interface LocalReviewDeps {
   now?: () => number;
 }
 
-export function localTargetId(projectId: string, worktreePath: string): string {
-  return `local:${createHash('sha256').update(`${projectId}\0${worktreePath}`).digest('hex').slice(0, 20)}`;
-}
-
-export function isLocalScope(value: unknown): value is LocalScope {
-  return LOCAL_SCOPES.includes(value as LocalScope);
-}
-
-export function localLabel(target: Pick<LocalTargetRow, 'worktreePath' | 'branch'>, scope?: LocalScope): string {
-  return `${basename(target.worktreePath)} · ${target.branch ?? 'detached HEAD'}${scope ? ` (${scope})` : ''}`;
-}
-
 /** Splits changed files into reviewable ones and skipped ones with a reason. */
 export function prepareLocalFiles(files: ChangedFile[], untrackedSkipped: SkippedFile[]): { files: ChangedFile[]; skipped: SkippedFile[] } {
   const skipped: SkippedFile[] = [...untrackedSkipped];
@@ -140,10 +99,6 @@ export function prepareLocalFiles(files: ChangedFile[], untrackedSkipped: Skippe
   return { files: prepared.files, skipped };
 }
 
-async function canonicalPath(path: string): Promise<string> {
-  return realpath(path).catch(() => path);
-}
-
 function isWithin(child: string, parent: string): boolean {
   return child === parent || child.startsWith(parent.endsWith(sep) ? parent : `${parent}${sep}`);
 }
@@ -151,85 +106,8 @@ function isWithin(child: string, parent: string): boolean {
 export function createLocalReviews(deps: LocalReviewDeps) {
   const now = deps.now ?? Date.now;
   const changed = (payload: Record<string, unknown>) => deps.publish('codenod:changed', { local: true, ...payload });
-
-  async function projectsWithPath(): Promise<Array<ZanaProject & { path: string }>> {
-    return (await deps.listProjects()).filter((project): project is ZanaProject & { path: string } => Boolean(project.path));
-  }
-
-  /** Checked-out locations per project; a project whose git listing fails maps to null. */
-  async function worktreesByProject(projects: Array<ZanaProject & { path: string }>): Promise<Map<string, WorktreeInfo[] | null>> {
-    const result = new Map<string, WorktreeInfo[] | null>();
-    for (const project of projects) {
-      result.set(project.id, await listWorktrees(deps.git, project.path).catch(() => null));
-    }
-    return result;
-  }
-
-  function toLocation(project: ZanaProject & { path: string }, worktree: WorktreeInfo): LocalLocation {
-    const target = deps.store.upsertLocalTarget({
-      id: localTargetId(project.id, worktree.path),
-      projectId: project.id,
-      worktreePath: worktree.path,
-      branch: worktree.branch
-    });
-    return { target, project, worktree };
-  }
-
-  async function listLocations(): Promise<LocalLocationSummary[]> {
-    const projects = await projectsWithPath();
-    const byProject = await worktreesByProject(projects);
-    const seen = new Set<string>();
-    const locations: LocalLocation[] = [];
-    for (const project of projects) {
-      for (const worktree of byProject.get(project.id) ?? []) {
-        if (seen.has(worktree.path) || (worktree.branch && CODENOD_BRANCH_PATTERN.test(worktree.branch))) continue;
-        seen.add(worktree.path);
-        locations.push(toLocation(project, worktree));
-      }
-    }
-    const counts = await mapWithConcurrency(locations, STATUS_CONCURRENCY, (location) => changedPathCount(deps.git, location.worktree.path));
-    return locations.map((location, index) => {
-      const latest = deps.store.listLocalReviews(location.target.id)[0]?.review ?? null;
-      return {
-        targetId: location.target.id,
-        projectId: location.project.id,
-        projectName: location.project.name,
-        worktreePath: location.worktree.path,
-        branch: location.worktree.branch,
-        isMain: location.worktree.isMain,
-        changedFiles: counts[index],
-        lastScope: location.target.lastScope,
-        latest: latest ? { id: latest.id, status: latest.status, riskScore: latest.riskScore, createdAt: latest.createdAt } : null
-      };
-    });
-  }
-
-  /** Validates that `worktreePath` is a checked-out location of the project; arbitrary paths are refused. */
-  async function resolveLocation(projectId: string, worktreePath: string): Promise<LocalLocation> {
-    const project = (await projectsWithPath()).find((candidate) => candidate.id === projectId);
-    if (!project) throw new Error(`Project ${projectId} has no local checkout`);
-    const wanted = await canonicalPath(worktreePath);
-    const worktrees = await listWorktrees(deps.git, project.path);
-    for (const worktree of worktrees) {
-      if ((await canonicalPath(worktree.path)) === wanted) return toLocation(project, worktree);
-    }
-    throw new Error(`${worktreePath} is not a checked-out location of project ${project.name}`);
-  }
-
-  /** Finds the project location that contains `path`, for example a terminal's working directory. */
-  async function locationForPath(path: string, projectId?: string): Promise<LocalLocation> {
-    const top = await repoTopLevel(deps.git, path);
-    if (!top) throw new Error(`${path} is not inside a git checkout`);
-    const wanted = await canonicalPath(top);
-    const projects = (await projectsWithPath()).filter((project) => !projectId || project.id === projectId);
-    for (const project of projects) {
-      const worktrees = await listWorktrees(deps.git, project.path).catch(() => [] as WorktreeInfo[]);
-      for (const worktree of worktrees) {
-        if ((await canonicalPath(worktree.path)) === wanted) return toLocation(project, worktree);
-      }
-    }
-    throw new Error(`${top} does not belong to a Zana project${projectId ? ` (${projectId})` : ''}. Register it as a project first.`);
-  }
+  const locations = createLocationResolver(deps);
+  const { canonicalPath, projectsWithPath, worktreesByProject, listLocations, resolveLocation, locationForPath, projectFor } = locations;
 
   /** Diff base of a scope: HEAD for uncommitted and staged, the merge base with the base branch for branch reviews. */
   async function diffBase(path: string, scope: LocalScope, baseRef: string | null): Promise<{ headSha: string; base: { ref: string; sha: string } | null; baseSha: string }> {
@@ -329,12 +207,6 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const target = deps.store.getLocalTarget(review.prId);
     if (!snapshot || !target) throw new Error(`Local review ${reviewId} has no snapshot`);
     return { review, snapshot, target };
-  }
-
-  async function projectFor(target: LocalTargetRow): Promise<ZanaProject & { path: string }> {
-    const project = (await projectsWithPath()).find((candidate) => candidate.id === target.projectId);
-    if (!project) throw new Error(`Project ${target.projectId} is no longer available`);
-    return project;
   }
 
   async function specFiles(projectId: string, snapshot: LocalSnapshotRow, path: string): Promise<SpecFileContext[]> {
