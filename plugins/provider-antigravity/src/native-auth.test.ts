@@ -651,6 +651,70 @@ describe('native-auth.ts unit tests', () => {
     }
   });
 
+  it.each((['gemini-api-key', 'agent-platform'] as const).flatMap(authMethod =>
+    ['catalog first', 'usage first', 'sign-out', 'account switch'].map(completion => ({ authMethod, completion }))))
+  ('coordinates concurrent headless catalog and usage authentication: $authMethod, $completion', async ({ authMethod, completion }) => {
+    const home = makeTempDir('headless-concurrent-');
+    const command = join(home, 'agy.exe');
+    writeFileSync(command, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home, GEMINI_API_KEY: 'same-account', GOOGLE_CLOUD_PROJECT: 'same-project' };
+    const pendingAuth: Array<() => void> = [];
+    const spawnImpl = vi.fn(() => {
+      const child = createMockChild();
+      const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+      child.stdin.write.mockImplementation((chunk: string) => {
+        const msg = JSON.parse(chunk);
+        if (msg.method === 'authenticate') {
+          pendingAuth.push(() => emit({ id: msg.id, result: {} }));
+          return;
+        }
+        queueMicrotask(() => {
+          if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [{ id: authMethod }] } });
+          if (msg.method === 'session/new') {
+            emit({ id: msg.id, result: { sessionId: 's1', configOptions: [{ id: 'model', options: [{ value: 'gemini', name: 'Gemini' }] }] } });
+            emit({ method: 'session/update', params: { sessionId: 's1', update: {
+              sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } });
+          }
+          if (msg.method === 'session/prompt') {
+            emit({ method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk', content: {
+              type: 'text', text: '### Quota Limits\n- **Gemini**\n  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)' } } } });
+            emit({ id: msg.id, result: { stopReason: 'end_turn' } });
+          }
+        });
+      });
+      return child;
+    });
+    const options = { command, args: [], authMethod, env, spawnImpl };
+    const catalog = getNativeCatalog(options);
+    const usage = queryNativeUsage(options);
+    await vi.waitFor(() => expect(pendingAuth).toHaveLength(2));
+    const first = completion === 'usage first' ? 1 : 0;
+    pendingAuth[first]();
+    // Let the first diagnostic finish its own settings write before the other authenticates.
+    if (first === 0) expect((await catalog).state).toBe('session_ready');
+    else expect((await usage).usage.status).toBe('ok');
+    if (completion === 'sign-out') writeNativeAcpAuthType(null, env);
+    if (completion === 'account switch') {
+      if (authMethod === 'gemini-api-key') env.GEMINI_API_KEY = 'different-account';
+      else env.GOOGLE_CLOUD_PROJECT = 'different-project';
+    }
+    pendingAuth[1 - first]();
+    if (completion === 'sign-out' || completion === 'account switch') {
+      const result = await usage;
+      expect(result.usage.status).toBe('error');
+      expect(result.usage.message).toContain('sign-in changed');
+      expect(result.usage.windows).toEqual([]);
+      if (completion === 'sign-out') expect(isAuthExplicitlyCleared(env)).toBe(true);
+    } else {
+      expect((await catalog).models.map(model => model.id)).toEqual(['gemini']);
+      expect((await usage).usage.status).toBe('ok');
+      // Both caches must survive the other diagnostic's completion.
+      expect((await getNativeCatalog(options)).state).toBe('session_ready');
+      expect((await queryNativeUsage(options)).usage.status).toBe('ok');
+      expect(spawnImpl).toHaveBeenCalledTimes(2);
+    }
+  });
+
   it.each(['oauth-personal', 'gemini-api-key'] as const)
   ('accepts usage with %s after token refresh or its own auth settings write', async (authMethod) => {
     const home = makeTempDir('usage-auth-stable-');

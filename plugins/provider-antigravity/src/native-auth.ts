@@ -852,10 +852,11 @@ function isAuthIdentityCurrent(identity: NativeAuthIdentity, env: NodeJS.Process
 }
 
 /** Shared key for catalog and usage refreshes so both follow the same account identity. */
-function buildNativeRefreshKey(options: { command: string; args: string[]; authMethod: GoogleAcpAuthMethod; cwd?: string; env?: NodeJS.ProcessEnv }): string {
+function buildNativeRefreshKey(options: { command: string; args: string[]; authMethod: GoogleAcpAuthMethod; cwd?: string; env?: NodeJS.ProcessEnv },
+  fingerprint: string): string {
   return JSON.stringify([options.command, options.args, options.authMethod, options.cwd,
     getZccDataDir(options.env), resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
-    computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)]);
+    fingerprint]);
 }
 
 /** Opaque account identity so UIs can drop results that belong to a previous sign-in. */
@@ -913,9 +914,16 @@ export function getFastNativeReadiness(options: {
   env?: NodeJS.ProcessEnv;
 }): NativeReadinessResult {
   const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  return getPreparedNativeReadiness(options, sanitized);
+}
+
+function getPreparedNativeReadiness(
+  options: Pick<NativeProbeOptions, 'command' | 'args' | 'authMethod' | 'env'>,
+  sanitized: ReturnType<typeof prepareSanitizedGeminiHome>,
+  fingerprint = computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)
+): NativeReadinessResult {
   const effectiveEnv: NodeJS.ProcessEnv = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
   const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const fingerprint = computeCredentialFingerprint(effectiveEnv, options.authMethod);
   const cacheKey = JSON.stringify({
     command: options.command,
     args: options.args,
@@ -952,10 +960,47 @@ export function getFastNativeReadiness(options: {
   return buildSignInRequiredFastReadiness(options, sanitized);
 }
 
+interface NativeInitializeOptions {
+  authMethod: GoogleAcpAuthMethod;
+  timeoutMs: number;
+  configuredAuthType: string | null;
+  env?: NodeJS.ProcessEnv;
+}
+
+interface HeadlessAuthGroup {
+  current: NativeAuthIdentity;
+  settingsWritten: boolean;
+  users: number;
+}
+
+// Each runtime authenticates its own session, but overlapping diagnostics commit settings once.
+// Keep the group until every participant leaves, including slower initialize/authenticate calls.
+const headlessAuthGroups = new Map<string, HeadlessAuthGroup>();
+
 async function performInitializeAndAuth(
   harness: RpcHarness,
-  options: { authMethod: GoogleAcpAuthMethod; timeoutMs: number; configuredAuthType: string | null; env?: NodeJS.ProcessEnv },
+  options: NativeInitializeOptions,
   identity: { current: NativeAuthIdentity }
+): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] }> {
+  if (options.configuredAuthType || (options.authMethod !== 'gemini-api-key' && options.authMethod !== 'agent-platform')) {
+    return initializeNativeSession(harness, options, identity);
+  }
+  const key = JSON.stringify([resolveSourceAndManagedGeminiHome(options.env), options.authMethod, identity.current]);
+  const group = headlessAuthGroups.get(key) ?? { current: identity.current, settingsWritten: false, users: 0 };
+  group.users++;
+  headlessAuthGroups.set(key, group);
+  try {
+    return await initializeNativeSession(harness, options, identity, group);
+  } finally {
+    if (--group.users === 0) headlessAuthGroups.delete(key);
+  }
+}
+
+async function initializeNativeSession(
+  harness: RpcHarness,
+  options: NativeInitializeOptions,
+  identity: { current: NativeAuthIdentity },
+  headlessGroup?: HeadlessAuthGroup
 ): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] }> {
   const initResult = await harness.request(
     'initialize',
@@ -977,17 +1022,18 @@ async function performInitializeAndAuth(
     ? initResult.authMethods.map((m: any) => (typeof m?.id === 'string' ? m.id : null)).filter(Boolean)
     : [];
 
-  if (
-    !options.configuredAuthType &&
-    (options.authMethod === 'gemini-api-key' || options.authMethod === 'agent-platform')
-  ) {
+  if (headlessGroup) {
     await harness.request('authenticate', { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
+    if (!isAuthIdentityCurrent(headlessGroup.current, options.env, options.authMethod)) {
       throw new Error('Antigravity sign-in changed during authentication. Retry to load the current account.');
     }
-    writeNativeAcpAuthType(options.authMethod, options.env);
-    // Rebase only our synchronous settings write; changes during authentication remain invalid.
-    identity.current = captureAuthIdentity(options.env, options.authMethod);
+    if (!headlessGroup.settingsWritten) {
+      writeNativeAcpAuthType(options.authMethod, options.env);
+      // Only this synchronous write may rebase the group. External changes still fail validation.
+      headlessGroup.current = captureAuthIdentity(options.env, options.authMethod);
+      headlessGroup.settingsWritten = true;
+    }
+    identity.current = headlessGroup.current;
   }
 
   return { protocolVersion, agentVersion, advertisedAuthMethods };
@@ -1156,7 +1202,7 @@ function setupStderrAuthDetector(harness: RpcHarness) {
 
 /** Both diagnostics use the same isolated runtime, auth detection, deadline and cleanup. */
 function createNativeDiagnostic(options: NativeProbeOptions, operation: string,
-  sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod })) {
+  sanitized: ReturnType<typeof prepareSanitizedGeminiHome>) {
   const effectiveEnv = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
   const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
   const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
@@ -1183,21 +1229,21 @@ let usageCache: { key: string; result: NativeUsageResult } | null = null;
 
 export async function queryNativeUsage(options: NativeProbeOptions): Promise<NativeUsageResult> {
   // Sync source credentials first so the key describes the account the query would use.
-  prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const key = buildNativeRefreshKey(options);
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
+  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
   if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
     return usageCache.result;
   }
   const running = usageRefreshes.get(key);
   if (running) return running;
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const request = performNativeUsageQuery(options, identity).then(result => {
+  const request = performNativeUsageQuery(options, identity, sanitized).then(result => {
     if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
       return { supported: true as const, usage: { status: 'error' as const, planLabel: null, accountEmail: null,
         windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' as const,
         message: 'Antigravity sign-in changed while usage was being checked. Retry to load the current account.' } };
     }
-    if (result.usage.status === 'ok') usageCache = { key: buildNativeRefreshKey(options), result };
+    if (result.usage.status === 'ok') usageCache = { key: buildNativeRefreshKey(options, identity.current.fingerprint), result };
     return result;
   }).finally(() => usageRefreshes.delete(key));
   usageRefreshes.set(key, request);
@@ -1248,11 +1294,12 @@ function trackUsageSessionUpdates(harness: RpcHarness): UsageSessionTracker {
   };
 }
 
-async function performNativeUsageQuery(options: NativeProbeOptions, identity: { current: NativeAuthIdentity }): Promise<NativeUsageResult> {
+async function performNativeUsageQuery(options: NativeProbeOptions, identity: { current: NativeAuthIdentity },
+  preparedHome: ReturnType<typeof prepareSanitizedGeminiHome>): Promise<NativeUsageResult> {
   const usage: NativeUsageResult['usage'] = { status: 'error', planLabel: null, accountEmail: null,
     windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' };
   if (!existsSync(options.command)) return { supported: true, usage: { ...usage, status: 'not_installed' } };
-  const diagnostic = createNativeDiagnostic(options, 'usage check');
+  const diagnostic = createNativeDiagnostic(options, 'usage check', preparedHome);
   const { sanitized, effectiveEnv, harness, timeoutMs, detector } = diagnostic;
   const tracker = trackUsageSessionUpdates(harness);
   try {
@@ -1295,20 +1342,21 @@ export function isNativeCatalogSettled(readiness: NativeReadinessResult, forceRe
 
 /** Refresh only on explicit catalog requests, never on ordinary health reads. */
 export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
-  const previous = getFastNativeReadiness(options);
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
+  const previous = getPreparedNativeReadiness(options, sanitized, identity.current.fingerprint);
   if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
-  const key = buildNativeRefreshKey(options);
+  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
   const running = catalogRefreshes.get(key);
   if (running) return running;
   const retry = catalogRetryAfter.get(key);
   if (!options.forceRefresh && retry && retry > Date.now()) return previous;
   // The probe rebases this identity after its own headless auth-type write.
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity).then(result => {
+  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity, sanitized).then(result => {
     // Never fall back to, or back off on behalf of, a catalog that belongs to a previous sign-in.
     if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) return result;
     // Re-key after the probe: its own auth-type write changes the fingerprint the next request will use.
-    const retryKey = buildNativeRefreshKey(options);
+    const retryKey = buildNativeRefreshKey(options, identity.current.fingerprint);
     if (retryKey !== key) catalogRetryAfter.delete(key);
     if (result.state !== 'session_ready' || result.models.length === 0) {
       if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value!);
@@ -1323,24 +1371,24 @@ export async function getNativeCatalog(options: NativeProbeOptions): Promise<Nat
   return refresh;
 }
 
-export function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
-  return runNativeReadinessProbe(options, { current: captureAuthIdentity(options.env, options.authMethod) });
+export async function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  return runNativeReadinessProbe(options, { current: captureAuthIdentity(options.env, options.authMethod) }, sanitized);
 }
 
 /** Probes readiness, keeping `identity` on the account the discovery is attributed to. */
 async function runNativeReadinessProbe(
   options: NativeProbeOptions,
-  identity: { current: NativeAuthIdentity }
+  identity: { current: NativeAuthIdentity },
+  sanitized: ReturnType<typeof prepareSanitizedGeminiHome>
 ): Promise<NativeReadinessResult> {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
   const effectiveEnv: NodeJS.ProcessEnv = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
   const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const fingerprint = computeCredentialFingerprint(effectiveEnv, options.authMethod);
+  const fingerprint = identity.current.fingerprint;
   const cacheKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType });
 
   const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized);
   if (earlyResult) return earlyResult;
-  identity.current = captureAuthIdentity(options.env, options.authMethod);
 
   const diagnostic = createNativeDiagnostic(options, 'session verification', sanitized);
   const { harness, detector, timeoutMs } = diagnostic;

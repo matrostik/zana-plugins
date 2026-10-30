@@ -15,7 +15,9 @@ Initially reviewed 2026-10-30 on branch `review/antigravity-provider-reliability
 
 PR #22 review fixes also revalidate source and managed credentials before returning or caching catalog and usage results, including sign-out, account replacement and changes during headless authentication. Access-token refresh for the same refresh token remains valid. Readiness and usage diagnostics share runtime setup, auth detection, deadlines and cleanup. Synchronous setup failures return structured bridge errors, and oversized usage output reports its cause.
 
-Current plugin verification: 101 tests pass across six files, including the generated UI bundle. Coverage passes the configured floor: statements 93.26%, branches 83.04%, functions 94.44%, lines 95.37%. Typecheck, build, manifest validation and bundle syntax checks pass. Seven new regression cases were observed failing before their fixes; two additional checks preserve same-account token refresh and headless-auth usage caching. Companion-app results have not been rerun in this pass.
+Concurrent first-time headless catalog and usage diagnostics now share one auth settings commit while authenticating each runtime independently. The group validates the account before accepting each authentication, so another diagnostic's settings write is allowed while sign-out or credential replacement still invalidates pending results. Both refresh paths prepare the managed home once and reuse their initial fingerprints for identity and cache keys.
+
+Current plugin verification: 109 tests pass across six files, including the generated UI bundle. Coverage passes the configured floor: statements 93.57%, branches 83.58%, functions 94.49%, lines 95.53%. Typecheck, build, manifest validation and bundle syntax checks pass. Seven account-isolation regression cases and both concurrent-auth completion orders were observed failing before their fixes. Eight concurrency checks cover both headless auth methods, both completion orders, sign-out and credential replacement. Two additional checks preserve same-account token refresh and headless-auth usage caching. Companion-app results have not been rerun in this pass.
 
 ## Evidence and findings
 
@@ -90,7 +92,7 @@ The second screenshot shows “The saved composer mode is unavailable. Choose an
 
 ## Validation performed and limits
 
-- Current full plugin suite: **101 passed** across six files. Test hooks isolate HOME, USERPROFILE, GEMINI_HOME and ZCC_DATA_DIR. Regression coverage includes source and managed account changes, sign-out during usage, obsolete failure results, concurrent callers, headless authentication changes, same-account token refresh, oversized output and synchronous bridge setup errors.
+- Current full plugin suite: **109 passed** across six files. Test hooks isolate HOME, USERPROFILE, GEMINI_HOME and ZCC_DATA_DIR. Regression coverage includes source and managed account changes, sign-out during usage, obsolete failure results, concurrent callers, concurrent first-time headless diagnostics, headless authentication changes, same-account token refresh, oversized output and synchronous bridge setup errors.
 - Temporary diagnostic checks: **2 passed**: grouped-model omission reproduced and a live native-session check completed. The live check output was verified through its isolated persisted result; it sent no model prompt. Temporary test source removed.
 - Host/server/UI tests, plugin typecheck, build and bundle syntax checks pass using dependencies from the adjacent Zana checkout. The generated UI bundle is exercised by the UI tests; loading the rebuilt plugin inside Electron has not been repeated in this pass.
 - Remaining usage, billing dates, the raw live catalog's complete structure and whether runtime 1.4.5 changes catalog contents were not established.

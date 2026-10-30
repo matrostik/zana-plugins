@@ -42307,7 +42307,7 @@ function captureAuthIdentity(env, authMethod) {
 function isAuthIdentityCurrent(identity, env, authMethod) {
   return identity.generation === authGeneration && identity.fingerprint === computeEffectiveCredentialFingerprint(env ?? process.env, authMethod) && identity.sourceFingerprint === computeCredentialFingerprint(env ?? process.env, authMethod);
 }
-function buildNativeRefreshKey(options) {
+function buildNativeRefreshKey(options, fingerprint) {
   return JSON.stringify([
     options.command,
     options.args,
@@ -42315,7 +42315,7 @@ function buildNativeRefreshKey(options) {
     options.cwd,
     getZccDataDir(options.env),
     resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
-    computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)
+    fingerprint
   ]);
 }
 function buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized) {
@@ -42349,9 +42349,11 @@ function buildSignInRequiredFastReadiness(options, sanitized) {
 }
 function getFastNativeReadiness(options) {
   const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  return getPreparedNativeReadiness(options, sanitized);
+}
+function getPreparedNativeReadiness(options, sanitized, fingerprint = computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)) {
   const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
   const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const fingerprint = computeCredentialFingerprint(effectiveEnv, options.authMethod);
   const cacheKey = JSON.stringify({
     command: options.command,
     args: options.args,
@@ -42383,7 +42385,22 @@ function getFastNativeReadiness(options) {
   }
   return buildSignInRequiredFastReadiness(options, sanitized);
 }
+var headlessAuthGroups = /* @__PURE__ */ new Map();
 async function performInitializeAndAuth(harness, options, identity) {
+  if (options.configuredAuthType || options.authMethod !== "gemini-api-key" && options.authMethod !== "agent-platform") {
+    return initializeNativeSession(harness, options, identity);
+  }
+  const key = JSON.stringify([resolveSourceAndManagedGeminiHome(options.env), options.authMethod, identity.current]);
+  const group = headlessAuthGroups.get(key) ?? { current: identity.current, settingsWritten: false, users: 0 };
+  group.users++;
+  headlessAuthGroups.set(key, group);
+  try {
+    return await initializeNativeSession(harness, options, identity, group);
+  } finally {
+    if (--group.users === 0) headlessAuthGroups.delete(key);
+  }
+}
+async function initializeNativeSession(harness, options, identity, headlessGroup) {
   const initResult = await harness.request(
     "initialize",
     {
@@ -42400,13 +42417,17 @@ async function performInitializeAndAuth(harness, options, identity) {
   const protocolVersion = typeof initResult?.protocolVersion === "number" ? initResult.protocolVersion : null;
   const agentVersion = typeof initResult?.agentInfo?.version === "string" ? initResult.agentInfo.version : null;
   const advertisedAuthMethods = Array.isArray(initResult?.authMethods) ? initResult.authMethods.map((m) => typeof m?.id === "string" ? m.id : null).filter(Boolean) : [];
-  if (!options.configuredAuthType && (options.authMethod === "gemini-api-key" || options.authMethod === "agent-platform")) {
+  if (headlessGroup) {
     await harness.request("authenticate", { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
+    if (!isAuthIdentityCurrent(headlessGroup.current, options.env, options.authMethod)) {
       throw new Error("Antigravity sign-in changed during authentication. Retry to load the current account.");
     }
-    writeNativeAcpAuthType(options.authMethod, options.env);
-    identity.current = captureAuthIdentity(options.env, options.authMethod);
+    if (!headlessGroup.settingsWritten) {
+      writeNativeAcpAuthType(options.authMethod, options.env);
+      headlessGroup.current = captureAuthIdentity(options.env, options.authMethod);
+      headlessGroup.settingsWritten = true;
+    }
+    identity.current = headlessGroup.current;
   }
   return { protocolVersion, agentVersion, advertisedAuthMethods };
 }
@@ -42522,7 +42543,7 @@ function setupStderrAuthDetector(harness) {
   });
   return { isTriggered: () => triggered, promise: promise2 };
 }
-function createNativeDiagnostic(options, operation, sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod })) {
+function createNativeDiagnostic(options, operation, sanitized) {
   const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
   const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
   const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
@@ -42543,15 +42564,15 @@ function createNativeDiagnostic(options, operation, sanitized = prepareSanitized
 var usageRefreshes = /* @__PURE__ */ new Map();
 var usageCache = null;
 async function queryNativeUsage(options) {
-  prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const key = buildNativeRefreshKey(options);
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
+  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
   if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
     return usageCache.result;
   }
   const running = usageRefreshes.get(key);
   if (running) return running;
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const request = performNativeUsageQuery(options, identity).then((result) => {
+  const request = performNativeUsageQuery(options, identity, sanitized).then((result) => {
     if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
       return { supported: true, usage: {
         status: "error",
@@ -42563,7 +42584,7 @@ async function queryNativeUsage(options) {
         message: "Antigravity sign-in changed while usage was being checked. Retry to load the current account."
       } };
     }
-    if (result.usage.status === "ok") usageCache = { key: buildNativeRefreshKey(options), result };
+    if (result.usage.status === "ok") usageCache = { key: buildNativeRefreshKey(options, identity.current.fingerprint), result };
     return result;
   }).finally(() => usageRefreshes.delete(key));
   usageRefreshes.set(key, request);
@@ -42618,7 +42639,7 @@ function trackUsageSessionUpdates(harness) {
     }
   };
 }
-async function performNativeUsageQuery(options, identity) {
+async function performNativeUsageQuery(options, identity, preparedHome) {
   const usage = {
     status: "error",
     planLabel: null,
@@ -42628,7 +42649,7 @@ async function performNativeUsageQuery(options, identity) {
     source: "native-acp-/usage"
   };
   if (!existsSync3(options.command)) return { supported: true, usage: { ...usage, status: "not_installed" } };
-  const diagnostic = createNativeDiagnostic(options, "usage check");
+  const diagnostic = createNativeDiagnostic(options, "usage check", preparedHome);
   const { sanitized, effectiveEnv, harness, timeoutMs, detector } = diagnostic;
   const tracker = trackUsageSessionUpdates(harness);
   try {
@@ -42673,17 +42694,18 @@ function isNativeCatalogSettled(readiness, forceRefresh) {
   return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" || readiness.state === "session_ready" && readiness.models.length > 0);
 }
 async function getNativeCatalog(options) {
-  const previous = getFastNativeReadiness(options);
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
+  const previous = getPreparedNativeReadiness(options, sanitized, identity.current.fingerprint);
   if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
-  const key = buildNativeRefreshKey(options);
+  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
   const running = catalogRefreshes.get(key);
   if (running) return running;
   const retry = catalogRetryAfter.get(key);
   if (!options.forceRefresh && retry && retry > Date.now()) return previous;
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity).then((result) => {
+  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity, sanitized).then((result) => {
     if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) return result;
-    const retryKey = buildNativeRefreshKey(options);
+    const retryKey = buildNativeRefreshKey(options, identity.current.fingerprint);
     if (retryKey !== key) catalogRetryAfter.delete(key);
     if (result.state !== "session_ready" || result.models.length === 0) {
       if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value);
@@ -42697,15 +42719,13 @@ async function getNativeCatalog(options) {
   catalogRefreshes.set(key, refresh);
   return refresh;
 }
-async function runNativeReadinessProbe(options, identity) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+async function runNativeReadinessProbe(options, identity, sanitized) {
   const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
   const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const fingerprint = computeCredentialFingerprint(effectiveEnv, options.authMethod);
+  const fingerprint = identity.current.fingerprint;
   const cacheKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType });
   const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized);
   if (earlyResult) return earlyResult;
-  identity.current = captureAuthIdentity(options.env, options.authMethod);
   const diagnostic = createNativeDiagnostic(options, "session verification", sanitized);
   const { harness, detector, timeoutMs } = diagnostic;
   const catalogUpdates = trackCatalogUpdates(harness);
