@@ -18,6 +18,7 @@ import {
   writeAuthTypeSettings,
   type GoogleAcpAuthMethod
 } from './gemini-home.js';
+import { KeyedRefresh } from './keyed-refresh.js';
 import { parseNativeQuotaWindows, type NativeUsageResult } from './native-usage.js';
 import {
   readinessResult,
@@ -42,7 +43,6 @@ const USAGE_CACHE_TTL_MS = 60_000;
 const USAGE_COMMANDS_WAIT_MS = 1000;
 const USAGE_MAX_TEXT_CHARS = 32_768;
 const CATALOG_RETRY_BACKOFF_MS = 30_000;
-const CATALOG_RETRY_MAX_KEYS = 32;
 
 /** Writes the auth type everywhere the runtime reads it, then invalidates every cached account result. */
 export function writeNativeAcpAuthType(
@@ -288,29 +288,23 @@ export interface NativeProbeOptions extends NativeTarget {
   spawnImpl?: typeof spawn;
 }
 
-/** The vendor advertises /usage as a local ACP command; never send it speculatively to a model. */
-const usageRefreshes = new Map<string, Promise<NativeUsageResult>>();
-let usageCache: { key: string; result: NativeUsageResult } | null = null;
+const usageRefresh = new KeyedRefresh<NativeUsageResult>({ successTtlMs: USAGE_CACHE_TTL_MS });
 
+/** The vendor advertises /usage as a local ACP command; never send it speculatively to a model. */
 export async function queryNativeUsage(options: NativeProbeOptions): Promise<NativeUsageResult> {
   const account = captureAccount(options);
   const key = account.refreshKey;
-  if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
-    return usageCache.result;
-  }
-  const running = usageRefreshes.get(key);
-  if (running) return running;
-  const request = performNativeUsageQuery(options, account).then(result => {
+  const cached = options.forceRefresh ? undefined : usageRefresh.cached(key);
+  if (cached) return cached;
+  return usageRefresh.run(key, async () => {
+    const result = await performNativeUsageQuery(options, account);
     if (!account.isCurrent()) {
-      return { supported: true as const, usage: { status: 'error' as const, planLabel: null, accountEmail: null,
-        windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' as const,
-        message: 'Antigravity sign-in changed while usage was being checked. Retry to load the current account.' } };
+      return { outcome: 'discard', key, result: { supported: true as const, usage: { status: 'error' as const, planLabel: null,
+        accountEmail: null, windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' as const,
+        message: 'Antigravity sign-in changed while usage was being checked. Retry to load the current account.' } } };
     }
-    if (result.usage.status === 'ok') usageCache = { key: account.refreshKey, result };
-    return result;
-  }).finally(() => usageRefreshes.delete(key));
-  usageRefreshes.set(key, request);
-  return request;
+    return { result, outcome: result.usage.status === 'ok' ? 'success' : 'failure', key: account.refreshKey };
+  });
 }
 
 async function performNativeUsageQuery(options: NativeProbeOptions, account: AccountSnapshot): Promise<NativeUsageResult> {
@@ -342,8 +336,7 @@ async function performNativeUsageQuery(options: NativeProbeOptions, account: Acc
   }
 }
 
-const catalogRefreshes = new Map<string, Promise<NativeReadinessResult>>();
-const catalogRetryAfter = new Map<string, number>();
+const catalogRefresh = new KeyedRefresh<NativeReadinessResult>({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
 
 /**
  * True when a catalog request can be answered from readiness alone, without probing. An empty
@@ -360,27 +353,16 @@ export async function getNativeCatalog(options: NativeProbeOptions): Promise<Nat
   const previous = readPreparedReadiness(account);
   if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
   const key = account.refreshKey;
-  const running = catalogRefreshes.get(key);
-  if (running) return running;
-  const retry = catalogRetryAfter.get(key);
-  if (!options.forceRefresh && retry && retry > Date.now()) return previous;
-  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, account).then(result => {
+  return catalogRefresh.run(key, async () => {
+    const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);
     // Never fall back to, or back off on behalf of, a catalog that belongs to a previous sign-in.
-    if (!account.isCurrent()) return result;
-    // Re-key after the probe: its own auth-type write changes the fingerprint the next request will use.
-    const retryKey = account.refreshKey;
-    if (retryKey !== key) catalogRetryAfter.delete(key);
-    if (result.state !== 'session_ready' || result.models.length === 0) {
-      if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value!);
-      catalogRetryAfter.set(retryKey, Date.now() + CATALOG_RETRY_BACKOFF_MS);
-      if (result.state !== 'sign_in_required' && result.state !== 'session_ready' && previous.models.length > 0) {
-        return { ...previous, state: 'authenticated' as const, catalogStale: true, error: result.error };
-      }
-    } else catalogRetryAfter.delete(retryKey);
-    return result;
-  }).finally(() => catalogRefreshes.delete(key));
-  catalogRefreshes.set(key, refresh);
-  return refresh;
+    if (!account.isCurrent()) return { result, outcome: 'discard', key };
+    // Re-keyed after the probe: its own auth-type write changes the fingerprint the next request will use.
+    if (result.state === 'session_ready' && result.models.length > 0) return { result, outcome: 'success', key: account.refreshKey };
+    const keepPrevious = result.state !== 'sign_in_required' && result.state !== 'session_ready' && previous.models.length > 0;
+    return { outcome: 'failure', key: account.refreshKey,
+      result: keepPrevious ? { ...previous, state: 'authenticated' as const, catalogStale: true, error: result.error } : result };
+  }, { whileBackingOff: options.forceRefresh ? undefined : () => previous });
 }
 
 export async function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
