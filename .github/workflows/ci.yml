@@ -53,19 +53,31 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: salesforce/zana
+          ref: bb2cb0b6201dd409fbf73dd11bf7096df5dacf93
           path: .zana-sdk
           sparse-checkout: |
             packages/plugin-sdk
+            packages/agent-process-utils
+            packages/domain
+            packages/host-daemon-contract
+            packages/provider-bridge-acp
+            packages/provider-bridge-protocol
+            packages/server-contract
+            packages/hono-typed-routes
+            packages/tsconfig
 
-      - name: Install Vitest & Coverage Tools
-        run: npm install -g vitest@^4.0.0 @vitest/coverage-v8@^4.0.0 esbuild@^0.25.0 typescript@^5.0.0
+      - name: Install locked verification tools and build SDK
+        run: |
+          npm ci
+          npm run prepare:sdk
+          npm run test:ci
 
       - name: Run Plugin Tests, Coverage & Bundle Drift Check
         env:
           CI_BASE_REF: ${{ github.base_ref || 'master' }}
           CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          NODE_PATH="$(npm root -g):$NODE_PATH" node scripts/ci-plugin-tests.mjs
+          npm run verify:plugins
 
       - name: Upload Coverage Reports
         if: always()
