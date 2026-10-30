@@ -4,7 +4,7 @@ Initially reviewed 2026-10-30 on branch `review/antigravity-provider-reliability
 
 ## Implementation results
 
-- Implemented automatic cold/expired catalog discovery, concurrent-refresh sharing, failure backoff, same-credential stale fallback, explicit cached labels, and preservation of model IDs. Successful empty catalogs remain authoritative. Sign-out and credential changes invalidate cached data.
+- Implemented automatic cold/expired catalog discovery, concurrent-refresh sharing, failure backoff, same-credential stale fallback, explicit cached labels, and preservation of model IDs. Empty catalogs remain eligible for discovery after backoff so late updates can recover. Sign-out and credential changes invalidate cached data.
 - Fixed grouped model extraction, authoritative config precedence over legacy aliases, and handling of catalog update notifications during discovery.
 - Generic server errors retain their cause; unverified health is `unknown` rather than `unauthenticated`. Diagnostic deadlines now report an explicit timeout and close the process tree. Readiness cache writes use uniquely named temporary files and rename.
 - Plan is registered as a composer action. Isolated native ACP testing established that `/plan` is an advertised command even though it is absent from permission-mode choices. A real planning request produced a plan and left the temporary project unchanged. Plan uses that native command rather than pretending `default` is a planning permission policy.
@@ -13,7 +13,9 @@ Initially reviewed 2026-10-30 on branch `review/antigravity-provider-reliability
 - The companion app fix is in the Zana repository on `fix/composer-unavailable-mode-recovery-v2`: missing saved modes display as unavailable, with an explicit Switch to Agent action that clears the invalid mode and retains the draft.
 - Fixed test environment isolation after discovering an existing logout test could write real authentication settings even with a separate `ZCC_DATA_DIR`. Restored the previously verified OAuth setting and isolated HOME, USERPROFILE, GEMINI_HOME and ZCC_DATA_DIR in all plugin tests. Also corrected Windows PATH casing in the app's E2E launcher: fake provider turns had been failing with `spawn node ENOENT` because `Path` was lost when adding uppercase `PATH`.
 
-Current verification: 81 plugin tests pass, including the generated UI bundle; line coverage 94.66%, branch coverage 81.29%, statement coverage 92.38%, function coverage 93.10%. Plugin typecheck, build, manifest check and bundle syntax checks pass. The companion app has 73 passing focused tests and passes renderer typecheck.
+PR #22 review fixes also revalidate source and managed credentials before returning or caching catalog and usage results, including sign-out, account replacement and changes during headless authentication. Access-token refresh for the same refresh token remains valid. Readiness and usage diagnostics share runtime setup, auth detection, deadlines and cleanup. Synchronous setup failures return structured bridge errors, and oversized usage output reports its cause.
+
+Current plugin verification: 101 tests pass across six files, including the generated UI bundle. Coverage passes the configured floor: statements 93.26%, branches 83.04%, functions 94.44%, lines 95.37%. Typecheck, build, manifest validation and bundle syntax checks pass. Seven new regression cases were observed failing before their fixes; two additional checks preserve same-account token refresh and headless-auth usage caching. Companion-app results have not been rerun in this pass.
 
 ## Evidence and findings
 
@@ -88,9 +90,9 @@ The second screenshot shows “The saved composer mode is unavailable. Choose an
 
 ## Validation performed and limits
 
-- Existing native auth/runtime tests: **29 passed**. They include deterministic TTL expiry. Ran with isolated `ZCC_DATA_DIR` because tests call cache-clearing helpers; the real persisted catalog was preserved.
+- Current full plugin suite: **101 passed** across six files. Test hooks isolate HOME, USERPROFILE, GEMINI_HOME and ZCC_DATA_DIR. Regression coverage includes source and managed account changes, sign-out during usage, obsolete failure results, concurrent callers, headless authentication changes, same-account token refresh, oversized output and synchronous bridge setup errors.
 - Temporary diagnostic checks: **2 passed**: grouped-model omission reproduced and a live native-session check completed. The live check output was verified through its isolated persisted result; it sent no model prompt. Temporary test source removed.
-- Full host/server/UI suite and bundle loading were not run: repository-root dependencies are absent; the available Vitest runner came from the adjacent Zana checkout. Those checks remain implementation gates.
+- Host/server/UI tests, plugin typecheck, build and bundle syntax checks pass using dependencies from the adjacent Zana checkout. The generated UI bundle is exercised by the UI tests; loading the rebuilt plugin inside Electron has not been repeated in this pass.
 - Remaining usage, billing dates, the raw live catalog's complete structure and whether runtime 1.4.5 changes catalog contents were not established.
 - Follow-up review: a direct Node assertion using Zana's real mode projection reproduced Agent-only entries and an unavailable saved Plan selection. The exact screenshot guard and existing host runtime test were inspected; the full composer test suite was not rerun. The incident's stored mode ID and native planning behavior remain unverified.
 

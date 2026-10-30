@@ -536,6 +536,160 @@ describe('native-auth.ts unit tests', () => {
     expect(spawnImpl).toHaveBeenCalledTimes(2);
   });
 
+  it.each(['sign-out', 'managed account switch', 'source account switch', 'failed source account switch'])
+  ('discards usage after a %s during the query', async (change) => {
+    const home = makeTempDir('usage-pending-account-');
+    const dataDir = makeTempDir('usage-pending-data-');
+    const command = join(home, 'agy.exe');
+    writeFileSync(command, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: dataDir };
+    writeNativeAcpAuthType('oauth-personal', env);
+    const sourceToken = join(home, 'antigravity-acp/acp_token.json');
+    writeFileSync(sourceToken, '{"refresh_token":"account-one"}');
+    const managedToken = join(prepareSanitizedGeminiHome({ env }).geminiHome, 'antigravity-acp/acp_token.json');
+    let changeAccount = true;
+    const spawnImpl = vi.fn(() => {
+      const child = createMockChild();
+      const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+      child.stdin.write.mockImplementation((chunk: string) => {
+        const msg = JSON.parse(chunk);
+        queueMicrotask(() => {
+          if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [] } });
+          if (msg.method === 'session/new') {
+            emit({ id: msg.id, result: { sessionId: 's1', _meta: { antigravity: { tier: { name: 'Old account tier' } } } } });
+            emit({ method: 'session/update', params: { sessionId: 's1', update: {
+              sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } });
+          }
+          if (msg.method === 'session/prompt') {
+            if (changeAccount) {
+              if (change === 'sign-out') writeNativeAcpAuthType(null, env);
+              else writeFileSync(change === 'managed account switch' ? managedToken : sourceToken,
+                '{"refresh_token":"account-two"}');
+            }
+            if (changeAccount && change === 'failed source account switch') {
+              emit({ id: msg.id, error: { code: -32000, message: 'Old account backend detail' } });
+            } else {
+              emit({ method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk',
+                content: { type: 'text', text: '### Quota Limits\n- **Gemini**\n  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)' } } } });
+              emit({ id: msg.id, result: { stopReason: 'end_turn' } });
+            }
+          }
+        });
+      });
+      return child;
+    });
+    const options = { command, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl };
+    const [first, concurrent] = await Promise.all([queryNativeUsage(options), queryNativeUsage(options)]);
+    for (const result of [first, concurrent]) {
+      expect(result.usage.status).toBe('error');
+      expect(result.usage.windows).toEqual([]);
+      expect(result.usage.planLabel).toBeNull();
+      expect(result.usage.message).toContain('sign-in changed');
+    }
+    // Returning to the original credentials must not expose an obsolete cached success.
+    changeAccount = false;
+    writeNativeAcpAuthType('oauth-personal', env);
+    writeFileSync(sourceToken, '{"refresh_token":"account-one"}');
+    writeFileSync(managedToken, '{"refresh_token":"account-one"}');
+    expect((await queryNativeUsage(options)).usage.status).toBe('ok');
+    expect(spawnImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards a catalog when only the source account changes during discovery', async () => {
+    const home = makeTempDir('catalog-source-switch-');
+    const command = join(home, 'agy.exe');
+    writeFileSync(command, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: makeTempDir('catalog-source-data-') };
+    writeNativeAcpAuthType('oauth-personal', env);
+    const sourceToken = join(home, 'antigravity-acp/acp_token.json');
+    writeFileSync(sourceToken, '{"refresh_token":"account-one"}');
+    const child = createMockChild();
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      if (msg.method === 'session/new') writeFileSync(sourceToken, '{"refresh_token":"account-two"}');
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ id: msg.id, result: msg.method === 'initialize'
+        ? { protocolVersion: 1, authMethods: [] }
+        : { sessionId: 's1', configOptions: [{ id: 'model', options: [{ value: 'old', name: 'Old' }] }] } }) + '\n'));
+    });
+    const result = await getNativeCatalog({ command, args: [], authMethod: 'oauth-personal', env, spawnImpl: () => child });
+    expect(result.models).toEqual([]);
+    expect(result.error).toContain('sign-in changed');
+    expect(getCachedNativeReadiness()).toBeNull();
+  });
+
+  it.each(['catalog', 'usage'])('discards %s when credentials change during headless authentication', async (probe) => {
+    const home = makeTempDir('headless-account-switch-');
+    const command = join(home, 'agy.exe');
+    writeFileSync(command, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home, GEMINI_API_KEY: 'original-key' };
+    const child = createMockChild();
+    const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        if (msg.method === 'authenticate') env.GEMINI_API_KEY = 'replacement-key';
+        emit({ id: msg.id, result: msg.method === 'initialize'
+          ? { protocolVersion: 1, authMethods: [{ id: 'gemini-api-key' }] }
+          : { sessionId: 's1', stopReason: 'end_turn', configOptions: [{ id: 'model', options: [{ value: 'old', name: 'Old' }] }] } });
+        if (msg.method === 'session/new') emit({ method: 'session/update', params: { sessionId: 's1', update: {
+          sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } });
+        if (msg.method === 'session/prompt') emit({ method: 'session/update', params: { sessionId: 's1', update: {
+          sessionUpdate: 'agent_message_chunk', content: { type: 'text',
+            text: '### Quota Limits\n- **Gemini**\n  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)' } } } });
+      });
+    });
+    const options = { command, args: [], authMethod: 'gemini-api-key' as const, env, spawnImpl: () => child, forceRefresh: true };
+    if (probe === 'catalog') {
+      const result = await probeNativeAcpReadiness(options);
+      expect(result.models).toEqual([]);
+      expect(result.error).toContain('sign-in changed');
+    } else {
+      const result = await queryNativeUsage(options);
+      expect(result.usage.status).toBe('error');
+      expect(result.usage.windows).toEqual([]);
+      expect(result.usage.message).toContain('sign-in changed');
+    }
+  });
+
+  it.each(['oauth-personal', 'gemini-api-key'] as const)
+  ('accepts usage with %s after token refresh or its own auth settings write', async (authMethod) => {
+    const home = makeTempDir('usage-auth-stable-');
+    const command = join(home, 'agy.exe');
+    writeFileSync(command, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home, GEMINI_API_KEY: 'stable-key' };
+    if (authMethod === 'oauth-personal') writeNativeAcpAuthType(authMethod, env);
+    const managedHome = prepareSanitizedGeminiHome({ env, authMethod }).geminiHome;
+    const tokenPath = join(managedHome, 'antigravity-acp/acp_token.json');
+    writeFileSync(tokenPath, '{"refresh_token":"same-account","access_token":"old"}');
+    const spawnImpl = vi.fn(() => {
+      const child = createMockChild();
+      const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+      child.stdin.write.mockImplementation((chunk: string) => {
+        const msg = JSON.parse(chunk);
+        queueMicrotask(() => {
+          if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [{ id: authMethod }] } });
+          if (msg.method === 'authenticate') emit({ id: msg.id, result: {} });
+          if (msg.method === 'session/new') {
+            writeFileSync(tokenPath, '{"refresh_token":"same-account","access_token":"refreshed"}');
+            emit({ id: msg.id, result: { sessionId: 's1' } });
+            emit({ method: 'session/update', params: { sessionId: 's1', update: {
+              sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } });
+          }
+          if (msg.method === 'session/prompt') {
+            emit({ method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk', content: {
+              type: 'text', text: '### Quota Limits\n- **Gemini**\n  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)' } } } });
+            emit({ id: msg.id, result: { stopReason: 'end_turn' } });
+          }
+        });
+      });
+      return child;
+    });
+    const options = { command, args: [], authMethod, env, spawnImpl };
+    expect((await queryNativeUsage(options)).usage.status).toBe('ok');
+    expect((await queryNativeUsage(options)).usage.status).toBe('ok');
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps waiting for /usage when an earlier command update omits it', async () => {
     const home = makeTempDir('usage-late-command-');
     const fakeExe = join(home, 'agy.exe');

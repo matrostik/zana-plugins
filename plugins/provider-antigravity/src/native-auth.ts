@@ -835,16 +835,20 @@ function computeEffectiveCredentialFingerprint(env: NodeJS.ProcessEnv, authMetho
 interface NativeAuthIdentity {
   generation: number;
   fingerprint: string;
+  sourceFingerprint: string;
 }
 
 /** The account a discovery started against; the fingerprint also catches sign-out in another process. */
 function captureAuthIdentity(env: NodeJS.ProcessEnv | undefined, authMethod: GoogleAcpAuthMethod): NativeAuthIdentity {
-  return { generation: authGeneration, fingerprint: computeEffectiveCredentialFingerprint(env ?? process.env, authMethod) };
+  const sourceEnv = env ?? process.env;
+  return { generation: authGeneration, fingerprint: computeEffectiveCredentialFingerprint(sourceEnv, authMethod),
+    sourceFingerprint: computeCredentialFingerprint(sourceEnv, authMethod) };
 }
 
 function isAuthIdentityCurrent(identity: NativeAuthIdentity, env: NodeJS.ProcessEnv | undefined, authMethod: GoogleAcpAuthMethod): boolean {
   return identity.generation === authGeneration
-    && identity.fingerprint === computeEffectiveCredentialFingerprint(env ?? process.env, authMethod);
+    && identity.fingerprint === computeEffectiveCredentialFingerprint(env ?? process.env, authMethod)
+    && identity.sourceFingerprint === computeCredentialFingerprint(env ?? process.env, authMethod);
 }
 
 /** Shared key for catalog and usage refreshes so both follow the same account identity. */
@@ -950,8 +954,9 @@ export function getFastNativeReadiness(options: {
 
 async function performInitializeAndAuth(
   harness: RpcHarness,
-  options: { authMethod: GoogleAcpAuthMethod; timeoutMs: number; configuredAuthType: string | null; env?: NodeJS.ProcessEnv }
-): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[]; authTypeWritten: boolean }> {
+  options: { authMethod: GoogleAcpAuthMethod; timeoutMs: number; configuredAuthType: string | null; env?: NodeJS.ProcessEnv },
+  identity: { current: NativeAuthIdentity }
+): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] }> {
   const initResult = await harness.request(
     'initialize',
     {
@@ -977,11 +982,15 @@ async function performInitializeAndAuth(
     (options.authMethod === 'gemini-api-key' || options.authMethod === 'agent-platform')
   ) {
     await harness.request('authenticate', { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
+    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
+      throw new Error('Antigravity sign-in changed during authentication. Retry to load the current account.');
+    }
     writeNativeAcpAuthType(options.authMethod, options.env);
-    return { protocolVersion, agentVersion, advertisedAuthMethods, authTypeWritten: true };
+    // Rebase only our synchronous settings write; changes during authentication remain invalid.
+    identity.current = captureAuthIdentity(options.env, options.authMethod);
   }
 
-  return { protocolVersion, agentVersion, advertisedAuthMethods, authTypeWritten: false };
+  return { protocolVersion, agentVersion, advertisedAuthMethods };
 }
 
 function checkProbeCachedOrMissing(
@@ -1145,6 +1154,18 @@ function setupStderrAuthDetector(harness: RpcHarness) {
   return { isTriggered: () => triggered, promise };
 }
 
+/** Both diagnostics use the same isolated runtime, auth detection, deadline and cleanup. */
+function createNativeDiagnostic(options: NativeProbeOptions, operation: string,
+  sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod })) {
+  const effectiveEnv = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
+  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
+  const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
+  const detector = setupStderrAuthDetector(harness);
+  const deadline = setTimeout(() => harness.close(new Error(`Native ACP ${operation} timed out after ${timeoutMs}ms`)), timeoutMs);
+  return { sanitized, effectiveEnv, timeoutMs, harness, detector,
+    dispose() { clearTimeout(deadline); harness.close(); } };
+}
+
 export interface NativeProbeOptions {
   command: string;
   args: string[];
@@ -1169,8 +1190,14 @@ export async function queryNativeUsage(options: NativeProbeOptions): Promise<Nat
   }
   const running = usageRefreshes.get(key);
   if (running) return running;
-  const request = performNativeUsageQuery(options).then(result => {
-    if (result.usage.status === 'ok') usageCache = { key, result };
+  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
+  const request = performNativeUsageQuery(options, identity).then(result => {
+    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
+      return { supported: true as const, usage: { status: 'error' as const, planLabel: null, accountEmail: null,
+        windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' as const,
+        message: 'Antigravity sign-in changed while usage was being checked. Retry to load the current account.' } };
+    }
+    if (result.usage.status === 'ok') usageCache = { key: buildNativeRefreshKey(options), result };
     return result;
   }).finally(() => usageRefreshes.delete(key));
   usageRefreshes.set(key, request);
@@ -1221,20 +1248,16 @@ function trackUsageSessionUpdates(harness: RpcHarness): UsageSessionTracker {
   };
 }
 
-async function performNativeUsageQuery(options: NativeProbeOptions): Promise<NativeUsageResult> {
+async function performNativeUsageQuery(options: NativeProbeOptions, identity: { current: NativeAuthIdentity }): Promise<NativeUsageResult> {
   const usage: NativeUsageResult['usage'] = { status: 'error', planLabel: null, accountEmail: null,
     windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' };
   if (!existsSync(options.command)) return { supported: true, usage: { ...usage, status: 'not_installed' } };
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const effectiveEnv = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
-  const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
-  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
-  const deadline = setTimeout(() => harness.close(new Error(`Native ACP usage check timed out after ${timeoutMs}ms`)), timeoutMs);
-  const detector = setupStderrAuthDetector(harness);
+  const diagnostic = createNativeDiagnostic(options, 'usage check');
+  const { sanitized, effectiveEnv, harness, timeoutMs, detector } = diagnostic;
   const tracker = trackUsageSessionUpdates(harness);
   try {
     const init = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs,
-      configuredAuthType: readConfiguredNativeAuthType(effectiveEnv), env: options.env });
+      configuredAuthType: readConfiguredNativeAuthType(effectiveEnv), env: options.env }, identity);
     if (init.protocolVersion !== 1) throw new Error('Unsupported Native ACP protocol version.');
     const session = await Promise.race([harness.request('session/new', { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
     if (session === 'stderr_auth_required') return { supported: true, usage: { ...usage, status: 'unauthenticated' } };
@@ -1254,8 +1277,7 @@ async function performNativeUsageQuery(options: NativeProbeOptions): Promise<Nat
       message: tracker.unexpectedTools ? 'Native usage unexpectedly requested tools; the diagnostic session was stopped.' : failure.error } };
   } finally {
     tracker.dispose();
-    clearTimeout(deadline);
-    harness.close();
+    diagnostic.dispose();
   }
 }
 
@@ -1320,16 +1342,12 @@ async function runNativeReadinessProbe(
   if (earlyResult) return earlyResult;
   identity.current = captureAuthIdentity(options.env, options.authMethod);
 
-  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
-  const harness = createNativeRpcHarness({ command: options.command, args: options.args, cwd: options.cwd, env: effectiveEnv, spawnImpl: options.spawnImpl }, true);
-  const detector = setupStderrAuthDetector(harness);
+  const diagnostic = createNativeDiagnostic(options, 'session verification', sanitized);
+  const { harness, detector, timeoutMs } = diagnostic;
   const catalogUpdates = trackCatalogUpdates(harness);
-  const deadline = setTimeout(() => harness.close(new Error(`Native ACP session verification timed out after ${timeoutMs}ms`)), timeoutMs);
 
   try {
-    const initInfo = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs, configuredAuthType, env: options.env });
-    // The probe's own headless auth-type write is not an account change.
-    if (initInfo.authTypeWritten) identity.current = captureAuthIdentity(options.env, options.authMethod);
+    const initInfo = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs, configuredAuthType, env: options.env }, identity);
     const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, sanitized);
     if (compatError) return compatError;
 
@@ -1362,8 +1380,7 @@ async function runNativeReadinessProbe(
     return failedResult;
   } finally {
     catalogUpdates.dispose();
-    clearTimeout(deadline);
-    harness.close();
+    diagnostic.dispose();
   }
 }
 
