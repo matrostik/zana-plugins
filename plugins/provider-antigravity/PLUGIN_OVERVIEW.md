@@ -23,16 +23,24 @@ The saved-mode recovery control belongs to Zana itself and is implemented separa
    - Validates required companion binaries (`localharness_external.exe` on Windows alongside `agy_acp_server.exe`).
    - Supports atomic rollback (`runtime:rollback` RPC) via `current.json` (`previousVersion`) and cleans up process trees on Windows using `taskkill /PID <pid> /T /F`.
 
-2. **Authentication, Readiness & Sanitized `GEMINI_HOME` (`src/native-auth.ts`)**:
+2. **Sanitized `GEMINI_HOME` (`src/gemini-home.ts`)**:
    - Supports all four official Google ACP authentication methods: `oauth-personal` (default), `oauth-business`, `gemini-api-key`, and `agent-platform`.
-   - Prepares a sanitized ZCC `GEMINI_HOME` (`~/.zcc/state/antigravity-gemini-home`) that syncs `antigravity-acp/settings.json` and `antigravity-acp/acp_token.json` with `~/.gemini/antigravity-acp/` while automatically disabling unreachable IDE-only named-pipe MCP proxies (`*-antigravityide`) in `config/mcp_config.json` so prompts never stall on dead IDE pipes.
-   - Keeps health and Settings reads non-spawning. Explicit model discovery refreshes cold or expired catalogs with one bounded probe, backs off failures, and preserves a stale same-credential catalog for transient failures. Readiness freshness remains separate from catalog availability.
-   - Provides an explicit 5-stage live readiness probe (`probeNativeAcpReadiness` with `BROWSER=echo`) and interactive Google OAuth sign-in (`startNativeAcpSignIn`).
+   - Prepares a sanitized ZCC `GEMINI_HOME` (`~/.zcc/state/antigravity-gemini-home`) that syncs `antigravity-acp/settings.json` and `antigravity-acp/acp_token.json` with `~/.gemini/antigravity-acp/` while automatically disabling unreachable IDE-only named-pipe MCP proxies (`*-antigravityide`) in `config/mcp_config.json` so prompts never stall on dead IDE pipes. Unchanged files are left alone.
 
-3. **Host Provider Bridge (`host.ts`)**:
-   - Launches `agy_acp_server` as a persistent per-thread ACP server with `_meta.parameterizedModelPicker: true` and `nativeReasoning.configId: 'thinking_level'`.
-   - Intercepts `provider/health`, `model/list`, and `provider/usage`; quota reads use a bounded native `/usage` command, coalesce concurrent checks and cache successful results for one minute.
+3. **Native diagnostics (`src/native-auth.ts`)**: readiness, the model catalog, `/usage` and sign-in, behind the entry points `host.ts` and `server.ts` call. Each is a short script on these modules:
+   - **Account identity (`src/account-identity.ts`)**: a snapshot of the account a diagnostic started against, with every cache key and the UI credential id. Results from an account that changed mid-run are discarded; a headless diagnostic's own auth-type write is adopted rather than treated as a change.
+   - **Native ACP session (`src/acp-session.ts`)**: spawn, JSON-RPC, the stderr sign-in signal, late catalog updates, command waits, output guards, deadline and cleanup. Tests drive it through the scripted `FakeAcpServer` (`src/fake-acp-server.ts`).
+   - **Readiness store (`src/readiness-store.ts`)**: readiness shared between processes through memory and disk. Health and Settings reads stay non-spawning; an expired catalog for the same account is served as stale and outlives transient failures.
+   - **Keyed refresh (`src/keyed-refresh.ts`)**: catalog and usage refreshes are coalesced per account; catalog failures back off, usage successes are cached for one minute.
+
+4. **Provider config (`src/provider-config.ts`)**: settings normalization, the launch spec (`_meta.parameterizedModelPicker: true`, `nativeReasoning.configId: 'thinking_level'`), and the projections into thread health, `model/list` replies and the Settings doctor status.
+
+5. **Host Provider Bridge (`host.ts`)**:
+   - Launches `agy_acp_server` as a persistent per-thread ACP server.
+   - Intercepts `provider/health`, `model/list`, and `provider/usage`.
    - Transparently upgrades legacy `agy-*` `providerThreadId` resume requests into fresh `thread/start` sessions.
+
+Domain terms are defined in [GLOSSARY.md](GLOSSARY.md).
 
 ---
 
