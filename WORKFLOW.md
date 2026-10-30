@@ -149,7 +149,8 @@ npm run verify:plugins
 
 Build Antigravity bundles with this layout before committing them. Its host
 bundle and source map include dependency paths, so bundles built against an
-adjacent checkout differ from the pinned CI build.
+adjacent checkout differ from the pinned CI build. The build normalizes source
+map contents to LF so Windows and Linux checkouts produce identical artifacts.
 
 ```mermaid
 flowchart LR

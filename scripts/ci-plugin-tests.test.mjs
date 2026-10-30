@@ -15,6 +15,13 @@ test('the repository lockfile contains no extraneous platform binaries', () => {
   }
 });
 
+test('the committed host source map normalizes checkout line endings', () => {
+  const map = JSON.parse(readFileSync(new URL('../plugins/provider-antigravity/dist/host.js.map', import.meta.url), 'utf8'));
+  for (const [index, source] of map.sourcesContent.entries()) {
+    if (typeof source === 'string') assert.ok(!source.includes('\r\n'), `${map.sources[index]} contains checkout-specific CRLF`);
+  }
+});
+
 for (const localVitest of [false, true]) test(`a plugin without a lockfile uses ${localVitest ? 'plugin' : 'repository'} tools`, () => {
   const root = mkdtempSync(join(tmpdir(), 'plugin-ci-tools-'));
   try {
