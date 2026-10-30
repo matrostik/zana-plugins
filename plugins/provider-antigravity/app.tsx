@@ -2,6 +2,7 @@ import { definePluginApp, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { DoctorStatusResult } from './server.js';
 import type { NativeSetupState } from './src/native-auth.js';
+import type { NativeUsageResult } from './src/native-usage.js';
 
 const NATIVE_STATE_LABELS: Record<NativeSetupState, string> = {
   runtime_missing: 'Runtime Missing',
@@ -279,6 +280,53 @@ function DiscoveredModelsList({ status }: { status: DoctorStatusResult | null })
   );
 }
 
+function SubscriptionUsage({ status }: { status: DoctorStatusResult | null }) {
+  const rpc = useRpc();
+  const [result, setResult] = useState<NativeUsageResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const requestVersion = useRef(0);
+  useEffect(() => {
+    requestVersion.current++;
+    setResult(null); setError(null); setBusy(false);
+    return () => { requestVersion.current++; };
+  }, [status?.authMethod, status?.configuredAuthType, status?.executable, status?.authenticated, status?.credentialId]);
+  const checkUsage = async () => {
+    const version = ++requestVersion.current;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await rpc.call('usage:status') as NativeUsageResult;
+      if (version === requestVersion.current) setResult(next);
+    }
+    catch (err: any) { if (version === requestVersion.current) setError(err?.message || 'Could not check subscription usage.'); }
+    finally { if (version === requestVersion.current) setBusy(false); }
+  };
+  return (
+    <div className="agy-usage-card">
+      <h4>Subscription usage</h4>
+      <p className="agy-desc">Plan: {status?.tierName || 'not yet verified'}</p>
+      <button type="button" className="agy-btn" onClick={checkUsage} disabled={busy || !status?.authenticated}>
+        {busy ? 'Checking usage...' : 'Check subscription usage'}
+      </button>
+      {error && <p role="status" className="agy-desc agy-desc-error">{error}</p>}
+      {result?.usage.status === 'ok' && <>
+        <p className="agy-desc">Checked {new Date(result.usage.checkedAt).toISOString()} · Google Antigravity /usage</p>
+        <ul className="agy-usage-list">{result.usage.windows.map(quota => (
+          <li key={quota.label}>
+            <strong>{quota.label.replace(/ Remaining$/, '')}</strong>: {Math.round((100 - quota.usedPercent) * 100) / 100}% remaining
+            {quota.resetsAt && <span> · Resets {quota.resetsAt}</span>}
+          </li>
+        ))}</ul>
+      </>}
+      {result && result.usage.status !== 'ok' && <p role="status" className="agy-desc agy-desc-error">
+        {result.usage.message || 'Usage is unavailable. Verify your Google sign-in and try again.'}
+      </p>}
+      <p className="agy-desc">Baseline quota is separate from AI credits. You can also check usage in Google Antigravity Settings or run <code>/usage</code> in an Antigravity thread.</p>
+    </div>
+  );
+}
+
 function SetupGuide() {
   return (
     <div className="agy-steps-card">
@@ -333,12 +381,17 @@ export function AntigravitySettingsSection() {
           onCopy={act.copyToClipboard}
         />
         <DiscoveredModelsList status={act.status} />
+        {act.status?.checkedAt && <p className="agy-desc">
+          {act.status.catalogStale ? 'Catalog refresh needed — last verified ' : 'Session last checked '}
+          {new Date(act.status.checkedAt).toISOString()}
+        </p>}
         {act.status && act.status.disabledDeadMcpServers.length > 0 && (
           <p className="agy-desc agy-desc-note">
             Automatically bypassed unreachable IDE named-pipe MCP proxies (<code>{act.status.disabledDeadMcpServers.join(', ')}</code>) to prevent prompt stalls.
           </p>
         )}
       </div>
+      <SubscriptionUsage status={act.status} />
       <SetupGuide />
     </div>
   );
@@ -391,6 +444,9 @@ function ensureStyles() {
     .agy-command-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 6px; background: var(--bg-input, #0d0d0d); border: 1px solid var(--border-subtle, #222); font-family: monospace; font-size: 11px; margin-top: 6px; }
     .agy-command-text { word-break: break-all; }
     .agy-models-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .agy-usage-card { padding: 12px; border: 1px solid var(--border-subtle, #333); border-radius: 6px; margin: 12px 0; }
+    .agy-usage-card h4 { margin: 0 0 8px; }
+    .agy-usage-list { padding-left: 20px; font-size: 12px; line-height: 1.7; }
     .agy-steps-card { padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-subtle, #222); background: var(--bg-card, #111); }
     .agy-steps-title { font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: var(--fg-default, #ddd); }
     .agy-steps-list { margin: 0; padding-left: 18px; font-size: 12px; color: var(--fg-muted, #888); line-height: 1.6; }

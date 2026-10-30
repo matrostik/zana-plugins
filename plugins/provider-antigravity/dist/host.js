@@ -63,15 +63,15 @@ var require_windows = __commonJS({
       }
       return false;
     }
-    function checkStat(stat2, path5, options) {
-      if (!stat2.isSymbolicLink() && !stat2.isFile()) {
+    function checkStat(stat3, path5, options) {
+      if (!stat3.isSymbolicLink() && !stat3.isFile()) {
         return false;
       }
       return checkPathExt(path5, options);
     }
     function isexe(path5, options, cb) {
-      fs3.stat(path5, function(er, stat2) {
-        cb(er, er ? false : checkStat(stat2, path5, options));
+      fs3.stat(path5, function(er, stat3) {
+        cb(er, er ? false : checkStat(stat3, path5, options));
       });
     }
     function sync(path5, options) {
@@ -87,20 +87,20 @@ var require_mode = __commonJS({
     isexe.sync = sync;
     var fs3 = __require("fs");
     function isexe(path5, options, cb) {
-      fs3.stat(path5, function(er, stat2) {
-        cb(er, er ? false : checkStat(stat2, options));
+      fs3.stat(path5, function(er, stat3) {
+        cb(er, er ? false : checkStat(stat3, options));
       });
     }
     function sync(path5, options) {
       return checkStat(fs3.statSync(path5), options);
     }
-    function checkStat(stat2, options) {
-      return stat2.isFile() && checkMode(stat2, options);
+    function checkStat(stat3, options) {
+      return stat3.isFile() && checkMode(stat3, options);
     }
-    function checkMode(stat2, options) {
-      var mod = stat2.mode;
-      var uid = stat2.uid;
-      var gid = stat2.gid;
+    function checkMode(stat3, options) {
+      var mod = stat3.mode;
+      var uid = stat3.uid;
+      var gid = stat3.gid;
       var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
       var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
       var u = parseInt("100", 8);
@@ -517,7 +517,7 @@ var require_cross_spawn = __commonJS({
     var cp = __require("child_process");
     var parse3 = require_parse();
     var enoent = require_enoent();
-    function spawn(command, args, options) {
+    function spawn2(command, args, options) {
       const parsed = parse3(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
@@ -529,15 +529,15 @@ var require_cross_spawn = __commonJS({
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module.exports = spawn;
-    module.exports.spawn = spawn;
+    module.exports = spawn2;
+    module.exports.spawn = spawn2;
     module.exports.sync = spawnSync;
     module.exports._parse = parse3;
     module.exports._enoent = enoent;
   }
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/external.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -800,7 +800,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/index.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -1117,7 +1117,7 @@ __export(core_exports2, {
   withParser: () => withParser
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/util.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1188,6 +1188,7 @@ __export(util_exports, {
   required: () => required,
   safeExtend: () => safeExtend,
   shallowClone: () => shallowClone,
+  sizeCaps: () => sizeCaps,
   slugify: () => slugify,
   stringifyPrimitive: () => stringifyPrimitive,
   toZod: () => toZod,
@@ -1707,6 +1708,18 @@ function prefixIssues(path5, issues) {
 function unwrapMessage(message) {
   return typeof message === "string" ? message : message?.message;
 }
+function sizeCaps(defChecks) {
+  const caps = [];
+  for (const ch of defChecks ?? []) {
+    const d = ch._zod.def;
+    if (!/_(length|size)$|_equals$/.test(d.check))
+      break;
+    const max = d.maximum ?? d.length ?? d.size;
+    if (max >= 0)
+      caps.push([max, ch]);
+  }
+  return caps;
+}
 function attachSchema(issues, start, inst) {
   var _a3;
   for (let i = start; i < issues.length; i++) {
@@ -1960,7 +1973,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/core.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2082,7 +2095,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/errors.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -2274,7 +2287,7 @@ function prettifyError(error62) {
   return lines.join("\n");
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/parse.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -2434,7 +2447,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   anyString: () => anyString,
@@ -2606,7 +2619,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/checks.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -3082,7 +3095,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/doc.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -3123,14 +3136,14 @@ ${content.join("\n")}
   }
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/versions.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
-  patch: 5
+  patch: 7
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/schemas.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -3883,6 +3896,31 @@ var $ZodDate = /* @__PURE__ */ $constructor("$ZodDate", (inst, def) => {
     return payload;
   };
 });
+function capSize(inst, size) {
+  const caps = sizeCaps(inst._zod.def.checks);
+  if (!caps.length)
+    return;
+  const cap = Math.min(...caps.map((c) => c[0]));
+  const parse3 = inst._zod.parse;
+  inst._zod.parse = (payload, ctx) => {
+    const n = size(payload.value);
+    if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
+      for (const [max, ch] of sizeCaps(inst._zod.def.checks)) {
+        if (n > max && ch._zod.def.when(payload)) {
+          const start = payload.issues.length;
+          ch._zod.check(payload);
+          payload.issues[start].continue = false;
+          attachSchema(payload.issues, start, inst);
+          return payload;
+        }
+      }
+    }
+    return parse3(payload, ctx);
+  };
+}
+var arraySize = (input2) => Array.isArray(input2) ? input2.length : -1;
+var mapSize = (input2) => input2 instanceof Map ? input2.size : -1;
+var setSize = (input2) => input2 instanceof Set ? input2.size : -1;
 function handleArrayResult(result, final, index) {
   if (result.issues.length) {
     final.issues.push(...prefixIssues(index, result.issues));
@@ -3926,6 +3964,7 @@ var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
     }
     return payload;
   };
+  capSize(inst, arraySize);
 });
 function handlePropertyResult(result, final, key, input2, optin, optout) {
   const isPresent = key in input2;
@@ -4882,6 +4921,7 @@ var $ZodMap = /* @__PURE__ */ $constructor("$ZodMap", (inst, def) => {
       return Promise.all(proms).then(() => payload);
     return payload;
   };
+  capSize(inst, mapSize);
 });
 function handleMapResult(keyResult, valueResult, final, key, input2, inst, ctx) {
   if (keyResult.issues.length) {
@@ -4948,6 +4988,7 @@ var $ZodSet = /* @__PURE__ */ $constructor("$ZodSet", (inst, def) => {
       return Promise.all(proms).then(() => payload);
     return payload;
   };
+  capSize(inst, setSize);
 });
 function handleSetResult(result, final) {
   if (result.issues.length) {
@@ -5544,7 +5585,7 @@ function handleRefineResult(result, payload, input2, inst) {
   }
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/memoizer.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -5821,7 +5862,7 @@ function isBackEdge(ctx, value) {
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/index.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -5889,7 +5930,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ar.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6001,7 +6042,7 @@ function ar_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/az.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6112,7 +6153,7 @@ function az_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/be.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6281,7 +6322,7 @@ function be_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/bg.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6407,7 +6448,7 @@ function bg_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/bn.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -6521,7 +6562,7 @@ function bn_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ca.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6635,7 +6676,7 @@ function ca_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ckb.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -6768,7 +6809,7 @@ function ckb_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/cs.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6885,7 +6926,7 @@ function cs_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/da.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7006,7 +7047,7 @@ function da_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/de.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7120,7 +7161,7 @@ function de_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/el.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7233,7 +7274,7 @@ function el_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/en.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7358,7 +7399,7 @@ function en_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/eo.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7473,7 +7514,7 @@ function eo_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/es.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7610,7 +7651,7 @@ function es_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fa.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7730,7 +7771,7 @@ function fa_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fi.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7848,7 +7889,7 @@ function fi_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fr.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -7978,7 +8019,7 @@ function fr_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/fr-CA.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8091,7 +8132,7 @@ function fr_CA_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/gu.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -8205,7 +8246,7 @@ function gu_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/he.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8407,7 +8448,7 @@ function he_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hi.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -8519,7 +8560,7 @@ function hi_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hr.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8646,7 +8687,7 @@ function hr_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hu.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8760,7 +8801,7 @@ function hu_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/hy.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8919,7 +8960,7 @@ function hy_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/id.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -9031,7 +9072,7 @@ function id_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/is.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -9146,7 +9187,7 @@ function is_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/it.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -9260,7 +9301,7 @@ function it_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ja.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9373,7 +9414,7 @@ function ja_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ka.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9491,7 +9532,7 @@ function ka_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/km.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9607,12 +9648,12 @@ function km_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/kh.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/kn.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -9728,7 +9769,7 @@ function kn_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ko.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9845,7 +9886,7 @@ function ko_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/lt.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -10053,7 +10094,7 @@ function lt_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/mk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -10168,7 +10209,7 @@ function mk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ms.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -10281,7 +10322,7 @@ function ms_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ne.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -10393,7 +10434,7 @@ function ne_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/nl.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -10509,7 +10550,7 @@ function nl_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/nn.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -10623,7 +10664,7 @@ function nn_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/no.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10737,7 +10778,7 @@ function no_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ota.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10852,7 +10893,7 @@ function ota_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ps.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -10972,7 +11013,7 @@ function ps_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/pl.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -11087,7 +11128,7 @@ function pl_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/pt.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11231,7 +11272,7 @@ function pt_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/pt-BR.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11376,7 +11417,7 @@ function pt_BR_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ro.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -11499,7 +11540,7 @@ function ro_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ru.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11668,7 +11709,7 @@ function ru_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/sk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -11785,7 +11826,7 @@ function sk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/sl.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -11900,7 +11941,7 @@ function sl_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/sv.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -12016,7 +12057,7 @@ function sv_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ta.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -12132,7 +12173,7 @@ function ta_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/tg.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -12249,7 +12290,7 @@ function tg_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/th.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -12365,7 +12406,7 @@ function th_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/tk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -12473,7 +12514,7 @@ function tk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/tr.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -12584,7 +12625,7 @@ function tr_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/uk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -12698,12 +12739,12 @@ function uk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ua.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/ur.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -12819,7 +12860,7 @@ function ur_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/uz.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -12933,7 +12974,7 @@ function uz_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/vi.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -13047,7 +13088,7 @@ function vi_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/zh-CN.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -13162,7 +13203,7 @@ function zh_CN_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/zh-TW.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -13275,7 +13316,7 @@ function zh_TW_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/locales/yo.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -13388,7 +13429,7 @@ function yo_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/registries.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -13438,7 +13479,7 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/compile.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/compile.js
 var INVALID = Symbol.for("zod.compile.invalid");
 var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
@@ -14478,9 +14519,15 @@ function generateNullableCheck(doc, ctx, schema, accessor, buildsValue = true) {
   doc.write(`}`);
   return outputVar;
 }
+function generateSizeGate(doc, schema, size) {
+  for (const [max, check2] of sizeCaps(schema._zod.def.checks)) {
+    doc.write(`if (${size} > ${numericOperand(max, check2._zod.def.check)}) return INVALID;`);
+  }
+}
 function generateArrayCheck(doc, ctx, schema, accessor, buildsValue = true) {
   const def = schema._zod.def;
   doc.write(`if (!Array.isArray(${accessor})) return INVALID;`);
+  generateSizeGate(doc, schema, `${accessor}.length`);
   const outputVar = buildsValue ? newVar(ctx) : null;
   const iVar = newVar(ctx);
   const elemVar = newVar(ctx);
@@ -14880,6 +14927,7 @@ function literalPropertyKey(ctx, key) {
 function generateMapCheck(doc, ctx, schema, accessor) {
   const def = schema._zod.def;
   doc.write(`if (!(${accessor} instanceof Map)) return INVALID;`);
+  generateSizeGate(doc, schema, `${accessor}.size`);
   const outputVar = newVar(ctx);
   const kVar = newVar(ctx);
   const valVar = newVar(ctx);
@@ -14896,6 +14944,7 @@ function generateMapCheck(doc, ctx, schema, accessor) {
 function generateSetCheck(doc, ctx, schema, accessor) {
   const def = schema._zod.def;
   doc.write(`if (!(${accessor} instanceof Set)) return INVALID;`);
+  generateSizeGate(doc, schema, `${accessor}.size`);
   const outputVar = newVar(ctx);
   const valVar = newVar(ctx);
   doc.write(`const ${outputVar} = new Set();`);
@@ -15040,7 +15089,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   return accessor;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/api.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -16099,7 +16148,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/to-json-schema.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target2, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -16629,7 +16678,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/json-schema-processors.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -17377,7 +17426,7 @@ function toJSONSchema(input2, params) {
   return finalize(ctx, input2);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/json-schema-generator.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -17455,10 +17504,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/json-schema.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -17639,7 +17688,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/checks.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -17674,7 +17723,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/errors.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -17720,7 +17769,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, void 0
   Parent: Error
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/parse.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -17734,7 +17783,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/schemas.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -19199,7 +19248,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/compat.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -19225,7 +19274,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/iso.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19250,7 +19299,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/from-json-schema.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -19983,7 +20032,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/visit.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/visit.js
 var RESOLVING = Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
@@ -20138,7 +20187,7 @@ function visit(schema, fnOrHandlers) {
   return run(schema);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/deep-partial.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -20150,7 +20199,7 @@ function deepPartial(schema) {
   });
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/in-out.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -20180,7 +20229,7 @@ function output(schema) {
   });
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/classic/coerce.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -25042,7 +25091,9 @@ var BRIDGE_REQUEST_METHODS = {
 var bridgeRequestMethodValues = Object.values(
   BRIDGE_REQUEST_METHODS
 );
+var sessionKindSchema = external_exports.enum(["interactive", "automated"]);
 var sessionConstructionFields = {
+  sessionKind: sessionKindSchema.optional().catch(void 0),
   threadId: external_exports.string().min(1),
   cwd: external_exports.string().min(1),
   options: bridgeExecutionOptionsSchema,
@@ -26555,9 +26606,40 @@ function spawnPortableOutputProcess(request) {
   assertPortableOutputProcess(child);
   return child;
 }
+var portableCommandCleanupKey = Symbol.for("zcc.portable-command-cleanup.v1");
+var portableCommandGlobal = globalThis;
+var portableCommandCleanup = portableCommandGlobal[portableCommandCleanupKey] ?? (() => {
+  const state = { children: /* @__PURE__ */ new Set(), aborters: /* @__PURE__ */ new Map(), closed: false };
+  portableCommandGlobal[portableCommandCleanupKey] = state;
+  const cleanup = () => {
+    for (const child of state.children) terminatePortableCommandTree(child);
+    state.children.clear();
+  };
+  process.once("exit", cleanup);
+  for (const signal of ["SIGTERM", "SIGINT"]) {
+    const onSignal = () => {
+      const hasOwnerHandler = process.listeners(signal).some((listener) => listener !== onSignal);
+      cleanup();
+      if (!hasOwnerHandler) {
+        process.removeListener(signal, onSignal);
+        process.kill(process.pid, signal);
+      }
+    };
+    process.prependListener(signal, onSignal);
+  }
+  return state;
+})();
+function terminatePortableCommandTree(child) {
+  try {
+    killProcessGroup({ child, signal: "SIGKILL" });
+  } catch {
+  }
+}
 function runPortableCommand(command, args, options) {
+  if (portableCommandCleanup.closed) return Promise.reject(new Error("Portable commands are shutting down"));
   return new Promise((resolve6, reject) => {
-    const child = spawnPortableOutputProcess({ command, args: [...args], env: options.env, cwd: options.cwd });
+    const child = spawnPortableOutputProcess({ command, args: [...args], env: options.env, cwd: options.cwd, detached: supportsProcessGroups() });
+    portableCommandCleanup.children.add(child);
     let stdout = "";
     let stderr = "";
     let bytes = 0;
@@ -26569,16 +26651,21 @@ function runPortableCommand(command, args, options) {
       if (error62) reject(error62);
       else resolve6({ stdout, stderr });
     };
+    const abort = (error62) => {
+      terminatePortableCommandTree(child);
+      child.stdout.destroy();
+      child.stderr.destroy();
+      finish(error62);
+    };
+    portableCommandCleanup.aborters.set(child, abort);
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      finish(Object.assign(new Error(`Command timed out after ${options.timeout}ms`), { killed: true }));
+      abort(Object.assign(new Error(`Command timed out after ${options.timeout}ms`), { killed: true }));
     }, options.timeout);
     const collect = (stream, text) => {
       if (done) return;
       bytes += Buffer.byteLength(text);
       if (bytes > (options.maxBuffer ?? 1024 * 1024)) {
-        child.kill("SIGKILL");
-        finish(new Error("Command output exceeded its byte limit"));
+        abort(new Error("Command output exceeded its byte limit"));
         return;
       }
       if (stream === "stdout") stdout += text;
@@ -26586,14 +26673,30 @@ function runPortableCommand(command, args, options) {
     };
     child.stdout.setEncoding("utf8").on("data", (text) => collect("stdout", text));
     child.stderr.setEncoding("utf8").on("data", (text) => collect("stderr", text));
-    child.on("error", finish);
+    child.on("error", abort);
+    child.once("exit", () => terminatePortableCommandTree(child));
     child.on("close", (code, signal) => {
+      portableCommandCleanup.children.delete(child);
+      portableCommandCleanup.aborters.delete(child);
       finish(code === 0 ? void 0 : Object.assign(
         new Error(stderr.trim() || `Command exited with code ${code}, signal ${signal}`),
         { code, signal, stdout, stderr }
       ));
     });
   });
+}
+function supportsProcessGroups() {
+  return process.platform !== "win32";
+}
+function killProcessGroup(args) {
+  if (supportsProcessGroups() && args.child.pid !== void 0) {
+    try {
+      process.kill(-args.child.pid, args.signal);
+      return;
+    } catch {
+    }
+  }
+  args.child.kill(args.signal);
 }
 
 // ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
@@ -26620,6 +26723,9 @@ async function resolveExecutablePath(command) {
   } catch {
     return null;
   }
+}
+function versionFrom(value) {
+  return value?.match(/\bv?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/u)?.[1] ?? null;
 }
 async function readCliVersion(command) {
   try {
@@ -26921,7 +27027,8 @@ var acpInitializeResultSchema = external_exports.object({
   agentCapabilities: external_exports.object({
     loadSession: external_exports.boolean().optional(),
     sessionCapabilities: external_exports.object({
-      fork: external_exports.object({}).passthrough().nullable().optional()
+      fork: external_exports.object({}).passthrough().nullable().optional(),
+      additionalDirectories: external_exports.object({}).passthrough().nullable().optional()
     }).passthrough().optional(),
     promptCapabilities: external_exports.object({
       image: external_exports.boolean().optional(),
@@ -27205,21 +27312,79 @@ import os from "node:os";
 import path2 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
+
+// ../../../zana/packages/provider-bridge-acp/src/bridge/launch-health.ts
+import { stat } from "node:fs/promises";
+var PROBE_TIMEOUT_MS = 5e3;
+var PROBE_OUTPUT_MAX_BYTES = 64 * 1024;
+var DIAGNOSTIC_MAX_CHARS = 2048;
+async function getAcpLaunchHealth(options, deps = { runCommand: runPortableCommand }) {
+  const { command } = options;
+  if (command === null || command.trim().length === 0) return { supported: false };
+  let status = "unknown";
+  let installedVersion = null;
+  let statusMessage = null;
+  try {
+    if (command.includes("\0") || /[\r\n]/u.test(command)) {
+      throw new Error("The launch command must be a single executable name or path.");
+    }
+    const output2 = await deps.runCommand(command, ["--version"], {
+      timeout: PROBE_TIMEOUT_MS,
+      maxBuffer: PROBE_OUTPUT_MAX_BYTES,
+      ...options.cwd === void 0 ? {} : { cwd: options.cwd },
+      env: { ...withoutBridgeRuntimeEnv(process.env), ...options.env }
+    });
+    status = "ready";
+    installedVersion = versionFrom(`${output2.stdout}
+${output2.stderr}`);
+  } catch (error62) {
+    const code = error62 instanceof Error && "code" in error62 ? error62.code : void 0;
+    const cwdExists = options.cwd === void 0 || await stat(options.cwd).then((entry) => entry.isDirectory(), () => false);
+    status = code === "ENOENT" && cwdExists ? "not_installed" : "unknown";
+    let detail = error62 instanceof Error ? error62.message : "Executable probe failed.";
+    const secretValues = Object.entries(process.env).flatMap(([key, value]) => /TOKEN|SECRET|PASSWORD|API_KEY|CREDENTIAL|PRIVATE_KEY/iu.test(key) && value && value.length >= 8 ? [value] : []);
+    for (const value of [...secretValues, ...Object.values(options.env ?? {})].sort((a, b) => b.length - a.length)) {
+      if (value.length > 0) detail = detail.split(value).join("[redacted]");
+    }
+    detail = detail.replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu, "").slice(0, DIAGNOSTIC_MAX_CHARS);
+    const identity = JSON.stringify(command).slice(0, DIAGNOSTIC_MAX_CHARS);
+    statusMessage = `ACP command ${identity} failed its --version check: ${detail} Check the executable and its dependencies on this host.`;
+  }
+  return {
+    supported: true,
+    health: {
+      status,
+      statusMessage,
+      accountEmail: null,
+      planLabel: null,
+      installedVersion,
+      minimumSupportedVersion: null,
+      canInstall: false,
+      canUpdate: false,
+      loginCommand: null
+    }
+  };
+}
+
+// ../../../zana/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 var execFileAsync2 = promisify(execFile);
 var USAGE_FETCH_TIMEOUT_MS = 15e3;
 var CURSOR_DASHBOARD_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService";
 var CURSOR_KEYCHAIN_ACCOUNT = "cursor-user";
 var CURSOR_ACCESS_TOKEN_SERVICE = "cursor-access-token";
 var CURSOR_INSTALL_SCRIPT_URL = "https://cursor.com/install";
-function cursorAuthFilePath() {
+function cursorHomeDir(env) {
+  return (process.platform === "win32" ? env.USERPROFILE ?? env.HOME : env.HOME) ?? os.homedir();
+}
+function cursorAuthFilePath(env = process.env) {
   if (process.platform === "win32") {
-    const appData = process.env.APPDATA ?? path2.join(os.homedir(), "AppData", "Roaming");
+    const appData = env.APPDATA ?? path2.join(cursorHomeDir(env), "AppData", "Roaming");
     return path2.join(appData, "Cursor", "auth.json");
   }
   if (process.platform === "darwin") {
-    return path2.join(os.homedir(), ".cursor", "auth.json");
+    return path2.join(cursorHomeDir(env), ".cursor", "auth.json");
   }
-  const configHome = process.env.XDG_CONFIG_HOME ?? path2.join(os.homedir(), ".config");
+  const configHome = env.XDG_CONFIG_HOME ?? path2.join(cursorHomeDir(env), ".config");
   return path2.join(configHome, "cursor", "auth.json");
 }
 async function readKeychainAccessToken() {
@@ -27245,26 +27410,26 @@ async function readKeychainAccessToken() {
 var cursorFileCredentialsSchema = external_exports.object({
   accessToken: external_exports.string().min(1).nullish()
 });
-async function readAccessToken() {
+async function readAccessToken(env = process.env) {
   const keychain = await readKeychainAccessToken();
   if (keychain) return keychain;
   try {
     const parsed = cursorFileCredentialsSchema.safeParse(
-      JSON.parse(await fs.readFile(cursorAuthFilePath(), "utf8"))
+      JSON.parse(await fs.readFile(cursorAuthFilePath(env), "utf8"))
     );
     return parsed.success ? parsed.data.accessToken ?? null : null;
   } catch {
     return null;
   }
 }
-function cursorStateDatabasePath() {
+function cursorStateDatabasePath(env = process.env) {
   if (process.platform === "win32") {
-    const appData = process.env.APPDATA ?? path2.join(os.homedir(), "AppData", "Roaming");
+    const appData = env.APPDATA ?? path2.join(cursorHomeDir(env), "AppData", "Roaming");
     return path2.join(appData, "Cursor", "User", "globalStorage", "state.vscdb");
   }
   if (process.platform === "darwin") {
     return path2.join(
-      os.homedir(),
+      cursorHomeDir(env),
       "Library",
       "Application Support",
       "Cursor",
@@ -27273,7 +27438,7 @@ function cursorStateDatabasePath() {
       "state.vscdb"
     );
   }
-  const configHome = process.env.XDG_CONFIG_HOME ?? path2.join(os.homedir(), ".config");
+  const configHome = env.XDG_CONFIG_HOME ?? path2.join(cursorHomeDir(env), ".config");
   return path2.join(
     configHome,
     "Cursor",
@@ -27282,8 +27447,8 @@ function cursorStateDatabasePath() {
     "state.vscdb"
   );
 }
-function readAccountEmail() {
-  const databasePath = cursorStateDatabasePath();
+function readAccountEmail(env = process.env) {
+  const databasePath = cursorStateDatabasePath(env);
   if (!existsSync(databasePath)) return null;
   let database = null;
   try {
@@ -27324,19 +27489,19 @@ async function getAcpProviderHealth(args) {
       statusMessage: "The ACP provider has no launch command."
     });
   }
-  if (await resolveExecutablePath(args.command) === null) {
-    return healthResult({ maintenance, status: "not_installed" });
-  }
-  const version2 = await readCliVersion(args.command);
-  if (maintenance === void 0) {
+  const launchHealth = await getAcpLaunchHealth(args);
+  if (!launchHealth.supported) return launchHealth;
+  const version2 = launchHealth.health.installedVersion;
+  if (launchHealth.health.status !== "ready" || maintenance === void 0) {
     return healthResult({
       maintenance,
-      status: "ready",
+      status: launchHealth.health.status,
+      statusMessage: launchHealth.health.statusMessage,
       installedVersion: version2
     });
   }
   try {
-    const account = await maintenance.readAccount();
+    const account = await maintenance.readAccount({ cwd: args.cwd, env: args.env });
     return healthResult({
       maintenance,
       status: account === null ? "unauthenticated" : "ready",
@@ -27475,9 +27640,10 @@ async function getAcpProviderUsage(args) {
 var CURSOR_ACP_MAINTENANCE = {
   loginCommand: "cursor-agent login",
   installer: () => downloadedInstallerCommand(CURSOR_INSTALL_SCRIPT_URL),
-  readAccount: async () => {
-    const accessToken = await readAccessToken();
-    return accessToken === null ? null : { email: readAccountEmail() };
+  readAccount: async (context) => {
+    const env = { ...process.env, ...context?.env };
+    const accessToken = await readAccessToken(env);
+    return accessToken === null ? null : { email: readAccountEmail(env) };
   },
   readUsage: readCursorUsage
 };
@@ -27847,7 +28013,19 @@ function normalizeOpenCodeCommandEvent(event) {
 }
 var OPENCODE_ACP_DIALECT = {
   id: "opencode",
-  launchEnv: { OPENCODE_CLIENT: "acp", OPENCODE_ENABLE_QUESTION_TOOL: "false" },
+  launchEnv(permissionMode) {
+    const outsideEdits = permissionMode === "full" ? "allow" : "ask";
+    return {
+      OPENCODE_CLIENT: "acp",
+      OPENCODE_ENABLE_QUESTION_TOOL: "false",
+      OPENCODE_PERMISSION: JSON.stringify({
+        edit: "allow",
+        bash: outsideEdits,
+        webfetch: outsideEdits,
+        external_directory: outsideEdits
+      })
+    };
+  },
   normalizeCommandEvent: normalizeOpenCodeCommandEvent
 };
 var DIALECTS_BY_ID = /* @__PURE__ */ new Map([
@@ -30281,7 +30459,7 @@ function createAcpAgentConnection(options) {
 // ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 import { execFile as execFile2 } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat as stat2, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename as basename2, dirname, join as join2, resolve as resolve2 } from "node:path";
 
@@ -30628,7 +30806,7 @@ async function acquireApprovalLock(path5) {
       }
     }
     try {
-      const lockStat = await stat(lockPath);
+      const lockStat = await stat2(lockPath);
       if (Date.now() - lockStat.mtimeMs > CURSOR_APPROVAL_LOCK_STALE_MS) {
         await rm(lockPath, { recursive: true, force: true });
         continue;
@@ -31779,6 +31957,10 @@ function getSessionByProviderThreadId(providerThreadId) {
   const bbThreadId = bbThreadIdByProviderThreadId.get(providerThreadId);
   return bbThreadId ? sessionsByBbThreadId.get(bbThreadId) : void 0;
 }
+function additionalSessionDirectories(params, supported) {
+  const directories = [...new Set(params.workspaceWriteRoots.filter((root) => root !== params.cwd))];
+  return supported && directories.length > 0 ? { additionalDirectories: directories } : {};
+}
 async function startAgentSession(request) {
   const params = request.params;
   const bbThreadId = params.threadId;
@@ -31816,7 +31998,7 @@ async function startAgentSession(request) {
   const childEnv = {
     ...withoutBridgeRuntimeEnv(process.env),
     ...params.envVars,
-    ...dialect.launchEnv
+    ...dialect.launchEnv?.(params.permissionMode)
   };
   const connection = createAcpAgentConnection({
     command: params.agent.command,
@@ -31853,6 +32035,7 @@ async function startAgentSession(request) {
     connection,
     supportsImageInput: false,
     supportsLoadSession: false,
+    supportsAdditionalDirectories: false,
     policy: {
       permissionMode: params.permissionMode,
       workspaceWriteRoots: params.workspaceWriteRoots
@@ -31900,6 +32083,8 @@ async function startAgentSession(request) {
       );
     }
     session.supportsLoadSession = supportsLoadSession;
+    session.supportsAdditionalDirectories = initializeResult.agentCapabilities?.sessionCapabilities?.additionalDirectories != null;
+    const extraDirectories = additionalSessionDirectories(params, session.supportsAdditionalDirectories);
     const mcpServers = await buildSessionMcpServers(params);
     const mcpServer = mcpServers[0];
     if (mcpServer) {
@@ -31925,7 +32110,8 @@ async function startAgentSession(request) {
         params: {
           sessionId: request.sourceProviderThreadId,
           cwd: params.cwd,
-          mcpServers
+          mcpServers,
+          ...extraDirectories
         },
         resultSchema: acpSessionForkResultSchema
       });
@@ -31947,7 +32133,8 @@ async function startAgentSession(request) {
           params: {
             sessionId: request.resumeProviderThreadId,
             cwd: params.cwd,
-            mcpServers
+            mcpServers,
+            ...extraDirectories
           },
           resultSchema: external_exports.union([acpConfigStateResultSchema, external_exports.null()])
         });
@@ -31967,7 +32154,7 @@ async function startAgentSession(request) {
       session.pendingLoadUsageUpdate = void 0;
       const newSession = await connection.request({
         method: "session/new",
-        params: { cwd: params.cwd, mcpServers },
+        params: { cwd: params.cwd, mcpServers, ...extraDirectories },
         resultSchema: acpSessionNewResultSchema
       });
       sessionId = newSession.sessionId;
@@ -32261,10 +32448,16 @@ function reconcileExecutionSettings(session, options) {
       construction.permissionMode
     )
   ) || !isDeepStrictEqual(
+    session.dialect.launchEnv?.(session.construction.permissionMode),
+    session.dialect.launchEnv?.(construction.permissionMode)
+  ) || !isDeepStrictEqual(
     launchModelSelection(session.construction),
     launchModelSelection(construction)
   );
-  const restart = session.connection.exited || session.restartAfterCancelError || launchArgsChanged || !isDeepStrictEqual(envVars ?? {}, session.construction.envVars ?? {});
+  const restart = session.connection.exited || session.restartAfterCancelError || launchArgsChanged || !isDeepStrictEqual(
+    additionalSessionDirectories(session.construction, session.supportsAdditionalDirectories),
+    additionalSessionDirectories(construction, session.supportsAdditionalDirectories)
+  ) || !isDeepStrictEqual(envVars ?? {}, session.construction.envVars ?? {});
   cancelPendingPermissions(session);
   session.policy = {
     permissionMode: options.permissionMode,
@@ -32534,11 +32727,12 @@ async function handleModelList(id2, params, dialectId) {
     selectedOnlyModels: []
   });
 }
-function decodeLaunchSpec(providerOptions) {
+function decodeLaunchSpec(providerOptions, cwd) {
   const launchSpec = acpLaunchSpecSchema.safeParse(
     providerOptions?.["acpLaunchSpec"]
   );
-  return launchSpec.success ? launchSpec.data : null;
+  if (!launchSpec.success) return null;
+  return launchSpec.data.cwd === void 0 && cwd ? { ...launchSpec.data, cwd } : launchSpec.data;
 }
 var acpProviderOptionsSchema = external_exports.object({
   additionalWorkspaceWriteRoots: external_exports.array(external_exports.string()).optional(),
@@ -32598,7 +32792,7 @@ async function handleRequest2(request) {
       await handleModelList(
         request.id,
         buildAcpModelListParams(
-          decodeLaunchSpec(request.params.providerOptions),
+          decodeLaunchSpec(request.params.providerOptions, request.params.cwd),
           modelPicker
         ),
         decodeDialectId(request.params.providerOptions)
@@ -32614,7 +32808,9 @@ async function handleRequest2(request) {
             request.params.providerOptions,
             launchSpec
           ),
-          command: launchSpec?.command ?? null
+          command: launchSpec?.command ?? null,
+          ...launchSpec?.cwd ?? request.params.cwd ? { cwd: launchSpec?.cwd ?? request.params.cwd } : {},
+          ...launchSpec?.env === void 0 ? {} : { env: launchSpec.env }
         })
       );
       return;
@@ -32854,13 +33050,22 @@ async function stopAllSessions() {
 if (process.argv.includes("--mcp-stdio")) {
   runAcpDynamicToolMcpServer();
 }
+var bridgeStopping = false;
+function shutdownBridge() {
+  if (bridgeStopping) return;
+  bridgeStopping = true;
+  const deadline = setTimeout(() => process.exit(0), 4e3);
+  deadline.unref();
+  void stopAllSessions().catch(() => void 0).finally(() => {
+    clearTimeout(deadline);
+    process.exit(0);
+  });
+}
 var experimental_providerBridge = experimental_defineProviderBridge({
   handleLine,
-  onClose: () => {
-    void stopAllSessions().finally(() => {
-      process.exit(0);
-    });
-  }
+  onClose: shutdownBridge,
+  onSigterm: shutdownBridge,
+  onSigint: shutdownBridge
 });
 
 // ../../../zana/packages/provider-bridge-acp/src/probe.ts
@@ -32923,15 +33128,15 @@ var require_windows2 = __commonJS2({
       }
       return false;
     }
-    function checkStat(stat2, path22, options) {
-      if (!stat2.isSymbolicLink() && !stat2.isFile()) {
+    function checkStat(stat3, path22, options) {
+      if (!stat3.isSymbolicLink() && !stat3.isFile()) {
         return false;
       }
       return checkPathExt(path22, options);
     }
     function isexe(path22, options, cb) {
-      fs3.stat(path22, function(er, stat2) {
-        cb(er, er ? false : checkStat(stat2, path22, options));
+      fs3.stat(path22, function(er, stat3) {
+        cb(er, er ? false : checkStat(stat3, path22, options));
       });
     }
     function sync(path22, options) {
@@ -32945,20 +33150,20 @@ var require_mode2 = __commonJS2({
     isexe.sync = sync;
     var fs3 = __require2("fs");
     function isexe(path22, options, cb) {
-      fs3.stat(path22, function(er, stat2) {
-        cb(er, er ? false : checkStat(stat2, options));
+      fs3.stat(path22, function(er, stat3) {
+        cb(er, er ? false : checkStat(stat3, options));
       });
     }
     function sync(path22, options) {
       return checkStat(fs3.statSync(path22), options);
     }
-    function checkStat(stat2, options) {
-      return stat2.isFile() && checkMode(stat2, options);
+    function checkStat(stat3, options) {
+      return stat3.isFile() && checkMode(stat3, options);
     }
-    function checkMode(stat2, options) {
-      var mod = stat2.mode;
-      var uid = stat2.uid;
-      var gid = stat2.gid;
+    function checkMode(stat3, options) {
+      var mod = stat3.mode;
+      var uid = stat3.uid;
+      var gid = stat3.gid;
       var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
       var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
       var u = parseInt("100", 8);
@@ -32990,12 +33195,12 @@ var require_isexe2 = __commonJS2({
         if (typeof Promise !== "function") {
           throw new TypeError("callback not provided");
         }
-        return new Promise(function(resolve22, reject) {
+        return new Promise(function(resolve42, reject) {
           isexe(path22, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
-              resolve22(is);
+              resolve42(is);
             }
           });
         });
@@ -33059,27 +33264,27 @@ var require_which2 = __commonJS2({
         opt = {};
       const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
       const found = [];
-      const step = (i) => new Promise((resolve22, reject) => {
+      const step = (i) => new Promise((resolve42, reject) => {
         if (i === pathEnv.length)
-          return opt.all && found.length ? resolve22(found) : reject(getNotFoundError(cmd));
+          return opt.all && found.length ? resolve42(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
         const pCmd = path22.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
-        resolve22(subStep(p, i, 0));
+        resolve42(subStep(p, i, 0));
       });
-      const subStep = (p, i, ii) => new Promise((resolve22, reject) => {
+      const subStep = (p, i, ii) => new Promise((resolve42, reject) => {
         if (ii === pathExt.length)
-          return resolve22(step(i + 1));
+          return resolve42(step(i + 1));
         const ext = pathExt[ii];
         isexe(p + ext, { pathExt: pathExtExe }, (er, is) => {
           if (!er && is) {
             if (opt.all)
               found.push(p + ext);
             else
-              return resolve22(p + ext);
+              return resolve42(p + ext);
           }
-          return resolve22(subStep(p, i, ii + 1));
+          return resolve42(subStep(p, i, ii + 1));
         });
       });
       return cb ? step(0).then((res) => cb(null, res), cb) : step(0);
@@ -33353,7 +33558,7 @@ var require_cross_spawn2 = __commonJS2({
     var cp = __require2("child_process");
     var parse3 = require_parse2();
     var enoent = require_enoent2();
-    function spawn(command, args, options) {
+    function spawn2(command, args, options) {
       const parsed = parse3(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
@@ -33365,13 +33570,56 @@ var require_cross_spawn2 = __commonJS2({
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module.exports = spawn;
-    module.exports.spawn = spawn;
+    module.exports = spawn2;
+    module.exports.spawn = spawn2;
     module.exports.sync = spawnSync;
     module.exports._parse = parse3;
     module.exports._enoent = enoent;
   }
 });
+var import_cross_spawn2 = __toESM2(require_cross_spawn2(), 1);
+var portableCommandCleanupKey2 = Symbol.for("zcc.portable-command-cleanup.v1");
+var portableCommandGlobal2 = globalThis;
+var portableCommandCleanup2 = portableCommandGlobal2[portableCommandCleanupKey2] ?? (() => {
+  const state = { children: /* @__PURE__ */ new Set(), aborters: /* @__PURE__ */ new Map(), closed: false };
+  portableCommandGlobal2[portableCommandCleanupKey2] = state;
+  const cleanup = () => {
+    for (const child of state.children) terminatePortableCommandTree2(child);
+    state.children.clear();
+  };
+  process.once("exit", cleanup);
+  for (const signal of ["SIGTERM", "SIGINT"]) {
+    const onSignal = () => {
+      const hasOwnerHandler = process.listeners(signal).some((listener) => listener !== onSignal);
+      cleanup();
+      if (!hasOwnerHandler) {
+        process.removeListener(signal, onSignal);
+        process.kill(process.pid, signal);
+      }
+    };
+    process.prependListener(signal, onSignal);
+  }
+  return state;
+})();
+function terminatePortableCommandTree2(child) {
+  try {
+    killProcessGroup2({ child, signal: "SIGKILL" });
+  } catch {
+  }
+}
+function supportsProcessGroups2() {
+  return process.platform !== "win32";
+}
+function killProcessGroup2(args) {
+  if (supportsProcessGroups2() && args.child.pid !== void 0) {
+    try {
+      process.kill(-args.child.pid, args.signal);
+      return;
+    } catch {
+    }
+  }
+  args.child.kill(args.signal);
+}
 var activeThinkingSchema2 = external_exports.object({
   id: external_exports.string(),
   text: external_exports.string(),
@@ -37864,7 +38112,6 @@ var errorEnvelopeSchema2 = external_exports.object({
     message: external_exports.string().optional()
   }).passthrough().optional()
 }).passthrough();
-var import_cross_spawn2 = __toESM2(require_cross_spawn2(), 1);
 function experimental_defineProviderBridge2(definition) {
   return { experimental_apiVersion: 1, ...definition };
 }
@@ -38026,7 +38273,9 @@ var BRIDGE_REQUEST_METHODS2 = {
 var bridgeRequestMethodValues2 = Object.values(
   BRIDGE_REQUEST_METHODS2
 );
+var sessionKindSchema2 = external_exports.enum(["interactive", "automated"]);
 var sessionConstructionFields2 = {
+  sessionKind: sessionKindSchema2.optional().catch(void 0),
   threadId: external_exports.string().min(1),
   cwd: external_exports.string().min(1),
   options: bridgeExecutionOptionsSchema2,
@@ -41254,17 +41503,21 @@ var desktopBrowserChangedSchema = external_exports.object({
 }).strict();
 
 // src/native-auth.ts
+import { spawn } from "node:child_process";
+import { createHash as createHash2, randomUUID } from "node:crypto";
 import {
   copyFileSync,
   existsSync as existsSync3,
   mkdirSync as mkdirSync3,
   readFileSync as readFileSync3,
+  renameSync as renameSync2,
   rmSync as rmSync2,
   statSync,
   writeFileSync as writeFileSync2
 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 // src/native-runtime.ts
 import { execFile as execFile4, execFileSync } from "node:child_process";
@@ -41425,6 +41678,58 @@ function resolveNativeAcpRuntime(options) {
     platformKey
   };
 }
+function killProcessTree(child) {
+  if (!child) return;
+  try {
+    child.stdin?.end();
+  } catch {
+  }
+  const pid = child.pid;
+  if (process.platform === "win32" && typeof pid === "number" && pid > 0) {
+    try {
+      execFileSync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true
+      });
+      return;
+    } catch {
+    }
+  }
+  try {
+    child.kill("SIGTERM");
+  } catch {
+  }
+}
+
+// src/native-usage.ts
+function parseNativeQuotaWindows(text) {
+  const windows = [];
+  let inQuotas = false;
+  let group = "";
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith("### ")) {
+      inQuotas = line.trim() === "### Quota Limits";
+      continue;
+    }
+    if (!inQuotas) continue;
+    const heading = /^- \*\*([^*]+)\*\*$/.exec(line);
+    if (heading) {
+      group = heading[1];
+      continue;
+    }
+    const match = /^\s+- \*\*([^*]+):\*\* (\d+(?:\.\d+)?)% remaining \(resets ([^)]+)\)\s*$/.exec(line);
+    if (!group || !match) continue;
+    const remaining = Number(match[2]);
+    if (remaining < 0 || remaining > 100) continue;
+    const resetTime = Date.parse(match[3]);
+    windows.push({
+      label: `${group} \u2014 ${match[1]}`,
+      usedPercent: 100 - remaining,
+      resetsAt: Number.isFinite(resetTime) ? new Date(resetTime).toISOString() : null
+    });
+  }
+  return windows;
+}
 
 // src/native-auth.ts
 var GOOGLE_ACP_AUTH_METHODS = [
@@ -41529,6 +41834,21 @@ function writeSettingsFileAtomically(settingsPath, authType) {
   } catch {
   }
 }
+function writeNativeAcpAuthType(authType, env = process.env) {
+  const primaryPath = getNativeAcpSettingsPath(env);
+  writeSettingsFileAtomically(primaryPath, authType);
+  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  for (const dir of [sourceGeminiHome, managedGeminiHome]) {
+    const candidate = join4(dir, "antigravity-acp", "settings.json");
+    if (candidate !== primaryPath) {
+      try {
+        writeSettingsFileAtomically(candidate, authType);
+      } catch {
+      }
+    }
+  }
+  clearCachedNativeReadiness(env);
+}
 function syncFileNewer(src, dest) {
   if (!existsSync3(src)) return;
   try {
@@ -41620,40 +41940,326 @@ function prepareSanitizedGeminiHome(options) {
     disabledDeadMcpServers
   };
 }
+function extractSessionReasoningMetadata(sessionResult) {
+  const configOptions = sessionResult?.configOptions;
+  if (!Array.isArray(configOptions)) return {};
+  const reasoningOpt = configOptions.find(
+    (opt) => opt?.id === "thinking_level" || opt?.id === "reasoning_effort" || opt?.category === "reasoning" || opt?.category === "thinking_level"
+  );
+  if (!reasoningOpt || !Array.isArray(reasoningOpt.options)) return {};
+  const levels = reasoningOpt.options.map((o) => typeof o?.value === "string" ? o.value : typeof o?.id === "string" ? o.id : null).filter((v) => Boolean(v));
+  if (levels.length === 0) return {};
+  const rawDefault = reasoningOpt.currentValue ?? reasoningOpt.defaultValue;
+  const defaultLevel = typeof rawDefault === "string" && levels.includes(rawDefault) ? rawDefault : levels[0];
+  return {
+    supportedReasoningEfforts: levels,
+    ...defaultLevel ? { defaultReasoningEffort: defaultLevel } : {}
+  };
+}
+function extractModelReasoningMetadata(item, sessionReasoning) {
+  const rawEfforts = item?.supportedReasoningEfforts ?? item?.reasoningLevels ?? item?.thinkingLevels;
+  if (Array.isArray(rawEfforts)) {
+    const levels = rawEfforts.map(
+      (e) => typeof e === "string" ? e : typeof e?.reasoningEffort === "string" ? e.reasoningEffort : typeof e?.value === "string" ? e.value : null
+    ).filter((v) => Boolean(v));
+    if (levels.length === 0) return {};
+    const rawDefault = item?.defaultReasoningEffort ?? item?.defaultThinkingLevel;
+    const defaultLevel = typeof rawDefault === "string" && levels.includes(rawDefault) ? rawDefault : levels[0];
+    return {
+      supportedReasoningEfforts: levels,
+      ...defaultLevel ? { defaultReasoningEffort: defaultLevel } : {}
+    };
+  }
+  return sessionReasoning;
+}
+function extractModelsFromSessionResult(sessionResult) {
+  const models = [];
+  const seen = /* @__PURE__ */ new Set();
+  const sessionReasoning = extractSessionReasoningMetadata(sessionResult);
+  const configOptions = sessionResult?.configOptions;
+  let authoritativeCatalog = false;
+  if (Array.isArray(configOptions)) {
+    const modelOpt = configOptions.find(
+      (opt) => opt?.id === "model" || opt?.category === "model"
+    );
+    if (Array.isArray(modelOpt?.options)) {
+      authoritativeCatalog = true;
+      for (const opt of modelOpt.options.flatMap((option) => Array.isArray(option?.options) ? option.options : [option])) {
+        const id2 = opt?.value;
+        if (typeof id2 === "string" && id2 && !seen.has(id2)) {
+          seen.add(id2);
+          models.push({
+            id: id2,
+            name: typeof opt?.name === "string" && opt.name ? opt.name : id2,
+            ...typeof opt?.description === "string" ? { description: opt.description } : {},
+            ...extractModelReasoningMetadata(opt, sessionReasoning)
+          });
+        }
+      }
+    }
+  }
+  if (!authoritativeCatalog) {
+    const availableModels = sessionResult?.models?.availableModels;
+    if (Array.isArray(availableModels)) {
+      for (const item of availableModels) {
+        const id2 = item?.id || item?.modelId;
+        if (typeof id2 === "string" && id2 && !seen.has(id2)) {
+          seen.add(id2);
+          models.push({
+            id: id2,
+            name: typeof item?.name === "string" && item.name ? item.name : id2,
+            ...typeof item?.description === "string" ? { description: item.description } : {},
+            ...extractModelReasoningMetadata(item, sessionReasoning)
+          });
+        }
+      }
+    }
+  }
+  return models;
+}
+function extractModesFromSessionResult(sessionResult) {
+  const available = sessionResult?.modes?.availableModes;
+  if (!Array.isArray(available)) return [];
+  return available.map((m) => typeof m?.id === "string" ? m.id : null).filter((id2) => Boolean(id2));
+}
 function getPersistedReadinessPath(env = process.env) {
   return join4(getZccDataDir(env), "state", "antigravity-native-readiness.json");
 }
+var statMemo = /* @__PURE__ */ new Map();
+function memoizeByStat(filePath, compute) {
+  let stamp;
+  try {
+    const stat3 = statSync(filePath);
+    stamp = `${stat3.ino}:${stat3.size}:${stat3.mtimeMs}`;
+  } catch {
+    stamp = "missing";
+  }
+  const hit = statMemo.get(filePath);
+  if (hit && hit.stamp === stamp) return hit.value;
+  const value = compute();
+  statMemo.set(filePath, { stamp, value });
+  return value;
+}
 function readPersistedReadiness(key, env = process.env) {
   const filePath = getPersistedReadinessPath(env);
-  if (!existsSync3(filePath)) return null;
-  try {
-    const raw = JSON.parse(readFileSync3(filePath, "utf8"));
-    if (raw && raw.key === key && raw.result && typeof raw.result === "object") {
-      return { result: raw.result, fingerprint: raw.fingerprint || "" };
+  const raw = memoizeByStat(filePath, () => {
+    try {
+      return existsSync3(filePath) ? JSON.parse(readFileSync3(filePath, "utf8")) : null;
+    } catch {
+      return null;
     }
-  } catch {
+  });
+  if (raw && raw.key === key && raw.result && typeof raw.result === "object" && Number.isFinite(raw.result.checkedAt) && Array.isArray(raw.result.models) && raw.result.models.every((model) => typeof model?.id === "string" && typeof model?.name === "string") && Array.isArray(raw.result.modes) && Array.isArray(raw.result.advertisedAuthMethods)) {
+    return { result: raw.result, fingerprint: raw.fingerprint || "" };
   }
   return null;
 }
+function writePersistedReadiness(key, result, fingerprint, env = process.env) {
+  try {
+    const filePath = getPersistedReadinessPath(env);
+    mkdirSync3(dirname4(filePath), { recursive: true });
+    const temporary = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      writeFileSync2(temporary, JSON.stringify({ key, result, fingerprint }, null, 2) + "\n", { mode: 384 });
+      renameSync2(temporary, filePath);
+    } finally {
+      rmSync2(temporary, { force: true });
+      statMemo.delete(filePath);
+    }
+  } catch {
+  }
+}
 function computeCredentialFingerprint(env, authMethod) {
   const tokenPath = getNativeAcpTokenPath(env);
-  let tokenInfo = "no-token";
-  if (existsSync3(tokenPath)) {
+  const tokenInfo = memoizeByStat(tokenPath, () => {
+    if (!existsSync3(tokenPath)) return "no-token";
     try {
-      const stat2 = statSync(tokenPath);
-      tokenInfo = `${stat2.size}:${stat2.mtimeMs}`;
+      const contents = readFileSync3(tokenPath, "utf8");
+      let identity = contents;
+      try {
+        const token = JSON.parse(contents);
+        if (typeof token.refresh_token === "string") identity = `${token.client_id ?? ""}:${token.refresh_token}`;
+      } catch {
+      }
+      return createHash2("sha256").update(identity).digest("hex");
     } catch {
-      tokenInfo = "err";
+      return "err";
     }
-  }
+  });
   const configured = readConfiguredNativeAuthType(env) ?? "none";
-  const apiKey = env.GEMINI_API_KEY ? `key:${env.GEMINI_API_KEY.length}` : "no-key";
-  const appCreds = env.GOOGLE_APPLICATION_CREDENTIALS ? "gac" : "no-gac";
+  const apiKey = env.GEMINI_API_KEY ? `key:${createHash2("sha256").update(env.GEMINI_API_KEY).digest("hex")}` : "no-key";
+  const gacPath = env.GOOGLE_APPLICATION_CREDENTIALS;
+  const appCreds = gacPath ? memoizeByStat(gacPath, () => {
+    let cloudIdentity = gacPath;
+    try {
+      cloudIdentity += ":" + readFileSync3(gacPath, "utf8");
+    } catch {
+      cloudIdentity += ":unreadable";
+    }
+    return `gac:${createHash2("sha256").update(cloudIdentity).digest("hex")}`;
+  }) : "no-gac";
+  const settings = memoizeByStat(getNativeAcpSettingsPath(env), () => readNativeAcpSettings(env));
+  const cloudProject = createHash2("sha256").update(JSON.stringify([
+    settings?.gcp ?? null,
+    env.GOOGLE_CLOUD_PROJECT,
+    env.GOOGLE_CLOUD_LOCATION,
+    env.CLOUD_ML_PROJECT_ID,
+    env.GOOGLE_API_KEY
+  ])).digest("hex");
   const cleared = isAuthExplicitlyCleared(env) ? "cleared" : "uncleared";
-  return `${authMethod}:${configured}:${cleared}:${tokenInfo}:${apiKey}:${appCreds}`;
+  return `${authMethod}:${configured}:${cleared}:${tokenInfo}:${apiKey}:${appCreds}:${cloudProject}`;
+}
+function setupStdoutHandler(stdout, onMessage) {
+  if (!stdout) return;
+  const stdoutDecoder = new StringDecoder("utf8");
+  let stdoutBuffer = "";
+  stdout.on("data", (chunk) => {
+    stdoutBuffer += typeof chunk === "string" ? chunk : stdoutDecoder.write(chunk);
+    let newlineIdx;
+    while ((newlineIdx = stdoutBuffer.indexOf("\n")) >= 0) {
+      const line = stdoutBuffer.slice(0, newlineIdx).trim();
+      stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
+      if (!line) continue;
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed && typeof parsed === "object") {
+          onMessage(parsed);
+        }
+      } catch {
+      }
+    }
+  });
+}
+function setupStderrHandler(stderr, onLine) {
+  if (!stderr) return;
+  const stderrDecoder = new StringDecoder("utf8");
+  let stderrBuffer = "";
+  stderr.on("data", (chunk) => {
+    stderrBuffer += typeof chunk === "string" ? chunk : stderrDecoder.write(chunk);
+    let newlineIdx;
+    while ((newlineIdx = stderrBuffer.indexOf("\n")) >= 0) {
+      const line = stderrBuffer.slice(0, newlineIdx).trim();
+      stderrBuffer = stderrBuffer.slice(newlineIdx + 1);
+      if (line) onLine(line);
+    }
+  });
+}
+function attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, onClose) {
+  setupStdoutHandler(child.stdout, (parsed) => {
+    if (typeof parsed.method === "string") {
+      if (parsed.id !== void 0) {
+        const reply = parsed.method === "session/request_permission" ? { result: { outcome: { outcome: "cancelled" } } } : { error: { code: -32601, message: "Not supported by the diagnostic client" } };
+        child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, ...reply }) + "\n");
+      } else for (const listener of notificationListeners) listener(parsed.method, parsed.params);
+      return;
+    }
+    const entry = pending.get(Number(parsed.id));
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pending.delete(Number(parsed.id));
+    if (parsed.error) {
+      const err = new Error(parsed.error?.data?.message || parsed.error?.message || `ACP error ${parsed.error?.code}`);
+      err.code = parsed.error?.code;
+      err.data = parsed.error?.data;
+      entry.reject(err);
+    } else {
+      entry.resolve(parsed.result);
+    }
+  });
+  setupStderrHandler(child.stderr, (line) => {
+    for (const listener of stderrListeners) listener(line);
+  });
+  const rejectAll = (err) => {
+    for (const [, entry] of pending) {
+      clearTimeout(entry.timer);
+      entry.reject(err);
+    }
+    pending.clear();
+  };
+  child.on("error", (err) => rejectAll(err));
+  child.stdin?.on?.("error", (err) => rejectAll(err));
+  child.on("close", (code) => {
+    onClose();
+    rejectAll(new Error(`Native ACP server exited (code ${code ?? "null"})`));
+  });
+  return rejectAll;
+}
+function createHarnessRequester(child, pending, isClosed, getNextId) {
+  return function request(method, params, timeoutMs = 2e4) {
+    if (isClosed()) return Promise.reject(new Error("Native ACP server is already closed"));
+    const id2 = getNextId();
+    return new Promise((resolveReq, rejectReq) => {
+      const timer = setTimeout(() => {
+        pending.delete(id2);
+        rejectReq(new Error(`ACP request "${method}" timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      pending.set(id2, { resolve: resolveReq, reject: rejectReq, timer });
+      try {
+        child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: id2, method, params }) + "\n");
+      } catch (err) {
+        clearTimeout(timer);
+        pending.delete(id2);
+        rejectReq(err);
+      }
+    });
+  };
+}
+function createNativeRpcHarness(options, suppressBrowser) {
+  const spawnFn = options.spawnImpl ?? spawn;
+  const env = {
+    ...process.env,
+    ...options.env ?? {},
+    ...suppressBrowser ? { BROWSER: "echo" } : {}
+  };
+  const child = spawnFn(options.command, options.args, {
+    cwd: options.cwd || process.cwd(),
+    env,
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true
+  });
+  const pending = /* @__PURE__ */ new Map();
+  const stderrListeners = [];
+  const notificationListeners = [];
+  let nextId = 1;
+  let closed = false;
+  const rejectAll = attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, () => {
+    closed = true;
+  });
+  const request = createHarnessRequester(child, pending, () => closed, () => nextId++);
+  return {
+    child,
+    request,
+    onStderrLine(listener) {
+      stderrListeners.push(listener);
+    },
+    onNotification(listener) {
+      notificationListeners.push(listener);
+    },
+    close(reason) {
+      if (closed) return;
+      closed = true;
+      rejectAll(reason ?? new Error("Native ACP probe closed"));
+      killProcessTree(child);
+    }
+  };
 }
 var cachedReadiness = null;
 var READINESS_CACHE_TTL_MS = 10 * 60 * 1e3;
+var NATIVE_PROBE_TIMEOUT_MS = 2e4;
+var USAGE_CACHE_TTL_MS = 6e4;
+var USAGE_COMMANDS_WAIT_MS = 1e3;
+var USAGE_MAX_TEXT_CHARS = 32768;
+var CATALOG_RETRY_BACKOFF_MS = 3e4;
+var CATALOG_RETRY_MAX_KEYS = 32;
+function clearCachedNativeReadiness(env = process.env) {
+  cachedReadiness = null;
+  try {
+    const filePath = getPersistedReadinessPath(env);
+    statMemo.delete(filePath);
+    rmSync2(filePath, { force: true });
+  } catch {
+  }
+}
 function checkLocalCredentialPresence(authMethod, effectiveEnv, configuredAuthType) {
   if (authMethod === "gemini-api-key") {
     return Boolean(effectiveEnv.GEMINI_API_KEY) ? { authenticated: true, note: "API key detected in environment (unverified session)" } : { authenticated: false };
@@ -41669,16 +42275,22 @@ function checkLocalCredentialPresence(authMethod, effectiveEnv, configuredAuthTy
   }
   return { authenticated: false };
 }
-function checkCachedReadiness(cacheKey, fingerprint, effectiveEnv) {
-  if (cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS) {
-    return cachedReadiness.result;
-  }
+function checkCachedReadiness(cacheKey, fingerprint, effectiveEnv, allowStaleCatalog = false) {
+  const memory = cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS ? cachedReadiness.result : null;
   const persisted = readPersistedReadiness(cacheKey, effectiveEnv);
-  if (persisted && persisted.fingerprint === fingerprint && Date.now() - persisted.result.checkedAt < READINESS_CACHE_TTL_MS) {
-    cachedReadiness = { key: cacheKey, fingerprint, result: persisted.result };
-    return persisted.result;
+  const result = persisted && persisted.fingerprint === fingerprint ? persisted.result : null;
+  if (result && Date.now() - result.checkedAt < READINESS_CACHE_TTL_MS && (!memory || result.checkedAt > memory.checkedAt)) {
+    cachedReadiness = { key: cacheKey, fingerprint, result };
+    return result;
   }
-  return null;
+  const staleCatalog = allowStaleCatalog && result && result.state === "session_ready" && result.models.length > 0 ? { ...result, state: "authenticated", catalogStale: true } : null;
+  if (memory && staleCatalog && memory.state === "runtime_launches") return { ...staleCatalog, error: memory.error };
+  if (memory) return memory;
+  return staleCatalog;
+}
+function computeEffectiveCredentialFingerprint(env, authMethod) {
+  const { managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  return computeCredentialFingerprint({ ...env, GEMINI_HOME: managedGeminiHome }, authMethod);
 }
 function buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized) {
   return {
@@ -41720,7 +42332,7 @@ function getFastNativeReadiness(options) {
     authMethod: options.authMethod,
     configuredAuthType
   });
-  const cached2 = checkCachedReadiness(cacheKey, fingerprint, effectiveEnv);
+  const cached2 = existsSync3(options.command) ? checkCachedReadiness(cacheKey, fingerprint, effectiveEnv, true) : null;
   if (cached2) {
     return { ...cached2, disabledDeadMcpServers: sanitized.disabledDeadMcpServers };
   }
@@ -41744,6 +42356,353 @@ function getFastNativeReadiness(options) {
     return buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized);
   }
   return buildSignInRequiredFastReadiness(options, sanitized);
+}
+async function performInitializeAndAuth(harness, options) {
+  const initResult = await harness.request(
+    "initialize",
+    {
+      protocolVersion: 1,
+      clientInfo: { name: "zcc", title: "Zana Command Center", version: "1.0.0" },
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        _meta: { parameterizedModelPicker: true }
+      }
+    },
+    options.timeoutMs
+  );
+  const protocolVersion = typeof initResult?.protocolVersion === "number" ? initResult.protocolVersion : null;
+  const agentVersion = typeof initResult?.agentInfo?.version === "string" ? initResult.agentInfo.version : null;
+  const advertisedAuthMethods = Array.isArray(initResult?.authMethods) ? initResult.authMethods.map((m) => typeof m?.id === "string" ? m.id : null).filter(Boolean) : [];
+  if (!options.configuredAuthType && (options.authMethod === "gemini-api-key" || options.authMethod === "agent-platform")) {
+    await harness.request("authenticate", { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
+    writeNativeAcpAuthType(options.authMethod, options.env);
+  }
+  return { protocolVersion, agentVersion, advertisedAuthMethods };
+}
+function checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized) {
+  if (!options.forceRefresh && cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS) {
+    return cachedReadiness.result;
+  }
+  if (!existsSync3(options.command)) {
+    return {
+      state: "runtime_missing",
+      agentVersion: null,
+      protocolVersion: null,
+      advertisedAuthMethods: [],
+      selectedAuthMethod: options.authMethod,
+      configuredAuthType,
+      models: [],
+      modes: [],
+      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+      error: `Native ACP binary not found at "${options.command}".`,
+      checkedAt: Date.now()
+    };
+  }
+  return null;
+}
+function buildProbeSessionResult(sessionRace, initInfo, options, effectiveEnv, sanitized, cacheKey, fingerprint) {
+  const models = extractModelsFromSessionResult(sessionRace);
+  const modes = extractModesFromSessionResult(sessionRace);
+  const tierName = typeof sessionRace?._meta?.antigravity?.tier?.name === "string" ? sessionRace._meta.antigravity.tier.name : null;
+  if (!options.env?.GEMINI_HOME) {
+    syncFileNewer(
+      join4(sanitized.geminiHome, "antigravity-acp", "acp_token.json"),
+      join4(resolveGeminiHome(options.env), "antigravity-acp", "acp_token.json")
+    );
+  }
+  const readyResult = {
+    state: "session_ready",
+    agentVersion: initInfo.agentVersion,
+    protocolVersion: initInfo.protocolVersion,
+    advertisedAuthMethods: initInfo.advertisedAuthMethods,
+    selectedAuthMethod: options.authMethod,
+    configuredAuthType: readConfiguredNativeAuthType(effectiveEnv) ?? options.authMethod,
+    models,
+    modes,
+    tierName,
+    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+    checkedAt: Date.now()
+  };
+  cachedReadiness = { key: cacheKey, fingerprint, result: readyResult };
+  writePersistedReadiness(cacheKey, readyResult, fingerprint, effectiveEnv);
+  return readyResult;
+}
+function checkInitCompatibility(initInfo, options, configuredAuthType, sanitized) {
+  if (initInfo.protocolVersion !== 1) {
+    return {
+      state: "runtime_launches",
+      agentVersion: initInfo.agentVersion,
+      protocolVersion: initInfo.protocolVersion,
+      advertisedAuthMethods: initInfo.advertisedAuthMethods,
+      selectedAuthMethod: options.authMethod,
+      configuredAuthType,
+      models: [],
+      modes: [],
+      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+      error: `Unsupported ACP protocolVersion returned: ${initInfo.protocolVersion}`,
+      checkedAt: Date.now()
+    };
+  }
+  if (initInfo.advertisedAuthMethods.length > 0 && !initInfo.advertisedAuthMethods.includes(options.authMethod)) {
+    return {
+      state: "runtime_launches",
+      agentVersion: initInfo.agentVersion,
+      protocolVersion: initInfo.protocolVersion,
+      advertisedAuthMethods: initInfo.advertisedAuthMethods,
+      selectedAuthMethod: options.authMethod,
+      configuredAuthType,
+      models: [],
+      modes: [],
+      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+      error: `Selected auth method "${options.authMethod}" is not advertised.`,
+      checkedAt: Date.now()
+    };
+  }
+  return null;
+}
+function formatProbeFailureResult(err, interactiveLoginTriggeredOnStderr, options, configuredAuthType, sanitized) {
+  const message = err?.message || String(err);
+  const isAuthRequired = interactiveLoginTriggeredOnStderr || /authentication required|no authentication method selected|credentials (?:missing|invalid|expired)/i.test(message) || err?.data?.recovery?.kind === "authRequired";
+  return {
+    state: isAuthRequired ? "sign_in_required" : "runtime_launches",
+    agentVersion: null,
+    protocolVersion: 1,
+    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
+    selectedAuthMethod: options.authMethod,
+    configuredAuthType,
+    models: [],
+    modes: [],
+    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+    error: isAuthRequired ? 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' : message,
+    checkedAt: Date.now()
+  };
+}
+function setupStderrAuthDetector(harness) {
+  let triggered = false;
+  let resolve6 = null;
+  const promise2 = new Promise((res) => {
+    resolve6 = () => res("stderr_auth_required");
+  });
+  harness.onStderrLine((line) => {
+    if (line.includes("Credentials missing or invalid") || line.includes("Launching browser login flow") || line.includes("Open the following link to authenticate")) {
+      triggered = true;
+      resolve6?.();
+    }
+  });
+  return { isTriggered: () => triggered, promise: promise2 };
+}
+var usageRefreshes = /* @__PURE__ */ new Map();
+var usageCache = null;
+function queryNativeUsage(options) {
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const env = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
+  const key = JSON.stringify([
+    options.command,
+    options.args,
+    options.authMethod,
+    getZccDataDir(env),
+    sanitized.geminiHome,
+    computeCredentialFingerprint(env, options.authMethod)
+  ]);
+  if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
+    return Promise.resolve(usageCache.result);
+  }
+  const running = usageRefreshes.get(key);
+  if (running) return running;
+  const request = performNativeUsageQuery(options).then((result) => {
+    if (result.usage.status === "ok") usageCache = { key, result };
+    return result;
+  }).finally(() => usageRefreshes.delete(key));
+  usageRefreshes.set(key, request);
+  return request;
+}
+function trackUsageSessionUpdates(harness) {
+  let advertised = false;
+  let text = "";
+  let unexpectedTools = false;
+  let commandsReceived = () => {
+  };
+  const commandsReady = new Promise((resolve6) => {
+    commandsReceived = resolve6;
+  });
+  let commandTimer;
+  harness.onNotification((method, params) => {
+    if (method !== "session/update") return;
+    const update = params?.update;
+    if (update?.sessionUpdate === "available_commands_update") {
+      advertised = Array.isArray(update.availableCommands) && update.availableCommands.some((command) => command?.name === "usage");
+      commandsReceived();
+    }
+    if (update?.sessionUpdate === "tool_call") {
+      unexpectedTools = true;
+      harness.close();
+    }
+    if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
+      text += update.content.text;
+      if (text.length > USAGE_MAX_TEXT_CHARS) harness.close();
+    }
+  });
+  return {
+    get advertised() {
+      return advertised;
+    },
+    get text() {
+      return text;
+    },
+    get unexpectedTools() {
+      return unexpectedTools;
+    },
+    waitForCommands(timeoutMs) {
+      if (advertised) return Promise.resolve();
+      return Promise.race([commandsReady, new Promise((resolve6) => {
+        commandTimer = setTimeout(resolve6, timeoutMs);
+      })]);
+    },
+    dispose() {
+      clearTimeout(commandTimer);
+    }
+  };
+}
+async function performNativeUsageQuery(options) {
+  const usage = {
+    status: "error",
+    planLabel: null,
+    accountEmail: null,
+    windows: [],
+    checkedAt: Date.now(),
+    source: "native-acp-/usage"
+  };
+  if (!existsSync3(options.command)) return { supported: true, usage: { ...usage, status: "not_installed" } };
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
+  const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
+  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
+  const deadline = setTimeout(() => harness.close(new Error(`Native ACP usage check timed out after ${timeoutMs}ms`)), timeoutMs);
+  const detector = setupStderrAuthDetector(harness);
+  const tracker = trackUsageSessionUpdates(harness);
+  try {
+    const init = await performInitializeAndAuth(harness, {
+      authMethod: options.authMethod,
+      timeoutMs,
+      configuredAuthType: readConfiguredNativeAuthType(effectiveEnv),
+      env: options.env
+    });
+    if (init.protocolVersion !== 1) throw new Error("Unsupported Native ACP protocol version.");
+    const session = await Promise.race([harness.request("session/new", { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
+    if (session === "stderr_auth_required") return { supported: true, usage: { ...usage, status: "unauthenticated" } };
+    usage.planLabel = typeof session?._meta?.antigravity?.tier?.name === "string" ? session._meta.antigravity.tier.name : null;
+    await tracker.waitForCommands(USAGE_COMMANDS_WAIT_MS);
+    if (!tracker.advertised) throw new Error("This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.");
+    const result = await harness.request("session/prompt", { sessionId: session.sessionId, prompt: [{ type: "text", text: "/usage" }] }, timeoutMs);
+    if (result?.stopReason !== "end_turn" || tracker.unexpectedTools) throw new Error("Native usage command did not complete successfully.");
+    usage.windows = parseNativeQuotaWindows(tracker.text);
+    if (usage.windows.length === 0) throw new Error("Native usage returned no recognized quota windows. Check usage in Google Antigravity Settings.");
+    return { supported: true, usage: { ...usage, status: "ok", checkedAt: Date.now() } };
+  } catch (error62) {
+    const failure2 = formatProbeFailureResult(
+      error62,
+      detector.isTriggered(),
+      options,
+      readConfiguredNativeAuthType(effectiveEnv),
+      sanitized
+    );
+    return { supported: true, usage: {
+      ...usage,
+      status: failure2.state === "sign_in_required" ? "unauthenticated" : "error",
+      message: tracker.unexpectedTools ? "Native usage unexpectedly requested tools; the diagnostic session was stopped." : failure2.error
+    } };
+  } finally {
+    tracker.dispose();
+    clearTimeout(deadline);
+    harness.close();
+  }
+}
+var catalogRefreshes = /* @__PURE__ */ new Map();
+var catalogRetryAfter = /* @__PURE__ */ new Map();
+function isNativeCatalogSettled(readiness, forceRefresh) {
+  return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" || readiness.state === "session_ready" && readiness.models.length > 0);
+}
+function getNativeCatalog(options) {
+  const previous = getFastNativeReadiness(options);
+  if (isNativeCatalogSettled(previous, options.forceRefresh)) return Promise.resolve(previous);
+  const key = JSON.stringify([
+    options.command,
+    options.args,
+    options.authMethod,
+    options.cwd,
+    getZccDataDir(options.env),
+    resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
+    computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)
+  ]);
+  const running = catalogRefreshes.get(key);
+  if (running) return running;
+  const retry = catalogRetryAfter.get(key);
+  if (!options.forceRefresh && retry && retry > Date.now()) return Promise.resolve(previous);
+  const refresh = probeNativeAcpReadiness({ ...options, forceRefresh: true }).then((result) => {
+    if (result.state !== "session_ready" || result.models.length === 0) {
+      if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value);
+      catalogRetryAfter.set(key, Date.now() + CATALOG_RETRY_BACKOFF_MS);
+      if (result.state !== "sign_in_required" && result.state !== "session_ready" && previous.models.length > 0) {
+        return { ...previous, state: "authenticated", catalogStale: true, error: result.error };
+      }
+    } else catalogRetryAfter.delete(key);
+    return result;
+  }).finally(() => catalogRefreshes.delete(key));
+  catalogRefreshes.set(key, refresh);
+  return refresh;
+}
+async function probeNativeAcpReadiness(options) {
+  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
+  const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
+  const fingerprint = computeCredentialFingerprint(effectiveEnv, options.authMethod);
+  const cacheKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType });
+  const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized);
+  if (earlyResult) return earlyResult;
+  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
+  const harness = createNativeRpcHarness({ command: options.command, args: options.args, cwd: options.cwd, env: effectiveEnv, spawnImpl: options.spawnImpl }, true);
+  const detector = setupStderrAuthDetector(harness);
+  const catalogUpdates = /* @__PURE__ */ new Map();
+  harness.onNotification((method, params) => {
+    if (method === "session/update" && typeof params?.sessionId === "string" && params.update?.sessionUpdate === "config_option_update" && Array.isArray(params.update.configOptions)) {
+      if (catalogUpdates.size < 16 || catalogUpdates.has(params.sessionId)) catalogUpdates.set(params.sessionId, params.update.configOptions);
+    }
+  });
+  const deadline = setTimeout(() => harness.close(new Error(`Native ACP session verification timed out after ${timeoutMs}ms`)), timeoutMs);
+  try {
+    const initInfo = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs, configuredAuthType, env: options.env });
+    const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, sanitized);
+    if (compatError) return compatError;
+    const sessionRace = await Promise.race([harness.request("session/new", { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
+    if (sessionRace === "stderr_auth_required" || detector.isTriggered()) {
+      const signInResult = { state: "sign_in_required", agentVersion: initInfo.agentVersion, protocolVersion: initInfo.protocolVersion, advertisedAuthMethods: initInfo.advertisedAuthMethods, selectedAuthMethod: options.authMethod, configuredAuthType, models: [], modes: [], disabledDeadMcpServers: sanitized.disabledDeadMcpServers, error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.', checkedAt: Date.now() };
+      cachedReadiness = { key: cacheKey, fingerprint, result: signInResult };
+      writePersistedReadiness(cacheKey, signInResult, fingerprint, effectiveEnv);
+      return signInResult;
+    }
+    const configUpdate = catalogUpdates.get(sessionRace?.sessionId);
+    if (configUpdate) sessionRace.configOptions = configUpdate;
+    const updatedAuthType = readConfiguredNativeAuthType(effectiveEnv);
+    const updatedKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType: updatedAuthType });
+    return buildProbeSessionResult(
+      sessionRace,
+      initInfo,
+      options,
+      effectiveEnv,
+      sanitized,
+      updatedKey,
+      computeCredentialFingerprint(effectiveEnv, options.authMethod)
+    );
+  } catch (err) {
+    const failedResult = formatProbeFailureResult(err, detector.isTriggered(), options, configuredAuthType, sanitized);
+    cachedReadiness = { key: cacheKey, fingerprint, result: failedResult };
+    if (failedResult.state === "sign_in_required") writePersistedReadiness(cacheKey, failedResult, fingerprint, effectiveEnv);
+    return failedResult;
+  } finally {
+    clearTimeout(deadline);
+    harness.close();
+  }
 }
 
 // host.ts
@@ -41896,9 +42855,9 @@ function handleNativeProviderHealth(id2, params) {
   if (readiness.state !== "session_ready") {
     sendHealthResponse(
       id2,
-      "unauthenticated",
+      readiness.state === "sign_in_required" ? "unauthenticated" : "unknown",
       formatNonReadyHealthMessage(readiness),
-      null,
+      readiness.tierName ?? null,
       reportedVersion
     );
     return;
@@ -41909,7 +42868,7 @@ function formatEffortDescription(level) {
   const capitalized = level.charAt(0).toUpperCase() + level.slice(1);
   return `${capitalized} reasoning effort`;
 }
-function mapDiscoveredModels(models) {
+function mapDiscoveredModels(models, stale = false) {
   return models.map((m, idx) => {
     const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
     const supportedReasoningEfforts = levels.map((level) => ({
@@ -41920,7 +42879,7 @@ function mapDiscoveredModels(models) {
     return {
       id: m.id,
       model: m.id,
-      displayName: m.name,
+      displayName: stale ? `${m.name} (cached)` : m.name,
       description: m.description || `Google Antigravity Native ACP model (${m.id})`,
       supportedReasoningEfforts,
       ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
@@ -41975,22 +42934,42 @@ function handleNativeModelList(id2, params) {
     return;
   }
   const authMethod = resolveAuthMethod(providerOptions);
+  const forceRefresh = params?.forceRefresh === true;
   const readiness = getFastNativeReadiness({
     command: runtime.executable,
     args: runtime.args,
     authMethod
   });
-  if (readiness.state !== "session_ready" || readiness.models.length === 0) {
-    sendModelListError(id2, readiness);
+  const respond = (result) => {
+    if (result.models.length === 0 || result.state === "sign_in_required") {
+      sendModelListError(id2, result);
+      return;
+    }
+    writeBridgeJsonRpc({
+      jsonrpc: "2.0",
+      id: id2,
+      result: {
+        models: mapDiscoveredModels(result.models, result.catalogStale),
+        selectedOnlyModels: [],
+        _meta: {
+          checkedAt: result.checkedAt,
+          stale: result.catalogStale === true,
+          ...result.error ? { warning: result.error } : {}
+        }
+      }
+    });
+  };
+  if (isNativeCatalogSettled(readiness, forceRefresh)) {
+    respond(readiness);
     return;
   }
-  writeBridgeJsonRpc({
-    jsonrpc: "2.0",
-    id: id2,
-    result: {
-      models: mapDiscoveredModels(readiness.models),
-      selectedOnlyModels: []
-    }
+  void getNativeCatalog({
+    command: runtime.executable,
+    args: runtime.args,
+    authMethod,
+    forceRefresh
+  }).then(respond).catch((error62) => {
+    sendModelListError(id2, { ...readiness, error: error62 instanceof Error ? error62.message : String(error62) });
   });
 }
 function isLegacyAgyThreadResume(msg) {
@@ -42038,6 +43017,16 @@ function transformLegacyResumeForNative(msg) {
   };
 }
 function dispatchBridgeMessage(msg) {
+  if (msg.method === "provider/usage" && msg.id !== void 0) {
+    const options = getProviderOptionsFromParams(msg.params);
+    const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
+    void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) }).then((result) => writeBridgeJsonRpc({ jsonrpc: "2.0", id: msg.id, result })).catch((error62) => writeBridgeJsonRpc({
+      jsonrpc: "2.0",
+      id: msg.id,
+      error: { code: -32e3, message: error62 instanceof Error ? error62.message : String(error62) }
+    }));
+    return { handled: true, rewritten: false };
+  }
   if (msg.method === "provider/health" && msg.id !== void 0) {
     handleNativeProviderHealth(msg.id, msg.params);
     return { handled: true, rewritten: false };

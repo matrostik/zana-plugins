@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import './src/test-environment.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadPluginApp, renderSlot } from '@zana-ai/zcc-plugin-sdk/testing/app';
 import type { DoctorStatusResult } from './server.js';
@@ -67,6 +68,59 @@ describe('antigravity provider app slots', () => {
     await slot.findByText('Antigravity Native ACP (Runtime Missing)');
     await slot.findByText('Install Native ACP Runtime (v1.4.3)');
     expect(slot.inspection.rpcCalls).toContainEqual({ method: 'doctor:status', input: null });
+    slot.lifecycle.unmount();
+  });
+
+  it('fetches subscription quota on demand and shows remaining values and reset times', async () => {
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => makeDoctorStatus({ tierName: 'Google AI Pro', checkedAt: 1793341520797, catalogStale: true }),
+      'usage:status': () => ({ supported: true, usage: { status: 'ok', planLabel: 'Google AI Pro',
+        checkedAt: 1793341520797, windows: [{ label: 'Gemini Models — Weekly Limit Remaining',
+          usedPercent: 86, resetsAt: '2026-10-31T06:11:00.000Z' }] } })
+    });
+    await slot.findByText('Antigravity Native ACP Connected');
+    ((await slot.findByText('Check subscription usage')) as HTMLElement).click();
+    await slot.findByText(/14% remaining/);
+    await slot.findByText(/2026-10-31/);
+    await slot.findByText(/Catalog refresh needed/);
+    slot.lifecycle.unmount();
+  });
+
+  it('discards an in-flight usage response after sign-out', async () => {
+    let finish!: (value: unknown) => void;
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => makeDoctorStatus(),
+      'usage:status': () => new Promise(resolve => { finish = resolve; }),
+      'auth:logout': () => makeDoctorStatus({ authenticated: false, state: 'sign_in_required' })
+    });
+    await slot.findByText('Antigravity Native ACP Connected');
+    ((await slot.findByText('Check subscription usage')) as HTMLElement).click();
+    await slot.findByText('Checking usage...');
+    ((await slot.findByText('Clear Auth Selection')) as HTMLElement).click();
+    await slot.findByText('Antigravity Native ACP (Sign-in Required)');
+    finish({ supported: true, usage: { status: 'ok', checkedAt: Date.now(), windows: [
+      { label: 'Old account', usedPercent: 86, resetsAt: null }
+    ] } });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(document.body.textContent).not.toContain('14% remaining');
+    slot.lifecycle.unmount();
+  });
+
+  it('clears displayed usage after re-authenticating as a different account', async () => {
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => makeDoctorStatus({ credentialId: 'account-a' }),
+      'usage:status': () => ({ supported: true, usage: { status: 'ok', checkedAt: Date.now(), windows: [
+        { label: 'Old account', usedPercent: 86, resetsAt: null }
+      ] } }),
+      'auth:login': () => makeDoctorStatus({ credentialId: 'account-b' })
+    });
+    await slot.findByText('Antigravity Native ACP Connected');
+    ((await slot.findByText('Check subscription usage')) as HTMLElement).click();
+    await slot.findByText(/14% remaining/);
+    ((await slot.findByText('Re-authenticate with Google')) as HTMLElement).click();
+    await slot.findByText('Re-authenticate with Google');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(document.body.textContent).not.toContain('14% remaining');
     slot.lifecycle.unmount();
   });
 

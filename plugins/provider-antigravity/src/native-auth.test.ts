@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import './test-environment.js';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import {
   extractModelsFromSessionResult,
   getCachedNativeReadiness,
   getFastNativeReadiness,
+  getNativeCatalog,
   getNativeAcpSettingsPath,
   getNativeAcpTokenPath,
   hasNativeAcpToken,
@@ -18,6 +20,7 @@ import {
   probeNativeAcpReadiness,
   readConfiguredNativeAuthType,
   readNativeAcpSettings,
+  queryNativeUsage,
   resolveGeminiHome,
   startNativeAcpSignIn,
   writeNativeAcpAuthType
@@ -189,6 +192,183 @@ describe('native-auth.ts unit tests', () => {
         defaultReasoningEffort: 'medium'
       }
     ]);
+  });
+
+  it('discovers grouped model options without merging a conflicting legacy catalog', () => {
+    expect(extractModelsFromSessionResult({
+      configOptions: [{ id: 'model', options: [{ group: 'google', name: 'Google', options: [
+        { value: 'gemini', name: 'Gemini' }, { value: 'gemini', name: 'Duplicate' }
+      ] }] }],
+      models: { availableModels: [{ id: 'unavailable-legacy-model' }] }
+    }).map(model => model.id)).toEqual(['gemini']);
+  });
+
+  it('does not resurrect removed legacy models when the authoritative config catalog is empty', () => {
+    expect(extractModelsFromSessionResult({ configOptions: [{ id: 'model', options: [] }],
+      models: { availableModels: [{ id: 'removed', name: 'Removed' }] } })).toEqual([]);
+  });
+
+  it('invalidates cloud credentials when their contents change at the same path', () => {
+    const home = makeTempDir('cloud-identity-');
+    const credentialsPath = join(home, 'credentials.json');
+    const env = { GEMINI_HOME: home, GOOGLE_APPLICATION_CREDENTIALS: credentialsPath };
+    writeFileSync(credentialsPath, '{"account":"one"}');
+    const first = computeCredentialFingerprint(env, 'agent-platform');
+    writeFileSync(credentialsPath, '{"account":"two"}');
+    expect(computeCredentialFingerprint(env, 'agent-platform')).not.toBe(first);
+  });
+
+  it('preserves generic server errors instead of reporting them as expired authentication', async () => {
+    const home = makeTempDir('probe-network-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ jsonrpc: '2.0', id: msg.id,
+        error: { code: -32000, message: 'Backend temporarily unavailable' } }) + '\n'));
+    });
+    const result = await probeNativeAcpReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal',
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
+    expect(result.state).toBe('runtime_launches');
+    expect(result.error).toContain('Backend temporarily unavailable');
+  });
+
+  it('invalidates equal-length API keys when the account changes', () => {
+    const home = makeTempDir('key-identity-');
+    const env = { GEMINI_HOME: home, GEMINI_API_KEY: 'account-one' };
+    expect(computeCredentialFingerprint(env, 'gemini-api-key')).not.toBe(
+      computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'account-two' }, 'gemini-api-key')
+    );
+  });
+
+  it('shares concurrent catalog refresh and keeps a stale catalog after a transient failure', async () => {
+    const home = makeTempDir('catalog-refresh-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home };
+    writeNativeAcpAuthType('oauth-personal', env);
+    writeFileSync(join(home, 'antigravity-acp/acp_token.json'), '{"refresh_token":"account-one"}');
+    const child = createMockChild();
+    let fail = false;
+    let empty = false;
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ jsonrpc: '2.0', id: msg.id,
+        ...(fail ? { error: { code: -32000, message: 'Backend unavailable' } } : { result: msg.method === 'initialize'
+          ? { protocolVersion: 1, authMethods: [] }
+          : { sessionId: 's1', configOptions: [{ id: 'model', options: empty ? [] : [{ value: 'gemini', name: 'Gemini' }] }] } })
+      }) + '\n'));
+    });
+    const spawnImpl = vi.fn(() => child);
+    const options = { command: fakeExe, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl };
+    const results = await Promise.all([getNativeCatalog(options), getNativeCatalog(options)]);
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+    expect(results[0].models[0].id).toBe('gemini');
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + 11 * 60 * 1000);
+    fail = true;
+    const stale = await getNativeCatalog(options);
+    expect(stale.models[0].id).toBe('gemini');
+    expect(stale.catalogStale).toBe(true);
+    expect(stale.error).toContain('Backend unavailable');
+    const backedOff = await getNativeCatalog(options);
+    expect(spawnImpl).toHaveBeenCalledTimes(2);
+    expect(backedOff.models[0].id).toBe('gemini');
+    expect(backedOff.catalogStale).toBe(true);
+    expect(getFastNativeReadiness(options).models[0].id).toBe('gemini');
+    fail = false; empty = true;
+    const removed = await getNativeCatalog({ ...options, forceRefresh: true });
+    expect(removed.models).toEqual([]);
+  });
+
+  it('queries the advertised native usage command and accumulates fragmented quota text', async () => {
+    const home = makeTempDir('usage-query-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [], agentInfo: { name: 'antigravity-acp', version: '1.4.3' } } });
+        if (msg.method === 'session/new') {
+          emit({ id: msg.id, result: { sessionId: 'usage-session', _meta: { antigravity: { tier: { name: 'Test Pro' } } } } });
+          setTimeout(() => emit({ method: 'session/update', params: { sessionId: 'usage-session', update: {
+            sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } }), 5);
+        }
+        if (msg.method === 'session/prompt') {
+          expect(msg.params.prompt).toEqual([{ type: 'text', text: '/usage' }]);
+          for (const text of ['### Quota Limits\n- **Gemini**\n', '  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)']) {
+            emit({ method: 'session/update', params: { sessionId: 'usage-session', update: {
+              sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } } });
+          }
+          emit({ id: msg.id, result: { stopReason: 'end_turn' } });
+        }
+      });
+    });
+    const spawnImpl = vi.fn(() => child);
+    const options = { command: fakeExe, args: [], authMethod: 'oauth-personal' as const,
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl };
+    const [result] = await Promise.all([queryNativeUsage(options), queryNativeUsage(options)]);
+    expect(result.usage.status).toBe('ok');
+    expect(result.usage.windows[0].usedPercent).toBe(86);
+    expect(result.usage.planLabel).toBe('Test Pro');
+    expect(child.stdin.end).toHaveBeenCalled();
+    await queryNativeUsage(options);
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not send usage to a model when the native command is not advertised', async () => {
+    const home = makeTempDir('usage-unsupported-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    const methods: string[] = [];
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk); methods.push(msg.method);
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ id: msg.id,
+        result: msg.method === 'initialize' ? { protocolVersion: 1, authMethods: [] } : { sessionId: 's1' } }) + '\n'));
+    });
+    const result = await queryNativeUsage({ command: fakeExe, args: [], authMethod: 'oauth-personal',
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child });
+    expect(result.usage.status).toBe('error');
+    expect(result.usage.message).toContain('does not advertise /usage');
+    expect(methods).not.toContain('session/prompt');
+  });
+
+  it('reports a bounded usage timeout and closes the diagnostic process', async () => {
+    const home = makeTempDir('usage-timeout-');
+    const command = join(home, 'agy.exe');
+    writeFileSync(command, 'exe');
+    const child = createMockChild();
+    const result = await queryNativeUsage({ command, args: [], authMethod: 'oauth-personal', timeoutMs: 10,
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child });
+    expect(result.usage.status).toBe('error');
+    expect(result.usage.message).toContain('timed out after 10ms');
+    expect(child.stdin.end).toHaveBeenCalled();
+  });
+
+  it('uses a session catalog update received before session/new resolves', async () => {
+    const home = makeTempDir('catalog-update-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        if (msg.method === 'session/new') {
+          child.stdout.emit('data', JSON.stringify({ method: 'session/update', params: { sessionId: 's1', update: {
+            sessionUpdate: 'config_option_update', configOptions: [{ id: 'model', options: [{ value: 'updated', name: 'Updated' }] }]
+          } } }) + '\n');
+        }
+        child.stdout.emit('data', JSON.stringify({ id: msg.id,
+          result: msg.method === 'initialize' ? { protocolVersion: 1, authMethods: [] } : { sessionId: 's1' } }) + '\n');
+      });
+    });
+    const result = await probeNativeAcpReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal',
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
+    expect(result.models.map(model => model.id)).toEqual(['updated']);
   });
 
   it('getFastNativeReadiness validates local oauth and api-key credentials', () => {
@@ -495,7 +675,8 @@ describe('native-auth.ts unit tests', () => {
     expect(fp1).toContain('no-token');
     writeFileSync(join(acpDir, 'acp_token.json'), '{"token":"1234567890123"}');
     expect(computeCredentialFingerprint(env, 'oauth-personal')).not.toEqual(fp1);
-    expect(computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'secret-key' }, 'gemini-api-key')).toContain('key:10');
+    expect(computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'secret-key' }, 'gemini-api-key')).toContain('key:');
+    expect(computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'secret-key' }, 'gemini-api-key')).not.toContain('secret-key');
     expect(
       computeCredentialFingerprint({ ...env, GOOGLE_APPLICATION_CREDENTIALS: 'creds.json' }, 'agent-platform')
     ).toContain('gac');
@@ -524,7 +705,7 @@ describe('native-auth.ts unit tests', () => {
         JSON.stringify({
           key,
           fingerprint,
-          result: { state: 'session_ready', checkedAt, models: [], modes: [], advertisedAuthMethods: [] }
+          result: { state: 'session_ready', checkedAt, models: [{ id: 'gemini', name: 'Gemini' }], modes: [], advertisedAuthMethods: [] }
         })
       );
 
@@ -536,8 +717,11 @@ describe('native-auth.ts unit tests', () => {
 
     clearCachedNativeReadiness();
     writeCache(Date.now() - 20 * 60 * 1000);
-    expect(getFastNativeReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env }).state).toBe(
-      'authenticated'
-    );
+    const stale = getFastNativeReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env });
+    expect(stale.state).toBe('authenticated');
+    expect(stale.models.map(model => model.id)).toEqual(['gemini']);
+    expect(stale.catalogStale).toBe(true);
+    writeFileSync(join(sanitized.geminiHome, 'antigravity-acp/acp_token.json'), '{"token":"other-account-token"}');
+    expect(getFastNativeReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env }).models).toEqual([]);
   });
 });

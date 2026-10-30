@@ -15,6 +15,7 @@ export default defineConfig({
         '**/*.test.ts',
         '**/*.test.tsx',
         '**/*.mjs',
+        '**/test-environment.ts',
         'dist/**',
         'node_modules/**',
         'types/**'

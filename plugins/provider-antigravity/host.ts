@@ -2,6 +2,9 @@ import { experimental_acpProviderBridge } from '@zana-ai/zcc-plugin-sdk/provider
 import { experimental_defineProviderBridge } from '@zana-ai/zcc-plugin-sdk/provider-bridge';
 import {
   getFastNativeReadiness,
+  getNativeCatalog,
+  isNativeCatalogSettled,
+  queryNativeUsage,
   isValidGoogleAuthMethod,
   prepareSanitizedGeminiHome,
   type DiscoveredNativeModel,
@@ -115,7 +118,7 @@ function writeBridgeJsonRpc(payload: Record<string, unknown>): void {
 
 function sendHealthResponse(
   id: string | number,
-  status: 'not_installed' | 'unauthenticated' | 'ready',
+  status: 'not_installed' | 'unauthenticated' | 'ready' | 'unknown',
   statusMessage: string | null,
   planLabel: string | null,
   version: string | null
@@ -190,9 +193,9 @@ function handleNativeProviderHealth(id: string | number, params: any): void {
   if (readiness.state !== 'session_ready') {
     sendHealthResponse(
       id,
-      'unauthenticated',
+      readiness.state === 'sign_in_required' ? 'unauthenticated' : 'unknown',
       formatNonReadyHealthMessage(readiness),
-      null,
+      readiness.tierName ?? null,
       reportedVersion
     );
     return;
@@ -206,7 +209,7 @@ function formatEffortDescription(level: string): string {
   return `${capitalized} reasoning effort`;
 }
 
-function mapDiscoveredModels(models: DiscoveredNativeModel[]) {
+function mapDiscoveredModels(models: DiscoveredNativeModel[], stale = false) {
   return models.map((m, idx) => {
     const levels = Array.isArray(m.supportedReasoningEfforts)
       ? m.supportedReasoningEfforts.filter((l): l is string => typeof l === 'string' && l.length > 0)
@@ -224,7 +227,7 @@ function mapDiscoveredModels(models: DiscoveredNativeModel[]) {
     return {
       id: m.id,
       model: m.id,
-      displayName: m.name,
+      displayName: stale ? `${m.name} (cached)` : m.name,
       description: m.description || `Google Antigravity Native ACP model (${m.id})`,
       supportedReasoningEfforts,
       ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
@@ -290,25 +293,38 @@ function handleNativeModelList(id: string | number, params: any): void {
   }
 
   const authMethod = resolveAuthMethod(providerOptions);
+  const forceRefresh = params?.forceRefresh === true;
   const readiness = getFastNativeReadiness({
     command: runtime.executable,
     args: runtime.args,
     authMethod
   });
 
-  if (readiness.state !== 'session_ready' || readiness.models.length === 0) {
-    sendModelListError(id, readiness);
+  const respond = (result: NativeReadinessResult) => {
+    if (result.models.length === 0 || result.state === 'sign_in_required') {
+      sendModelListError(id, result);
+      return;
+    }
+    writeBridgeJsonRpc({
+      jsonrpc: '2.0',
+      id,
+      result: {
+        models: mapDiscoveredModels(result.models, result.catalogStale),
+        selectedOnlyModels: [],
+        _meta: { checkedAt: result.checkedAt, stale: result.catalogStale === true,
+          ...(result.error ? { warning: result.error } : {}) }
+      }
+    });
+  };
+  // Answer cached catalogs synchronously; the settle policy itself lives in native-auth.
+  if (isNativeCatalogSettled(readiness, forceRefresh)) {
+    respond(readiness);
     return;
   }
-
-  writeBridgeJsonRpc({
-    jsonrpc: '2.0',
-    id,
-    result: {
-      models: mapDiscoveredModels(readiness.models),
-      selectedOnlyModels: []
-    }
-  });
+  void getNativeCatalog({ command: runtime.executable, args: runtime.args, authMethod,
+    forceRefresh }).then(respond).catch(error => {
+      sendModelListError(id, { ...readiness, error: error instanceof Error ? error.message : String(error) });
+    });
 }
 
 export function isLegacyAgyThreadResume(msg: any): string | null {
@@ -369,6 +385,15 @@ export function transformLegacyResumeForNative(msg: any): {
 }
 
 function dispatchBridgeMessage(msg: any): { handled: boolean; rewritten: boolean } {
+  if (msg.method === 'provider/usage' && msg.id !== undefined) {
+    const options = getProviderOptionsFromParams(msg.params);
+    const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
+    void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) })
+      .then(result => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id, result }))
+      .catch(error => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id,
+        error: { code: -32000, message: error instanceof Error ? error.message : String(error) } }));
+    return { handled: true, rewritten: false };
+  }
   if (msg.method === 'provider/health' && msg.id !== undefined) {
     handleNativeProviderHealth(msg.id, msg.params);
     return { handled: true, rewritten: false };

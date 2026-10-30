@@ -3,10 +3,10 @@
   "sdkVersion": "0.1.0",
   "artifactFormatVersion": 1,
   "pluginId": "provider-antigravity",
-  "pluginVersion": "0.2.0",
+  "pluginVersion": "0.3.0",
   "builtWith": {
     "zccVersion": "2.4.0",
     "pluginSdkVersion": "0.1.0"
   },
-  "artifactDigest": "f2e60597e392cf05b0454a3dc70302fa3f38e5d8715bbed6bddd87658c3b1cf1"
+  "artifactDigest": "438df51b4dcccb49bc7b585c9f2f166a949a3f1067b63b0c83ce5b216693b446"
 }

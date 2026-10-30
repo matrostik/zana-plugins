@@ -1,3 +1,4 @@
+import './src/test-environment.js';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -61,6 +62,8 @@ describe('antigravity provider plugin', () => {
     });
     expect(provider.capabilities.reasoningLevels).toEqual(['low', 'medium', 'high']);
     expect(provider.models?.scope).toBe('host');
+    expect(provider.composerActions).toContain('plan');
+    expect(provider.maintenance?.usage).toBe(true);
     expect(provider.models?.fallback).toBeUndefined();
     expect(harness.settings).toHaveProperty('authMethod');
     expect(harness.settings).toHaveProperty('nativeExecutable');
