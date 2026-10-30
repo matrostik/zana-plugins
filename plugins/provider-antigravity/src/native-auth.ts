@@ -1,14 +1,5 @@
 import type { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync
-} from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { NativeAcpSession, type InitializeInfo } from './acp-session.js';
 import {
   captureAccount,
@@ -18,20 +9,24 @@ import {
   type NativeTarget
 } from './account-identity.js';
 import {
-  forgetStatMemo,
   GOOGLE_ACP_AUTH_METHODS,
   hasNativeAcpToken,
   isAuthExplicitlyCleared,
   isHeadlessAuthMethod,
-  memoizeByStat,
   readConfiguredNativeAuthType,
   syncTokenToSource,
   writeAuthTypeSettings,
-  type GoogleAcpAuthMethod,
-  type PreparedGeminiHome
+  type GoogleAcpAuthMethod
 } from './gemini-home.js';
-import { getZccDataDir } from './native-runtime.js';
 import { parseNativeQuotaWindows, type NativeUsageResult } from './native-usage.js';
+import {
+  readinessResult,
+  readinessStore,
+  runtimeMissingResult,
+  type DiscoveredNativeModel,
+  type NativeReadinessResult,
+  type ReadinessSubject
+} from './readiness-store.js';
 
 export {
   GOOGLE_ACP_AUTH_METHODS,
@@ -39,37 +34,15 @@ export {
   prepareSanitizedGeminiHome,
   type GoogleAcpAuthMethod
 } from './gemini-home.js';
+export type { DiscoveredNativeModel, NativeReadinessResult, NativeSetupState } from './readiness-store.js';
 
-export type NativeSetupState =
-  | 'runtime_missing'
-  | 'runtime_launches'
-  | 'sign_in_required'
-  | 'authenticated'
-  | 'session_ready';
-
-export interface DiscoveredNativeModel {
-  id: string;
-  name: string;
-  description?: string;
-  supportedReasoningEfforts?: string[];
-  defaultReasoningEffort?: string;
-}
-
-export interface NativeReadinessResult {
-  state: NativeSetupState;
-  agentVersion: string | null;
-  protocolVersion: number | null;
-  advertisedAuthMethods: string[];
-  selectedAuthMethod: GoogleAcpAuthMethod;
-  configuredAuthType: string | null;
-  models: DiscoveredNativeModel[];
-  modes: string[];
-  tierName?: string | null;
-  disabledDeadMcpServers?: string[];
-  error?: string;
-  checkedAt: number;
-  catalogStale?: boolean;
-}
+const NATIVE_PROBE_TIMEOUT_MS = 20_000;
+const USAGE_CACHE_TTL_MS = 60_000;
+/** How long to wait for available_commands_update after session/new before giving up on /usage. */
+const USAGE_COMMANDS_WAIT_MS = 1000;
+const USAGE_MAX_TEXT_CHARS = 32_768;
+const CATALOG_RETRY_BACKOFF_MS = 30_000;
+const CATALOG_RETRY_MAX_KEYS = 32;
 
 /** Writes the auth type everywhere the runtime reads it, then invalidates every cached account result. */
 export function writeNativeAcpAuthType(
@@ -78,6 +51,17 @@ export function writeNativeAcpAuthType(
 ): void {
   writeAuthTypeSettings(authType, env);
   clearCachedNativeReadiness(env);
+}
+
+/** Sign-in, sign-out, auth-type and runtime changes: drop cached readiness and every captured account. */
+export function clearCachedNativeReadiness(env: NodeJS.ProcessEnv = process.env): void {
+  readinessStore.invalidate(env);
+  invalidateAccounts();
+}
+
+/** Opaque account identity so UIs can drop results that belong to a previous sign-in. */
+export function getNativeCredentialId(authMethod: GoogleAcpAuthMethod, env: NodeJS.ProcessEnv = process.env): string {
+  return currentCredentialId(authMethod, env);
 }
 
 function extractSessionReasoningMetadata(sessionResult: any): {
@@ -194,188 +178,37 @@ function extractModesFromSessionResult(sessionResult: any): string[] {
     .filter((id: string | null): id is string => Boolean(id));
 }
 
-function getPersistedReadinessPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(getZccDataDir(env), 'state', 'antigravity-native-readiness.json');
+/** Catalog, modes and tier of a ready session. */
+function describeSession(session: any): Pick<NativeReadinessResult, 'models' | 'modes' | 'tierName'> {
+  const tierName = session?._meta?.antigravity?.tier?.name;
+  return {
+    models: extractModelsFromSessionResult(session),
+    modes: extractModesFromSessionResult(session),
+    tierName: typeof tierName === 'string' ? tierName : null
+  };
 }
 
-function readPersistedReadiness(key: string, env: NodeJS.ProcessEnv = process.env): { result: NativeReadinessResult; fingerprint: string } | null {
-  const filePath = getPersistedReadinessPath(env);
-  const raw = memoizeByStat(filePath, () => {
-    try {
-      return existsSync(filePath) ? JSON.parse(readFileSync(filePath, 'utf8')) : null;
-    } catch {
-      return null; // Ignore corrupted cache
-    }
-  });
-  if (raw && raw.key === key && raw.result && typeof raw.result === 'object'
-    && Number.isFinite(raw.result.checkedAt) && Array.isArray(raw.result.models)
-    && raw.result.models.every((model: any) => typeof model?.id === 'string' && typeof model?.name === 'string')
-    && Array.isArray(raw.result.modes) && Array.isArray(raw.result.advertisedAuthMethods)) {
-    return { result: raw.result as NativeReadinessResult, fingerprint: raw.fingerprint || '' };
-  }
-  return null;
+function fromInitialize(info: InitializeInfo): Pick<NativeReadinessResult, 'agentVersion' | 'protocolVersion' | 'advertisedAuthMethods'> {
+  return { agentVersion: info.agentVersion, protocolVersion: info.protocolVersion, advertisedAuthMethods: info.advertisedAuthMethods };
 }
 
-function writePersistedReadiness(
-  key: string,
-  result: NativeReadinessResult,
-  fingerprint: string,
-  env: NodeJS.ProcessEnv = process.env
-): void {
-  try {
-    const filePath = getPersistedReadinessPath(env);
-    mkdirSync(dirname(filePath), { recursive: true });
-    const temporary = `${filePath}.${randomUUID()}.tmp`;
-    try {
-      writeFileSync(temporary, JSON.stringify({ key, result, fingerprint }, null, 2) + '\n', { mode: 0o600 });
-      renameSync(temporary, filePath);
-    } finally {
-      rmSync(temporary, { force: true });
-      forgetStatMemo(filePath);
-    }
-  } catch {
-    // Ignore cache write errors
-  }
+function subjectOf(account: AccountSnapshot, configuredAuthType = account.configuredAuthType): ReadinessSubject {
+  return { authMethod: account.target.authMethod, configuredAuthType, disabledDeadMcpServers: account.home.disabledDeadMcpServers };
 }
 
-let cachedReadiness: {
-  key: string;
-  fingerprint: string;
-  result: NativeReadinessResult;
-} | null = null;
-export const READINESS_CACHE_TTL_MS = 10 * 60 * 1000;
-const NATIVE_PROBE_TIMEOUT_MS = 20_000;
-const USAGE_CACHE_TTL_MS = 60_000;
-/** How long to wait for available_commands_update after session/new before giving up on /usage. */
-const USAGE_COMMANDS_WAIT_MS = 1000;
-const USAGE_MAX_TEXT_CHARS = 32_768;
-const CATALOG_RETRY_BACKOFF_MS = 30_000;
-const CATALOG_RETRY_MAX_KEYS = 32;
-
-export function getCachedNativeReadiness(): NativeReadinessResult | null {
-  if (!cachedReadiness) return null;
-  if (Date.now() - cachedReadiness.result.checkedAt > READINESS_CACHE_TTL_MS) {
-    return null;
-  }
-  return cachedReadiness.result;
-}
-
-/** Sign-in, sign-out, auth-type and runtime changes: drop cached readiness and every captured account. */
-export function clearCachedNativeReadiness(env: NodeJS.ProcessEnv = process.env): void {
-  cachedReadiness = null;
-  invalidateAccounts();
-  try {
-    const filePath = getPersistedReadinessPath(env);
-    forgetStatMemo(filePath);
-    rmSync(filePath, { force: true });
-  } catch {
-    // Ignore
-  }
-}
-
-/** Opaque account identity so UIs can drop results that belong to a previous sign-in. */
-export function getNativeCredentialId(authMethod: GoogleAcpAuthMethod, env: NodeJS.ProcessEnv = process.env): string {
-  return currentCredentialId(authMethod, env);
-}
-
-function checkLocalCredentialPresence(
-  authMethod: GoogleAcpAuthMethod,
-  effectiveEnv: NodeJS.ProcessEnv,
-  configuredAuthType: string | null
-): { authenticated: boolean; note?: string } {
-  if (authMethod === 'gemini-api-key') {
-    return Boolean(effectiveEnv.GEMINI_API_KEY)
-      ? { authenticated: true, note: 'API key detected in environment (unverified session)' }
-      : { authenticated: false };
-  }
+/** Whether local files or the environment hold credentials for the method; nothing is verified. */
+function hasLocalCredentials(authMethod: GoogleAcpAuthMethod, effectiveEnv: NodeJS.ProcessEnv, configuredAuthType: string | null): boolean {
+  if (authMethod === 'gemini-api-key') return Boolean(effectiveEnv.GEMINI_API_KEY);
   if (authMethod === 'agent-platform') {
-    const hasPlatformCreds = Boolean(
-      effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS ||
-      effectiveEnv.CLOUD_ML_PROJECT_ID ||
-      effectiveEnv.GOOGLE_CLOUD_PROJECT
-    );
-    return hasPlatformCreds
-      ? { authenticated: true, note: 'Platform credentials detected (unverified session)' }
-      : { authenticated: false };
+    return Boolean(effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS || effectiveEnv.CLOUD_ML_PROJECT_ID || effectiveEnv.GOOGLE_CLOUD_PROJECT);
   }
-  if (!isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && configuredAuthType) {
-    return { authenticated: true, note: 'Local credentials present (unverified session)' };
-  }
-  return { authenticated: false };
-}
-
-function checkCachedReadiness(
-  cacheKey: string,
-  fingerprint: string,
-  effectiveEnv: NodeJS.ProcessEnv,
-  allowStaleCatalog = false
-): NativeReadinessResult | null {
-  const memory = cachedReadiness &&
-    cachedReadiness.key === cacheKey &&
-    cachedReadiness.fingerprint === fingerprint &&
-    Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS
-    ? cachedReadiness.result
-    : null;
-  // Consult disk too: the Settings process may have refreshed a different host process's cache.
-  // The newer entry wins so a failed persist never shadows a fresher in-memory result.
-  const persisted = readPersistedReadiness(cacheKey, effectiveEnv);
-  const result = persisted && persisted.fingerprint === fingerprint ? persisted.result : null;
-  if (result && Date.now() - result.checkedAt < READINESS_CACHE_TTL_MS
-    && (!memory || result.checkedAt > memory.checkedAt)) {
-    cachedReadiness = { key: cacheKey, fingerprint, result };
-    return result;
-  }
-  const staleCatalog = allowStaleCatalog && result && result.state === 'session_ready' && result.models.length > 0
-    ? { ...result, state: 'authenticated' as const, catalogStale: true }
-    : null;
-  // A transient probe failure must not hide the last good catalog for the rest of the backoff window.
-  if (memory && staleCatalog && memory.state === 'runtime_launches') return { ...staleCatalog, error: memory.error };
-  if (memory) return memory;
-  return staleCatalog;
-}
-
-function buildAuthenticatedFastReadiness(
-  options: { authMethod: GoogleAcpAuthMethod },
-  configuredAuthType: string | null,
-  sanitized: { disabledDeadMcpServers: string[] }
-): NativeReadinessResult {
-  return {
-    state: 'authenticated',
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: configuredAuthType ?? options.authMethod,
-    models: [],
-    modes: ['default', 'auto_edit', 'yolo'],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-}
-
-function buildSignInRequiredFastReadiness(
-  options: { authMethod: GoogleAcpAuthMethod },
-  sanitized: { disabledDeadMcpServers: string[] }
-): NativeReadinessResult {
-  return {
-    state: 'sign_in_required',
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: null,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.',
-    checkedAt: Date.now()
-  };
+  return !isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && Boolean(configuredAuthType);
 }
 
 /**
  * Returns Native ACP readiness without spawning, from the in-memory or persisted cache,
  * strictly validating TTL expiration and credential changes. Unverified local credentials
- * are reported as `authenticated` (with unverified note) rather than `session_ready`.
+ * are reported as `authenticated` rather than `session_ready`.
  */
 export function getFastNativeReadiness(options: {
   command: string;
@@ -383,42 +216,23 @@ export function getFastNativeReadiness(options: {
   authMethod: GoogleAcpAuthMethod;
   env?: NodeJS.ProcessEnv;
 }): NativeReadinessResult {
-  return getPreparedNativeReadiness(captureAccount(options));
+  return readPreparedReadiness(captureAccount(options));
 }
 
-function getPreparedNativeReadiness(account: AccountSnapshot): NativeReadinessResult {
+function readPreparedReadiness(account: AccountSnapshot): NativeReadinessResult {
   const { target, home, effectiveEnv } = account;
   const configuredAuthType = account.configuredAuthType;
+  if (!existsSync(target.command)) return runtimeMissingResult(target.command, subjectOf(account));
 
-  const cached = existsSync(target.command)
-    ? checkCachedReadiness(account.readinessKey, account.fingerprint, effectiveEnv, true)
-    : null;
-  if (cached) {
-    return { ...cached, disabledDeadMcpServers: home.disabledDeadMcpServers };
+  const cached = readinessStore.lookup(account.slot, effectiveEnv, { allowStale: true });
+  if (cached) return { ...cached, disabledDeadMcpServers: home.disabledDeadMcpServers };
+
+  if (hasLocalCredentials(target.authMethod, effectiveEnv, configuredAuthType)) {
+    return readinessResult('authenticated', subjectOf(account, configuredAuthType ?? target.authMethod),
+      { modes: ['default', 'auto_edit', 'yolo'] });
   }
-
-  if (!existsSync(target.command)) {
-    return {
-      state: 'runtime_missing',
-      agentVersion: null,
-      protocolVersion: null,
-      advertisedAuthMethods: [],
-      selectedAuthMethod: target.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: home.disabledDeadMcpServers,
-      error: `Native ACP binary not found at "${target.command}".`,
-      checkedAt: Date.now()
-    };
-  }
-
-  const credCheck = checkLocalCredentialPresence(target.authMethod, effectiveEnv, configuredAuthType);
-  if (credCheck.authenticated) {
-    return buildAuthenticatedFastReadiness(target, configuredAuthType, home);
-  }
-
-  return buildSignInRequiredFastReadiness(target, home);
+  return readinessResult('sign_in_required', subjectOf(account, null),
+    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' });
 }
 
 /** Initializes the runtime and, for env-credential methods without a configured auth type, authenticates headlessly. */
@@ -440,138 +254,32 @@ function openDiagnosticSession(options: NativeProbeOptions, account: AccountSnap
   return NativeAcpSession.open({ command: options.command, args: options.args, cwd: options.cwd, env: account.effectiveEnv,
     spawnImpl: options.spawnImpl, timeoutMs: options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS, operation });
 }
-function checkProbeCachedOrMissing(
-  options: { command: string; args: string[]; authMethod: GoogleAcpAuthMethod; forceRefresh?: boolean },
-  cacheKey: string,
-  fingerprint: string,
-  configuredAuthType: string | null,
-  sanitized: { geminiHome: string; disabledDeadMcpServers: string[] }
-): NativeReadinessResult | null {
-  if (
-    !options.forceRefresh &&
-    cachedReadiness &&
-    cachedReadiness.key === cacheKey &&
-    cachedReadiness.fingerprint === fingerprint &&
-    Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS
-  ) {
-    return cachedReadiness.result;
-  }
-  if (!existsSync(options.command)) {
-    return {
-      state: 'runtime_missing',
-      agentVersion: null,
-      protocolVersion: null,
-      advertisedAuthMethods: [],
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Native ACP binary not found at "${options.command}".`,
-      checkedAt: Date.now()
-    };
+
+function incompatibility(info: InitializeInfo, authMethod: GoogleAcpAuthMethod): string | null {
+  if (info.protocolVersion !== 1) return `Unsupported ACP protocolVersion returned: ${info.protocolVersion}`;
+  if (info.advertisedAuthMethods.length > 0 && !info.advertisedAuthMethods.includes(authMethod)) {
+    return `Selected auth method "${authMethod}" is not advertised.`;
   }
   return null;
 }
 
-function buildProbeSessionResult(
-  sessionRace: any,
-  initInfo: { protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] },
-  account: AccountSnapshot
-): NativeReadinessResult {
-  const models = extractModelsFromSessionResult(sessionRace);
-  const modes = extractModesFromSessionResult(sessionRace);
-  const tierName = typeof sessionRace?._meta?.antigravity?.tier?.name === 'string'
-    ? sessionRace._meta.antigravity.tier.name
-    : null;
-
-  syncTokenToSource(account.home, account.target.env);
-
-  const readyResult: NativeReadinessResult = {
-    state: 'session_ready',
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: account.target.authMethod,
-    configuredAuthType: account.configuredAuthType ?? account.target.authMethod,
-    models,
-    modes,
-    tierName,
-    disabledDeadMcpServers: account.home.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-  // Keyed after the probe: its own headless auth-type write changes the configured type.
-  cachedReadiness = { key: account.readinessKey, fingerprint: account.fingerprint, result: readyResult };
-  writePersistedReadiness(account.readinessKey, readyResult, account.fingerprint, account.effectiveEnv);
-  return readyResult;
-}
-
-function checkInitCompatibility(
-  initInfo: { protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] },
-  options: { authMethod: GoogleAcpAuthMethod },
-  configuredAuthType: string | null,
-  sanitized: { disabledDeadMcpServers: string[] }
-): NativeReadinessResult | null {
-  if (initInfo.protocolVersion !== 1) {
-    return {
-      state: 'runtime_launches',
-      agentVersion: initInfo.agentVersion,
-      protocolVersion: initInfo.protocolVersion,
-      advertisedAuthMethods: initInfo.advertisedAuthMethods,
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Unsupported ACP protocolVersion returned: ${initInfo.protocolVersion}`,
-      checkedAt: Date.now()
-    };
-  }
-  if (initInfo.advertisedAuthMethods.length > 0 && !initInfo.advertisedAuthMethods.includes(options.authMethod)) {
-    return {
-      state: 'runtime_launches',
-      agentVersion: initInfo.agentVersion,
-      protocolVersion: initInfo.protocolVersion,
-      advertisedAuthMethods: initInfo.advertisedAuthMethods,
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Selected auth method "${options.authMethod}" is not advertised.`,
-      checkedAt: Date.now()
-    };
-  }
-  return null;
-}
-
-function formatProbeFailureResult(
-  err: any,
-  interactiveLoginTriggeredOnStderr: boolean,
-  options: { authMethod: GoogleAcpAuthMethod },
-  configuredAuthType: string | null,
-  sanitized: { disabledDeadMcpServers: string[] }
-): NativeReadinessResult {
-  const message = err?.message || String(err);
+/** A failed diagnostic is a sign-in problem when the runtime said so; otherwise its cause is kept. */
+function failureResult(error: any, signInRequested: boolean, subject: ReadinessSubject): NativeReadinessResult {
+  const message = error?.message || String(error);
   const isAuthRequired =
-    interactiveLoginTriggeredOnStderr ||
+    signInRequested ||
     /authentication required|no authentication method selected|credentials (?:missing|invalid|expired)/i.test(message) ||
-    err?.data?.recovery?.kind === 'authRequired';
-  return {
-    state: isAuthRequired ? 'sign_in_required' : 'runtime_launches',
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: isAuthRequired
-      ? 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.'
-      : message,
-    checkedAt: Date.now()
-  };
+    error?.data?.recovery?.kind === 'authRequired';
+  return isAuthRequired
+    ? readinessResult('sign_in_required', subject,
+      { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' })
+    : readinessResult('runtime_launches', subject, { error: message });
+}
+
+/** Uncached result for a discovery whose account was signed out or switched while it ran. */
+function accountChangedResult(subject: ReadinessSubject, fields: Partial<NativeReadinessResult>): NativeReadinessResult {
+  return readinessResult('runtime_launches', subject, { ...fields,
+    error: 'Antigravity sign-in changed while models were being discovered. Retry to load the current account.' });
 }
 
 export interface NativeProbeOptions extends NativeTarget {
@@ -615,8 +323,7 @@ async function performNativeUsageQuery(options: NativeProbeOptions, account: Acc
     if (init.protocolVersion !== 1) throw new Error('Unsupported Native ACP protocol version.');
     const opened = await session.newSession();
     if (opened.kind === 'sign_in_required') return { supported: true, usage: { ...usage, status: 'unauthenticated' } };
-    const tierName = opened.session?._meta?.antigravity?.tier?.name;
-    usage.planLabel = typeof tierName === 'string' ? tierName : null;
+    usage.planLabel = describeSession(opened.session).tierName ?? null;
     // Native notifications can arrive after the session/new response in a separate stdout chunk.
     if (!await session.waitForCommand('usage', USAGE_COMMANDS_WAIT_MS)) {
       throw new Error('This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.');
@@ -627,8 +334,7 @@ async function performNativeUsageQuery(options: NativeProbeOptions, account: Acc
     if (usage.windows.length === 0) throw new Error('Native usage returned no recognized quota windows. Check usage in Google Antigravity Settings.');
     return { supported: true, usage: { ...usage, status: 'ok', checkedAt: Date.now() } };
   } catch (error: any) {
-    const failure = formatProbeFailureResult(error, session.signInRequested, options,
-      account.configuredAuthType, account.home);
+    const failure = failureResult(error, session.signInRequested, subjectOf(account));
     return { supported: true, usage: { ...usage, status: failure.state === 'sign_in_required' ? 'unauthenticated' : 'error',
       message: failure.error } };
   } finally {
@@ -651,7 +357,7 @@ export function isNativeCatalogSettled(readiness: NativeReadinessResult, forceRe
 /** Refresh only on explicit catalog requests, never on ordinary health reads. */
 export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
   const account = captureAccount(options);
-  const previous = getPreparedNativeReadiness(account);
+  const previous = readPreparedReadiness(account);
   if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
   const key = account.refreshKey;
   const running = catalogRefreshes.get(key);
@@ -686,125 +392,45 @@ async function runNativeReadinessProbe(
   options: NativeProbeOptions,
   account: AccountSnapshot
 ): Promise<NativeReadinessResult> {
-  const { home, effectiveEnv } = account;
-  const configuredAuthType = account.configuredAuthType;
-  const fingerprint = account.fingerprint;
-  const cacheKey = account.readinessKey;
-
-  const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, home);
-  if (earlyResult) return earlyResult;
+  const { effectiveEnv } = account;
+  // Failures are attributed to the configuration the probe started with.
+  const startSlot = account.slot;
+  const subject = subjectOf(account);
+  if (!existsSync(options.command)) return runtimeMissingResult(options.command, subject);
+  const cached = options.forceRefresh ? null : readinessStore.lookup(startSlot, effectiveEnv);
+  if (cached) return cached;
 
   const session = openDiagnosticSession(options, account, 'session verification');
   try {
-    const initInfo = await initializeFor(session, account, configuredAuthType);
-    const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, home);
-    if (compatError) return compatError;
+    const initInfo = await initializeFor(session, account, subject.configuredAuthType);
+    const incompatible = incompatibility(initInfo, options.authMethod);
+    if (incompatible) return readinessResult('runtime_launches', subject, { ...fromInitialize(initInfo), error: incompatible });
 
     const opened = await session.newSession({ awaitCatalog: true });
     // Sign-out or an account switch during discovery must not persist the previous account's result.
-    if (!account.isCurrent()) {
-      return buildAuthChangedResult(initInfo, options, configuredAuthType, home);
-    }
+    if (!account.isCurrent()) return accountChangedResult(subject, fromInitialize(initInfo));
     if (opened.kind === 'sign_in_required') {
-      const signInResult = buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, home);
-      cachedReadiness = { key: cacheKey, fingerprint, result: signInResult };
-      writePersistedReadiness(cacheKey, signInResult, fingerprint, effectiveEnv);
+      const signInResult = readinessResult('sign_in_required', subject, { ...fromInitialize(initInfo),
+        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.' });
+      readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
     }
 
-    return buildProbeSessionResult(opened.session, initInfo, account);
-  } catch (err: any) {
-    const failedResult = formatProbeFailureResult(err, session.signInRequested, options, configuredAuthType, home);
+    syncTokenToSource(account.home, account.target.env);
+    const ready = readinessResult('session_ready', subjectOf(account, account.configuredAuthType ?? options.authMethod),
+      { ...fromInitialize(initInfo), ...describeSession(opened.session) });
+    // Keyed after the probe: its own headless auth-type write changes the configured type.
+    readinessStore.put(account.slot, ready, effectiveEnv);
+    return ready;
+  } catch (error: any) {
+    const failed = failureResult(error, session.signInRequested, subject);
     // A failure from an obsolete account must not overwrite a newer sign-in's readiness.
-    if (!account.isCurrent()) {
-      return buildAuthChangedResult(failedResult, options, configuredAuthType, home);
-    }
-    cachedReadiness = { key: cacheKey, fingerprint, result: failedResult };
-    if (failedResult.state === 'sign_in_required') writePersistedReadiness(cacheKey, failedResult, fingerprint, effectiveEnv);
-    return failedResult;
+    if (!account.isCurrent()) return accountChangedResult(subject, {});
+    readinessStore.put(startSlot, failed, effectiveEnv);
+    return failed;
   } finally {
     session.close();
   }
-}
-
-function buildProbeSignInRequiredResult(
-  initInfo: { protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] },
-  options: { authMethod: GoogleAcpAuthMethod },
-  configuredAuthType: string | null,
-  sanitized: { disabledDeadMcpServers: string[] }
-): NativeReadinessResult {
-  return {
-    state: 'sign_in_required',
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.',
-    checkedAt: Date.now()
-  };
-}
-
-/** Uncached result for a discovery whose account was signed out or switched while it ran. */
-function buildAuthChangedResult(
-  initInfo: { protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] },
-  options: { authMethod: GoogleAcpAuthMethod },
-  configuredAuthType: string | null,
-  sanitized: { disabledDeadMcpServers: string[] }
-): NativeReadinessResult {
-  return {
-    state: 'runtime_launches',
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Antigravity sign-in changed while models were being discovered. Retry to load the current account.',
-    checkedAt: Date.now()
-  };
-}
-
-function buildSignInSuccessResult(
-  sessionResult: any,
-  initInfo: InitializeInfo,
-  account: AccountSnapshot,
-  advertisedAuthMethods: string[]
-): NativeReadinessResult {
-  const { target, home } = account;
-  writeNativeAcpAuthType(target.authMethod, target.env);
-  syncTokenToSource(home, target.env);
-
-  const models = extractModelsFromSessionResult(sessionResult);
-  const modes = extractModesFromSessionResult(sessionResult);
-  const tierName = typeof sessionResult?._meta?.antigravity?.tier?.name === 'string'
-    ? sessionResult._meta.antigravity.tier.name
-    : null;
-  clearCachedNativeReadiness(target.env);
-
-  const readyResult: NativeReadinessResult = {
-    state: 'session_ready',
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion ?? 1,
-    advertisedAuthMethods,
-    selectedAuthMethod: target.authMethod,
-    configuredAuthType: target.authMethod,
-    models,
-    modes,
-    tierName,
-    disabledDeadMcpServers: home.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-  // The account signed in just now, so attribute the result to a snapshot taken after the write.
-  const signedIn = account.recapture();
-  cachedReadiness = { key: signedIn.readinessKey, fingerprint: signedIn.fingerprint, result: readyResult };
-  writePersistedReadiness(signedIn.readinessKey, readyResult, signedIn.fingerprint, signedIn.effectiveEnv);
-  return readyResult;
 }
 
 export async function startNativeAcpSignIn(options: {
@@ -818,11 +444,10 @@ export async function startNativeAcpSignIn(options: {
   spawnImpl?: typeof spawn;
 }): Promise<NativeReadinessResult> {
   if (!existsSync(options.command)) {
-    return { state: 'runtime_missing', agentVersion: null, protocolVersion: null, advertisedAuthMethods: [], selectedAuthMethod: options.authMethod, configuredAuthType: readConfiguredNativeAuthType(options.env), models: [], modes: [], error: `Native ACP binary not found at "${options.command}".`, checkedAt: Date.now() };
+    return runtimeMissingResult(options.command, { authMethod: options.authMethod, configuredAuthType: readConfiguredNativeAuthType(options.env) });
   }
   const account = captureAccount(options);
-  const { home, effectiveEnv } = account;
-  const session = NativeAcpSession.open({ command: options.command, args: options.args, cwd: options.cwd, env: effectiveEnv,
+  const session = NativeAcpSession.open({ command: options.command, args: options.args, cwd: options.cwd, env: account.effectiveEnv,
     spawnImpl: options.spawnImpl, timeoutMs: 20_000, operation: 'sign-in', interactive: true });
   session.onStderrLine((line) => {
     const match = line.match(/https:\/\/accounts\.google\.com\/o\/oauth2\/\S+/);
@@ -845,9 +470,19 @@ export async function startNativeAcpSignIn(options: {
     const opened = await session.newSession({ awaitCatalog: true, timeoutMs: 25_000 });
     if (opened.kind === 'sign_in_required') throw new Error('Google sign-in did not complete. Try signing in again.');
 
-    return buildSignInSuccessResult(opened.session, initInfo, account, advertisedAuthMethods);
-  } catch (err: any) {
-    return { state: 'sign_in_required', agentVersion: null, protocolVersion: 1, advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS], selectedAuthMethod: options.authMethod, configuredAuthType: readConfiguredNativeAuthType(effectiveEnv), models: [], modes: [], disabledDeadMcpServers: home.disabledDeadMcpServers, error: err?.message || 'Interactive Google sign-in failed or timed out.', checkedAt: Date.now() };
+    writeNativeAcpAuthType(options.authMethod, options.env);
+    syncTokenToSource(account.home, options.env);
+    // The account signed in just now, so attribute the result to a snapshot taken after the write.
+    const signedIn = account.recapture();
+    const ready = readinessResult('session_ready', subjectOf(signedIn, options.authMethod), {
+      agentVersion: initInfo.agentVersion, protocolVersion: initInfo.protocolVersion ?? 1, advertisedAuthMethods,
+      ...describeSession(opened.session)
+    });
+    readinessStore.put(signedIn.slot, ready, signedIn.effectiveEnv);
+    return ready;
+  } catch (error: any) {
+    return readinessResult('sign_in_required', subjectOf(account, readConfiguredNativeAuthType(account.effectiveEnv)),
+      { error: error?.message || 'Interactive Google sign-in failed or timed out.' });
   } finally {
     session.close();
   }

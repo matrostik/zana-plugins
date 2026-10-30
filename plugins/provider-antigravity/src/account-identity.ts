@@ -119,6 +119,11 @@ export class AccountSnapshot {
     return JSON.stringify({ command, args, authMethod, configuredAuthType: this.configuredAuthType });
   }
 
+  /** Where readiness for this account is cached, as of now. */
+  get slot(): { key: string; fingerprint: string } {
+    return { key: this.readinessKey, fingerprint: this.fingerprint };
+  }
+
   /** Identifies catalog and usage refreshes for this runtime and account. */
   get refreshKey(): string {
     const { command, args, authMethod, cwd, env } = this.target;

@@ -3,13 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { captureAccount } from './account-identity.js';
 import { catalogSession, fail, FakeAcpServer, NO_REPLY, QUOTA_TEXT, usageScript } from './fake-acp-server.js';
 import { isAuthExplicitlyCleared, prepareSanitizedGeminiHome, readConfiguredNativeAuthType } from './gemini-home.js';
 import {
   clearCachedNativeReadiness,
   extractModelsFromSessionResult,
-  getCachedNativeReadiness,
   getFastNativeReadiness,
   getNativeCatalog,
   isNativeCatalogSettled,
@@ -43,6 +41,14 @@ function signedIn(prefix: string, account = 'account-one', options: { dataDir?: 
   const managedToken = join(prepareSanitizedGeminiHome({ env: context.env, authMethod: 'oauth-personal' }).geminiHome,
     'antigravity-acp/acp_token.json');
   return { ...context, managedToken };
+}
+
+/** Nothing from the probe was cached: reads fall back to unverified local state. */
+function expectNoCachedCatalog(command: string, env: NodeJS.ProcessEnv) {
+  const fast = getFastNativeReadiness({ command, args: [], authMethod: 'oauth-personal', env });
+  expect(fast.state).not.toBe('session_ready');
+  expect(fast.models).toEqual([]);
+  expect(fast.error ?? '').not.toContain('Backend unavailable');
 }
 
 afterEach(() => {
@@ -230,7 +236,7 @@ describe('native-auth.ts unit tests', () => {
     expect(result.state).not.toBe('session_ready');
     expect(result.models).toEqual([]);
     expect(result.error).toContain('sign-in changed');
-    expect(getCachedNativeReadiness()).toBeNull();
+    expectNoCachedCatalog(command, env);
   });
 
   it('does not fall back to the previous account catalog when credentials change mid-refresh', async () => {
@@ -285,7 +291,7 @@ describe('native-auth.ts unit tests', () => {
     const result = await probeNativeAcpReadiness({ command, args: [], authMethod: 'oauth-personal', env,
       spawnImpl: server.spawnImpl, forceRefresh: true });
     expect(result.error).toContain('sign-in changed');
-    expect(getCachedNativeReadiness()).toBeNull();
+    expectNoCachedCatalog(command, env);
   });
 
   it('re-queries usage when the source account changes within the usage cache TTL', async () => {
@@ -350,7 +356,7 @@ describe('native-auth.ts unit tests', () => {
     const result = await getNativeCatalog({ command, args: [], authMethod: 'oauth-personal', env, spawnImpl: server.spawnImpl });
     expect(result.models).toEqual([]);
     expect(result.error).toContain('sign-in changed');
-    expect(getCachedNativeReadiness()).toBeNull();
+    expectNoCachedCatalog(command, env);
   });
 
   it.each(['catalog', 'usage'])('discards %s when credentials change during headless authentication', async (probe) => {
@@ -568,7 +574,7 @@ describe('native-auth.ts unit tests', () => {
     expect(res.agentVersion).toBe('1.4.3');
     expect(res.tierName).toBe('Google One AI Premium');
     expect(res.modes).toEqual(['default', 'auto_edit']);
-    expect(getCachedNativeReadiness()?.state).toBe('session_ready');
+    expect(getFastNativeReadiness({ command, args: [], authMethod: 'oauth-personal', env }).state).toBe('session_ready');
   });
 
   it('probeNativeAcpReadiness handles missing binary and error rejections', async () => {
@@ -661,45 +667,20 @@ describe('native-auth.ts unit tests', () => {
     expect(getFastNativeReadiness({ command, args: [], authMethod: 'oauth-personal', env }).models.map(model => model.id)).toEqual(['late']);
   });
 
-  it('handles readiness cache TTL expiry and persisted disk cache hits', () => {
-    const home = makeTempDir('cache-test-');
-    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home };
-    const fakeExe = join(home, 'agy.exe');
-    writeFileSync(fakeExe, 'exe');
+  it('serves a verified catalog until it expires, then as stale for the same account only', async () => {
+    const { command, env, managedToken } = signedIn('cache-expiry-');
+    const server = new FakeAcpServer({ 'session/new': () => catalogSession('gemini') });
+    const options = { command, args: [], authMethod: 'oauth-personal' as const, env };
+    await probeNativeAcpReadiness({ ...options, spawnImpl: server.spawnImpl, forceRefresh: true });
+    expect(getFastNativeReadiness(options).state).toBe('session_ready');
 
-    writeNativeAcpAuthType('oauth-personal', env);
-    const acpDir = join(home, 'antigravity-acp');
-    mkdirSync(acpDir, { recursive: true });
-    writeFileSync(join(acpDir, 'acp_token.json'), '{"token":"valid-test-token"}');
-
-    const account = captureAccount({ command: fakeExe, args: [], authMethod: 'oauth-personal', env });
-    const sanitized = account.home;
-    const persistPath = join(home, 'state', 'antigravity-native-readiness.json');
-    const key = account.readinessKey;
-    const fingerprint = account.fingerprint;
-    const writeCache = (checkedAt: number) =>
-      writeFileSync(
-        persistPath,
-        JSON.stringify({
-          key,
-          fingerprint,
-          result: { state: 'session_ready', checkedAt, models: [{ id: 'gemini', name: 'Gemini' }], modes: [], advertisedAuthMethods: [] }
-        })
-      );
-
-    clearCachedNativeReadiness();
-    writeCache(Date.now());
-    expect(getFastNativeReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env }).state).toBe(
-      'session_ready'
-    );
-
-    clearCachedNativeReadiness();
-    writeCache(Date.now() - 20 * 60 * 1000);
-    const stale = getFastNativeReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 20 * 60 * 1000);
+    const stale = getFastNativeReadiness(options);
     expect(stale.state).toBe('authenticated');
     expect(stale.models.map(model => model.id)).toEqual(['gemini']);
     expect(stale.catalogStale).toBe(true);
-    writeFileSync(join(sanitized.geminiHome, 'antigravity-acp/acp_token.json'), '{"token":"other-account-token"}');
-    expect(getFastNativeReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env }).models).toEqual([]);
+
+    writeFileSync(managedToken, '{"refresh_token":"other-account"}');
+    expect(getFastNativeReadiness(options).models).toEqual([]);
   });
 });
