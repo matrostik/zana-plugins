@@ -1,12 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const runner = new URL('./ci-plugin-tests.mjs', import.meta.url);
+
+test('the repository lockfile contains no extraneous platform binaries', () => {
+  const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  for (const [name, pkg] of Object.entries(lock.packages)) {
+    assert.ok(!pkg.extraneous, `${name} is extraneous; regenerate the lockfile with CI's npm version`);
+  }
+});
 
 for (const localVitest of [false, true]) test(`a plugin without a lockfile uses ${localVitest ? 'plugin' : 'repository'} tools`, () => {
   const root = mkdtempSync(join(tmpdir(), 'plugin-ci-tools-'));
