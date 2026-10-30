@@ -40,9 +40,9 @@ var __toESM = (mod, isNodeMode, target2) => (target2 = mod != null ? __create(__
   mod
 ));
 
-// ../../node_modules/isexe/windows.js
+// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js
 var require_windows = __commonJS({
-  "../../node_modules/isexe/windows.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require("fs");
@@ -80,9 +80,9 @@ var require_windows = __commonJS({
   }
 });
 
-// ../../node_modules/isexe/mode.js
+// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js
 var require_mode = __commonJS({
-  "../../node_modules/isexe/mode.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require("fs");
@@ -113,9 +113,9 @@ var require_mode = __commonJS({
   }
 });
 
-// ../../node_modules/isexe/index.js
+// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js
 var require_isexe = __commonJS({
-  "../../node_modules/isexe/index.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
@@ -168,9 +168,9 @@ var require_isexe = __commonJS({
   }
 });
 
-// ../../node_modules/which/which.js
+// ../../../zana/node_modules/.pnpm/which@2.0.2/node_modules/which/which.js
 var require_which = __commonJS({
-  "../../node_modules/which/which.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/which@2.0.2/node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
     var path5 = __require("path");
     var COLON = isWindows ? ";" : ":";
@@ -264,9 +264,9 @@ var require_which = __commonJS({
   }
 });
 
-// ../../node_modules/path-key/index.js
+// ../../../zana/node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js
 var require_path_key = __commonJS({
-  "../../node_modules/path-key/index.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js"(exports, module) {
     "use strict";
     var pathKey = (options = {}) => {
       const environment = options.env || process.env;
@@ -281,9 +281,9 @@ var require_path_key = __commonJS({
   }
 });
 
-// ../../node_modules/cross-spawn/lib/util/resolveCommand.js
+// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js
 var require_resolveCommand = __commonJS({
-  "../../node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
     var path5 = __require("path");
     var which = require_which();
@@ -323,9 +323,9 @@ var require_resolveCommand = __commonJS({
   }
 });
 
-// ../../node_modules/cross-spawn/lib/util/escape.js
+// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js
 var require_escape = __commonJS({
-  "../../node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
     var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
     function escapeCommand(arg) {
@@ -348,17 +348,17 @@ var require_escape = __commonJS({
   }
 });
 
-// ../../node_modules/shebang-regex/index.js
+// ../../../zana/node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js
 var require_shebang_regex = __commonJS({
-  "../../node_modules/shebang-regex/index.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
 
-// ../../node_modules/shebang-command/index.js
+// ../../../zana/node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js
 var require_shebang_command = __commonJS({
-  "../../node_modules/shebang-command/index.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
     var shebangRegex = require_shebang_regex();
     module.exports = (string4 = "") => {
@@ -376,9 +376,9 @@ var require_shebang_command = __commonJS({
   }
 });
 
-// ../../node_modules/cross-spawn/lib/util/readShebang.js
+// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js
 var require_readShebang = __commonJS({
-  "../../node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
     var fs3 = __require("fs");
     var shebangCommand = require_shebang_command();
@@ -398,9 +398,9 @@ var require_readShebang = __commonJS({
   }
 });
 
-// ../../node_modules/cross-spawn/lib/parse.js
+// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js
 var require_parse = __commonJS({
-  "../../node_modules/cross-spawn/lib/parse.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
     var path5 = __require("path");
     var resolveCommand = require_resolveCommand();
@@ -460,9 +460,9 @@ var require_parse = __commonJS({
   }
 });
 
-// ../../node_modules/cross-spawn/lib/enoent.js
+// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js
 var require_enoent = __commonJS({
-  "../../node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
     var isWin = process.platform === "win32";
     function notFoundError(original, syscall) {
@@ -510,9 +510,9 @@ var require_enoent = __commonJS({
   }
 });
 
-// ../../node_modules/cross-spawn/index.js
+// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js
 var require_cross_spawn = __commonJS({
-  "../../node_modules/cross-spawn/index.js"(exports, module) {
+  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
     var cp = __require("child_process");
     var parse3 = require_parse();
@@ -537,7 +537,7 @@ var require_cross_spawn = __commonJS({
   }
 });
 
-// ../../node_modules/zod/v4/classic/external.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -800,7 +800,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// ../../node_modules/zod/v4/core/index.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -1117,7 +1117,7 @@ __export(core_exports2, {
   withParser: () => withParser
 });
 
-// ../../node_modules/zod/v4/core/util.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1973,7 +1973,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// ../../node_modules/zod/v4/core/core.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2095,7 +2095,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// ../../node_modules/zod/v4/core/errors.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -2287,7 +2287,7 @@ function prettifyError(error62) {
   return lines.join("\n");
 }
 
-// ../../node_modules/zod/v4/core/parse.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -2447,7 +2447,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// ../../node_modules/zod/v4/core/regexes.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   anyString: () => anyString,
@@ -2619,7 +2619,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../../node_modules/zod/v4/core/checks.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -3095,7 +3095,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../../node_modules/zod/v4/core/doc.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -3136,14 +3136,14 @@ ${content.join("\n")}
   }
 };
 
-// ../../node_modules/zod/v4/core/versions.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 7
 };
 
-// ../../node_modules/zod/v4/core/schemas.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -5585,7 +5585,7 @@ function handleRefineResult(result, payload, input2, inst) {
   }
 }
 
-// ../../node_modules/zod/v4/core/memoizer.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -5862,7 +5862,7 @@ function isBackEdge(ctx, value) {
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
 
-// ../../node_modules/zod/v4/locales/index.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -5930,7 +5930,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// ../../node_modules/zod/v4/locales/ar.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6042,7 +6042,7 @@ function ar_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/az.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6153,7 +6153,7 @@ function az_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/be.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6322,7 +6322,7 @@ function be_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/bg.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6448,7 +6448,7 @@ function bg_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/bn.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -6562,7 +6562,7 @@ function bn_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ca.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6676,7 +6676,7 @@ function ca_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ckb.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -6809,7 +6809,7 @@ function ckb_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/cs.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6926,7 +6926,7 @@ function cs_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/da.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7047,7 +7047,7 @@ function da_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/de.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7161,7 +7161,7 @@ function de_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/el.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7274,7 +7274,7 @@ function el_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/en.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7399,7 +7399,7 @@ function en_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/eo.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7514,7 +7514,7 @@ function eo_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/es.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7651,7 +7651,7 @@ function es_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/fa.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7771,7 +7771,7 @@ function fa_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/fi.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7889,7 +7889,7 @@ function fi_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/fr.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8019,7 +8019,7 @@ function fr_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/fr-CA.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8132,7 +8132,7 @@ function fr_CA_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/gu.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -8246,7 +8246,7 @@ function gu_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/he.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8448,7 +8448,7 @@ function he_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/hi.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -8560,7 +8560,7 @@ function hi_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/hr.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8687,7 +8687,7 @@ function hr_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/hu.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8801,7 +8801,7 @@ function hu_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/hy.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8960,7 +8960,7 @@ function hy_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/id.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -9072,7 +9072,7 @@ function id_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/is.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -9187,7 +9187,7 @@ function is_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/it.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -9301,7 +9301,7 @@ function it_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ja.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9414,7 +9414,7 @@ function ja_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ka.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9532,7 +9532,7 @@ function ka_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/km.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9648,12 +9648,12 @@ function km_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/kh.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// ../../node_modules/zod/v4/locales/kn.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -9769,7 +9769,7 @@ function kn_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ko.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9886,7 +9886,7 @@ function ko_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/lt.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -10094,7 +10094,7 @@ function lt_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/mk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -10209,7 +10209,7 @@ function mk_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ms.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -10322,7 +10322,7 @@ function ms_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ne.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -10434,7 +10434,7 @@ function ne_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/nl.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -10550,7 +10550,7 @@ function nl_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/nn.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -10664,7 +10664,7 @@ function nn_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/no.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10778,7 +10778,7 @@ function no_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ota.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10893,7 +10893,7 @@ function ota_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ps.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -11013,7 +11013,7 @@ function ps_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/pl.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -11128,7 +11128,7 @@ function pl_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/pt.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11272,7 +11272,7 @@ function pt_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/pt-BR.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11417,7 +11417,7 @@ function pt_BR_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ro.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -11540,7 +11540,7 @@ function ro_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ru.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11709,7 +11709,7 @@ function ru_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/sk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -11826,7 +11826,7 @@ function sk_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/sl.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -11941,7 +11941,7 @@ function sl_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/sv.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -12057,7 +12057,7 @@ function sv_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ta.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -12173,7 +12173,7 @@ function ta_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/tg.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -12290,7 +12290,7 @@ function tg_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/th.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -12406,7 +12406,7 @@ function th_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/tk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -12514,7 +12514,7 @@ function tk_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/tr.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -12625,7 +12625,7 @@ function tr_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/uk.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -12739,12 +12739,12 @@ function uk_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/ua.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// ../../node_modules/zod/v4/locales/ur.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -12860,7 +12860,7 @@ function ur_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/uz.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -12974,7 +12974,7 @@ function uz_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/vi.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -13088,7 +13088,7 @@ function vi_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/zh-CN.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -13203,7 +13203,7 @@ function zh_CN_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/zh-TW.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -13316,7 +13316,7 @@ function zh_TW_default() {
   };
 }
 
-// ../../node_modules/zod/v4/locales/yo.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -13429,7 +13429,7 @@ function yo_default() {
   };
 }
 
-// ../../node_modules/zod/v4/core/registries.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -13479,7 +13479,7 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// ../../node_modules/zod/v4/core/compile.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/compile.js
 var INVALID = Symbol.for("zod.compile.invalid");
 var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
@@ -15089,7 +15089,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   return accessor;
 }
 
-// ../../node_modules/zod/v4/core/api.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -16148,7 +16148,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// ../../node_modules/zod/v4/core/to-json-schema.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target2, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -16678,7 +16678,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// ../../node_modules/zod/v4/core/json-schema-processors.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -17426,7 +17426,7 @@ function toJSONSchema(input2, params) {
   return finalize(ctx, input2);
 }
 
-// ../../node_modules/zod/v4/core/json-schema-generator.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -17504,10 +17504,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// ../../node_modules/zod/v4/core/json-schema.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// ../../node_modules/zod/v4/classic/schemas.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -17688,7 +17688,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// ../../node_modules/zod/v4/classic/checks.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -17723,7 +17723,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// ../../node_modules/zod/v4/classic/errors.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -17769,7 +17769,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, void 0
   Parent: Error
 });
 
-// ../../node_modules/zod/v4/classic/parse.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -17783,7 +17783,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../../node_modules/zod/v4/classic/schemas.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -19248,7 +19248,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// ../../node_modules/zod/v4/classic/compat.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -19274,7 +19274,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// ../../node_modules/zod/v4/classic/iso.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19299,7 +19299,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../../node_modules/zod/v4/classic/from-json-schema.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -20032,7 +20032,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// ../../node_modules/zod/v4/core/visit.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/visit.js
 var RESOLVING = Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
@@ -20187,7 +20187,7 @@ function visit(schema, fnOrHandlers) {
   return run(schema);
 }
 
-// ../../node_modules/zod/v4/classic/deep-partial.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -20199,7 +20199,7 @@ function deepPartial(schema) {
   });
 }
 
-// ../../node_modules/zod/v4/classic/in-out.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -20229,7 +20229,7 @@ function output(schema) {
   });
 }
 
-// ../../node_modules/zod/v4/classic/coerce.js
+// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -20254,7 +20254,7 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/active-thinking.ts
+// ../../../zana/packages/domain/src/bb-thread/active-thinking.ts
 var activeThinkingSchema = external_exports.object({
   id: external_exports.string(),
   text: external_exports.string(),
@@ -20262,7 +20262,7 @@ var activeThinkingSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/shared-types.ts
+// ../../../zana/packages/domain/src/bb-thread/shared-types.ts
 var reasoningLevelValues = [
   "none",
   "low",
@@ -20632,7 +20632,7 @@ var projectExecutionDefaultsSchema = external_exports.object({
   permissionMode: permissionModeSchema
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/acp-cli.ts
+// ../../../zana/packages/domain/src/bb-thread/acp-cli.ts
 var ACP_DEFAULT_MODEL_ID = "acp-default";
 var providerSkillRootPathSchema = external_exports.string().min(1).refine((value) => {
   const normalized = value.replaceAll("\\", "/");
@@ -20715,7 +20715,7 @@ var acpPermissionCliSchema = external_exports.object({
   }
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/app-settings.ts
+// ../../../zana/packages/domain/src/bb-thread/app-settings.ts
 var appSettingsSchema = external_exports.object({
   /** Show shortcut hints after holding Command or Control. */
   showKeyboardHints: external_exports.boolean(),
@@ -20753,7 +20753,7 @@ var appSettingsSchema = external_exports.object({
   onboardingCompletedAt: external_exports.string().nullable()
 }).strict();
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/app-keybindings.ts
+// ../../../zana/packages/domain/src/bb-thread/app-keybindings.ts
 var THREAD_JUMP_APP_COMMAND_IDS = [
   "thread.jump.1",
   "thread.jump.2",
@@ -20891,7 +20891,7 @@ var appKeybindingOverridesSchema = external_exports.array(appKeybindingOverrideS
   }
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/json-value.ts
+// ../../../zana/packages/domain/src/bb-thread/json-value.ts
 var jsonValueSchema = external_exports.lazy(
   () => external_exports.union([
     external_exports.string(),
@@ -20907,7 +20907,7 @@ var jsonObjectSchema = external_exports.record(
   jsonValueSchema
 );
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/code-theme.ts
+// ../../../zana/packages/domain/src/bb-thread/code-theme.ts
 var DEFAULT_CODE_THEME_DARK = "pierre-dark";
 var DEFAULT_CODE_THEME_LIGHT = "pierre-light";
 var codeThemeNameSchema = external_exports.string().min(1).max(128).regex(
@@ -20937,7 +20937,7 @@ var uiCodeThemeDeclarationSchema = external_exports.object({
   light: external_exports.string().min(1).max(256).optional()
 }).strict();
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/app-theme.ts
+// ../../../zana/packages/domain/src/bb-thread/app-theme.ts
 var builtInThemeIdSchema = external_exports.enum([
   "default",
   "nord",
@@ -20995,7 +20995,7 @@ var appThemeSelectionSchema = external_exports.object({
   faviconColor: faviconColorPreferenceSchema
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/background-task.ts
+// ../../../zana/packages/domain/src/bb-thread/background-task.ts
 var backgroundTaskStatusValues = [
   "pending",
   "running",
@@ -21055,7 +21055,7 @@ var backgroundTaskUsageSchema = external_exports.object({
   durationMs: external_exports.number()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-interaction-limits.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-interaction-limits.ts
 var PLUGIN_INTERACTION_MAX_TITLE_LENGTH = 160;
 var PLUGIN_INTERACTION_MAX_PAYLOAD_BYTES = 64 * 1024;
 var PLUGIN_INTERACTION_MAX_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1e3;
@@ -21063,7 +21063,7 @@ function jsonByteLength(value) {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/item-presentation.ts
+// ../../../zana/packages/domain/src/bb-thread/item-presentation.ts
 var THREAD_EVENT_ITEM_PRESENTATION_DETAIL_MAX_LENGTH = 280;
 var threadEventItemPresentationLabelSchema = external_exports.object({
   /** Present-tense row title while the item is in flight ("Reading file"). */
@@ -21101,7 +21101,7 @@ var threadEventItemPresentationSchema = external_exports.object({
   }).optional()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/provider-extension-kind.ts
+// ../../../zana/packages/domain/src/bb-thread/provider-extension-kind.ts
 var EXTENSION_KIND_PATTERN = /^[a-z0-9-]+\/[a-z0-9-]+$/u;
 function isExtensionKind(value) {
   return EXTENSION_KIND_PATTERN.test(value);
@@ -21110,7 +21110,7 @@ var extensionKindSchema = external_exports.string().refine(isExtensionKind, {
   message: 'extension kinds are "<pluginId>/<name>" (lowercase letters, digits, and "-")'
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/pending-interactions.ts
+// ../../../zana/packages/domain/src/bb-thread/pending-interactions.ts
 var pendingInteractionStatusSchema = external_exports.enum([
   "pending",
   "resolving",
@@ -21515,10 +21515,10 @@ var interactionLifecycleSchema = external_exports.union([
   pluginExtensionInteractionLifecycleSchema
 ]);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/protocol-ids.ts
+// ../../../zana/packages/domain/src/bb-thread/protocol-ids.ts
 var clientTurnRequestIdSchema = external_exports.string().regex(/^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/system-message.ts
+// ../../../zana/packages/domain/src/bb-thread/system-message.ts
 var systemMessageKindValues = [
   "ownership-assigned",
   "ownership-removed",
@@ -21542,7 +21542,7 @@ var systemMessageSubjectSchema = external_exports.discriminatedUnion("kind", [
   })
 ]);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-events.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-events.ts
 var systemEventTypeValues = [
   "client/thread/start",
   "client/turn/requested",
@@ -21747,7 +21747,7 @@ var systemProviderTurnWatchdogEventDataSchema = external_exports.object({
   firedAt: external_exports.number().int().nonnegative()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-event-scope.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-event-scope.ts
 var threadEventScopeKindValues = ["thread", "turn"];
 var threadEventScopeKindSchema = external_exports.enum(threadEventScopeKindValues);
 var threadEventScopeSchema = external_exports.discriminatedUnion("kind", [
@@ -21935,7 +21935,7 @@ function validateThreadEventScope(args) {
   return { valid: true };
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-goal.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-timeline-goal.ts
 var threadTimelineGoalStatusSchema = external_exports.enum([
   "active",
   "paused",
@@ -21952,7 +21952,7 @@ var threadTimelineGoalSchema = external_exports.object({
   timeUsedSeconds: external_exports.number()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/provider-event.ts
+// ../../../zana/packages/domain/src/bb-thread/provider-event.ts
 var threadEventItemStatusSchema = external_exports.enum([
   "pending",
   "completed",
@@ -22679,7 +22679,7 @@ var threadEventTypeSchema = external_exports.string().refine(
   "Invalid thread event type"
 );
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/change-kinds.ts
+// ../../../zana/packages/domain/src/bb-thread/change-kinds.ts
 var THREAD_CHANGE_KINDS = [
   "thread-created",
   "thread-deleted",
@@ -22883,7 +22883,7 @@ var changedMessageLenientSchema = external_exports.discriminatedUnion("entity", 
   systemChangedMessageLenientSchema
 ]);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/claude-task-tools.ts
+// ../../../zana/packages/domain/src/bb-thread/claude-task-tools.ts
 var claudeTaskToolNameValues = [
   "TaskCreate",
   "TaskGet",
@@ -22955,7 +22955,7 @@ var claudeTaskToolOutputSchema = external_exports.union([
   claudeTaskUpdateOutputSchema
 ]);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/environment.ts
+// ../../../zana/packages/domain/src/bb-thread/environment.ts
 var environmentStatusValues = [
   "provisioning",
   "ready",
@@ -23005,7 +23005,7 @@ var environmentSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/experiments.ts
+// ../../../zana/packages/domain/src/bb-thread/experiments.ts
 var experimentKeys = [
   "claudeCodeMockCliTraffic",
   "newOnboarding",
@@ -23014,7 +23014,7 @@ var experimentKeys = [
 var experimentKeySchema = external_exports.enum(experimentKeys);
 var experimentsSchema = external_exports.record(experimentKeySchema, external_exports.boolean());
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/feature-flags.ts
+// ../../../zana/packages/domain/src/bb-thread/feature-flags.ts
 var featureFlagsSchema = external_exports.object({
   placeholder: external_exports.boolean(),
   /**
@@ -23032,7 +23032,7 @@ var featureFlagsSchema = external_exports.object({
   timelineWindowEventBudget: external_exports.number().int().positive()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/git-checkout.ts
+// ../../../zana/packages/domain/src/bb-thread/git-checkout.ts
 var gitBranchForbiddenCharacterPattern = /[\u0000-\u001f\u007f\\:~^?*\[]/u;
 var gitBranchWhitespacePattern = /[ \t]/u;
 var gitReservedBranchNames = /* @__PURE__ */ new Set([
@@ -23127,7 +23127,7 @@ var projectSourceCheckoutSchema = external_exports.object({
   selectedBranch: gitBranchRefClassificationSchema.nullable()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/host.ts
+// ../../../zana/packages/domain/src/bb-thread/host.ts
 var hostTypeValues = ["persistent"];
 var hostTypeSchema = external_exports.enum(hostTypeValues);
 var hostStatusValues = ["connected", "disconnected"];
@@ -23171,7 +23171,7 @@ var hostSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/provider-skill-roots.ts
+// ../../../zana/packages/domain/src/bb-thread/provider-skill-roots.ts
 function isAbsoluteProviderSkillRootPath(value) {
   if (value.length === 0) {
     return false;
@@ -23192,7 +23192,7 @@ function isRelativeProviderSkillRootPath(value) {
   return !normalized.startsWith("/") && !/^[a-zA-Z]:\//u.test(normalized) && normalized.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/native-roots.ts
+// ../../../zana/packages/domain/src/bb-thread/native-roots.ts
 var PROVIDER_NATIVE_ROOTS_MAX = 32;
 var PROVIDER_NATIVE_ROOT_NAME_PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}:$/u;
 var nativeRootNamePrefixSchema = external_exports.string().refine(
@@ -23377,7 +23377,7 @@ var providerNativeRootSetSchema = external_exports.object({
   resolved: providerResolvedNativeRootsSchema
 }).strict();
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/legacy-thread-events.ts
+// ../../../zana/packages/domain/src/bb-thread/legacy-thread-events.ts
 var LEGACY_CODEX_GOAL_EXTENSION_KIND = "provider-codex/goal";
 var LEGACY_THREAD_EVENT_TYPES = [
   "thread/goal/updated",
@@ -23644,7 +23644,7 @@ function upgradeLegacyToolItem(item) {
   return item;
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-catalog-category.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-catalog-category.ts
 var PLUGIN_CATALOG_CATEGORY_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var pluginCatalogCategoryIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
 var pluginMarketplaceCollectionIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
@@ -23750,7 +23750,7 @@ var PLUGIN_CATALOG_CATEGORIES = [
 ];
 var pluginCatalogCategoryById = new Map(PLUGIN_CATALOG_CATEGORIES.map((category) => [category.id, category]));
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-icon.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-icon.ts
 function isPluginOwnedIconPath(icon) {
   return icon.startsWith("./");
 }
@@ -23763,10 +23763,10 @@ function isNamespacedGlyph(glyph) {
   return NAMESPACED_GLYPH_PATTERN.test(glyph);
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-id.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-id.ts
 var pluginIdSchema = external_exports.string().regex(/^[a-z0-9][a-z0-9-]*$/u);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-metadata.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-metadata.ts
 var PLUGIN_METADATA_MAX_BYTES = 256 * 1024;
 function exceedsPluginMetadataLimit(metadataJson) {
   return new TextEncoder().encode(metadataJson).byteLength > PLUGIN_METADATA_MAX_BYTES;
@@ -23780,7 +23780,7 @@ var pluginMetadataSchema = jsonObjectSchema.superRefine((value, ctx) => {
   }
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-manifest.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-manifest.ts
 var requiredManifestString = external_exports.string().trim().min(1);
 var pluginBrandingIconsSchema = external_exports.record(
   external_exports.string().max(
@@ -23856,7 +23856,7 @@ var pluginPackageJsonSchema = external_exports.object({
   bb: pluginBbManifestSchema
 }).passthrough();
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
 var MARKETPLACE_MAX_SCREENSHOTS = 6;
 var NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var TAG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -23996,11 +23996,11 @@ var marketplaceEntryV2Schema = external_exports.object({
   ...marketplaceEntryMetadataShape(false)
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-sdk-version.ts
+// ../../../zana/packages/domain/src/bb-thread/plugin-sdk-version.ts
 var PLUGIN_SDK_VERSION = "0.4.8";
 var PLUGIN_SDK_MAJOR = Number(PLUGIN_SDK_VERSION.split(".", 1)[0]);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/project.ts
+// ../../../zana/packages/domain/src/bb-thread/project.ts
 var projectKindValues = ["standard", "personal"];
 var projectKindSchema = external_exports.enum(projectKindValues);
 var projectSchema = external_exports.object({
@@ -24026,7 +24026,7 @@ var localPathProjectSourceSchema = baseProjectSourceSchema.extend({
   path: external_exports.string()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/prompt-history.ts
+// ../../../zana/packages/domain/src/bb-thread/prompt-history.ts
 var promptHistoryScopeValues = ["project", "thread"];
 var promptHistoryScopeSchema = external_exports.enum(promptHistoryScopeValues);
 var promptHistoryEntrySchema = external_exports.object({
@@ -24035,11 +24035,11 @@ var promptHistoryEntrySchema = external_exports.object({
   input: external_exports.array(promptInputSchema).min(1)
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/provider-fork.ts
+// ../../../zana/packages/domain/src/bb-thread/provider-fork.ts
 var PROVIDER_FORK_VALUES = ["none", "tip", "checkpoint"];
 var providerForkSchema = external_exports.enum(PROVIDER_FORK_VALUES);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/provider-types.ts
+// ../../../zana/packages/domain/src/bb-thread/provider-types.ts
 var modelReasoningEffortSchema = external_exports.object({
   reasoningEffort: reasoningLevelSchema,
   description: external_exports.string()
@@ -24210,7 +24210,7 @@ var dynamicToolSchema = external_exports.object({
   presentation: threadEventItemPresentationSchema.optional()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/queued-message.ts
+// ../../../zana/packages/domain/src/bb-thread/queued-message.ts
 var queuedMessageWaitingOnKindValues = [
   "time",
   "thread-busy",
@@ -24282,7 +24282,7 @@ var queuedMessageSystemNoticeSchema = external_exports.object({
   subject: systemMessageSubjectSchema.nullable()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/raw-thread-id.ts
+// ../../../zana/packages/domain/src/bb-thread/raw-thread-id.ts
 var GENERATED_ID_ALPHABET = "23456789abcdefghijkmnpqrstuvwxyz";
 var GENERATED_ID_SUFFIX_LENGTH = 10;
 var THREAD_ID_PREFIX = "thr_";
@@ -24290,7 +24290,7 @@ var RAW_THREAD_ID_PATTERN_SOURCE = `${THREAD_ID_PREFIX}[${GENERATED_ID_ALPHABET}
 var rawThreadIdPattern = new RegExp(`^${RAW_THREAD_ID_PATTERN_SOURCE}$`, "u");
 var rawThreadIdSchema = external_exports.string().regex(rawThreadIdPattern);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/reasoning-efforts.ts
+// ../../../zana/packages/domain/src/bb-thread/reasoning-efforts.ts
 var NONE_REASONING_EFFORT = {
   reasoningEffort: "none",
   description: "No extended thinking"
@@ -24337,7 +24337,7 @@ function reasoningEffortsForLevels(levels) {
   return levels.map((level) => ({ ...REASONING_EFFORT_BY_LEVEL[level] }));
 }
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/stored-thread-event.ts
+// ../../../zana/packages/domain/src/bb-thread/stored-thread-event.ts
 var threadEventRowInputSchema = external_exports.object({
   id: external_exports.string(),
   scope: threadEventScopeSchema,
@@ -24419,7 +24419,7 @@ var threadEventRowSchema = threadEventRowInputSchema.transform(
   (row) => parseThreadEventRowInput(row)
 );
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/terminal.ts
+// ../../../zana/packages/domain/src/bb-thread/terminal.ts
 var TERMINAL_COLS_MAX = 500;
 var TERMINAL_ROWS_MAX = 200;
 var TERMINAL_DATA_MAX_BYTES = 64 * 1024;
@@ -24463,7 +24463,7 @@ var terminalDataBase64Schema = external_exports.string().min(1).max(TERMINAL_DAT
   }
 );
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-git-diff.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-git-diff.ts
 var workspaceDiffTargetSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     type: external_exports.literal("uncommitted")
@@ -24508,7 +24508,7 @@ var threadGitDiffResponseSchema = external_exports.object({
   mergeBaseRef: external_exports.string().nullable()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-search.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-search.ts
 var threadSearchSourceKindValues = [
   "title",
   "title_fallback",
@@ -24520,7 +24520,7 @@ var threadSearchSourceKindSchema = external_exports.enum(
   threadSearchSourceKindValues
 );
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
 var threadTimelineActivePromptModeSchema = external_exports.object({
   mode: external_exports.literal("plan"),
   /**
@@ -24534,7 +24534,7 @@ var threadTimelineActivePromptModeSchema = external_exports.object({
   prompt: external_exports.string()
 }).strict();
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
 var threadTimelineModelFallbackSchema = external_exports.object({
   sourceSeq: external_exports.number().int().nonnegative(),
   detectedAt: external_exports.number(),
@@ -24544,7 +24544,7 @@ var threadTimelineModelFallbackSchema = external_exports.object({
   message: external_exports.string()
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
 var threadTimelinePendingTodoItemStatusSchema = external_exports.enum([
   "pending",
   "in_progress",
@@ -24561,11 +24561,11 @@ var threadTimelinePendingTodosSchema = external_exports.object({
   items: external_exports.array(threadTimelinePendingTodoItemSchema)
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-visibility.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-visibility.ts
 var threadVisibilityValues = ["visible", "hidden"];
 var threadVisibilitySchema = external_exports.enum(threadVisibilityValues);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-status.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-status.ts
 var threadStatusValues = [
   "pending",
   "idle",
@@ -24576,11 +24576,11 @@ var threadStatusValues = [
 ];
 var threadStatusSchema = external_exports.enum(threadStatusValues);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread-origin-kind.ts
+// ../../../zana/packages/domain/src/bb-thread/thread-origin-kind.ts
 var threadOriginKindValues = ["fork"];
 var threadOriginKindSchema = external_exports.enum(threadOriginKindValues);
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/thread.ts
+// ../../../zana/packages/domain/src/bb-thread/thread.ts
 var threadRuntimeDisplayStatusValues = [
   ...threadStatusValues,
   "provisioning",
@@ -24857,7 +24857,7 @@ var threadListEntrySchema = threadWithRuntimeSchema.extend({
   environmentWorkspaceDisplayKind: environmentWorkspaceDisplayKindSchema
 });
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/update-state.ts
+// ../../../zana/packages/domain/src/bb-thread/update-state.ts
 var RUN_STATE_PRESENTATION = {
   "in-progress": { icon: "Loading", label: "In progress", inFlight: true },
   succeeded: { icon: "CircleCheck", label: "Succeeded", inFlight: false },
@@ -24901,10 +24901,10 @@ var UPDATE_STATE_PRESENTATION = {
   offline: { icon: "CircleX", label: "Offline", tone: "muted" }
 };
 
-// ../../.zana-sdk/packages/domain/src/bb-thread/prompt-attachment-limits.ts
+// ../../../zana/packages/domain/src/bb-thread/prompt-attachment-limits.ts
 var PROMPT_ATTACHMENT_MAX_BYTES = 35 * 1024 * 1024;
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/launch-spec.ts
+// ../../../zana/packages/provider-bridge-acp/src/launch-spec.ts
 var acpNativeSkillRootsSchema = external_exports.object({
   user: external_exports.array(providerNativeRootInputSchema).default([]),
   project: external_exports.array(providerNativeRootInputSchema).default([])
@@ -24942,11 +24942,11 @@ var acpLaunchSpecSchema = external_exports.object({
   permissionCli: acpPermissionCliSchema.optional()
 }).strict();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/version.ts
+// ../../../zana/packages/provider-bridge-protocol/src/version.ts
 var PROVIDER_BRIDGE_PROTOCOL_VERSION = 2;
 var THREAD_DELTA_GRAMMAR_V3 = 3;
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/handshake.ts
+// ../../../zana/packages/provider-bridge-protocol/src/handshake.ts
 var bridgeGrammarVersionsSchema = external_exports.tuple([external_exports.number().int().positive(), external_exports.number().int().positive()]).refine(([min, max]) => min <= max, {
   message: "grammarVersions must be an ascending [min, max] range"
 });
@@ -25054,7 +25054,7 @@ var initializeResultSchema = external_exports.object({
   )
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/execution-options.ts
+// ../../../zana/packages/provider-bridge-protocol/src/execution-options.ts
 var bridgeExecutionOptionsSchema = external_exports.object({
   model: external_exports.string().min(1).optional(),
   serviceTier: serviceTierSchema.optional(),
@@ -25066,7 +25066,7 @@ var bridgeExecutionOptionsSchema = external_exports.object({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 }).and(runtimePermissionPolicySchema);
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/requests.ts
+// ../../../zana/packages/provider-bridge-protocol/src/requests.ts
 var BRIDGE_REQUEST_METHODS = {
   initialize: "initialize",
   modelList: "model/list",
@@ -25094,6 +25094,7 @@ var bridgeRequestMethodValues = Object.values(
 var sessionKindSchema = external_exports.enum(["interactive", "automated"]);
 var sessionConstructionFields = {
   sessionKind: sessionKindSchema.optional().catch(void 0),
+  providerId: external_exports.string().min(1).optional(),
   threadId: external_exports.string().min(1),
   cwd: external_exports.string().min(1),
   options: bridgeExecutionOptionsSchema,
@@ -25187,7 +25188,7 @@ var modelListResultSchema = external_exports.object({
   }).optional()
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/errors.ts
+// ../../../zana/packages/provider-bridge-protocol/src/errors.ts
 var BRIDGE_JSON_RPC_ERRORS = {
   /** Standard JSON-RPC: params failed schema validation. */
   INVALID_PARAMS: -32602,
@@ -25211,7 +25212,7 @@ var providerRecoveryHintSchema = external_exports.object({
 });
 var bridgeErrorDataSchema = external_exports.object({ recovery: providerRecoveryHintSchema.optional() }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/notifications.ts
+// ../../../zana/packages/provider-bridge-protocol/src/notifications.ts
 var BRIDGE_NOTIFICATION_METHODS = {
   threadIdentity: "thread/identity",
   sessionReplaced: "session/replaced",
@@ -25253,7 +25254,7 @@ var errorNotificationSchema = external_exports.object({
   message: external_exports.string().min(1)
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-requests.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-requests.ts
 var BRIDGE_INBOUND_REQUEST_METHODS = {
   toolCall: "item/tool/call",
   interactionRequest: "interaction/request"
@@ -25285,7 +25286,7 @@ var interactionRequestParamsSchema = external_exports.object({
   payload: pendingInteractionPayloadSchema
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/thread-delta.ts
+// ../../../zana/packages/provider-bridge-protocol/src/thread-delta.ts
 var THREAD_DELTA_NOTIFICATION_METHOD = "thread/delta";
 var deltaPresentationSchema = threadEventItemPresentationSchema;
 var THREAD_DELTA_KEY_SEPARATOR = "";
@@ -25797,7 +25798,7 @@ var threadDeltaNotificationParamsSchema = external_exports.object({
   deltas: external_exports.array(threadDeltaSchema)
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/provider-maintenance.ts
+// ../../../zana/packages/provider-bridge-protocol/src/provider-maintenance.ts
 var providerMaintenanceParamsSchema = external_exports.object({
   providerId: external_exports.string().min(1),
   cwd: external_exports.string().min(1).optional(),
@@ -25930,7 +25931,7 @@ var providerInstallationRunResultSchema = external_exports.discriminatedUnion(
   ]
 );
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
 var bashArgsSchema = external_exports.object({
   command: external_exports.string().optional(),
   cwd: external_exports.string().optional()
@@ -25940,7 +25941,7 @@ var textBlockSchema = external_exports.object({
   text: external_exports.string()
 });
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -25949,7 +25950,7 @@ function getStringProperty(value, key) {
   return typeof next === "string" ? next : void 0;
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
 var contentWrapperSchema = external_exports.object({
   content: external_exports.array(external_exports.unknown())
 }).passthrough();
@@ -26026,7 +26027,7 @@ function describeResultContentBlock(block) {
   return `[${type}]`;
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
 var MAX_JSON_RPC_LINE_BYTES = 64 * 1024 * 1024;
 function createBoundedLineFramer(args) {
   const maxLineBytes = args.maxLineBytes ?? MAX_JSON_RPC_LINE_BYTES;
@@ -26104,7 +26105,7 @@ function createBoundedLineFramer(args) {
   return { push, end, clear: clearLine };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
 var BridgeRecoveryError = class extends Error {
   code;
   recovery;
@@ -26167,7 +26168,7 @@ function runBridgeRequest(args) {
   });
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
 import {
   closeSync,
   mkdirSync,
@@ -26377,7 +26378,7 @@ function experimental_recordProviderChildIo(child, scope) {
   getBridgeRecorder()?.recordChildIo(child, scope);
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
 function withoutBridgeRuntimeEnv(env) {
   const childEnv = { ...env };
   delete childEnv.ELECTRON_RUN_AS_NODE;
@@ -26385,7 +26386,7 @@ function withoutBridgeRuntimeEnv(env) {
   return childEnv;
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
 var providerToolCallResponseSchema = external_exports.object({
   success: external_exports.boolean(),
   contentItems: external_exports.array(
@@ -26506,7 +26507,7 @@ function buildBridgeToolCallContent(result) {
   return blocks;
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
 var recordSchema = external_exports.record(external_exports.string(), external_exports.unknown());
 var jsonRpcEnvelopeSchema = external_exports.object({
   jsonrpc: external_exports.literal("2.0"),
@@ -26550,7 +26551,7 @@ var errorEnvelopeSchema = external_exports.object({
   }).passthrough().optional()
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
 import { extname } from "node:path";
 function mimeTypeFromExtension(filePath) {
   switch (extname(filePath).toLowerCase()) {
@@ -26570,7 +26571,7 @@ function mimeTypeFromExtension(filePath) {
   }
 }
 
-// ../../.zana-sdk/packages/agent-process-utils/src/index.ts
+// ../../../zana/packages/agent-process-utils/src/index.ts
 var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 function spawnPortableProcess(request) {
   return (0, import_cross_spawn.default)(request.command, request.args, {
@@ -26699,7 +26700,7 @@ function killProcessGroup(args) {
   args.child.kill(args.signal);
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
 import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -26754,7 +26755,7 @@ function clampPercent(value) {
   );
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
 var PRESENTATION_TITLE_MAX_LENGTH = 160;
 function presentationTitle(text) {
   const firstLine = text.trim().split("\n", 1)[0]?.trim() ?? "";
@@ -26826,12 +26827,12 @@ function toolPresentation(tool) {
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
 function experimental_defineProviderBridge(definition) {
   return { experimental_apiVersion: 1, ...definition };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
 var normalizedToolCallRequestSchema = external_exports.object({
   providerThreadId: external_exports.string().min(1),
   threadId: external_exports.string().min(1).optional(),
@@ -26843,7 +26844,7 @@ var normalizedToolCallRequestSchema = external_exports.object({
   arguments: external_exports.unknown()
 });
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
 function createProviderVisibilityMetadata(args) {
   return {
     parseRawEvent: args.parseRawEvent,
@@ -26854,10 +26855,10 @@ function createProviderVisibilityMetadata(args) {
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
+// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
 var ignoredJsonRpcResultSchema = external_exports.unknown();
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/bridge.ts
 import { execFile as execFile3 } from "node:child_process";
 import { randomBytes as randomBytes2 } from "node:crypto";
 import { promises as fs2, readFileSync } from "node:fs";
@@ -26866,7 +26867,7 @@ import { dirname as dirname2, isAbsolute, basename as basename3, relative, resol
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/wire.ts
+// ../../../zana/packages/provider-bridge-acp/src/wire.ts
 var acpTextContentBlockSchema = external_exports.object({
   type: external_exports.literal("text"),
   text: external_exports.string()
@@ -27184,7 +27185,7 @@ var acpWriteTextFileParamsSchema = external_exports.object({
   content: external_exports.string()
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge-protocol.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge-protocol.ts
 var acpModelListParamsSchema = modelListParamsSchema.extend({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 });
@@ -27301,10 +27302,10 @@ var acpWarningNotificationParamsSchema = external_exports.object({
   details: external_exports.string().optional()
 }).passthrough();
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
+// ../../../zana/packages/provider-bridge-acp/src/dialect.ts
 import { basename } from "node:path";
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -27313,7 +27314,7 @@ import path2 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/launch-health.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/launch-health.ts
 import { stat } from "node:fs/promises";
 var PROBE_TIMEOUT_MS = 5e3;
 var PROBE_OUTPUT_MAX_BYTES = 64 * 1024;
@@ -27366,7 +27367,7 @@ ${output2.stderr}`);
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 var execFileAsync2 = promisify(execFile);
 var USAGE_FETCH_TIMEOUT_MS = 15e3;
 var CURSOR_DASHBOARD_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService";
@@ -27692,7 +27693,7 @@ async function readCursorUsage() {
   }
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/presentation.ts
+// ../../../zana/packages/provider-bridge-acp/src/presentation.ts
 function stripCodeTicks(text) {
   const trimmed = text.trim();
   return trimmed.length >= 2 && trimmed.startsWith("`") && trimmed.endsWith("`") ? trimmed.slice(1, -1) : trimmed;
@@ -27788,7 +27789,7 @@ function toolKindPresentation(args) {
   );
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
+// ../../../zana/packages/provider-bridge-acp/src/dialect.ts
 var GENERIC_ACP_DIALECT = { id: "acp" };
 var grokToolMetaSchema = external_exports.object({
   "x.ai/tool": external_exports.object({
@@ -28048,7 +28049,7 @@ function resolveAcpDialect(launch) {
   return byCommand === void 0 ? GENERIC_ACP_DIALECT : DIALECTS_BY_ID.get(byCommand) ?? GENERIC_ACP_DIALECT;
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/tool-call-operation.ts
+// ../../../zana/packages/provider-bridge-acp/src/tool-call-operation.ts
 import path3 from "node:path";
 var acpRawInputCommandSchema = external_exports.object({ command: external_exports.string() }).passthrough();
 var acpRawInputPathSchema = external_exports.object({
@@ -28142,7 +28143,7 @@ function resolveAcpFileChangeWriteScope(paths) {
   return candidate;
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/tool-classification.ts
+// ../../../zana/packages/provider-bridge-acp/src/tool-classification.ts
 var ZCC_TOOL_SERVER = "zcc";
 function isInjectedToolCandidate(event) {
   if (event.kind !== void 0 && event.kind !== "other") {
@@ -28512,7 +28513,7 @@ function classifyAcpToolCall2(event, injected, options) {
   }
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/visibility.ts
+// ../../../zana/packages/provider-bridge-acp/src/visibility.ts
 var NORMALIZED_ACP_METHODS = /* @__PURE__ */ new Set([
   "thread/identity",
   "error",
@@ -28577,7 +28578,7 @@ var acpVisibilityMetadata = createProviderVisibilityMetadata({
   describeParsedRawEvent: describeParsedAcpRawEvent
 });
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/system-instruction-echo.ts
+// ../../../zana/packages/provider-bridge-acp/src/system-instruction-echo.ts
 var SYSTEM_INSTRUCTIONS_OPEN = "<system_instructions>";
 var SYSTEM_INSTRUCTIONS_CLOSE = "</system_instructions>";
 var SYSTEM_INSTRUCTION_ECHO_MAX_CHARS = 256 * 1024;
@@ -28659,7 +28660,7 @@ function consumeEchoBuffer(buffer, expectedEcho) {
   return { emit: buffer, buffer: "", done: true };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/delta-translation.ts
+// ../../../zana/packages/provider-bridge-acp/src/delta-translation.ts
 var ASSISTANT_STREAM_KEY = "assistant";
 var THOUGHT_STREAM_KEY = "thought";
 var ACP_PLAN_STEP_STATUS_BY_ENTRY_STATUS = {
@@ -29453,7 +29454,7 @@ function createAcpDeltaTranslator(options = {}) {
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/interactions.ts
+// ../../../zana/packages/provider-bridge-acp/src/interactions.ts
 function classifyAcpPermission(toolCall, options) {
   const own2 = classifyAcpToolCall(toolCall, options);
   if (own2.kind !== "generic" || !toolCall.startedToolCall) {
@@ -29570,10 +29571,10 @@ function resolveAcpPermissionDecision(args) {
   return { decision: args.resolution.decision };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
+// ../../../zana/packages/provider-bridge-acp/src/session-params.ts
 import path4 from "node:path";
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/model-catalog.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/model-catalog.ts
 var ACP_NATIVE_REASONING_EFFORTS = [
   {
     reasoningEffort: "medium",
@@ -29932,7 +29933,7 @@ function splitPrimaryModels(catalogModels, primaryModels) {
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/cursor-model-selection.ts
+// ../../../zana/packages/provider-bridge-acp/src/cursor-model-selection.ts
 var CURSOR_LEGACY_FAMILY_SELECTIONS = {
   "claude-4-sonnet": { modelId: "claude-sonnet-4" },
   "claude-4.5-opus": { modelId: "claude-opus-4-5" },
@@ -30019,7 +30020,7 @@ function buildCursorParameterizedModelCatalog(models) {
   return [...normalized.values()].map((entry) => entry.model);
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
+// ../../../zana/packages/provider-bridge-acp/src/session-params.ts
 function sanitizeAcpSkillDescription(description) {
   const sanitized = description.replace(/[\r\n]+/gu, " ").replace(/\s+/gu, " ").replace(/[<>]/gu, "").trim();
   return sanitized.length > 0 ? sanitized : "(description unavailable)";
@@ -30182,7 +30183,7 @@ function buildAcpSessionParams(args) {
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/agent-connection.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/agent-connection.ts
 import { createInterface } from "node:readline";
 var STDERR_TAIL_MAX_CHUNKS = 40;
 var CLOSED_STDIN_ERROR_CODES = /* @__PURE__ */ new Set(["EPIPE", "ERR_STREAM_DESTROYED"]);
@@ -30456,14 +30457,14 @@ function createAcpAgentConnection(options) {
   };
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 import { execFile as execFile2 } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat as stat2, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename as basename2, dirname, join as join2, resolve as resolve2 } from "node:path";
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
 import { createConnection } from "node:net";
 import { createInterface as createInterface2 } from "node:readline";
 var ACP_BRIDGE_MCP_SERVER_NAME = "zcc";
@@ -30711,7 +30712,7 @@ function runAcpDynamicToolMcpServer() {
   });
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 var CURSOR_MCP_APPROVAL_FILE = "mcp-approvals.json";
 var CURSOR_APPROVAL_LOCK_STALE_MS = 3e4;
 var CURSOR_APPROVAL_LOCK_TIMEOUT_MS = 5e3;
@@ -30873,7 +30874,7 @@ async function revokeCursorSessionMcpServer(approval) {
   );
 }
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
+// ../../../zana/packages/provider-bridge-acp/src/bridge/bridge.ts
 var sessionsByBbThreadId = /* @__PURE__ */ new Map();
 var bbThreadIdByProviderThreadId = /* @__PURE__ */ new Map();
 var pendingRuntimeRequests = /* @__PURE__ */ new Map();
@@ -33068,13 +33069,13 @@ var experimental_providerBridge = experimental_defineProviderBridge({
   onSigint: shutdownBridge
 });
 
-// ../../.zana-sdk/packages/provider-bridge-acp/src/probe.ts
+// ../../../zana/packages/provider-bridge-acp/src/probe.ts
 var acpAgentProbeSchema = external_exports.union([
   external_exports.object({ reachable: external_exports.literal(true), fork: external_exports.boolean() }),
   external_exports.object({ reachable: external_exports.literal(false), reason: external_exports.string() })
 ]);
 
-// ../../.zana-sdk/packages/plugin-sdk/dist/provider-bridge.js
+// ../../../zana/packages/plugin-sdk/dist/provider-bridge.js
 var __create2 = Object.create;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -33107,7 +33108,7 @@ var __toESM2 = (mod, isNodeMode, target2) => (target2 = mod != null ? __create2(
   mod
 ));
 var require_windows2 = __commonJS2({
-  "node_modules/isexe/windows.js"(exports, module) {
+  "../../node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require2("fs");
@@ -33145,7 +33146,7 @@ var require_windows2 = __commonJS2({
   }
 });
 var require_mode2 = __commonJS2({
-  "node_modules/isexe/mode.js"(exports, module) {
+  "../../node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require2("fs");
@@ -33176,7 +33177,7 @@ var require_mode2 = __commonJS2({
   }
 });
 var require_isexe2 = __commonJS2({
-  "node_modules/isexe/index.js"(exports, module) {
+  "../../node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require2("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
@@ -33229,7 +33230,7 @@ var require_isexe2 = __commonJS2({
   }
 });
 var require_which2 = __commonJS2({
-  "node_modules/which/which.js"(exports, module) {
+  "../../node_modules/.pnpm/which@2.0.2/node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
     var path22 = __require2("path");
     var COLON = isWindows ? ";" : ":";
@@ -33323,7 +33324,7 @@ var require_which2 = __commonJS2({
   }
 });
 var require_path_key2 = __commonJS2({
-  "node_modules/path-key/index.js"(exports, module) {
+  "../../node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js"(exports, module) {
     "use strict";
     var pathKey = (options = {}) => {
       const environment = options.env || process.env;
@@ -33338,7 +33339,7 @@ var require_path_key2 = __commonJS2({
   }
 });
 var require_resolveCommand2 = __commonJS2({
-  "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
     var path22 = __require2("path");
     var which = require_which2();
@@ -33378,7 +33379,7 @@ var require_resolveCommand2 = __commonJS2({
   }
 });
 var require_escape2 = __commonJS2({
-  "node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
     var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
     function escapeCommand(arg) {
@@ -33401,13 +33402,13 @@ var require_escape2 = __commonJS2({
   }
 });
 var require_shebang_regex2 = __commonJS2({
-  "node_modules/shebang-regex/index.js"(exports, module) {
+  "../../node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
 var require_shebang_command2 = __commonJS2({
-  "node_modules/shebang-command/index.js"(exports, module) {
+  "../../node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
     var shebangRegex = require_shebang_regex2();
     module.exports = (string4 = "") => {
@@ -33425,7 +33426,7 @@ var require_shebang_command2 = __commonJS2({
   }
 });
 var require_readShebang2 = __commonJS2({
-  "node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
     var fs3 = __require2("fs");
     var shebangCommand = require_shebang_command2();
@@ -33445,7 +33446,7 @@ var require_readShebang2 = __commonJS2({
   }
 });
 var require_parse2 = __commonJS2({
-  "node_modules/cross-spawn/lib/parse.js"(exports, module) {
+  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
     var path22 = __require2("path");
     var resolveCommand = require_resolveCommand2();
@@ -33505,7 +33506,7 @@ var require_parse2 = __commonJS2({
   }
 });
 var require_enoent2 = __commonJS2({
-  "node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
     var isWin = process.platform === "win32";
     function notFoundError(original, syscall) {
@@ -33553,7 +33554,7 @@ var require_enoent2 = __commonJS2({
   }
 });
 var require_cross_spawn2 = __commonJS2({
-  "node_modules/cross-spawn/index.js"(exports, module) {
+  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
     var cp = __require2("child_process");
     var parse3 = require_parse2();
@@ -38276,6 +38277,7 @@ var bridgeRequestMethodValues2 = Object.values(
 var sessionKindSchema2 = external_exports.enum(["interactive", "automated"]);
 var sessionConstructionFields2 = {
   sessionKind: sessionKindSchema2.optional().catch(void 0),
+  providerId: external_exports.string().min(1).optional(),
   threadId: external_exports.string().min(1),
   cwd: external_exports.string().min(1),
   options: bridgeExecutionOptionsSchema2,
@@ -41503,20 +41505,10 @@ var desktopBrowserChangedSchema = external_exports.object({
 }).strict();
 
 // src/native-auth.ts
+import { existsSync as existsSync6 } from "node:fs";
+
+// src/acp-session.ts
 import { spawn } from "node:child_process";
-import { createHash as createHash2, randomUUID } from "node:crypto";
-import {
-  copyFileSync,
-  existsSync as existsSync3,
-  mkdirSync as mkdirSync3,
-  readFileSync as readFileSync3,
-  renameSync as renameSync2,
-  rmSync as rmSync2,
-  statSync,
-  writeFileSync as writeFileSync2
-} from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
 // src/native-runtime.ts
@@ -41701,37 +41693,294 @@ function killProcessTree(child) {
   }
 }
 
-// src/native-usage.ts
-function parseNativeQuotaWindows(text) {
-  const windows = [];
-  let inQuotas = false;
-  let group = "";
-  for (const line of text.split(/\r?\n/)) {
-    if (line.startsWith("### ")) {
-      inQuotas = line.trim() === "### Quota Limits";
-      continue;
+// src/acp-session.ts
+var CATALOG_UPDATE_WAIT_MS = 1e3;
+var CATALOG_UPDATE_MAX_SESSIONS = 16;
+var SIGN_IN_PROMPTS = [
+  "Credentials missing or invalid",
+  "Launching browser login flow",
+  "Open the following link to authenticate"
+];
+function forEachLine(stream, onLine) {
+  if (!stream) return;
+  const decoder = new StringDecoder("utf8");
+  let buffer = "";
+  stream.on("data", (chunk) => {
+    buffer += typeof chunk === "string" ? chunk : decoder.write(chunk);
+    let newline;
+    while ((newline = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) onLine(line);
     }
-    if (!inQuotas) continue;
-    const heading = /^- \*\*([^*]+)\*\*$/.exec(line);
-    if (heading) {
-      group = heading[1];
-      continue;
+  });
+}
+function hasCatalogModels(session) {
+  const model = Array.isArray(session?.configOptions) ? session.configOptions.find((option) => option?.id === "model" || option?.category === "model") : void 0;
+  if (Array.isArray(model?.options)) {
+    return model.options.flatMap((option) => Array.isArray(option?.options) ? option.options : [option]).some((option) => typeof option?.value === "string" && option.value);
+  }
+  const legacy = session?.models?.availableModels;
+  return Array.isArray(legacy) && legacy.some((item) => typeof (item?.id || item?.modelId) === "string");
+}
+var NativeAcpSession = class _NativeAcpSession {
+  constructor(options) {
+    this.options = options;
+    const spawnFn = options.spawnImpl ?? spawn;
+    this.child = spawnFn(options.command, options.args, {
+      cwd: options.cwd || process.cwd(),
+      env: { ...process.env, ...options.env, ...options.interactive ? {} : { BROWSER: "echo" } },
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true
+    });
+    forEachLine(this.child.stdout, (line) => this.handleStdoutLine(line));
+    forEachLine(this.child.stderr, (line) => this.handleStderrLine(line));
+    this.child.on("error", (error62) => this.rejectAll(error62));
+    this.child.stdin?.on?.("error", (error62) => this.rejectAll(error62));
+    this.child.on("close", (code) => {
+      this.closed = true;
+      this.rejectAll(new Error(`Native ACP server exited (code ${code ?? "null"})`));
+    });
+    if (!options.interactive) {
+      this.later(options.timeoutMs, () => this.close(new Error(`Native ACP ${options.operation} timed out after ${options.timeoutMs}ms`)));
     }
-    const match = /^\s+- \*\*([^*]+):\*\* (\d+(?:\.\d+)?)% remaining \(resets ([^)]+)\)\s*$/.exec(line);
-    if (!group || !match) continue;
-    const remaining = Number(match[2]);
-    if (remaining < 0 || remaining > 100) continue;
-    const resetTime = Date.parse(match[3]);
-    windows.push({
-      label: `${group} \u2014 ${match[1]}`,
-      usedPercent: 100 - remaining,
-      resetsAt: Number.isFinite(resetTime) ? new Date(resetTime).toISOString() : null
+  }
+  child;
+  pending = /* @__PURE__ */ new Map();
+  notificationListeners = [];
+  stderrListeners = [];
+  catalogUpdates = /* @__PURE__ */ new Map();
+  availableCommands = /* @__PURE__ */ new Set();
+  signInWaiters = [];
+  /** Deadline and waits; closing runs them early so no wait outlives the session. */
+  timers = /* @__PURE__ */ new Map();
+  nextId = 1;
+  closed = false;
+  signInPrompts = 0;
+  static open(options) {
+    return new _NativeAcpSession(options);
+  }
+  /** True once the runtime printed a sign-in prompt on stderr. */
+  get signInRequested() {
+    return this.signInPrompts > 0;
+  }
+  onStderrLine(listener) {
+    this.stderrListeners.push(listener);
+  }
+  async initialize() {
+    const result = await this.request("initialize", {
+      protocolVersion: 1,
+      clientInfo: { name: "zcc", title: "Zana Command Center", version: "1.0.0" },
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        _meta: { parameterizedModelPicker: true }
+      }
+    });
+    return {
+      protocolVersion: typeof result?.protocolVersion === "number" ? result.protocolVersion : null,
+      agentVersion: typeof result?.agentInfo?.version === "string" ? result.agentInfo.version : null,
+      advertisedAuthMethods: Array.isArray(result?.authMethods) ? result.authMethods.map((method) => typeof method?.id === "string" ? method.id : null).filter(Boolean) : []
+    };
+  }
+  async authenticate(methodId, options = {}) {
+    await this.request(
+      "authenticate",
+      { methodId, ...options.headless ? { _meta: { headless: true } } : {} },
+      options.timeoutMs
+    );
+  }
+  /**
+   * Opens a session, or reports that the runtime asked for sign-in instead. With `awaitCatalog`,
+   * the session's configOptions reflect the latest config_option_update, briefly awaiting a late one
+   * when session/new itself carried no models.
+   */
+  async newSession(options = {}) {
+    const prompted = () => !this.options.interactive && this.signInRequested;
+    const request = this.request("session/new", { cwd: this.options.cwd || process.cwd(), mcpServers: [] }, options.timeoutMs);
+    const session = this.options.interactive ? await request : await Promise.race([
+      request,
+      new Promise((resolve6) => {
+        if (this.signInRequested) resolve6("sign_in_required");
+        else this.signInWaiters.push(() => resolve6("sign_in_required"));
+      })
+    ]);
+    if (session === "sign_in_required" || prompted()) return { kind: "sign_in_required" };
+    if (options.awaitCatalog) await this.applyCatalogUpdate(session);
+    return prompted() ? { kind: "sign_in_required" } : { kind: "ready", session };
+  }
+  /** Resolves true once the runtime advertises `/name`, or false after `waitMs`. */
+  waitForCommand(name, waitMs) {
+    if (this.availableCommands.has(name)) return Promise.resolve(true);
+    return new Promise((resolve6) => {
+      const timer = this.later(waitMs, () => resolve6(this.availableCommands.has(name)));
+      this.notificationListeners.push(() => {
+        if (!this.availableCommands.has(name)) return;
+        this.cancel(timer);
+        resolve6(true);
+      });
     });
   }
-  return windows;
-}
+  /**
+   * Runs a local slash command and collects its text output. The session is stopped, and the
+   * command fails, if it requests a tool or its output exceeds `maxTextChars`.
+   */
+  async runCommand(sessionId, name, options) {
+    let text = "";
+    const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
+    let requestedTools = false;
+    this.notificationListeners.push((method, params) => {
+      if (method !== "session/update") return;
+      const update = params?.update;
+      if (update?.sessionUpdate === "tool_call") {
+        requestedTools = true;
+        this.close(toolsRequested);
+      }
+      if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
+        text += update.content.text;
+        if (text.length > options.maxTextChars) {
+          this.close(new Error(`Native ${name} output exceeded ${options.maxTextChars} characters; the diagnostic session was stopped.`));
+        }
+      }
+    });
+    const result = await this.request("session/prompt", { sessionId, prompt: [{ type: "text", text: `/${name}` }] });
+    if (requestedTools) throw toolsRequested;
+    return { stopReason: result?.stopReason, text };
+  }
+  close(reason) {
+    if (!this.closed) {
+      this.closed = true;
+      this.rejectAll(reason ?? new Error("Native ACP probe closed"));
+      killProcessTree(this.child);
+    }
+    for (const [timer, run] of [...this.timers]) {
+      clearTimeout(timer);
+      this.timers.delete(timer);
+      run();
+    }
+  }
+  request(method, params, timeoutMs = this.options.timeoutMs) {
+    if (this.closed) return Promise.reject(new Error("Native ACP server is already closed"));
+    const id2 = this.nextId++;
+    return new Promise((resolve6, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id2);
+        reject(new Error(`ACP request "${method}" timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      this.pending.set(id2, { resolve: resolve6, reject, timer });
+      try {
+        this.child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: id2, method, params }) + "\n");
+      } catch (error62) {
+        clearTimeout(timer);
+        this.pending.delete(id2);
+        reject(error62);
+      }
+    });
+  }
+  handleStdoutLine(line) {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (!message || typeof message !== "object") return;
+    if (typeof message.method === "string") {
+      if (message.id !== void 0) this.replyToServerRequest(message);
+      else this.handleNotification(message.method, message.params);
+      return;
+    }
+    const entry = this.pending.get(Number(message.id));
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    this.pending.delete(Number(message.id));
+    if (message.error) {
+      const error62 = new Error(message.error?.data?.message || message.error?.message || `ACP error ${message.error?.code}`);
+      error62.code = message.error?.code;
+      error62.data = message.error?.data;
+      entry.reject(error62);
+    } else {
+      entry.resolve(message.result);
+    }
+  }
+  /** Diagnostics never approve tools or service arbitrary filesystem requests. */
+  replyToServerRequest(message) {
+    const reply = message.method === "session/request_permission" ? { result: { outcome: { outcome: "cancelled" } } } : { error: { code: -32601, message: "Not supported by the diagnostic client" } };
+    this.child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, ...reply }) + "\n");
+  }
+  handleNotification(method, params) {
+    const update = method === "session/update" ? params?.update : void 0;
+    if (update?.sessionUpdate === "available_commands_update") {
+      this.availableCommands.clear();
+      for (const command of Array.isArray(update.availableCommands) ? update.availableCommands : []) {
+        if (typeof command?.name === "string") this.availableCommands.add(command.name);
+      }
+    }
+    if (update?.sessionUpdate === "config_option_update" && typeof params?.sessionId === "string" && Array.isArray(update.configOptions) && (this.catalogUpdates.size < CATALOG_UPDATE_MAX_SESSIONS || this.catalogUpdates.has(params.sessionId))) {
+      this.catalogUpdates.set(params.sessionId, update.configOptions);
+    }
+    for (const listener of [...this.notificationListeners]) listener(method, params);
+  }
+  handleStderrLine(line) {
+    if (SIGN_IN_PROMPTS.some((prompt) => line.includes(prompt))) {
+      this.signInPrompts++;
+      for (const wake of this.signInWaiters.splice(0)) wake();
+    }
+    for (const listener of this.stderrListeners) listener(line);
+  }
+  async applyCatalogUpdate(session) {
+    const sessionId = session?.sessionId;
+    if (typeof sessionId !== "string") return;
+    if (!this.catalogUpdates.has(sessionId) && !hasCatalogModels(session)) {
+      await new Promise((resolve6) => {
+        const timer = this.later(CATALOG_UPDATE_WAIT_MS, resolve6);
+        this.notificationListeners.push(() => {
+          if (!this.catalogUpdates.has(sessionId)) return;
+          this.cancel(timer);
+          resolve6();
+        });
+      });
+    }
+    const update = this.catalogUpdates.get(sessionId);
+    if (update) session.configOptions = update;
+  }
+  later(ms, run) {
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      run();
+    }, ms);
+    this.timers.set(timer, run);
+    return timer;
+  }
+  cancel(timer) {
+    clearTimeout(timer);
+    this.timers.delete(timer);
+  }
+  rejectAll(error62) {
+    for (const entry of this.pending.values()) {
+      clearTimeout(entry.timer);
+      entry.reject(error62);
+    }
+    this.pending.clear();
+  }
+};
 
-// src/native-auth.ts
+// src/account-identity.ts
+import { createHash as createHash2 } from "node:crypto";
+import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
+
+// src/gemini-home.ts
+import {
+  copyFileSync,
+  existsSync as existsSync3,
+  mkdirSync as mkdirSync3,
+  readFileSync as readFileSync3,
+  rmSync as rmSync2,
+  statSync,
+  writeFileSync as writeFileSync2
+} from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
 var GOOGLE_ACP_AUTH_METHODS = [
   "oauth-personal",
   "oauth-business",
@@ -41745,6 +41994,9 @@ function isSanitizedGeminiHomePath(dirPath) {
 }
 function isValidGoogleAuthMethod(value) {
   return typeof value === "string" && GOOGLE_ACP_AUTH_METHODS.includes(value);
+}
+function isHeadlessAuthMethod(authMethod) {
+  return authMethod === "gemini-api-key" || authMethod === "agent-platform";
 }
 function resolveGeminiHome(env = process.env) {
   if (env.GEMINI_HOME && env.GEMINI_HOME.trim()) {
@@ -41763,6 +42015,9 @@ function resolveSourceAndManagedGeminiHome(env = process.env) {
   const sourceGeminiHome = configuredHome ?? fallbackUserHome;
   const managedGeminiHome = env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim() ? join4(getZccDataDir(env), "state", "antigravity-gemini-home") : configuredHome ? join4(sourceGeminiHome, "antigravity-zcc-home") : join4(getZccDataDir(env), "state", "antigravity-gemini-home");
   return { sourceGeminiHome, managedGeminiHome };
+}
+function withGeminiHome(env, geminiHome) {
+  return { ...env ?? process.env, GEMINI_HOME: geminiHome };
 }
 function getNativeAcpSettingsPath(env = process.env) {
   return join4(resolveGeminiHome(env), "antigravity-acp", "settings.json");
@@ -41803,6 +42058,24 @@ function readConfiguredNativeAuthType(env = process.env) {
   const authType = settings?.auth?.type;
   return typeof authType === "string" && authType.trim() ? authType.trim() : null;
 }
+var statMemo = /* @__PURE__ */ new Map();
+function memoizeByStat(filePath, compute) {
+  let stamp;
+  try {
+    const stat3 = statSync(filePath);
+    stamp = `${stat3.ino}:${stat3.size}:${stat3.mtimeMs}`;
+  } catch {
+    stamp = "missing";
+  }
+  const hit = statMemo.get(filePath);
+  if (hit && hit.stamp === stamp) return hit.value;
+  const value = compute();
+  statMemo.set(filePath, { stamp, value });
+  return value;
+}
+function forgetStatMemo(filePath) {
+  statMemo.delete(filePath);
+}
 function writeSettingsFileAtomically(settingsPath, authType) {
   let existing = {};
   if (existsSync3(settingsPath)) {
@@ -41834,7 +42107,7 @@ function writeSettingsFileAtomically(settingsPath, authType) {
   } catch {
   }
 }
-function writeNativeAcpAuthType(authType, env = process.env) {
+function writeAuthTypeSettings(authType, env = process.env) {
   const primaryPath = getNativeAcpSettingsPath(env);
   writeSettingsFileAtomically(primaryPath, authType);
   const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
@@ -41847,7 +42120,6 @@ function writeNativeAcpAuthType(authType, env = process.env) {
       }
     }
   }
-  clearCachedNativeReadiness(env);
 }
 function syncFileNewer(src, dest) {
   if (!existsSync3(src)) return;
@@ -41863,6 +42135,13 @@ function syncFileNewer(src, dest) {
     copyFileSync(src, dest);
   } catch {
   }
+}
+function syncTokenToSource(home, env) {
+  if (env?.GEMINI_HOME) return;
+  syncFileNewer(
+    join4(home.geminiHome, "antigravity-acp", "acp_token.json"),
+    join4(resolveGeminiHome(env), "antigravity-acp", "acp_token.json")
+  );
 }
 function isIdeNamedPipeMcpProxyUnreachable(serverConfig) {
   if (!serverConfig || typeof serverConfig !== "object") {
@@ -41882,6 +42161,13 @@ function isIdeNamedPipeMcpProxyUnreachable(serverConfig) {
     return !existsSync3(pipePath);
   }
   return true;
+}
+function writeFileIfChanged(filePath, contents) {
+  try {
+    if (readFileSync3(filePath, "utf8") === contents) return;
+  } catch {
+  }
+  writeFileSync2(filePath, contents, "utf8");
 }
 function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
   const disabledDeadMcpServers = [];
@@ -41903,13 +42189,9 @@ function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
         }
         sanitizedServers[serverName] = serverCfg;
       }
-      writeFileSync2(
-        targetMcpConfigPath,
-        JSON.stringify({ ...raw, mcpServers: sanitizedServers }, null, 2) + "\n",
-        "utf8"
-      );
+      writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ ...raw, mcpServers: sanitizedServers }, null, 2) + "\n");
     } catch {
-      writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
+      writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n");
     }
   } else if (!existsSync3(targetMcpConfigPath)) {
     writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
@@ -41940,6 +42222,332 @@ function prepareSanitizedGeminiHome(options) {
     disabledDeadMcpServers
   };
 }
+
+// src/account-identity.ts
+var generation = 0;
+var ownWrites = /* @__PURE__ */ new Map();
+function fingerprintCredentials(env, authMethod) {
+  const tokenPath = getNativeAcpTokenPath(env);
+  const tokenInfo = memoizeByStat(tokenPath, () => {
+    if (!existsSync4(tokenPath)) return "no-token";
+    try {
+      const contents = readFileSync4(tokenPath, "utf8");
+      let identity = contents;
+      try {
+        const token = JSON.parse(contents);
+        if (typeof token.refresh_token === "string") identity = `${token.client_id ?? ""}:${token.refresh_token}`;
+      } catch {
+      }
+      return createHash2("sha256").update(identity).digest("hex");
+    } catch {
+      return "err";
+    }
+  });
+  const configured = readConfiguredNativeAuthType(env) ?? "none";
+  const apiKey = env.GEMINI_API_KEY ? `key:${createHash2("sha256").update(env.GEMINI_API_KEY).digest("hex")}` : "no-key";
+  const gacPath = env.GOOGLE_APPLICATION_CREDENTIALS;
+  const appCreds = gacPath ? memoizeByStat(gacPath, () => {
+    let cloudIdentity = gacPath;
+    try {
+      cloudIdentity += ":" + readFileSync4(gacPath, "utf8");
+    } catch {
+      cloudIdentity += ":unreadable";
+    }
+    return `gac:${createHash2("sha256").update(cloudIdentity).digest("hex")}`;
+  }) : "no-gac";
+  const settings = memoizeByStat(getNativeAcpSettingsPath(env), () => readNativeAcpSettings(env));
+  const cloudProject = createHash2("sha256").update(JSON.stringify([
+    settings?.gcp ?? null,
+    env.GOOGLE_CLOUD_PROJECT,
+    env.GOOGLE_CLOUD_LOCATION,
+    env.CLOUD_ML_PROJECT_ID,
+    env.GOOGLE_API_KEY
+  ])).digest("hex");
+  const cleared = isAuthExplicitlyCleared(env) ? "cleared" : "uncleared";
+  return `${authMethod}:${configured}:${cleared}:${tokenInfo}:${apiKey}:${appCreds}:${cloudProject}`;
+}
+function fingerprintAccount(env, authMethod) {
+  const { managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  return {
+    managed: fingerprintCredentials(withGeminiHome(env, managedGeminiHome), authMethod),
+    source: fingerprintCredentials(env, authMethod)
+  };
+}
+function combine(fingerprints) {
+  return `${fingerprints.managed}
+${fingerprints.source}`;
+}
+function hashCredentialId(managedFingerprint) {
+  return createHash2("sha256").update(managedFingerprint).digest("hex").slice(0, 16);
+}
+var AccountSnapshot = class _AccountSnapshot {
+  constructor(target2, home) {
+    this.target = target2;
+    this.home = home;
+    this.effectiveEnv = withGeminiHome(target2.env, home.geminiHome);
+    this.fingerprints = fingerprintAccount(target2.env ?? process.env, target2.authMethod);
+  }
+  home;
+  /** The caller's environment pointed at the managed home the runtime uses. */
+  effectiveEnv;
+  generation = generation;
+  fingerprints;
+  get fingerprint() {
+    return this.fingerprints.managed;
+  }
+  /** Read live so keys follow this diagnostic's own auth-type write. */
+  get configuredAuthType() {
+    return readConfiguredNativeAuthType(this.effectiveEnv);
+  }
+  /** Identifies cached readiness for this runtime and auth configuration. */
+  get readinessKey() {
+    const { command, args, authMethod } = this.target;
+    return JSON.stringify({ command, args, authMethod, configuredAuthType: this.configuredAuthType });
+  }
+  /** Where readiness for this account is cached, as of now. */
+  get slot() {
+    return { key: this.readinessKey, fingerprint: this.fingerprint };
+  }
+  /** Identifies catalog and usage refreshes for this runtime and account. */
+  get refreshKey() {
+    const { command, args, authMethod, cwd, env } = this.target;
+    return JSON.stringify([
+      command,
+      args,
+      authMethod,
+      cwd,
+      getZccDataDir(env),
+      resolveSourceAndManagedGeminiHome(env).managedGeminiHome,
+      this.fingerprint
+    ]);
+  }
+  /** Opaque, so UIs can drop results that belong to a previous sign-in. */
+  get credentialId() {
+    return hashCredentialId(this.fingerprint);
+  }
+  /** A fresh snapshot of the same target, for an account that just changed on purpose (sign-in). */
+  recapture() {
+    return new _AccountSnapshot(this.target, this.home);
+  }
+  isCurrent() {
+    if (this.generation !== generation) return false;
+    const now = fingerprintAccount(this.target.env ?? process.env, this.target.authMethod);
+    if (combine(now) === combine(this.fingerprints)) return true;
+    const write = ownWrites.get(this.home.geminiHome);
+    if (write && write.before === combine(this.fingerprints) && write.after === combine(now)) {
+      this.fingerprints = now;
+      return true;
+    }
+    return false;
+  }
+  /**
+   * Records the auth type a headless authenticate just accepted. Only this synchronous write may move
+   * the snapshot forward; any other change since capture still fails validation.
+   */
+  commitHeadlessAuthType() {
+    if (!this.isCurrent()) {
+      throw new Error("Antigravity sign-in changed during authentication. Retry to load the current account.");
+    }
+    const before = combine(this.fingerprints);
+    writeAuthTypeSettings(this.target.authMethod, this.target.env);
+    const after = fingerprintAccount(this.target.env ?? process.env, this.target.authMethod);
+    if (combine(after) !== before) ownWrites.set(this.home.geminiHome, { before, after: combine(after) });
+    this.fingerprints = after;
+  }
+};
+function captureAccount(target2) {
+  return new AccountSnapshot(target2, prepareSanitizedGeminiHome({ env: target2.env, authMethod: target2.authMethod }));
+}
+
+// src/keyed-refresh.ts
+function remember(map2, key, value, maxKeys) {
+  map2.delete(key);
+  if (map2.size >= maxKeys) map2.delete(map2.keys().next().value);
+  map2.set(key, value);
+}
+var KeyedRefresh = class {
+  constructor(policy = {}) {
+    this.policy = policy;
+  }
+  running = /* @__PURE__ */ new Map();
+  successes = /* @__PURE__ */ new Map();
+  retryAfter = /* @__PURE__ */ new Map();
+  now() {
+    return this.policy.now ? this.policy.now() : Date.now();
+  }
+  /** A success cached for `key` within the TTL. */
+  cached(key) {
+    const hit = this.successes.get(key);
+    return hit && this.policy.successTtlMs !== void 0 && this.now() - hit.at < this.policy.successTtlMs ? hit.result : void 0;
+  }
+  /**
+   * Joins the refresh already running for `key`. Otherwise, if `key` failed within the backoff and
+   * `whileBackingOff` is given, answers with it; otherwise starts `task`.
+   */
+  run(key, task, options = {}) {
+    const running = this.running.get(key);
+    if (running) return running;
+    const retry = this.retryAfter.get(key);
+    if (options.whileBackingOff && retry !== void 0 && retry > this.now()) return Promise.resolve(options.whileBackingOff());
+    const refresh = task().then((run) => {
+      this.settle(key, run);
+      return run.result;
+    }).finally(() => this.running.delete(key));
+    this.running.set(key, refresh);
+    return refresh;
+  }
+  settle(startKey, run) {
+    if (run.outcome === "discard") return;
+    const maxKeys = this.policy.maxKeys ?? 32;
+    if (run.key !== startKey) this.retryAfter.delete(startKey);
+    if (run.outcome === "success") {
+      this.retryAfter.delete(run.key);
+      if (this.policy.successTtlMs !== void 0) remember(this.successes, run.key, { result: run.result, at: this.now() }, maxKeys);
+    } else if (this.policy.failureBackoffMs !== void 0) {
+      remember(this.retryAfter, run.key, this.now() + this.policy.failureBackoffMs, maxKeys);
+    }
+  }
+};
+
+// src/native-usage.ts
+function parseNativeQuotaWindows(text) {
+  const windows = [];
+  let inQuotas = false;
+  let group = "";
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith("### ")) {
+      inQuotas = line.trim() === "### Quota Limits";
+      continue;
+    }
+    if (!inQuotas) continue;
+    const heading = /^- \*\*([^*]+)\*\*$/.exec(line);
+    if (heading) {
+      group = heading[1];
+      continue;
+    }
+    const match = /^\s+- \*\*([^*]+):\*\* (\d+(?:\.\d+)?)% remaining \(resets ([^)]+)\)\s*$/.exec(line);
+    if (!group || !match) continue;
+    const remaining = Number(match[2]);
+    if (remaining < 0 || remaining > 100) continue;
+    const resetTime = Date.parse(match[3]);
+    windows.push({
+      label: `${group} \u2014 ${match[1]}`,
+      usedPercent: 100 - remaining,
+      resetsAt: Number.isFinite(resetTime) ? new Date(resetTime).toISOString() : null
+    });
+  }
+  return windows;
+}
+
+// src/readiness-store.ts
+import { randomUUID } from "node:crypto";
+import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync5, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname5, join as join5 } from "node:path";
+function readinessResult(state, subject, fields = {}) {
+  return {
+    state,
+    agentVersion: null,
+    protocolVersion: 1,
+    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
+    selectedAuthMethod: subject.authMethod,
+    configuredAuthType: subject.configuredAuthType,
+    models: [],
+    modes: [],
+    ...subject.disabledDeadMcpServers ? { disabledDeadMcpServers: subject.disabledDeadMcpServers } : {},
+    checkedAt: Date.now(),
+    ...fields
+  };
+}
+function runtimeMissingResult(command, subject) {
+  return readinessResult("runtime_missing", subject, {
+    protocolVersion: null,
+    advertisedAuthMethods: [],
+    error: `Native ACP binary not found at "${command}".`
+  });
+}
+var READINESS_CACHE_TTL_MS = 10 * 60 * 1e3;
+function isPersistedResult(raw) {
+  return raw?.result && typeof raw.result === "object" && Number.isFinite(raw.result.checkedAt) && Array.isArray(raw.result.models) && raw.result.models.every((model) => typeof model?.id === "string" && typeof model?.name === "string") && Array.isArray(raw.result.modes) && Array.isArray(raw.result.advertisedAuthMethods);
+}
+var ReadinessStore = class {
+  constructor(options = {}) {
+    this.options = options;
+  }
+  memory = null;
+  now() {
+    return this.options.now ? this.options.now() : Date.now();
+  }
+  isFresh(result) {
+    return this.now() - result.checkedAt < (this.options.ttlMs ?? READINESS_CACHE_TTL_MS);
+  }
+  /**
+   * The freshest result for the slot from memory or disk, newer winning. With `allowStale`, an
+   * expired catalog for the same account is returned as `authenticated` with `catalogStale`; it
+   * also outlives a fresher transient failure, whose error it carries.
+   */
+  lookup(slot, env, options = {}) {
+    const memory = this.memory && this.memory.key === slot.key && this.memory.fingerprint === slot.fingerprint && this.isFresh(this.memory.result) ? this.memory.result : null;
+    const persisted = this.readPersisted(slot, env);
+    if (persisted && this.isFresh(persisted) && (!memory || persisted.checkedAt > memory.checkedAt)) {
+      this.memory = { ...slot, result: persisted };
+      return persisted;
+    }
+    const stale = options.allowStale && persisted && persisted.state === "session_ready" && persisted.models.length > 0 ? { ...persisted, state: "authenticated", catalogStale: true } : null;
+    if (memory && stale && memory.state === "runtime_launches") return { ...stale, error: memory.error };
+    return memory ?? stale;
+  }
+  /** Transient runtime failures stay in this process; every other result is shared through disk. */
+  put(slot, result, env) {
+    this.memory = { ...slot, result };
+    if (result.state !== "runtime_launches") this.writePersisted(slot, result, env);
+  }
+  invalidate(env) {
+    this.memory = null;
+    try {
+      const filePath = this.path(env);
+      forgetStatMemo(filePath);
+      rmSync3(filePath, { force: true });
+    } catch {
+    }
+  }
+  path(env) {
+    return join5(getZccDataDir(env), "state", "antigravity-native-readiness.json");
+  }
+  readPersisted(slot, env) {
+    const filePath = this.path(env);
+    const raw = memoizeByStat(filePath, () => {
+      try {
+        return existsSync5(filePath) ? JSON.parse(readFileSync5(filePath, "utf8")) : null;
+      } catch {
+        return null;
+      }
+    });
+    return raw && raw.key === slot.key && (raw.fingerprint || "") === slot.fingerprint && isPersistedResult(raw) ? raw.result : null;
+  }
+  writePersisted(slot, result, env) {
+    try {
+      const filePath = this.path(env);
+      mkdirSync4(dirname5(filePath), { recursive: true });
+      const temporary = `${filePath}.${randomUUID()}.tmp`;
+      try {
+        writeFileSync3(temporary, JSON.stringify({ key: slot.key, result, fingerprint: slot.fingerprint }, null, 2) + "\n", { mode: 384 });
+        renameSync2(temporary, filePath);
+      } finally {
+        rmSync3(temporary, { force: true });
+        forgetStatMemo(filePath);
+      }
+    } catch {
+    }
+  }
+};
+var readinessStore = new ReadinessStore();
+
+// src/native-auth.ts
+var NATIVE_PROBE_TIMEOUT_MS = 2e4;
+var USAGE_CACHE_TTL_MS = 6e4;
+var USAGE_COMMANDS_WAIT_MS = 1e3;
+var USAGE_MAX_TEXT_CHARS = 32768;
+var CATALOG_RETRY_BACKOFF_MS = 3e4;
 function extractSessionReasoningMetadata(sessionResult) {
   const configOptions = sessionResult?.configOptions;
   if (!Array.isArray(configOptions)) return {};
@@ -42022,559 +42630,101 @@ function extractModesFromSessionResult(sessionResult) {
   if (!Array.isArray(available)) return [];
   return available.map((m) => typeof m?.id === "string" ? m.id : null).filter((id2) => Boolean(id2));
 }
-function getPersistedReadinessPath(env = process.env) {
-  return join4(getZccDataDir(env), "state", "antigravity-native-readiness.json");
-}
-var statMemo = /* @__PURE__ */ new Map();
-function memoizeByStat(filePath, compute) {
-  let stamp;
-  try {
-    const stat3 = statSync(filePath);
-    stamp = `${stat3.ino}:${stat3.size}:${stat3.mtimeMs}`;
-  } catch {
-    stamp = "missing";
-  }
-  const hit = statMemo.get(filePath);
-  if (hit && hit.stamp === stamp) return hit.value;
-  const value = compute();
-  statMemo.set(filePath, { stamp, value });
-  return value;
-}
-function readPersistedReadiness(key, env = process.env) {
-  const filePath = getPersistedReadinessPath(env);
-  const raw = memoizeByStat(filePath, () => {
-    try {
-      return existsSync3(filePath) ? JSON.parse(readFileSync3(filePath, "utf8")) : null;
-    } catch {
-      return null;
-    }
-  });
-  if (raw && raw.key === key && raw.result && typeof raw.result === "object" && Number.isFinite(raw.result.checkedAt) && Array.isArray(raw.result.models) && raw.result.models.every((model) => typeof model?.id === "string" && typeof model?.name === "string") && Array.isArray(raw.result.modes) && Array.isArray(raw.result.advertisedAuthMethods)) {
-    return { result: raw.result, fingerprint: raw.fingerprint || "" };
-  }
-  return null;
-}
-function writePersistedReadiness(key, result, fingerprint, env = process.env) {
-  try {
-    const filePath = getPersistedReadinessPath(env);
-    mkdirSync3(dirname4(filePath), { recursive: true });
-    const temporary = `${filePath}.${randomUUID()}.tmp`;
-    try {
-      writeFileSync2(temporary, JSON.stringify({ key, result, fingerprint }, null, 2) + "\n", { mode: 384 });
-      renameSync2(temporary, filePath);
-    } finally {
-      rmSync2(temporary, { force: true });
-      statMemo.delete(filePath);
-    }
-  } catch {
-  }
-}
-function computeCredentialFingerprint(env, authMethod) {
-  const tokenPath = getNativeAcpTokenPath(env);
-  const tokenInfo = memoizeByStat(tokenPath, () => {
-    if (!existsSync3(tokenPath)) return "no-token";
-    try {
-      const contents = readFileSync3(tokenPath, "utf8");
-      let identity = contents;
-      try {
-        const token = JSON.parse(contents);
-        if (typeof token.refresh_token === "string") identity = `${token.client_id ?? ""}:${token.refresh_token}`;
-      } catch {
-      }
-      return createHash2("sha256").update(identity).digest("hex");
-    } catch {
-      return "err";
-    }
-  });
-  const configured = readConfiguredNativeAuthType(env) ?? "none";
-  const apiKey = env.GEMINI_API_KEY ? `key:${createHash2("sha256").update(env.GEMINI_API_KEY).digest("hex")}` : "no-key";
-  const gacPath = env.GOOGLE_APPLICATION_CREDENTIALS;
-  const appCreds = gacPath ? memoizeByStat(gacPath, () => {
-    let cloudIdentity = gacPath;
-    try {
-      cloudIdentity += ":" + readFileSync3(gacPath, "utf8");
-    } catch {
-      cloudIdentity += ":unreadable";
-    }
-    return `gac:${createHash2("sha256").update(cloudIdentity).digest("hex")}`;
-  }) : "no-gac";
-  const settings = memoizeByStat(getNativeAcpSettingsPath(env), () => readNativeAcpSettings(env));
-  const cloudProject = createHash2("sha256").update(JSON.stringify([
-    settings?.gcp ?? null,
-    env.GOOGLE_CLOUD_PROJECT,
-    env.GOOGLE_CLOUD_LOCATION,
-    env.CLOUD_ML_PROJECT_ID,
-    env.GOOGLE_API_KEY
-  ])).digest("hex");
-  const cleared = isAuthExplicitlyCleared(env) ? "cleared" : "uncleared";
-  return `${authMethod}:${configured}:${cleared}:${tokenInfo}:${apiKey}:${appCreds}:${cloudProject}`;
-}
-function setupStdoutHandler(stdout, onMessage) {
-  if (!stdout) return;
-  const stdoutDecoder = new StringDecoder("utf8");
-  let stdoutBuffer = "";
-  stdout.on("data", (chunk) => {
-    stdoutBuffer += typeof chunk === "string" ? chunk : stdoutDecoder.write(chunk);
-    let newlineIdx;
-    while ((newlineIdx = stdoutBuffer.indexOf("\n")) >= 0) {
-      const line = stdoutBuffer.slice(0, newlineIdx).trim();
-      stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
-      if (!line) continue;
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed && typeof parsed === "object") {
-          onMessage(parsed);
-        }
-      } catch {
-      }
-    }
-  });
-}
-function setupStderrHandler(stderr, onLine) {
-  if (!stderr) return;
-  const stderrDecoder = new StringDecoder("utf8");
-  let stderrBuffer = "";
-  stderr.on("data", (chunk) => {
-    stderrBuffer += typeof chunk === "string" ? chunk : stderrDecoder.write(chunk);
-    let newlineIdx;
-    while ((newlineIdx = stderrBuffer.indexOf("\n")) >= 0) {
-      const line = stderrBuffer.slice(0, newlineIdx).trim();
-      stderrBuffer = stderrBuffer.slice(newlineIdx + 1);
-      if (line) onLine(line);
-    }
-  });
-}
-function attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, onClose) {
-  setupStdoutHandler(child.stdout, (parsed) => {
-    if (typeof parsed.method === "string") {
-      if (parsed.id !== void 0) {
-        const reply = parsed.method === "session/request_permission" ? { result: { outcome: { outcome: "cancelled" } } } : { error: { code: -32601, message: "Not supported by the diagnostic client" } };
-        child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, ...reply }) + "\n");
-      } else for (const listener of notificationListeners) listener(parsed.method, parsed.params);
-      return;
-    }
-    const entry = pending.get(Number(parsed.id));
-    if (!entry) return;
-    clearTimeout(entry.timer);
-    pending.delete(Number(parsed.id));
-    if (parsed.error) {
-      const err = new Error(parsed.error?.data?.message || parsed.error?.message || `ACP error ${parsed.error?.code}`);
-      err.code = parsed.error?.code;
-      err.data = parsed.error?.data;
-      entry.reject(err);
-    } else {
-      entry.resolve(parsed.result);
-    }
-  });
-  setupStderrHandler(child.stderr, (line) => {
-    for (const listener of stderrListeners) listener(line);
-  });
-  const rejectAll = (err) => {
-    for (const [, entry] of pending) {
-      clearTimeout(entry.timer);
-      entry.reject(err);
-    }
-    pending.clear();
-  };
-  child.on("error", (err) => rejectAll(err));
-  child.stdin?.on?.("error", (err) => rejectAll(err));
-  child.on("close", (code) => {
-    onClose();
-    rejectAll(new Error(`Native ACP server exited (code ${code ?? "null"})`));
-  });
-  return rejectAll;
-}
-function createHarnessRequester(child, pending, isClosed, getNextId) {
-  return function request(method, params, timeoutMs = 2e4) {
-    if (isClosed()) return Promise.reject(new Error("Native ACP server is already closed"));
-    const id2 = getNextId();
-    return new Promise((resolveReq, rejectReq) => {
-      const timer = setTimeout(() => {
-        pending.delete(id2);
-        rejectReq(new Error(`ACP request "${method}" timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      pending.set(id2, { resolve: resolveReq, reject: rejectReq, timer });
-      try {
-        child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: id2, method, params }) + "\n");
-      } catch (err) {
-        clearTimeout(timer);
-        pending.delete(id2);
-        rejectReq(err);
-      }
-    });
-  };
-}
-function createNativeRpcHarness(options, suppressBrowser) {
-  const spawnFn = options.spawnImpl ?? spawn;
-  const env = {
-    ...process.env,
-    ...options.env ?? {},
-    ...suppressBrowser ? { BROWSER: "echo" } : {}
-  };
-  const child = spawnFn(options.command, options.args, {
-    cwd: options.cwd || process.cwd(),
-    env,
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true
-  });
-  const pending = /* @__PURE__ */ new Map();
-  const stderrListeners = [];
-  const notificationListeners = [];
-  let nextId = 1;
-  let closed = false;
-  const rejectAll = attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, () => {
-    closed = true;
-  });
-  const request = createHarnessRequester(child, pending, () => closed, () => nextId++);
+function describeSession(session) {
+  const tierName = session?._meta?.antigravity?.tier?.name;
   return {
-    child,
-    request,
-    onStderrLine(listener) {
-      stderrListeners.push(listener);
-    },
-    onNotification(listener) {
-      notificationListeners.push(listener);
-    },
-    close(reason) {
-      if (closed) return;
-      closed = true;
-      rejectAll(reason ?? new Error("Native ACP probe closed"));
-      killProcessTree(child);
-    }
+    models: extractModelsFromSessionResult(session),
+    modes: extractModesFromSessionResult(session),
+    tierName: typeof tierName === "string" ? tierName : null
   };
 }
-var cachedReadiness = null;
-var READINESS_CACHE_TTL_MS = 10 * 60 * 1e3;
-var NATIVE_PROBE_TIMEOUT_MS = 2e4;
-var USAGE_CACHE_TTL_MS = 6e4;
-var USAGE_COMMANDS_WAIT_MS = 1e3;
-var USAGE_MAX_TEXT_CHARS = 32768;
-var CATALOG_RETRY_BACKOFF_MS = 3e4;
-var CATALOG_RETRY_MAX_KEYS = 32;
-var CATALOG_UPDATE_WAIT_MS = 1e3;
-var CATALOG_UPDATE_MAX_SESSIONS = 16;
-var authGeneration = 0;
-function clearCachedNativeReadiness(env = process.env) {
-  cachedReadiness = null;
-  authGeneration++;
-  try {
-    const filePath = getPersistedReadinessPath(env);
-    statMemo.delete(filePath);
-    rmSync2(filePath, { force: true });
-  } catch {
-  }
+function fromInitialize(info) {
+  return { agentVersion: info.agentVersion, protocolVersion: info.protocolVersion, advertisedAuthMethods: info.advertisedAuthMethods };
 }
-function checkLocalCredentialPresence(authMethod, effectiveEnv, configuredAuthType) {
-  if (authMethod === "gemini-api-key") {
-    return Boolean(effectiveEnv.GEMINI_API_KEY) ? { authenticated: true, note: "API key detected in environment (unverified session)" } : { authenticated: false };
-  }
+function subjectOf(account, configuredAuthType = account.configuredAuthType) {
+  return { authMethod: account.target.authMethod, configuredAuthType, disabledDeadMcpServers: account.home.disabledDeadMcpServers };
+}
+function hasLocalCredentials(authMethod, effectiveEnv, configuredAuthType) {
+  if (authMethod === "gemini-api-key") return Boolean(effectiveEnv.GEMINI_API_KEY);
   if (authMethod === "agent-platform") {
-    const hasPlatformCreds = Boolean(
-      effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS || effectiveEnv.CLOUD_ML_PROJECT_ID || effectiveEnv.GOOGLE_CLOUD_PROJECT
-    );
-    return hasPlatformCreds ? { authenticated: true, note: "Platform credentials detected (unverified session)" } : { authenticated: false };
+    return Boolean(effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS || effectiveEnv.CLOUD_ML_PROJECT_ID || effectiveEnv.GOOGLE_CLOUD_PROJECT);
   }
-  if (!isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && configuredAuthType) {
-    return { authenticated: true, note: "Local credentials present (unverified session)" };
-  }
-  return { authenticated: false };
-}
-function checkCachedReadiness(cacheKey, fingerprint, effectiveEnv, allowStaleCatalog = false) {
-  const memory = cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS ? cachedReadiness.result : null;
-  const persisted = readPersistedReadiness(cacheKey, effectiveEnv);
-  const result = persisted && persisted.fingerprint === fingerprint ? persisted.result : null;
-  if (result && Date.now() - result.checkedAt < READINESS_CACHE_TTL_MS && (!memory || result.checkedAt > memory.checkedAt)) {
-    cachedReadiness = { key: cacheKey, fingerprint, result };
-    return result;
-  }
-  const staleCatalog = allowStaleCatalog && result && result.state === "session_ready" && result.models.length > 0 ? { ...result, state: "authenticated", catalogStale: true } : null;
-  if (memory && staleCatalog && memory.state === "runtime_launches") return { ...staleCatalog, error: memory.error };
-  if (memory) return memory;
-  return staleCatalog;
-}
-function computeEffectiveCredentialFingerprint(env, authMethod) {
-  const { managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
-  return computeCredentialFingerprint({ ...env, GEMINI_HOME: managedGeminiHome }, authMethod);
-}
-function captureAuthIdentity(env, authMethod) {
-  const sourceEnv = env ?? process.env;
-  return {
-    generation: authGeneration,
-    fingerprint: computeEffectiveCredentialFingerprint(sourceEnv, authMethod),
-    sourceFingerprint: computeCredentialFingerprint(sourceEnv, authMethod)
-  };
-}
-function isAuthIdentityCurrent(identity, env, authMethod) {
-  return identity.generation === authGeneration && identity.fingerprint === computeEffectiveCredentialFingerprint(env ?? process.env, authMethod) && identity.sourceFingerprint === computeCredentialFingerprint(env ?? process.env, authMethod);
-}
-function buildNativeRefreshKey(options, fingerprint) {
-  return JSON.stringify([
-    options.command,
-    options.args,
-    options.authMethod,
-    options.cwd,
-    getZccDataDir(options.env),
-    resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
-    fingerprint
-  ]);
-}
-function buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized) {
-  return {
-    state: "authenticated",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: configuredAuthType ?? options.authMethod,
-    models: [],
-    modes: ["default", "auto_edit", "yolo"],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-}
-function buildSignInRequiredFastReadiness(options, sanitized) {
-  return {
-    state: "sign_in_required",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: null,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.',
-    checkedAt: Date.now()
-  };
+  return !isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && Boolean(configuredAuthType);
 }
 function getFastNativeReadiness(options) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  return getPreparedNativeReadiness(options, sanitized);
+  return readPreparedReadiness(captureAccount(options));
 }
-function getPreparedNativeReadiness(options, sanitized, fingerprint = computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)) {
-  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
-  const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const cacheKey = JSON.stringify({
-    command: options.command,
-    args: options.args,
-    authMethod: options.authMethod,
-    configuredAuthType
-  });
-  const cached2 = existsSync3(options.command) ? checkCachedReadiness(cacheKey, fingerprint, effectiveEnv, true) : null;
-  if (cached2) {
-    return { ...cached2, disabledDeadMcpServers: sanitized.disabledDeadMcpServers };
-  }
-  if (!existsSync3(options.command)) {
-    return {
-      state: "runtime_missing",
-      agentVersion: null,
-      protocolVersion: null,
-      advertisedAuthMethods: [],
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Native ACP binary not found at "${options.command}".`,
-      checkedAt: Date.now()
-    };
-  }
-  const credCheck = checkLocalCredentialPresence(options.authMethod, effectiveEnv, configuredAuthType);
-  if (credCheck.authenticated) {
-    return buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized);
-  }
-  return buildSignInRequiredFastReadiness(options, sanitized);
-}
-var headlessAuthGroups = /* @__PURE__ */ new Map();
-async function performInitializeAndAuth(harness, options, identity) {
-  if (options.configuredAuthType || options.authMethod !== "gemini-api-key" && options.authMethod !== "agent-platform") {
-    return initializeNativeSession(harness, options, identity);
-  }
-  const key = JSON.stringify([resolveSourceAndManagedGeminiHome(options.env), options.authMethod, identity.current]);
-  const group = headlessAuthGroups.get(key) ?? { current: identity.current, settingsWritten: false, users: 0 };
-  group.users++;
-  headlessAuthGroups.set(key, group);
-  try {
-    return await initializeNativeSession(harness, options, identity, group);
-  } finally {
-    if (--group.users === 0) headlessAuthGroups.delete(key);
-  }
-}
-async function initializeNativeSession(harness, options, identity, headlessGroup) {
-  const initResult = await harness.request(
-    "initialize",
-    {
-      protocolVersion: 1,
-      clientInfo: { name: "zcc", title: "Zana Command Center", version: "1.0.0" },
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true }
-      }
-    },
-    options.timeoutMs
-  );
-  const protocolVersion = typeof initResult?.protocolVersion === "number" ? initResult.protocolVersion : null;
-  const agentVersion = typeof initResult?.agentInfo?.version === "string" ? initResult.agentInfo.version : null;
-  const advertisedAuthMethods = Array.isArray(initResult?.authMethods) ? initResult.authMethods.map((m) => typeof m?.id === "string" ? m.id : null).filter(Boolean) : [];
-  if (headlessGroup) {
-    await harness.request("authenticate", { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
-    if (!isAuthIdentityCurrent(headlessGroup.current, options.env, options.authMethod)) {
-      throw new Error("Antigravity sign-in changed during authentication. Retry to load the current account.");
-    }
-    if (!headlessGroup.settingsWritten) {
-      writeNativeAcpAuthType(options.authMethod, options.env);
-      headlessGroup.current = captureAuthIdentity(options.env, options.authMethod);
-      headlessGroup.settingsWritten = true;
-    }
-    identity.current = headlessGroup.current;
-  }
-  return { protocolVersion, agentVersion, advertisedAuthMethods };
-}
-function checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized) {
-  if (!options.forceRefresh && cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS) {
-    return cachedReadiness.result;
-  }
-  if (!existsSync3(options.command)) {
-    return {
-      state: "runtime_missing",
-      agentVersion: null,
-      protocolVersion: null,
-      advertisedAuthMethods: [],
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Native ACP binary not found at "${options.command}".`,
-      checkedAt: Date.now()
-    };
-  }
-  return null;
-}
-function buildProbeSessionResult(sessionRace, initInfo, options, effectiveEnv, sanitized, cacheKey, fingerprint) {
-  const models = extractModelsFromSessionResult(sessionRace);
-  const modes = extractModesFromSessionResult(sessionRace);
-  const tierName = typeof sessionRace?._meta?.antigravity?.tier?.name === "string" ? sessionRace._meta.antigravity.tier.name : null;
-  if (!options.env?.GEMINI_HOME) {
-    syncFileNewer(
-      join4(sanitized.geminiHome, "antigravity-acp", "acp_token.json"),
-      join4(resolveGeminiHome(options.env), "antigravity-acp", "acp_token.json")
+function readPreparedReadiness(account) {
+  const { target: target2, home, effectiveEnv } = account;
+  const configuredAuthType = account.configuredAuthType;
+  if (!existsSync6(target2.command)) return runtimeMissingResult(target2.command, subjectOf(account));
+  const cached2 = readinessStore.lookup(account.slot, effectiveEnv, { allowStale: true });
+  if (cached2) return { ...cached2, disabledDeadMcpServers: home.disabledDeadMcpServers };
+  if (hasLocalCredentials(target2.authMethod, effectiveEnv, configuredAuthType)) {
+    return readinessResult(
+      "authenticated",
+      subjectOf(account, configuredAuthType ?? target2.authMethod),
+      { modes: ["default", "auto_edit", "yolo"] }
     );
   }
-  const readyResult = {
-    state: "session_ready",
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: readConfiguredNativeAuthType(effectiveEnv) ?? options.authMethod,
-    models,
-    modes,
-    tierName,
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-  cachedReadiness = { key: cacheKey, fingerprint, result: readyResult };
-  writePersistedReadiness(cacheKey, readyResult, fingerprint, effectiveEnv);
-  return readyResult;
+  return readinessResult(
+    "sign_in_required",
+    subjectOf(account, null),
+    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' }
+  );
 }
-function checkInitCompatibility(initInfo, options, configuredAuthType, sanitized) {
-  if (initInfo.protocolVersion !== 1) {
-    return {
-      state: "runtime_launches",
-      agentVersion: initInfo.agentVersion,
-      protocolVersion: initInfo.protocolVersion,
-      advertisedAuthMethods: initInfo.advertisedAuthMethods,
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Unsupported ACP protocolVersion returned: ${initInfo.protocolVersion}`,
-      checkedAt: Date.now()
-    };
+async function initializeFor(session, account, configuredAuthType) {
+  const info = await session.initialize();
+  const { authMethod } = account.target;
+  if (!configuredAuthType && isHeadlessAuthMethod(authMethod)) {
+    await session.authenticate(authMethod, { headless: true });
+    account.commitHeadlessAuthType();
   }
-  if (initInfo.advertisedAuthMethods.length > 0 && !initInfo.advertisedAuthMethods.includes(options.authMethod)) {
-    return {
-      state: "runtime_launches",
-      agentVersion: initInfo.agentVersion,
-      protocolVersion: initInfo.protocolVersion,
-      advertisedAuthMethods: initInfo.advertisedAuthMethods,
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Selected auth method "${options.authMethod}" is not advertised.`,
-      checkedAt: Date.now()
-    };
+  return info;
+}
+function openDiagnosticSession(options, account, operation) {
+  return NativeAcpSession.open({
+    command: options.command,
+    args: options.args,
+    cwd: options.cwd,
+    env: account.effectiveEnv,
+    spawnImpl: options.spawnImpl,
+    timeoutMs: options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS,
+    operation
+  });
+}
+function incompatibility(info, authMethod) {
+  if (info.protocolVersion !== 1) return `Unsupported ACP protocolVersion returned: ${info.protocolVersion}`;
+  if (info.advertisedAuthMethods.length > 0 && !info.advertisedAuthMethods.includes(authMethod)) {
+    return `Selected auth method "${authMethod}" is not advertised.`;
   }
   return null;
 }
-function formatProbeFailureResult(err, interactiveLoginTriggeredOnStderr, options, configuredAuthType, sanitized) {
-  const message = err?.message || String(err);
-  const isAuthRequired = interactiveLoginTriggeredOnStderr || /authentication required|no authentication method selected|credentials (?:missing|invalid|expired)/i.test(message) || err?.data?.recovery?.kind === "authRequired";
-  return {
-    state: isAuthRequired ? "sign_in_required" : "runtime_launches",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: isAuthRequired ? 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' : message,
-    checkedAt: Date.now()
-  };
+function failureResult(error62, signInRequested, subject) {
+  const message = error62?.message || String(error62);
+  const isAuthRequired = signInRequested || /authentication required|no authentication method selected|credentials (?:missing|invalid|expired)/i.test(message) || error62?.data?.recovery?.kind === "authRequired";
+  return isAuthRequired ? readinessResult(
+    "sign_in_required",
+    subject,
+    { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' }
+  ) : readinessResult("runtime_launches", subject, { error: message });
 }
-function setupStderrAuthDetector(harness) {
-  let triggered = false;
-  let resolve6 = null;
-  const promise2 = new Promise((res) => {
-    resolve6 = () => res("stderr_auth_required");
+function accountChangedResult(subject, fields) {
+  return readinessResult("runtime_launches", subject, {
+    ...fields,
+    error: "Antigravity sign-in changed while models were being discovered. Retry to load the current account."
   });
-  harness.onStderrLine((line) => {
-    if (line.includes("Credentials missing or invalid") || line.includes("Launching browser login flow") || line.includes("Open the following link to authenticate")) {
-      triggered = true;
-      resolve6?.();
-    }
-  });
-  return { isTriggered: () => triggered, promise: promise2 };
 }
-function createNativeDiagnostic(options, operation, sanitized) {
-  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
-  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
-  const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
-  const detector = setupStderrAuthDetector(harness);
-  const deadline = setTimeout(() => harness.close(new Error(`Native ACP ${operation} timed out after ${timeoutMs}ms`)), timeoutMs);
-  return {
-    sanitized,
-    effectiveEnv,
-    timeoutMs,
-    harness,
-    detector,
-    dispose() {
-      clearTimeout(deadline);
-      harness.close();
-    }
-  };
-}
-var usageRefreshes = /* @__PURE__ */ new Map();
-var usageCache = null;
+var usageRefresh = new KeyedRefresh({ successTtlMs: USAGE_CACHE_TTL_MS });
 async function queryNativeUsage(options) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
-  if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
-    return usageCache.result;
-  }
-  const running = usageRefreshes.get(key);
-  if (running) return running;
-  const request = performNativeUsageQuery(options, identity, sanitized).then((result) => {
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
-      return { supported: true, usage: {
+  const account = captureAccount(options);
+  const key = account.refreshKey;
+  const cached2 = options.forceRefresh ? void 0 : usageRefresh.cached(key);
+  if (cached2) return cached2;
+  return usageRefresh.run(key, async () => {
+    const result = await performNativeUsageQuery(options, account);
+    if (!account.isCurrent()) {
+      return { outcome: "discard", key, result: { supported: true, usage: {
         status: "error",
         planLabel: null,
         accountEmail: null,
@@ -42582,64 +42732,12 @@ async function queryNativeUsage(options) {
         checkedAt: Date.now(),
         source: "native-acp-/usage",
         message: "Antigravity sign-in changed while usage was being checked. Retry to load the current account."
-      } };
+      } } };
     }
-    if (result.usage.status === "ok") usageCache = { key: buildNativeRefreshKey(options, identity.current.fingerprint), result };
-    return result;
-  }).finally(() => usageRefreshes.delete(key));
-  usageRefreshes.set(key, request);
-  return request;
-}
-function trackUsageSessionUpdates(harness) {
-  let advertised = false;
-  let text = "";
-  let unexpectedTools = false;
-  let commandsReceived = () => {
-  };
-  const commandsReady = new Promise((resolve6) => {
-    commandsReceived = resolve6;
+    return { result, outcome: result.usage.status === "ok" ? "success" : "failure", key: account.refreshKey };
   });
-  let commandTimer;
-  harness.onNotification((method, params) => {
-    if (method !== "session/update") return;
-    const update = params?.update;
-    if (update?.sessionUpdate === "available_commands_update") {
-      advertised = Array.isArray(update.availableCommands) && update.availableCommands.some((command) => command?.name === "usage");
-      if (advertised) commandsReceived();
-    }
-    if (update?.sessionUpdate === "tool_call") {
-      unexpectedTools = true;
-      harness.close();
-    }
-    if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
-      text += update.content.text;
-      if (text.length > USAGE_MAX_TEXT_CHARS) {
-        harness.close(new Error(`Native usage output exceeded ${USAGE_MAX_TEXT_CHARS} characters; the diagnostic session was stopped.`));
-      }
-    }
-  });
-  return {
-    get advertised() {
-      return advertised;
-    },
-    get text() {
-      return text;
-    },
-    get unexpectedTools() {
-      return unexpectedTools;
-    },
-    waitForCommands(timeoutMs) {
-      if (advertised) return Promise.resolve();
-      return Promise.race([commandsReady, new Promise((resolve6) => {
-        commandTimer = setTimeout(resolve6, timeoutMs);
-      })]);
-    },
-    dispose() {
-      clearTimeout(commandTimer);
-    }
-  };
 }
-async function performNativeUsageQuery(options, identity, preparedHome) {
+async function performNativeUsageQuery(options, account) {
   const usage = {
     status: "error",
     planLabel: null,
@@ -42648,206 +42746,211 @@ async function performNativeUsageQuery(options, identity, preparedHome) {
     checkedAt: Date.now(),
     source: "native-acp-/usage"
   };
-  if (!existsSync3(options.command)) return { supported: true, usage: { ...usage, status: "not_installed" } };
-  const diagnostic = createNativeDiagnostic(options, "usage check", preparedHome);
-  const { sanitized, effectiveEnv, harness, timeoutMs, detector } = diagnostic;
-  const tracker = trackUsageSessionUpdates(harness);
+  if (!existsSync6(options.command)) return { supported: true, usage: { ...usage, status: "not_installed" } };
+  const session = openDiagnosticSession(options, account, "usage check");
   try {
-    const init = await performInitializeAndAuth(harness, {
-      authMethod: options.authMethod,
-      timeoutMs,
-      configuredAuthType: readConfiguredNativeAuthType(effectiveEnv),
-      env: options.env
-    }, identity);
+    const init = await initializeFor(session, account, account.configuredAuthType);
     if (init.protocolVersion !== 1) throw new Error("Unsupported Native ACP protocol version.");
-    const session = await Promise.race([harness.request("session/new", { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    if (session === "stderr_auth_required") return { supported: true, usage: { ...usage, status: "unauthenticated" } };
-    usage.planLabel = typeof session?._meta?.antigravity?.tier?.name === "string" ? session._meta.antigravity.tier.name : null;
-    await tracker.waitForCommands(USAGE_COMMANDS_WAIT_MS);
-    if (!tracker.advertised) throw new Error("This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.");
-    const result = await harness.request("session/prompt", { sessionId: session.sessionId, prompt: [{ type: "text", text: "/usage" }] }, timeoutMs);
-    if (result?.stopReason !== "end_turn" || tracker.unexpectedTools) throw new Error("Native usage command did not complete successfully.");
-    usage.windows = parseNativeQuotaWindows(tracker.text);
+    const opened = await session.newSession();
+    if (opened.kind === "sign_in_required") return { supported: true, usage: { ...usage, status: "unauthenticated" } };
+    usage.planLabel = describeSession(opened.session).tierName ?? null;
+    if (!await session.waitForCommand("usage", USAGE_COMMANDS_WAIT_MS)) {
+      throw new Error("This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.");
+    }
+    const result = await session.runCommand(opened.session.sessionId, "usage", { maxTextChars: USAGE_MAX_TEXT_CHARS });
+    if (result.stopReason !== "end_turn") throw new Error("Native usage command did not complete successfully.");
+    usage.windows = parseNativeQuotaWindows(result.text);
     if (usage.windows.length === 0) throw new Error("Native usage returned no recognized quota windows. Check usage in Google Antigravity Settings.");
     return { supported: true, usage: { ...usage, status: "ok", checkedAt: Date.now() } };
   } catch (error62) {
-    const failure2 = formatProbeFailureResult(
-      error62,
-      detector.isTriggered(),
-      options,
-      readConfiguredNativeAuthType(effectiveEnv),
-      sanitized
-    );
+    const failure2 = failureResult(error62, session.signInRequested, subjectOf(account));
     return { supported: true, usage: {
       ...usage,
       status: failure2.state === "sign_in_required" ? "unauthenticated" : "error",
-      message: tracker.unexpectedTools ? "Native usage unexpectedly requested tools; the diagnostic session was stopped." : failure2.error
+      message: failure2.error
     } };
   } finally {
-    tracker.dispose();
-    diagnostic.dispose();
+    session.close();
   }
 }
-var catalogRefreshes = /* @__PURE__ */ new Map();
-var catalogRetryAfter = /* @__PURE__ */ new Map();
-function isNativeCatalogSettled(readiness, forceRefresh) {
+var catalogRefresh = new KeyedRefresh({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
+function isCatalogSettled(readiness, forceRefresh) {
   return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" || readiness.state === "session_ready" && readiness.models.length > 0);
 }
-async function getNativeCatalog(options) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const previous = getPreparedNativeReadiness(options, sanitized, identity.current.fingerprint);
-  if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
-  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
-  const running = catalogRefreshes.get(key);
-  if (running) return running;
-  const retry = catalogRetryAfter.get(key);
-  if (!options.forceRefresh && retry && retry > Date.now()) return previous;
-  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity, sanitized).then((result) => {
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) return result;
-    const retryKey = buildNativeRefreshKey(options, identity.current.fingerprint);
-    if (retryKey !== key) catalogRetryAfter.delete(key);
-    if (result.state !== "session_ready" || result.models.length === 0) {
-      if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value);
-      catalogRetryAfter.set(retryKey, Date.now() + CATALOG_RETRY_BACKOFF_MS);
-      if (result.state !== "sign_in_required" && result.state !== "session_ready" && previous.models.length > 0) {
-        return { ...previous, state: "authenticated", catalogStale: true, error: result.error };
-      }
-    } else catalogRetryAfter.delete(retryKey);
-    return result;
-  }).finally(() => catalogRefreshes.delete(key));
-  catalogRefreshes.set(key, refresh);
-  return refresh;
+function resolveNativeCatalog(options) {
+  const account = captureAccount(options);
+  const previous = readPreparedReadiness(account);
+  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
 }
-async function runNativeReadinessProbe(options, identity, sanitized) {
-  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
-  const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const fingerprint = identity.current.fingerprint;
-  const cacheKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType });
-  const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized);
-  if (earlyResult) return earlyResult;
-  const diagnostic = createNativeDiagnostic(options, "session verification", sanitized);
-  const { harness, detector, timeoutMs } = diagnostic;
-  const catalogUpdates = trackCatalogUpdates(harness);
+function refreshCatalog(options, account, previous) {
+  const key = account.refreshKey;
+  return catalogRefresh.run(key, async () => {
+    const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);
+    if (!account.isCurrent()) return { result, outcome: "discard", key };
+    if (result.state === "session_ready" && result.models.length > 0) return { result, outcome: "success", key: account.refreshKey };
+    const keepPrevious = result.state !== "sign_in_required" && result.state !== "session_ready" && previous.models.length > 0;
+    return {
+      outcome: "failure",
+      key: account.refreshKey,
+      result: keepPrevious ? { ...previous, state: "authenticated", catalogStale: true, error: result.error } : result
+    };
+  }, { whileBackingOff: options.forceRefresh ? void 0 : () => previous });
+}
+async function runNativeReadinessProbe(options, account) {
+  const { effectiveEnv } = account;
+  const startSlot = account.slot;
+  const subject = subjectOf(account);
+  if (!existsSync6(options.command)) return runtimeMissingResult(options.command, subject);
+  const cached2 = options.forceRefresh ? null : readinessStore.lookup(startSlot, effectiveEnv);
+  if (cached2) return cached2;
+  const session = openDiagnosticSession(options, account, "session verification");
   try {
-    const initInfo = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs, configuredAuthType, env: options.env }, identity);
-    const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, sanitized);
-    if (compatError) return compatError;
-    const sessionRace = await Promise.race([harness.request("session/new", { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    const signInRequired = () => sessionRace === "stderr_auth_required" || detector.isTriggered();
-    if (!signInRequired()) await catalogUpdates.applyTo(sessionRace);
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
-      return buildAuthChangedResult(initInfo, options, configuredAuthType, sanitized);
-    }
-    if (signInRequired()) {
-      const signInResult = buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, sanitized);
-      cachedReadiness = { key: cacheKey, fingerprint, result: signInResult };
-      writePersistedReadiness(cacheKey, signInResult, fingerprint, effectiveEnv);
+    const initInfo = await initializeFor(session, account, subject.configuredAuthType);
+    const incompatible = incompatibility(initInfo, options.authMethod);
+    if (incompatible) return readinessResult("runtime_launches", subject, { ...fromInitialize(initInfo), error: incompatible });
+    const opened = await session.newSession({ awaitCatalog: true });
+    if (!account.isCurrent()) return accountChangedResult(subject, fromInitialize(initInfo));
+    if (opened.kind === "sign_in_required") {
+      const signInResult = readinessResult("sign_in_required", subject, {
+        ...fromInitialize(initInfo),
+        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.'
+      });
+      readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
     }
-    const updatedAuthType = readConfiguredNativeAuthType(effectiveEnv);
-    const updatedKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType: updatedAuthType });
-    return buildProbeSessionResult(
-      sessionRace,
-      initInfo,
-      options,
-      effectiveEnv,
-      sanitized,
-      updatedKey,
-      computeCredentialFingerprint(effectiveEnv, options.authMethod)
+    syncTokenToSource(account.home, account.target.env);
+    const ready = readinessResult(
+      "session_ready",
+      subjectOf(account, account.configuredAuthType ?? options.authMethod),
+      { ...fromInitialize(initInfo), ...describeSession(opened.session) }
     );
-  } catch (err) {
-    const failedResult = formatProbeFailureResult(err, detector.isTriggered(), options, configuredAuthType, sanitized);
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
-      return buildAuthChangedResult(failedResult, options, configuredAuthType, sanitized);
-    }
-    cachedReadiness = { key: cacheKey, fingerprint, result: failedResult };
-    if (failedResult.state === "sign_in_required") writePersistedReadiness(cacheKey, failedResult, fingerprint, effectiveEnv);
-    return failedResult;
+    readinessStore.put(account.slot, ready, effectiveEnv);
+    return ready;
+  } catch (error62) {
+    const failed = failureResult(error62, session.signInRequested, subject);
+    if (!account.isCurrent()) return accountChangedResult(subject, {});
+    readinessStore.put(startSlot, failed, effectiveEnv);
+    return failed;
   } finally {
-    catalogUpdates.dispose();
-    diagnostic.dispose();
+    session.close();
   }
 }
-function trackCatalogUpdates(harness) {
-  const updates = /* @__PURE__ */ new Map();
-  let waiter = null;
-  let waitTimer;
-  harness.onNotification((method, params) => {
-    if (method !== "session/update" || typeof params?.sessionId !== "string" || params.update?.sessionUpdate !== "config_option_update" || !Array.isArray(params.update.configOptions)) return;
-    if (updates.size < CATALOG_UPDATE_MAX_SESSIONS || updates.has(params.sessionId)) updates.set(params.sessionId, params.update.configOptions);
-    if (waiter && waiter.sessionId === params.sessionId) waiter.resolve();
-  });
-  return {
-    async applyTo(sessionResult) {
-      const sessionId = sessionResult?.sessionId;
-      if (typeof sessionId !== "string") return;
-      if (!updates.has(sessionId) && extractModelsFromSessionResult(sessionResult).length === 0) {
-        await new Promise((resolve6) => {
-          waiter = { sessionId, resolve: resolve6 };
-          waitTimer = setTimeout(resolve6, CATALOG_UPDATE_WAIT_MS);
-        });
-      }
-      const update = updates.get(sessionId);
-      if (update) sessionResult.configOptions = update;
-    },
-    dispose() {
-      clearTimeout(waitTimer);
-      waiter = null;
-    }
-  };
-}
-function buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, sanitized) {
-  return {
-    state: "sign_in_required",
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.',
-    checkedAt: Date.now()
-  };
-}
-function buildAuthChangedResult(initInfo, options, configuredAuthType, sanitized) {
-  return {
-    state: "runtime_launches",
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: "Antigravity sign-in changed while models were being discovered. Retry to load the current account.",
-    checkedAt: Date.now()
-  };
-}
 
-// host.ts
-function buildDefaultNativeLaunchSpec(authMethod = "oauth-personal") {
-  const runtime = resolveNativeAcpRuntime();
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
+// src/provider-config.ts
+var NATIVE_REASONING = {
+  configId: "thinking_level",
+  supportedLevels: ["low", "medium", "high"],
+  defaultLevel: "medium"
+};
+function normalizeAuthMethod(value) {
+  return isValidGoogleAuthMethod(value) ? value : "oauth-personal";
+}
+function normalizeExecutable(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : void 0;
+}
+function resolveRuntime(customExecutable) {
+  return resolveNativeAcpRuntime({ customExecutable });
+}
+function launchEnv(authMethod, home, env) {
+  return {
+    BROWSER: "echo",
+    GEMINI_HOME: home.geminiHome,
+    AGY_ACP_AUTH_METHOD: authMethod,
+    ...authMethod === "gemini-api-key" && env.GEMINI_API_KEY ? { GEMINI_API_KEY: env.GEMINI_API_KEY } : {}
+  };
+}
+function buildNativeLaunchSpec(options = {}) {
+  const authMethod = options.authMethod ?? "oauth-personal";
+  const runtime = resolveRuntime(options.customExecutable);
+  const home = options.home ?? prepareSanitizedGeminiHome({ env: options.env, authMethod });
   return {
     displayName: "Antigravity",
     command: runtime.executable,
     args: runtime.args,
-    env: {
-      BROWSER: "echo",
-      GEMINI_HOME: sanitized.geminiHome,
-      AGY_ACP_AUTH_METHOD: authMethod
-    },
-    nativeReasoning: {
-      configId: "thinking_level",
-      supportedLevels: ["low", "medium", "high"],
-      defaultLevel: "medium"
-    }
+    env: launchEnv(authMethod, home, options.env ?? process.env),
+    nativeReasoning: { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] }
   };
 }
+function completeLaunchSpec(spec, authMethod, home, env = process.env) {
+  const existing = spec.env && typeof spec.env === "object" ? spec.env : {};
+  const defaults = launchEnv(authMethod, home, env);
+  let changed = spec.env !== existing;
+  const next = { ...existing };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (next[key] === void 0) {
+      next[key] = value;
+      changed = true;
+    }
+  }
+  if (!next.GEMINI_HOME) {
+    next.GEMINI_HOME = home.geminiHome;
+    changed = true;
+  }
+  spec.env = next;
+  if (!spec.nativeReasoning) {
+    spec.nativeReasoning = { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+    changed = true;
+  }
+  return changed;
+}
+function notInstalledMessage(runtime) {
+  return !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
+}
+function healthFromReadiness(runtime, readiness) {
+  if (!runtime.installed || !readiness) {
+    return { status: "not_installed", statusMessage: notInstalledMessage(runtime), planLabel: null, installedVersion: null };
+  }
+  if (readiness.state === "runtime_missing") {
+    return {
+      status: "not_installed",
+      statusMessage: readiness.error || notInstalledMessage(runtime),
+      planLabel: null,
+      installedVersion: null
+    };
+  }
+  const installedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
+  const planLabel = readiness.tierName ?? null;
+  if (readiness.state === "session_ready") return { status: "ready", statusMessage: null, planLabel, installedVersion };
+  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google." : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.');
+  return { status: readiness.state === "sign_in_required" ? "unauthenticated" : "unknown", statusMessage, planLabel, installedVersion };
+}
+function formatEffortDescription(level) {
+  return `${level.charAt(0).toUpperCase() + level.slice(1)} reasoning effort`;
+}
+function mapDiscoveredModels(models, stale = false) {
+  return models.map((m, idx) => {
+    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
+    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
+    return {
+      id: m.id,
+      model: m.id,
+      displayName: stale ? `${m.name} (cached)` : m.name,
+      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
+      supportedReasoningEfforts: levels.map((level) => ({ reasoningEffort: level, description: formatEffortDescription(level) })),
+      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
+      isDefault: idx === 0
+    };
+  });
+}
+function modelListNotInstalled() {
+  return { error: { code: -32e3, message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings \u2192 Antigravity Provider.` } };
+}
+function modelListFromReadiness(readiness) {
+  if (readiness.state === "sign_in_required") {
+    const message = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
+    return { error: { code: -32e3, message, data: { recovery: { kind: "authRequired", message, retryable: false } } } };
+  }
+  if (readiness.models.length === 0) {
+    return { error: { code: -32e3, message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' } };
+  }
+  return { result: {
+    models: mapDiscoveredModels(readiness.models, readiness.catalogStale),
+    selectedOnlyModels: [],
+    _meta: { checkedAt: readiness.checkedAt, stale: readiness.catalogStale === true, ...readiness.error ? { warning: readiness.error } : {} }
+  } };
+}
+
+// host.ts
 function getProviderOptionsFromParams(params) {
   if (!params || typeof params !== "object") return void 0;
   if (params.options?.providerOptions && typeof params.options.providerOptions === "object") {
@@ -42858,34 +42961,18 @@ function getProviderOptionsFromParams(params) {
   }
   return void 0;
 }
-function enrichLaunchSpecEnv(spec, authMethod) {
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
-  spec.env = {
-    BROWSER: "echo",
-    GEMINI_HOME: sanitized.geminiHome,
-    AGY_ACP_AUTH_METHOD: authMethod,
-    ...spec.env && typeof spec.env === "object" ? spec.env : {}
-  };
-  if (!spec.env.GEMINI_HOME) {
-    spec.env.GEMINI_HOME = sanitized.geminiHome;
-  }
-  if (!spec.nativeReasoning) {
-    spec.nativeReasoning = {
-      configId: "thinking_level",
-      supportedLevels: ["low", "medium", "high"],
-      defaultLevel: "medium"
-    };
-  }
-}
 function resolveAuthMethod(providerOptions) {
-  return isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod) ? providerOptions.antigravityAuthMethod : "oauth-personal";
+  return normalizeAuthMethod(providerOptions?.antigravityAuthMethod);
 }
-function normalizeLaunchInOptionsContainer(container, authMethod) {
+function resolveRequestRuntime(providerOptions) {
+  return resolveRuntime(normalizeExecutable(providerOptions?.acpLaunchSpec?.command));
+}
+function normalizeLaunchInOptionsContainer(container, authMethod, prepareHome) {
   if (!container.providerOptions) {
     container.providerOptions = {
       acpDialect: "generic",
       parameterizedModelPicker: true,
-      acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
+      acpLaunchSpec: buildNativeLaunchSpec({ authMethod, home: prepareHome() })
     };
     return true;
   }
@@ -42893,40 +42980,47 @@ function normalizeLaunchInOptionsContainer(container, authMethod) {
   if (!po.acpLaunchSpec) {
     po.acpDialect = po.acpDialect || "generic";
     po.parameterizedModelPicker = true;
-    po.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
+    po.acpLaunchSpec = buildNativeLaunchSpec({ authMethod, home: prepareHome() });
     return true;
   }
-  enrichLaunchSpecEnv(po.acpLaunchSpec, authMethod);
-  return true;
+  return completeLaunchSpec(po.acpLaunchSpec, authMethod, prepareHome());
 }
 function ensureLaunchSpec(params) {
   if (!params || typeof params !== "object") return false;
   let modified = false;
+  const homes = /* @__PURE__ */ new Map();
+  const homeFor = (authMethod) => () => {
+    if (!homes.has(authMethod)) homes.set(authMethod, prepareSanitizedGeminiHome({ authMethod }));
+    return homes.get(authMethod);
+  };
   if (params.options && typeof params.options === "object") {
     const authMethod = resolveAuthMethod(params.options.providerOptions);
-    modified = normalizeLaunchInOptionsContainer(params.options, authMethod) || modified;
+    modified = normalizeLaunchInOptionsContainer(params.options, authMethod, homeFor(authMethod)) || modified;
   }
   const rootAuthMethod = resolveAuthMethod(
     params.providerOptions ?? params.options?.providerOptions
   );
-  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod) || modified;
+  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod, homeFor(rootAuthMethod)) || modified;
   return modified;
 }
 function writeBridgeJsonRpc(payload) {
   process.stdout.write(JSON.stringify(payload) + "\n");
 }
-function sendHealthResponse(id2, status, statusMessage, planLabel, version2) {
+function writeOutcome(id2, outcome) {
+  writeBridgeJsonRpc({ jsonrpc: "2.0", id: id2, ...outcome });
+}
+function handleNativeProviderHealth(id2, params) {
+  const providerOptions = getProviderOptionsFromParams(params);
+  const runtime = resolveRequestRuntime(providerOptions);
+  const readiness = runtime.installed ? getFastNativeReadiness({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(providerOptions) }) : void 0;
   writeBridgeJsonRpc({
     jsonrpc: "2.0",
     id: id2,
     result: {
       supported: true,
       health: {
-        status,
-        statusMessage,
+        ...healthFromReadiness(runtime, readiness),
         accountEmail: null,
-        planLabel,
-        installedVersion: version2,
         minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
         canInstall: false,
         canUpdate: false,
@@ -42935,165 +43029,24 @@ function sendHealthResponse(id2, status, statusMessage, planLabel, version2) {
     }
   });
 }
-function formatNonReadyHealthMessage(readiness) {
-  if (readiness.error) {
-    return readiness.error;
-  }
-  if (readiness.state === "sign_in_required") {
-    return "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google.";
-  }
-  if (readiness.state === "authenticated") {
-    return 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.';
-  }
-  return 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.';
-}
-function handleNativeProviderHealth(id2, params) {
-  const providerOptions = getProviderOptionsFromParams(params);
-  const customCommand = providerOptions?.acpLaunchSpec?.command;
-  const runtime = resolveNativeAcpRuntime({
-    customExecutable: typeof customCommand === "string" ? customCommand : void 0
-  });
-  if (!runtime.installed) {
-    const msg = !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
-    sendHealthResponse(id2, "not_installed", msg, null, null);
-    return;
-  }
-  const authMethod = resolveAuthMethod(providerOptions);
-  const readiness = getFastNativeReadiness({
-    command: runtime.executable,
-    args: runtime.args,
-    authMethod
-  });
-  if (readiness.state === "runtime_missing") {
-    sendHealthResponse(
-      id2,
-      "not_installed",
-      readiness.error || `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
-      null,
-      null
-    );
-    return;
-  }
-  const reportedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
-  if (readiness.state !== "session_ready") {
-    sendHealthResponse(
-      id2,
-      readiness.state === "sign_in_required" ? "unauthenticated" : "unknown",
-      formatNonReadyHealthMessage(readiness),
-      readiness.tierName ?? null,
-      reportedVersion
-    );
-    return;
-  }
-  sendHealthResponse(id2, "ready", null, readiness.tierName ?? null, reportedVersion);
-}
-function formatEffortDescription(level) {
-  const capitalized = level.charAt(0).toUpperCase() + level.slice(1);
-  return `${capitalized} reasoning effort`;
-}
-function mapDiscoveredModels(models, stale = false) {
-  return models.map((m, idx) => {
-    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
-    const supportedReasoningEfforts = levels.map((level) => ({
-      reasoningEffort: level,
-      description: formatEffortDescription(level)
-    }));
-    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
-    return {
-      id: m.id,
-      model: m.id,
-      displayName: stale ? `${m.name} (cached)` : m.name,
-      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts,
-      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
-      isDefault: idx === 0
-    };
-  });
-}
-function sendModelListError(id2, readiness) {
-  if (readiness.state === "sign_in_required") {
-    const authMessage = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      error: {
-        code: -32e3,
-        message: authMessage,
-        data: {
-          recovery: {
-            kind: "authRequired",
-            message: authMessage,
-            retryable: false
-          }
-        }
-      }
-    });
-    return;
-  }
-  writeBridgeJsonRpc({
-    jsonrpc: "2.0",
-    id: id2,
-    error: {
-      code: -32e3,
-      message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.'
-    }
-  });
-}
 function handleNativeModelList(id2, params) {
   const providerOptions = getProviderOptionsFromParams(params);
-  const customCommand = providerOptions?.acpLaunchSpec?.command;
-  const runtime = resolveNativeAcpRuntime({
-    customExecutable: typeof customCommand === "string" ? customCommand : void 0
-  });
+  const runtime = resolveRequestRuntime(providerOptions);
   if (!runtime.installed) {
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      error: {
-        code: -32e3,
-        message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings \u2192 Antigravity Provider.`
-      }
-    });
+    writeOutcome(id2, modelListNotInstalled());
     return;
   }
-  const authMethod = resolveAuthMethod(providerOptions);
-  const forceRefresh = params?.forceRefresh === true;
-  const readiness = getFastNativeReadiness({
+  const catalog = resolveNativeCatalog({
     command: runtime.executable,
     args: runtime.args,
-    authMethod
+    authMethod: resolveAuthMethod(providerOptions),
+    forceRefresh: params?.forceRefresh === true
   });
-  const respond = (result) => {
-    if (result.models.length === 0 || result.state === "sign_in_required") {
-      sendModelListError(id2, result);
-      return;
-    }
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      result: {
-        models: mapDiscoveredModels(result.models, result.catalogStale),
-        selectedOnlyModels: [],
-        _meta: {
-          checkedAt: result.checkedAt,
-          stale: result.catalogStale === true,
-          ...result.error ? { warning: result.error } : {}
-        }
-      }
-    });
-  };
-  if (isNativeCatalogSettled(readiness, forceRefresh)) {
-    respond(readiness);
+  if (!(catalog instanceof Promise)) {
+    writeOutcome(id2, modelListFromReadiness(catalog));
     return;
   }
-  void getNativeCatalog({
-    command: runtime.executable,
-    args: runtime.args,
-    authMethod,
-    forceRefresh
-  }).then(respond).catch((error62) => {
-    sendModelListError(id2, { ...readiness, error: error62 instanceof Error ? error62.message : String(error62) });
-  });
+  void catalog.then((result) => writeOutcome(id2, modelListFromReadiness(result))).catch((error62) => writeBridgeError(id2, error62));
 }
 function isLegacyAgyThreadResume(msg) {
   if (!msg || msg.method !== "thread/resume" || !msg.params) return null;
@@ -43158,7 +43111,7 @@ function dispatchBridgeMessage(msg) {
   if (msg.method === "provider/usage" && msg.id !== void 0) {
     return runLocalHandler(msg.id, () => {
       const options = getProviderOptionsFromParams(msg.params);
-      const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
+      const runtime = resolveRequestRuntime(options);
       void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) }).then((result) => writeBridgeJsonRpc({ jsonrpc: "2.0", id: msg.id, result })).catch((error62) => writeBridgeError(msg.id, error62));
     });
   }
