@@ -2,39 +2,24 @@ import { experimental_acpProviderBridge } from '@zana-ai/zcc-plugin-sdk/provider
 import { experimental_defineProviderBridge } from '@zana-ai/zcc-plugin-sdk/provider-bridge';
 import {
   getFastNativeReadiness,
-  getNativeCatalog,
-  isNativeCatalogSettled,
-  queryNativeUsage,
-  isValidGoogleAuthMethod,
   prepareSanitizedGeminiHome,
-  type DiscoveredNativeModel,
+  queryNativeUsage,
+  resolveNativeCatalog,
   type GoogleAcpAuthMethod,
   type NativeReadinessResult
 } from './src/native-auth.js';
+import { PINNED_NATIVE_ACP_VERSION } from './src/native-runtime.js';
 import {
-  PINNED_NATIVE_ACP_VERSION,
-  resolveNativeAcpRuntime
-} from './src/native-runtime.js';
-
-function buildDefaultNativeLaunchSpec(authMethod: GoogleAcpAuthMethod = 'oauth-personal') {
-  const runtime = resolveNativeAcpRuntime();
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
-  return {
-    displayName: 'Antigravity',
-    command: runtime.executable,
-    args: runtime.args,
-    env: {
-      BROWSER: 'echo',
-      GEMINI_HOME: sanitized.geminiHome,
-      AGY_ACP_AUTH_METHOD: authMethod
-    },
-    nativeReasoning: {
-      configId: 'thinking_level',
-      supportedLevels: ['low', 'medium', 'high'],
-      defaultLevel: 'medium'
-    }
-  };
-}
+  buildNativeLaunchSpec,
+  completeLaunchSpec,
+  healthFromReadiness,
+  modelListFromReadiness,
+  modelListNotInstalled,
+  normalizeAuthMethod,
+  normalizeExecutable,
+  resolveRuntime,
+  type JsonRpcOutcome
+} from './src/provider-config.js';
 
 function getProviderOptionsFromParams(params: any): Record<string, any> | undefined {
   if (!params || typeof params !== 'object') return undefined;
@@ -47,41 +32,25 @@ function getProviderOptionsFromParams(params: any): Record<string, any> | undefi
   return undefined;
 }
 
-function enrichLaunchSpecEnv(spec: Record<string, any>, authMethod: GoogleAcpAuthMethod): void {
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
-  spec.env = {
-    BROWSER: 'echo',
-    GEMINI_HOME: sanitized.geminiHome,
-    AGY_ACP_AUTH_METHOD: authMethod,
-    ...(spec.env && typeof spec.env === 'object' ? spec.env : {})
-  };
-  if (!spec.env.GEMINI_HOME) {
-    spec.env.GEMINI_HOME = sanitized.geminiHome;
-  }
-  if (!spec.nativeReasoning) {
-    spec.nativeReasoning = {
-      configId: 'thinking_level',
-      supportedLevels: ['low', 'medium', 'high'],
-      defaultLevel: 'medium'
-    };
-  }
+function resolveAuthMethod(providerOptions?: Record<string, any>): GoogleAcpAuthMethod {
+  return normalizeAuthMethod(providerOptions?.antigravityAuthMethod);
 }
 
-function resolveAuthMethod(providerOptions?: Record<string, any>): GoogleAcpAuthMethod {
-  return isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod)
-    ? providerOptions.antigravityAuthMethod
-    : 'oauth-personal';
+/** The runtime a request targets: its launch spec's command, else the managed installation. */
+function resolveRequestRuntime(providerOptions?: Record<string, any>) {
+  return resolveRuntime(normalizeExecutable(providerOptions?.acpLaunchSpec?.command));
 }
 
 function normalizeLaunchInOptionsContainer(
   container: Record<string, any>,
-  authMethod: GoogleAcpAuthMethod
+  authMethod: GoogleAcpAuthMethod,
+  prepareHome: () => ReturnType<typeof prepareSanitizedGeminiHome>
 ): boolean {
   if (!container.providerOptions) {
     container.providerOptions = {
       acpDialect: 'generic',
       parameterizedModelPicker: true,
-      acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
+      acpLaunchSpec: buildNativeLaunchSpec({ authMethod, home: prepareHome() })
     };
     return true;
   }
@@ -89,26 +58,31 @@ function normalizeLaunchInOptionsContainer(
   if (!po.acpLaunchSpec) {
     po.acpDialect = po.acpDialect || 'generic';
     po.parameterizedModelPicker = true;
-    po.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
+    po.acpLaunchSpec = buildNativeLaunchSpec({ authMethod, home: prepareHome() });
     return true;
   }
-  enrichLaunchSpecEnv(po.acpLaunchSpec, authMethod);
-  return true;
+  return completeLaunchSpec(po.acpLaunchSpec, authMethod, prepareHome());
 }
 
 export function ensureLaunchSpec(params: any): boolean {
   if (!params || typeof params !== 'object') return false;
   let modified = false;
+  const homes = new Map<GoogleAcpAuthMethod, ReturnType<typeof prepareSanitizedGeminiHome>>();
+  // Prepare the managed home once per message and auth method.
+  const homeFor = (authMethod: GoogleAcpAuthMethod) => () => {
+    if (!homes.has(authMethod)) homes.set(authMethod, prepareSanitizedGeminiHome({ authMethod }));
+    return homes.get(authMethod)!;
+  };
 
   if (params.options && typeof params.options === 'object') {
     const authMethod = resolveAuthMethod(params.options.providerOptions);
-    modified = normalizeLaunchInOptionsContainer(params.options, authMethod) || modified;
+    modified = normalizeLaunchInOptionsContainer(params.options, authMethod, homeFor(authMethod)) || modified;
   }
 
   const rootAuthMethod = resolveAuthMethod(
     params.providerOptions ?? params.options?.providerOptions
   );
-  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod) || modified;
+  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod, homeFor(rootAuthMethod)) || modified;
   return modified;
 }
 
@@ -116,24 +90,24 @@ function writeBridgeJsonRpc(payload: Record<string, unknown>): void {
   process.stdout.write(JSON.stringify(payload) + '\n');
 }
 
-function sendHealthResponse(
-  id: string | number,
-  status: 'not_installed' | 'unauthenticated' | 'ready' | 'unknown',
-  statusMessage: string | null,
-  planLabel: string | null,
-  version: string | null
-): void {
+function writeOutcome(id: string | number, outcome: JsonRpcOutcome): void {
+  writeBridgeJsonRpc({ jsonrpc: '2.0', id, ...outcome });
+}
+
+function handleNativeProviderHealth(id: string | number, params: any): void {
+  const providerOptions = getProviderOptionsFromParams(params);
+  const runtime = resolveRequestRuntime(providerOptions);
+  const readiness = runtime.installed
+    ? getFastNativeReadiness({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(providerOptions) })
+    : undefined;
   writeBridgeJsonRpc({
     jsonrpc: '2.0',
     id,
     result: {
       supported: true,
       health: {
-        status,
-        statusMessage,
+        ...healthFromReadiness(runtime, readiness),
         accountEmail: null,
-        planLabel,
-        installedVersion: version,
         minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
         canInstall: false,
         canUpdate: false,
@@ -143,188 +117,22 @@ function sendHealthResponse(
   });
 }
 
-function formatNonReadyHealthMessage(readiness: NativeReadinessResult): string {
-  if (readiness.error) {
-    return readiness.error;
-  }
-  if (readiness.state === 'sign_in_required') {
-    return 'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.';
-  }
-  if (readiness.state === 'authenticated') {
-    return 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.';
-  }
-  return 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.';
-}
-
-function handleNativeProviderHealth(id: string | number, params: any): void {
-  const providerOptions = getProviderOptionsFromParams(params);
-  const customCommand = providerOptions?.acpLaunchSpec?.command;
-  const runtime = resolveNativeAcpRuntime({
-    customExecutable: typeof customCommand === 'string' ? customCommand : undefined
-  });
-
-  if (!runtime.installed) {
-    const msg = !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0
-      ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(', ')}`
-      : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
-    sendHealthResponse(id, 'not_installed', msg, null, null);
-    return;
-  }
-
-  const authMethod = resolveAuthMethod(providerOptions);
-  const readiness = getFastNativeReadiness({
-    command: runtime.executable,
-    args: runtime.args,
-    authMethod
-  });
-
-  if (readiness.state === 'runtime_missing') {
-    sendHealthResponse(
-      id,
-      'not_installed',
-      readiness.error || `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
-      null,
-      null
-    );
-    return;
-  }
-
-  const reportedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
-  if (readiness.state !== 'session_ready') {
-    sendHealthResponse(
-      id,
-      readiness.state === 'sign_in_required' ? 'unauthenticated' : 'unknown',
-      formatNonReadyHealthMessage(readiness),
-      readiness.tierName ?? null,
-      reportedVersion
-    );
-    return;
-  }
-
-  sendHealthResponse(id, 'ready', null, readiness.tierName ?? null, reportedVersion);
-}
-
-function formatEffortDescription(level: string): string {
-  const capitalized = level.charAt(0).toUpperCase() + level.slice(1);
-  return `${capitalized} reasoning effort`;
-}
-
-function mapDiscoveredModels(models: DiscoveredNativeModel[], stale = false) {
-  return models.map((m, idx) => {
-    const levels = Array.isArray(m.supportedReasoningEfforts)
-      ? m.supportedReasoningEfforts.filter((l): l is string => typeof l === 'string' && l.length > 0)
-      : [];
-    const supportedReasoningEfforts = levels.map((level) => ({
-      reasoningEffort: level,
-      description: formatEffortDescription(level)
-    }));
-    const defaultReasoningEffort =
-      levels.length > 0
-        ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort)
-          ? m.defaultReasoningEffort
-          : levels[0]
-        : undefined;
-    return {
-      id: m.id,
-      model: m.id,
-      displayName: stale ? `${m.name} (cached)` : m.name,
-      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts,
-      ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
-      isDefault: idx === 0
-    };
-  });
-}
-
-function sendModelListError(
-  id: string | number,
-  readiness: NativeReadinessResult
-): void {
-  if (readiness.state === 'sign_in_required') {
-    const authMessage =
-      readiness.error ||
-      'Google Antigravity Native ACP is not authenticated. Open Settings → Antigravity Provider to sign in.';
-    writeBridgeJsonRpc({
-      jsonrpc: '2.0',
-      id,
-      error: {
-        code: -32000,
-        message: authMessage,
-        data: {
-          recovery: {
-            kind: 'authRequired',
-            message: authMessage,
-            retryable: false
-          }
-        }
-      }
-    });
-    return;
-  }
-  writeBridgeJsonRpc({
-    jsonrpc: '2.0',
-    id,
-    error: {
-      code: -32000,
-      message:
-        readiness.error ||
-        'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings → Antigravity Provider.'
-    }
-  });
-}
-
 function handleNativeModelList(id: string | number, params: any): void {
   const providerOptions = getProviderOptionsFromParams(params);
-  const customCommand = providerOptions?.acpLaunchSpec?.command;
-  const runtime = resolveNativeAcpRuntime({
-    customExecutable: typeof customCommand === 'string' ? customCommand : undefined
-  });
-
+  const runtime = resolveRequestRuntime(providerOptions);
   if (!runtime.installed) {
-    writeBridgeJsonRpc({
-      jsonrpc: '2.0',
-      id,
-      error: {
-        code: -32000,
-        message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings → Antigravity Provider.`
-      }
-    });
+    writeOutcome(id, modelListNotInstalled());
     return;
   }
-
-  const authMethod = resolveAuthMethod(providerOptions);
-  const forceRefresh = params?.forceRefresh === true;
-  const readiness = getFastNativeReadiness({
-    command: runtime.executable,
-    args: runtime.args,
-    authMethod
-  });
-
-  const respond = (result: NativeReadinessResult) => {
-    if (result.models.length === 0 || result.state === 'sign_in_required') {
-      sendModelListError(id, result);
-      return;
-    }
-    writeBridgeJsonRpc({
-      jsonrpc: '2.0',
-      id,
-      result: {
-        models: mapDiscoveredModels(result.models, result.catalogStale),
-        selectedOnlyModels: [],
-        _meta: { checkedAt: result.checkedAt, stale: result.catalogStale === true,
-          ...(result.error ? { warning: result.error } : {}) }
-      }
-    });
-  };
-  // Answer cached catalogs synchronously; the settle policy itself lives in native-auth.
-  if (isNativeCatalogSettled(readiness, forceRefresh)) {
-    respond(readiness);
+  const catalog = resolveNativeCatalog({ command: runtime.executable, args: runtime.args,
+    authMethod: resolveAuthMethod(providerOptions), forceRefresh: params?.forceRefresh === true });
+  // Answer settled catalogs synchronously.
+  if (!(catalog instanceof Promise)) {
+    writeOutcome(id, modelListFromReadiness(catalog));
     return;
   }
-  void getNativeCatalog({ command: runtime.executable, args: runtime.args, authMethod,
-    forceRefresh }).then(respond).catch(error => {
-      sendModelListError(id, { ...readiness, error: error instanceof Error ? error.message : String(error) });
-    });
+  void catalog.then((result: NativeReadinessResult) => writeOutcome(id, modelListFromReadiness(result)))
+    .catch(error => writeBridgeError(id, error));
 }
 
 export function isLegacyAgyThreadResume(msg: any): string | null {
@@ -403,7 +211,7 @@ function dispatchBridgeMessage(msg: any): { handled: boolean; rewritten: boolean
   if (msg.method === 'provider/usage' && msg.id !== undefined) {
     return runLocalHandler(msg.id, () => {
       const options = getProviderOptionsFromParams(msg.params);
-      const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
+      const runtime = resolveRequestRuntime(options);
       void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) })
         .then(result => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id, result }))
         .catch(error => writeBridgeError(msg.id, error));

@@ -16,6 +16,7 @@ export default defineConfig({
         '**/*.test.tsx',
         '**/*.mjs',
         '**/test-environment.ts',
+        '**/fake-acp-server.ts',
         'dist/**',
         'node_modules/**',
         'types/**'

@@ -4,88 +4,29 @@ import {
   getFastNativeReadiness,
   getNativeCredentialId,
   GOOGLE_ACP_AUTH_METHODS,
-  isValidGoogleAuthMethod,
   prepareSanitizedGeminiHome,
   probeNativeAcpReadiness,
   queryNativeUsage,
   startNativeAcpSignIn,
-  writeNativeAcpAuthType,
-  type DiscoveredNativeModel,
-  type GoogleAcpAuthMethod,
-  type NativeReadinessResult,
-  type NativeSetupState
+  writeNativeAcpAuthType
 } from './src/native-auth.js';
 import {
   installNativeAcpRuntime,
   PINNED_NATIVE_ACP_VERSION,
-  resolveNativeAcpRuntime,
-  rollbackNativeAcpRuntime,
-  type ResolvedNativeRuntime
+  rollbackNativeAcpRuntime
 } from './src/native-runtime.js';
+import {
+  buildNativeLaunchSpec,
+  doctorStatus,
+  normalizeAuthMethod,
+  readProviderSettings,
+  resolveRuntime,
+  type DoctorStatusResult
+} from './src/provider-config.js';
+
+export type { DoctorStatusResult } from './src/provider-config.js';
 
 const ICON = './icons/antigravity.svg';
-
-export interface DoctorStatusResult {
-  installed: boolean;
-  authenticated: boolean;
-  ready: boolean;
-  version: string | null;
-  pinnedVersion: string;
-  previousVersion: string | null;
-  source: 'custom' | 'managed' | 'uninstalled';
-  executable: string;
-  companionFilesPresent: boolean;
-  missingCompanionFiles: string[];
-  state: NativeSetupState;
-  authMethod: GoogleAcpAuthMethod;
-  configuredAuthType: string | null;
-  pendingAuthUrl: string | null;
-  models: DiscoveredNativeModel[];
-  modes: string[];
-  tierName: string | null;
-  disabledDeadMcpServers: string[];
-  error?: string;
-  checkedAt?: number;
-  catalogStale?: boolean;
-  /** Opaque hash that changes when the signed-in credentials change. */
-  credentialId?: string;
-}
-
-function normalizeAuthMethod(value: unknown): GoogleAcpAuthMethod {
-  return isValidGoogleAuthMethod(value) ? value : 'oauth-personal';
-}
-
-function buildNativeLaunchSpec(options?: {
-  customExecutable?: string | undefined;
-  authMethod?: GoogleAcpAuthMethod;
-}) {
-  const authMethod = options?.authMethod ?? 'oauth-personal';
-  const resolvedRuntime = resolveNativeAcpRuntime({
-    customExecutable: options?.customExecutable
-  });
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
-
-  const env: Record<string, string> = {
-    BROWSER: 'echo',
-    GEMINI_HOME: sanitized.geminiHome,
-    AGY_ACP_AUTH_METHOD: authMethod
-  };
-  if (authMethod === 'gemini-api-key' && process.env.GEMINI_API_KEY) {
-    env.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  }
-
-  return {
-    displayName: 'Antigravity',
-    command: resolvedRuntime.executable,
-    args: resolvedRuntime.args,
-    env,
-    nativeReasoning: {
-      configId: 'thinking_level',
-      supportedLevels: ['low', 'medium', 'high'],
-      defaultLevel: 'medium' as const
-    }
-  };
-}
 
 const ANTIGRAVITY_CAPABILITIES = {
   supportsServiceTier: false,
@@ -133,104 +74,23 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
   };
 }
 
-function formatUninstalledDoctorResult(
-  runtime: ResolvedNativeRuntime,
-  authMethod: GoogleAcpAuthMethod,
-  pendingAuthUrl: string | null
-): DoctorStatusResult {
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
-  const missingCompanionError =
-    !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0
-      ? `Native ACP archive is incomplete: missing companion file(s) ${runtime.missingCompanionFiles.join(', ')}.`
-      : undefined;
-  return {
-    installed: false,
-    authenticated: false,
-    ready: false,
-    version: runtime.version,
-    pinnedVersion: PINNED_NATIVE_ACP_VERSION,
-    previousVersion: runtime.previousVersion,
-    source: runtime.source,
-    executable: runtime.executable,
-    companionFilesPresent: runtime.companionFilesPresent,
-    missingCompanionFiles: runtime.missingCompanionFiles,
-    state: 'runtime_missing',
-    authMethod,
-    configuredAuthType: null,
-    pendingAuthUrl,
-    models: [],
-    modes: [],
-    tierName: null,
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: missingCompanionError || `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host.`
-  };
-}
-
-function formatInstalledDoctorResult(
-  runtime: ResolvedNativeRuntime,
-  readiness: NativeReadinessResult,
-  authMethod: GoogleAcpAuthMethod,
-  pendingAuthUrl: string | null
-): DoctorStatusResult {
-  const authenticated = readiness.state === 'authenticated' || readiness.state === 'session_ready';
-  const ready = readiness.state === 'session_ready';
-  return {
-    installed: true,
-    authenticated,
-    ready,
-    version: readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION,
-    pinnedVersion: PINNED_NATIVE_ACP_VERSION,
-    previousVersion: runtime.previousVersion,
-    source: runtime.source,
-    executable: runtime.executable,
-    companionFilesPresent: runtime.companionFilesPresent,
-    missingCompanionFiles: runtime.missingCompanionFiles,
-    state: readiness.state,
-    authMethod,
-    configuredAuthType: readiness.configuredAuthType,
-    pendingAuthUrl,
-    models: readiness.models,
-    modes: readiness.modes,
-    tierName: readiness.tierName ?? null,
-    disabledDeadMcpServers: readiness.disabledDeadMcpServers ?? [],
-    checkedAt: readiness.checkedAt,
-    catalogStale: readiness.catalogStale === true,
-    credentialId: getNativeCredentialId(authMethod),
-    ...(readiness.error ? { error: readiness.error } : {})
-  };
-}
-
 async function buildDoctorStatus(
   settings: any,
   options?: { probeNative?: boolean; forceRefresh?: boolean },
   pendingAuthUrl: string | null = null
 ): Promise<DoctorStatusResult> {
-  const current = await settings.get();
-  const authMethod = normalizeAuthMethod(current.authMethod);
-  const customNativeExe =
-    typeof current.nativeExecutable === 'string' && current.nativeExecutable.trim()
-      ? current.nativeExecutable.trim()
-      : undefined;
-
-  const runtime = resolveNativeAcpRuntime({ customExecutable: customNativeExe });
+  const { authMethod, customExecutable } = readProviderSettings(await settings.get());
+  const runtime = resolveRuntime(customExecutable);
   if (!runtime.installed) {
-    return formatUninstalledDoctorResult(runtime, authMethod, pendingAuthUrl);
+    return doctorStatus(runtime, { authMethod, pendingAuthUrl,
+      disabledDeadMcpServers: prepareSanitizedGeminiHome({ authMethod }).disabledDeadMcpServers });
   }
 
+  const target = { command: runtime.executable, args: runtime.args, authMethod };
   const readiness = options?.probeNative
-    ? await probeNativeAcpReadiness({
-        command: runtime.executable,
-        args: runtime.args,
-        authMethod,
-        forceRefresh: options?.forceRefresh
-      })
-    : getFastNativeReadiness({
-        command: runtime.executable,
-        args: runtime.args,
-        authMethod
-      });
-
-  return formatInstalledDoctorResult(runtime, readiness, authMethod, pendingAuthUrl);
+    ? await probeNativeAcpReadiness({ ...target, forceRefresh: options?.forceRefresh })
+    : getFastNativeReadiness(target);
+  return doctorStatus(runtime, { authMethod, pendingAuthUrl, readiness, credentialId: getNativeCredentialId(authMethod) });
 }
 
 async function handleAuthLogin(
@@ -241,12 +101,7 @@ async function handleAuthLogin(
   const current = await settings.get();
   const reqObj = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
   const authMethod = normalizeAuthMethod(reqObj.authMethod ?? current.authMethod);
-  const customNativeExe =
-    typeof current.nativeExecutable === 'string' && current.nativeExecutable.trim()
-      ? current.nativeExecutable.trim()
-      : undefined;
-
-  const runtime = resolveNativeAcpRuntime({ customExecutable: customNativeExe });
+  const runtime = resolveRuntime(readProviderSettings(current).customExecutable);
   if (!runtime.installed) {
     throw new Error(
       `Native ACP runtime is not installed. Click "Install Native ACP Runtime (v${PINNED_NATIVE_ACP_VERSION})" first.`
@@ -254,7 +109,7 @@ async function handleAuthLogin(
   }
 
   state.setPendingAuthUrl(null);
-  let signInResult: NativeReadinessResult;
+  let signInResult;
   try {
     signInResult = await startNativeAcpSignIn({
       command: runtime.executable,
@@ -279,9 +134,9 @@ function registerRpcMethods(
   state: { getPendingAuthUrl: () => string | null; setPendingAuthUrl: (url: string | null) => void }
 ) {
   zcc.rpc.method('usage:status', async () => {
-    const current = await settings.get();
-    const runtime = resolveNativeAcpRuntime({ customExecutable: current.nativeExecutable || undefined });
-    return queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: normalizeAuthMethod(current.authMethod) });
+    const { authMethod, customExecutable } = readProviderSettings(await settings.get());
+    const runtime = resolveRuntime(customExecutable);
+    return queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod });
   });
   zcc.rpc.method('doctor:status', async (args: unknown): Promise<DoctorStatusResult> => {
     const opts = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
@@ -309,7 +164,6 @@ function registerRpcMethods(
 
   zcc.rpc.method('auth:logout', async (): Promise<DoctorStatusResult> => {
     writeNativeAcpAuthType(null);
-    clearCachedNativeReadiness();
     return buildDoctorStatus(settings, { probeNative: false, forceRefresh: true });
   });
 }
@@ -345,17 +199,12 @@ export default function plugin(zcc: ZccPluginApi) {
   zcc.agents.experimental_registerProvider({
     ...providerConfig,
     deriveProviderOptions({ settings: currentSettings }) {
-      const authMethod = normalizeAuthMethod(currentSettings.authMethod);
-      const customNativeExe =
-        typeof currentSettings.nativeExecutable === 'string' && currentSettings.nativeExecutable.trim()
-          ? currentSettings.nativeExecutable.trim()
-          : undefined;
-
+      const { authMethod, customExecutable } = readProviderSettings(currentSettings);
       return {
         acpDialect: 'generic',
         antigravityAuthMethod: authMethod,
         parameterizedModelPicker: true,
-        acpLaunchSpec: buildNativeLaunchSpec({ customExecutable: customNativeExe, authMethod })
+        acpLaunchSpec: buildNativeLaunchSpec({ customExecutable, authMethod })
       };
     }
   });

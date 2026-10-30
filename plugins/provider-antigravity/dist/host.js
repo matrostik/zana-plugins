@@ -20683,16 +20683,16 @@ var acpNativeReasoningSchema = external_exports.object({
   supportedLevels: external_exports.array(reasoningLevelSchema).min(1),
   levelValues: acpReasoningCliLevelValueOverridesSchema.optional(),
   defaultLevel: reasoningLevelSchema.optional()
-}).strict().superRefine((nativeReasoning, context) => {
-  const supportedLevels = new Set(nativeReasoning.supportedLevels);
-  if (supportedLevels.size !== nativeReasoning.supportedLevels.length) {
+}).strict().superRefine((nativeReasoning2, context) => {
+  const supportedLevels = new Set(nativeReasoning2.supportedLevels);
+  if (supportedLevels.size !== nativeReasoning2.supportedLevels.length) {
     context.addIssue({
       code: "custom",
       message: "supportedLevels must not contain duplicates",
       path: ["supportedLevels"]
     });
   }
-  if (nativeReasoning.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning.defaultLevel)) {
+  if (nativeReasoning2.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning2.defaultLevel)) {
     context.addIssue({
       code: "custom",
       message: "defaultLevel must be one of supportedLevels",
@@ -31103,8 +31103,8 @@ function applyReasoningCliToModel(model, reasoningCli) {
 function modelHasOnlyAgentManagedReasoning(model) {
   return model.supportedReasoningEfforts.length === 1 && model.supportedReasoningEfforts[0]?.reasoningEffort === "medium" && model.defaultReasoningEffort === "medium";
 }
-function applyNativeReasoningHintToModel(model, nativeReasoning) {
-  const reasoningSupport = reasoningSupportFromCli(nativeReasoning);
+function applyNativeReasoningHintToModel(model, nativeReasoning2) {
+  const reasoningSupport = reasoningSupportFromCli(nativeReasoning2);
   return reasoningSupport === void 0 || !modelHasOnlyAgentManagedReasoning(model) ? model : {
     ...model,
     ...reasoningSupport
@@ -31123,13 +31123,13 @@ function resolveHintReasoningValue(args) {
   }
   return args.hint.supportedLevels.includes(args.reasoningLevel) ? args.reasoningLevel : void 0;
 }
-function nativeReasoningToThoughtLevelOption(nativeReasoning) {
-  if (nativeReasoning === void 0) {
+function nativeReasoningToThoughtLevelOption(nativeReasoning2) {
+  if (nativeReasoning2 === void 0) {
     return void 0;
   }
-  const options = nativeReasoning.supportedLevels.flatMap((level) => {
+  const options = nativeReasoning2.supportedLevels.flatMap((level) => {
     const value = resolveHintReasoningValue({
-      hint: nativeReasoning,
+      hint: nativeReasoning2,
       reasoningLevel: level
     });
     return value === void 0 ? [] : [
@@ -31139,12 +31139,12 @@ function nativeReasoningToThoughtLevelOption(nativeReasoning) {
       }
     ];
   });
-  const currentValue = nativeReasoning.defaultLevel === void 0 ? void 0 : resolveHintReasoningValue({
-    hint: nativeReasoning,
-    reasoningLevel: nativeReasoning.defaultLevel
+  const currentValue = nativeReasoning2.defaultLevel === void 0 ? void 0 : resolveHintReasoningValue({
+    hint: nativeReasoning2,
+    reasoningLevel: nativeReasoning2.defaultLevel
   });
   return {
-    id: nativeReasoning.configId,
+    id: nativeReasoning2.configId,
     category: "thought_level",
     type: "select",
     ...currentValue !== void 0 ? { currentValue } : {},
@@ -33971,16 +33971,16 @@ var acpNativeReasoningSchema2 = external_exports.object({
   supportedLevels: external_exports.array(reasoningLevelSchema2).min(1),
   levelValues: acpReasoningCliLevelValueOverridesSchema2.optional(),
   defaultLevel: reasoningLevelSchema2.optional()
-}).strict().superRefine((nativeReasoning, context) => {
-  const supportedLevels = new Set(nativeReasoning.supportedLevels);
-  if (supportedLevels.size !== nativeReasoning.supportedLevels.length) {
+}).strict().superRefine((nativeReasoning2, context) => {
+  const supportedLevels = new Set(nativeReasoning2.supportedLevels);
+  if (supportedLevels.size !== nativeReasoning2.supportedLevels.length) {
     context.addIssue({
       code: "custom",
       message: "supportedLevels must not contain duplicates",
       path: ["supportedLevels"]
     });
   }
-  if (nativeReasoning.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning.defaultLevel)) {
+  if (nativeReasoning2.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning2.defaultLevel)) {
     context.addIssue({
       code: "custom",
       message: "defaultLevel must be one of supportedLevels",
@@ -41503,20 +41503,10 @@ var desktopBrowserChangedSchema = external_exports.object({
 }).strict();
 
 // src/native-auth.ts
+import { existsSync as existsSync6 } from "node:fs";
+
+// src/acp-session.ts
 import { spawn } from "node:child_process";
-import { createHash as createHash2, randomUUID } from "node:crypto";
-import {
-  copyFileSync,
-  existsSync as existsSync3,
-  mkdirSync as mkdirSync3,
-  readFileSync as readFileSync3,
-  renameSync as renameSync2,
-  rmSync as rmSync2,
-  statSync,
-  writeFileSync as writeFileSync2
-} from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
 // src/native-runtime.ts
@@ -41701,244 +41691,27 @@ function killProcessTree(child) {
   }
 }
 
-// src/native-usage.ts
-function parseNativeQuotaWindows(text) {
-  const windows = [];
-  let inQuotas = false;
-  let group = "";
-  for (const line of text.split(/\r?\n/)) {
-    if (line.startsWith("### ")) {
-      inQuotas = line.trim() === "### Quota Limits";
-      continue;
-    }
-    if (!inQuotas) continue;
-    const heading = /^- \*\*([^*]+)\*\*$/.exec(line);
-    if (heading) {
-      group = heading[1];
-      continue;
-    }
-    const match = /^\s+- \*\*([^*]+):\*\* (\d+(?:\.\d+)?)% remaining \(resets ([^)]+)\)\s*$/.exec(line);
-    if (!group || !match) continue;
-    const remaining = Number(match[2]);
-    if (remaining < 0 || remaining > 100) continue;
-    const resetTime = Date.parse(match[3]);
-    windows.push({
-      label: `${group} \u2014 ${match[1]}`,
-      usedPercent: 100 - remaining,
-      resetsAt: Number.isFinite(resetTime) ? new Date(resetTime).toISOString() : null
-    });
-  }
-  return windows;
-}
-
-// src/native-auth.ts
-var GOOGLE_ACP_AUTH_METHODS = [
-  "oauth-personal",
-  "oauth-business",
-  "gemini-api-key",
-  "agent-platform"
+// src/acp-session.ts
+var CATALOG_UPDATE_WAIT_MS = 1e3;
+var CATALOG_UPDATE_MAX_SESSIONS = 16;
+var SIGN_IN_PROMPTS = [
+  "Credentials missing or invalid",
+  "Launching browser login flow",
+  "Open the following link to authenticate"
 ];
-var SANITIZED_HOME_SUFFIXES = ["antigravity-gemini-home", "antigravity-zcc-home"];
-function isSanitizedGeminiHomePath(dirPath) {
-  const normalized = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
-  return SANITIZED_HOME_SUFFIXES.some((suffix) => normalized.endsWith(`/${suffix}`));
-}
-function isValidGoogleAuthMethod(value) {
-  return typeof value === "string" && GOOGLE_ACP_AUTH_METHODS.includes(value);
-}
-function resolveGeminiHome(env = process.env) {
-  if (env.GEMINI_HOME && env.GEMINI_HOME.trim()) {
-    return resolve5(env.GEMINI_HOME.trim());
-  }
-  const home = env.USERPROFILE || env.HOME || homedir3();
-  return resolve5(home, ".gemini");
-}
-function resolveSourceAndManagedGeminiHome(env = process.env) {
-  const configuredHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? resolve5(env.GEMINI_HOME.trim()) : null;
-  const fallbackUserHome = resolve5(env.USERPROFILE || env.HOME || homedir3(), ".gemini");
-  if (configuredHome && isSanitizedGeminiHomePath(configuredHome)) {
-    const sourceGeminiHome2 = configuredHome.replace(/\\/g, "/").endsWith("/antigravity-zcc-home") ? dirname4(configuredHome) : fallbackUserHome;
-    return { sourceGeminiHome: sourceGeminiHome2, managedGeminiHome: configuredHome };
-  }
-  const sourceGeminiHome = configuredHome ?? fallbackUserHome;
-  const managedGeminiHome = env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim() ? join4(getZccDataDir(env), "state", "antigravity-gemini-home") : configuredHome ? join4(sourceGeminiHome, "antigravity-zcc-home") : join4(getZccDataDir(env), "state", "antigravity-gemini-home");
-  return { sourceGeminiHome, managedGeminiHome };
-}
-function getNativeAcpSettingsPath(env = process.env) {
-  return join4(resolveGeminiHome(env), "antigravity-acp", "settings.json");
-}
-function getNativeAcpTokenPath(env = process.env) {
-  return join4(resolveGeminiHome(env), "antigravity-acp", "acp_token.json");
-}
-function hasNativeAcpToken(env = process.env) {
-  const tokenPath = getNativeAcpTokenPath(env);
-  if (!existsSync3(tokenPath)) return false;
-  try {
-    return statSync(tokenPath).size > 10;
-  } catch {
-    return false;
-  }
-}
-function readNativeAcpSettings(env = process.env) {
-  const settingsPath = getNativeAcpSettingsPath(env);
-  if (!existsSync3(settingsPath)) {
-    return null;
-  }
-  try {
-    const raw = JSON.parse(readFileSync3(settingsPath, "utf8"));
-    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : null;
-  } catch {
-    return null;
-  }
-}
-function isAuthExplicitlyCleared(env = process.env) {
-  const settings = readNativeAcpSettings(env);
-  return settings?.auth?.cleared === true;
-}
-function readConfiguredNativeAuthType(env = process.env) {
-  const settings = readNativeAcpSettings(env);
-  if (settings?.auth?.cleared === true) {
-    return null;
-  }
-  const authType = settings?.auth?.type;
-  return typeof authType === "string" && authType.trim() ? authType.trim() : null;
-}
-function writeSettingsFileAtomically(settingsPath, authType) {
-  let existing = {};
-  if (existsSync3(settingsPath)) {
-    try {
-      const parsed = JSON.parse(readFileSync3(settingsPath, "utf8"));
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        existing = parsed;
-      }
-    } catch {
-      existing = {};
+function forEachLine(stream, onLine) {
+  if (!stream) return;
+  const decoder = new StringDecoder("utf8");
+  let buffer = "";
+  stream.on("data", (chunk) => {
+    buffer += typeof chunk === "string" ? chunk : decoder.write(chunk);
+    let newline;
+    while ((newline = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) onLine(line);
     }
-  }
-  const next = { ...existing };
-  if (authType === null) {
-    next.auth = { cleared: true };
-  } else {
-    next.auth = {
-      ...next.auth && typeof next.auth === "object" ? next.auth : {},
-      type: authType,
-      cleared: false
-    };
-  }
-  mkdirSync3(dirname4(settingsPath), { recursive: true });
-  const tmpPath = `${settingsPath}.tmp-${process.pid}`;
-  writeFileSync2(tmpPath, JSON.stringify(next, null, 2) + "\n", "utf8");
-  writeFileSync2(settingsPath, readFileSync3(tmpPath));
-  try {
-    rmSync2(tmpPath, { force: true });
-  } catch {
-  }
-}
-function writeNativeAcpAuthType(authType, env = process.env) {
-  const primaryPath = getNativeAcpSettingsPath(env);
-  writeSettingsFileAtomically(primaryPath, authType);
-  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
-  for (const dir of [sourceGeminiHome, managedGeminiHome]) {
-    const candidate = join4(dir, "antigravity-acp", "settings.json");
-    if (candidate !== primaryPath) {
-      try {
-        writeSettingsFileAtomically(candidate, authType);
-      } catch {
-      }
-    }
-  }
-  clearCachedNativeReadiness(env);
-}
-function syncFileNewer(src, dest) {
-  if (!existsSync3(src)) return;
-  try {
-    if (existsSync3(dest)) {
-      const srcStat = statSync(src);
-      const destStat = statSync(dest);
-      if (srcStat.mtimeMs <= destStat.mtimeMs && destStat.size > 0) {
-        return;
-      }
-    }
-    mkdirSync3(dirname4(dest), { recursive: true });
-    copyFileSync(src, dest);
-  } catch {
-  }
-}
-function isIdeNamedPipeMcpProxyUnreachable(serverConfig) {
-  if (!serverConfig || typeof serverConfig !== "object") {
-    return false;
-  }
-  const args = Array.isArray(serverConfig.args) ? serverConfig.args : [];
-  const usesIdeProxy = args.some(
-    (arg) => typeof arg === "string" && (arg.includes("mcp_proxy_bundle.js") || arg.endsWith("-antigravityide"))
-  );
-  if (!usesIdeProxy) return false;
-  const pipeId = args.find(
-    (arg) => typeof arg === "string" && arg.endsWith("-antigravityide")
-  );
-  if (!pipeId) return true;
-  if (process.platform === "win32") {
-    const pipePath = `\\\\.\\pipe\\datacloud-mcp-${pipeId}`;
-    return !existsSync3(pipePath);
-  }
-  return true;
-}
-function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
-  const disabledDeadMcpServers = [];
-  const sourceMcpConfigPath = join4(sourceGeminiHome, "config", "mcp_config.json");
-  const targetMcpConfigDir = join4(managedGeminiHome, "config");
-  const targetMcpConfigPath = join4(targetMcpConfigDir, "mcp_config.json");
-  mkdirSync3(targetMcpConfigDir, { recursive: true });
-  if (existsSync3(sourceMcpConfigPath)) {
-    try {
-      const raw = JSON.parse(readFileSync3(sourceMcpConfigPath, "utf8"));
-      const sourceServers = raw && typeof raw.mcpServers === "object" && raw.mcpServers !== null ? raw.mcpServers : {};
-      const sanitizedServers = {};
-      for (const [serverName, serverCfg] of Object.entries(sourceServers)) {
-        if (!serverCfg || typeof serverCfg !== "object") continue;
-        if (serverCfg.disabled === true) continue;
-        if (isIdeNamedPipeMcpProxyUnreachable(serverCfg)) {
-          disabledDeadMcpServers.push(serverName);
-          continue;
-        }
-        sanitizedServers[serverName] = serverCfg;
-      }
-      writeFileSync2(
-        targetMcpConfigPath,
-        JSON.stringify({ ...raw, mcpServers: sanitizedServers }, null, 2) + "\n",
-        "utf8"
-      );
-    } catch {
-      writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
-    }
-  } else if (!existsSync3(targetMcpConfigPath)) {
-    writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
-  }
-  return disabledDeadMcpServers;
-}
-function prepareSanitizedGeminiHome(options) {
-  const env = options?.env ?? process.env;
-  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
-  const sourceAcpDir = join4(sourceGeminiHome, "antigravity-acp");
-  const managedAcpDir = join4(managedGeminiHome, "antigravity-acp");
-  mkdirSync3(managedAcpDir, { recursive: true });
-  if (managedGeminiHome !== sourceGeminiHome) {
-    syncFileNewer(join4(sourceAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
-    syncFileNewer(join4(sourceAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
-  }
-  const managedEnv = { ...env, GEMINI_HOME: managedGeminiHome };
-  const currentAuthType = readConfiguredNativeAuthType(managedEnv);
-  const settingsFile = join4(managedAcpDir, "settings.json");
-  const explicitlyCleared = isAuthExplicitlyCleared(managedEnv);
-  if (!currentAuthType && !explicitlyCleared && !existsSync3(settingsFile) && existsSync3(join4(managedAcpDir, "acp_token.json"))) {
-    const defaultMethod = options?.authMethod ?? "oauth-personal";
-    writeSettingsFileAtomically(settingsFile, defaultMethod);
-  }
-  const disabledDeadMcpServers = sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome);
-  return {
-    geminiHome: managedGeminiHome,
-    disabledDeadMcpServers
-  };
+  });
 }
 function extractSessionReasoningMetadata(sessionResult) {
   const configOptions = sessionResult?.configOptions;
@@ -42017,13 +41790,344 @@ function extractModelsFromSessionResult(sessionResult) {
   }
   return models;
 }
-function extractModesFromSessionResult(sessionResult) {
-  const available = sessionResult?.modes?.availableModes;
-  if (!Array.isArray(available)) return [];
-  return available.map((m) => typeof m?.id === "string" ? m.id : null).filter((id2) => Boolean(id2));
+var extractCatalog = extractModelsFromSessionResult;
+var NativeAcpSession = class _NativeAcpSession {
+  constructor(options) {
+    this.options = options;
+    const spawnFn = options.spawnImpl ?? spawn;
+    this.child = spawnFn(options.command, options.args, {
+      cwd: options.cwd || process.cwd(),
+      env: { ...process.env, ...options.env, ...options.interactive ? {} : { BROWSER: "echo" } },
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true
+    });
+    forEachLine(this.child.stdout, (line) => this.handleStdoutLine(line));
+    forEachLine(this.child.stderr, (line) => this.handleStderrLine(line));
+    this.child.on("error", (error62) => this.rejectAll(error62));
+    this.child.stdin?.on?.("error", (error62) => this.rejectAll(error62));
+    this.child.on("close", (code) => {
+      this.closed = true;
+      this.rejectAll(new Error(`Native ACP server exited (code ${code ?? "null"})`));
+    });
+    if (!options.interactive) {
+      this.later(options.timeoutMs, () => this.close(new Error(`Native ACP ${options.operation} timed out after ${options.timeoutMs}ms`)));
+    }
+  }
+  child;
+  pending = /* @__PURE__ */ new Map();
+  notificationListeners = [];
+  stderrListeners = [];
+  catalogUpdates = /* @__PURE__ */ new Map();
+  availableCommands = /* @__PURE__ */ new Set();
+  signInWaiters = [];
+  /** Deadline and waits; closing runs them early so no wait outlives the session. */
+  timers = /* @__PURE__ */ new Map();
+  nextId = 1;
+  closed = false;
+  signInPrompts = 0;
+  static open(options) {
+    return new _NativeAcpSession(options);
+  }
+  /** True once the runtime printed a sign-in prompt on stderr. */
+  get signInRequested() {
+    return this.signInPrompts > 0;
+  }
+  onStderrLine(listener) {
+    this.stderrListeners.push(listener);
+  }
+  async initialize() {
+    const result = await this.request("initialize", {
+      protocolVersion: 1,
+      clientInfo: { name: "zcc", title: "Zana Command Center", version: "1.0.0" },
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        _meta: { parameterizedModelPicker: true }
+      }
+    });
+    return {
+      protocolVersion: typeof result?.protocolVersion === "number" ? result.protocolVersion : null,
+      agentVersion: typeof result?.agentInfo?.version === "string" ? result.agentInfo.version : null,
+      advertisedAuthMethods: Array.isArray(result?.authMethods) ? result.authMethods.map((method) => typeof method?.id === "string" ? method.id : null).filter(Boolean) : []
+    };
+  }
+  async authenticate(methodId, options = {}) {
+    await this.request(
+      "authenticate",
+      { methodId, ...options.headless ? { _meta: { headless: true } } : {} },
+      options.timeoutMs
+    );
+  }
+  /**
+   * Opens a session, or reports that the runtime asked for sign-in instead. With `awaitCatalog`,
+   * the session's configOptions reflect the latest config_option_update, briefly awaiting a late one
+   * when session/new itself carried no models.
+   */
+  async newSession(options = {}) {
+    const prompted = () => !this.options.interactive && this.signInRequested;
+    const request = this.request("session/new", { cwd: this.options.cwd || process.cwd(), mcpServers: [] }, options.timeoutMs);
+    const session = this.options.interactive ? await request : await Promise.race([
+      request,
+      new Promise((resolve6) => {
+        if (this.signInRequested) resolve6("sign_in_required");
+        else this.signInWaiters.push(() => resolve6("sign_in_required"));
+      })
+    ]);
+    if (session === "sign_in_required" || prompted()) return { kind: "sign_in_required" };
+    if (options.awaitCatalog) await this.applyCatalogUpdate(session);
+    return prompted() ? { kind: "sign_in_required" } : { kind: "ready", session };
+  }
+  /** Resolves true once the runtime advertises `/name`, or false after `waitMs`. */
+  waitForCommand(name, waitMs) {
+    if (this.availableCommands.has(name)) return Promise.resolve(true);
+    return new Promise((resolve6) => {
+      const timer = this.later(waitMs, () => resolve6(this.availableCommands.has(name)));
+      this.notificationListeners.push(() => {
+        if (!this.availableCommands.has(name)) return;
+        this.cancel(timer);
+        resolve6(true);
+      });
+    });
+  }
+  /**
+   * Runs a local slash command and collects its text output. The session is stopped, and the
+   * command fails, if it requests a tool or its output exceeds `maxTextChars`.
+   */
+  async runCommand(sessionId, name, options) {
+    let text = "";
+    const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
+    let requestedTools = false;
+    let outputLimitError = null;
+    this.notificationListeners.push((method, params) => {
+      if (method !== "session/update") return;
+      const update = params?.update;
+      if (update?.sessionUpdate === "tool_call") {
+        requestedTools = true;
+        this.close(toolsRequested);
+      }
+      if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
+        text += update.content.text;
+        if (text.length > options.maxTextChars) {
+          outputLimitError = new Error(`Native ${name} output exceeded ${options.maxTextChars} characters; the diagnostic session was stopped.`);
+          this.close(outputLimitError);
+        }
+      }
+    });
+    const result = await this.request("session/prompt", { sessionId, prompt: [{ type: "text", text: `/${name}` }] });
+    if (requestedTools) throw toolsRequested;
+    if (outputLimitError) throw outputLimitError;
+    return { stopReason: result?.stopReason, text };
+  }
+  close(reason) {
+    if (!this.closed) {
+      this.closed = true;
+      this.rejectAll(reason ?? new Error("Native ACP probe closed"));
+      killProcessTree(this.child);
+    }
+    for (const [timer, run] of [...this.timers]) {
+      clearTimeout(timer);
+      this.timers.delete(timer);
+      run();
+    }
+  }
+  request(method, params, timeoutMs = this.options.timeoutMs) {
+    if (this.closed) return Promise.reject(new Error("Native ACP server is already closed"));
+    const id2 = this.nextId++;
+    return new Promise((resolve6, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id2);
+        reject(new Error(`ACP request "${method}" timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      this.pending.set(id2, { resolve: resolve6, reject, timer });
+      try {
+        this.child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: id2, method, params }) + "\n");
+      } catch (error62) {
+        clearTimeout(timer);
+        this.pending.delete(id2);
+        reject(error62);
+      }
+    });
+  }
+  handleStdoutLine(line) {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (!message || typeof message !== "object") return;
+    if (typeof message.method === "string") {
+      if (message.id !== void 0) this.replyToServerRequest(message);
+      else this.handleNotification(message.method, message.params);
+      return;
+    }
+    const entry = this.pending.get(Number(message.id));
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    this.pending.delete(Number(message.id));
+    if (message.error) {
+      const error62 = new Error(message.error?.data?.message || message.error?.message || `ACP error ${message.error?.code}`);
+      error62.code = message.error?.code;
+      error62.data = message.error?.data;
+      entry.reject(error62);
+    } else {
+      entry.resolve(message.result);
+    }
+  }
+  /** Diagnostics never approve tools or service arbitrary filesystem requests. */
+  replyToServerRequest(message) {
+    const reply = message.method === "session/request_permission" ? { result: { outcome: { outcome: "cancelled" } } } : { error: { code: -32601, message: "Not supported by the diagnostic client" } };
+    this.child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, ...reply }) + "\n");
+  }
+  handleNotification(method, params) {
+    const update = method === "session/update" ? params?.update : void 0;
+    if (update?.sessionUpdate === "available_commands_update") {
+      this.availableCommands.clear();
+      for (const command of Array.isArray(update.availableCommands) ? update.availableCommands : []) {
+        if (typeof command?.name === "string") this.availableCommands.add(command.name);
+      }
+    }
+    if (update?.sessionUpdate === "config_option_update" && typeof params?.sessionId === "string" && Array.isArray(update.configOptions) && (this.catalogUpdates.size < CATALOG_UPDATE_MAX_SESSIONS || this.catalogUpdates.has(params.sessionId))) {
+      this.catalogUpdates.set(params.sessionId, update.configOptions);
+    }
+    for (const listener of [...this.notificationListeners]) listener(method, params);
+  }
+  handleStderrLine(line) {
+    if (SIGN_IN_PROMPTS.some((prompt) => line.includes(prompt))) {
+      this.signInPrompts++;
+      for (const wake of this.signInWaiters.splice(0)) wake();
+    }
+    for (const listener of this.stderrListeners) listener(line);
+  }
+  async applyCatalogUpdate(session) {
+    const sessionId = session?.sessionId;
+    if (typeof sessionId !== "string") return;
+    if (!this.catalogUpdates.has(sessionId) && extractCatalog(session).length === 0) {
+      await new Promise((resolve6) => {
+        const timer = this.later(CATALOG_UPDATE_WAIT_MS, resolve6);
+        this.notificationListeners.push(() => {
+          if (!this.catalogUpdates.has(sessionId)) return;
+          this.cancel(timer);
+          resolve6();
+        });
+      });
+    }
+    const update = this.catalogUpdates.get(sessionId);
+    if (update) session.configOptions = update;
+  }
+  later(ms, run) {
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      run();
+    }, ms);
+    this.timers.set(timer, run);
+    return timer;
+  }
+  cancel(timer) {
+    clearTimeout(timer);
+    this.timers.delete(timer);
+  }
+  rejectAll(error62) {
+    for (const entry of this.pending.values()) {
+      clearTimeout(entry.timer);
+      entry.reject(error62);
+    }
+    this.pending.clear();
+  }
+};
+
+// src/account-identity.ts
+import { createHash as createHash2 } from "node:crypto";
+import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
+
+// src/gemini-home.ts
+import {
+  copyFileSync,
+  existsSync as existsSync3,
+  mkdirSync as mkdirSync3,
+  readFileSync as readFileSync3,
+  rmSync as rmSync2,
+  statSync,
+  writeFileSync as writeFileSync2
+} from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
+var GOOGLE_ACP_AUTH_METHODS = [
+  "oauth-personal",
+  "oauth-business",
+  "gemini-api-key",
+  "agent-platform"
+];
+var SANITIZED_HOME_SUFFIXES = ["antigravity-gemini-home", "antigravity-zcc-home"];
+function isSanitizedGeminiHomePath(dirPath) {
+  const normalized = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  return SANITIZED_HOME_SUFFIXES.some((suffix) => normalized.endsWith(`/${suffix}`));
 }
-function getPersistedReadinessPath(env = process.env) {
-  return join4(getZccDataDir(env), "state", "antigravity-native-readiness.json");
+function isValidGoogleAuthMethod(value) {
+  return typeof value === "string" && GOOGLE_ACP_AUTH_METHODS.includes(value);
+}
+function isHeadlessAuthMethod(authMethod) {
+  return authMethod === "gemini-api-key" || authMethod === "agent-platform";
+}
+function resolveGeminiHome(env = process.env) {
+  if (env.GEMINI_HOME && env.GEMINI_HOME.trim()) {
+    return resolve5(env.GEMINI_HOME.trim());
+  }
+  const home = env.USERPROFILE || env.HOME || homedir3();
+  return resolve5(home, ".gemini");
+}
+function resolveSourceAndManagedGeminiHome(env = process.env) {
+  const configuredHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? resolve5(env.GEMINI_HOME.trim()) : null;
+  const fallbackUserHome = resolve5(env.USERPROFILE || env.HOME || homedir3(), ".gemini");
+  if (configuredHome && isSanitizedGeminiHomePath(configuredHome)) {
+    const sourceGeminiHome2 = configuredHome.replace(/\\/g, "/").endsWith("/antigravity-zcc-home") ? dirname4(configuredHome) : fallbackUserHome;
+    return { sourceGeminiHome: sourceGeminiHome2, managedGeminiHome: configuredHome };
+  }
+  const sourceGeminiHome = configuredHome ?? fallbackUserHome;
+  const managedGeminiHome = env.ZCC_DATA_DIR && env.ZCC_DATA_DIR.trim() ? join4(getZccDataDir(env), "state", "antigravity-gemini-home") : configuredHome ? join4(sourceGeminiHome, "antigravity-zcc-home") : join4(getZccDataDir(env), "state", "antigravity-gemini-home");
+  return { sourceGeminiHome, managedGeminiHome };
+}
+function withGeminiHome(env, geminiHome) {
+  return { ...env ?? process.env, GEMINI_HOME: geminiHome };
+}
+function getNativeAcpSettingsPath(env = process.env) {
+  return join4(resolveGeminiHome(env), "antigravity-acp", "settings.json");
+}
+function getNativeAcpTokenPath(env = process.env) {
+  return join4(resolveGeminiHome(env), "antigravity-acp", "acp_token.json");
+}
+function hasNativeAcpToken(env = process.env) {
+  const tokenPath = getNativeAcpTokenPath(env);
+  if (!existsSync3(tokenPath)) return false;
+  try {
+    return statSync(tokenPath).size > 10;
+  } catch {
+    return false;
+  }
+}
+function readNativeAcpSettings(env = process.env) {
+  const settingsPath = getNativeAcpSettingsPath(env);
+  if (!existsSync3(settingsPath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(readFileSync3(settingsPath, "utf8"));
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+function isAuthExplicitlyCleared(env = process.env) {
+  const settings = readNativeAcpSettings(env);
+  return settings?.auth?.cleared === true;
+}
+function readConfiguredNativeAuthType(env = process.env) {
+  const settings = readNativeAcpSettings(env);
+  if (settings?.auth?.cleared === true) {
+    return null;
+  }
+  const authType = settings?.auth?.type;
+  return typeof authType === "string" && authType.trim() ? authType.trim() : null;
 }
 var statMemo = /* @__PURE__ */ new Map();
 function memoizeByStat(filePath, compute) {
@@ -42040,41 +42144,165 @@ function memoizeByStat(filePath, compute) {
   statMemo.set(filePath, { stamp, value });
   return value;
 }
-function readPersistedReadiness(key, env = process.env) {
-  const filePath = getPersistedReadinessPath(env);
-  const raw = memoizeByStat(filePath, () => {
-    try {
-      return existsSync3(filePath) ? JSON.parse(readFileSync3(filePath, "utf8")) : null;
-    } catch {
-      return null;
-    }
-  });
-  if (raw && raw.key === key && raw.result && typeof raw.result === "object" && Number.isFinite(raw.result.checkedAt) && Array.isArray(raw.result.models) && raw.result.models.every((model) => typeof model?.id === "string" && typeof model?.name === "string") && Array.isArray(raw.result.modes) && Array.isArray(raw.result.advertisedAuthMethods)) {
-    return { result: raw.result, fingerprint: raw.fingerprint || "" };
-  }
-  return null;
+function forgetStatMemo(filePath) {
+  statMemo.delete(filePath);
 }
-function writePersistedReadiness(key, result, fingerprint, env = process.env) {
-  try {
-    const filePath = getPersistedReadinessPath(env);
-    mkdirSync3(dirname4(filePath), { recursive: true });
-    const temporary = `${filePath}.${randomUUID()}.tmp`;
+function writeSettingsFileAtomically(settingsPath, authType) {
+  let existing = {};
+  if (existsSync3(settingsPath)) {
     try {
-      writeFileSync2(temporary, JSON.stringify({ key, result, fingerprint }, null, 2) + "\n", { mode: 384 });
-      renameSync2(temporary, filePath);
-    } finally {
-      rmSync2(temporary, { force: true });
-      statMemo.delete(filePath);
+      const parsed = JSON.parse(readFileSync3(settingsPath, "utf8"));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        existing = parsed;
+      }
+    } catch {
+      existing = {};
     }
+  }
+  const next = { ...existing };
+  if (authType === null) {
+    next.auth = { cleared: true };
+  } else {
+    next.auth = {
+      ...next.auth && typeof next.auth === "object" ? next.auth : {},
+      type: authType,
+      cleared: false
+    };
+  }
+  mkdirSync3(dirname4(settingsPath), { recursive: true });
+  const tmpPath = `${settingsPath}.tmp-${process.pid}`;
+  writeFileSync2(tmpPath, JSON.stringify(next, null, 2) + "\n", "utf8");
+  writeFileSync2(settingsPath, readFileSync3(tmpPath));
+  try {
+    rmSync2(tmpPath, { force: true });
   } catch {
   }
 }
-function computeCredentialFingerprint(env, authMethod) {
+function writeAuthTypeSettings(authType, env = process.env) {
+  const primaryPath = getNativeAcpSettingsPath(env);
+  writeSettingsFileAtomically(primaryPath, authType);
+  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  for (const dir of [sourceGeminiHome, managedGeminiHome]) {
+    const candidate = join4(dir, "antigravity-acp", "settings.json");
+    if (candidate !== primaryPath) {
+      try {
+        writeSettingsFileAtomically(candidate, authType);
+      } catch {
+      }
+    }
+  }
+}
+function syncFileNewer(src, dest) {
+  if (!existsSync3(src)) return;
+  try {
+    if (existsSync3(dest)) {
+      const srcStat = statSync(src);
+      const destStat = statSync(dest);
+      if (srcStat.mtimeMs <= destStat.mtimeMs && destStat.size > 0) {
+        return;
+      }
+    }
+    mkdirSync3(dirname4(dest), { recursive: true });
+    copyFileSync(src, dest);
+  } catch {
+  }
+}
+function syncTokenToSource(home, env) {
+  if (env?.GEMINI_HOME) return;
+  syncFileNewer(
+    join4(home.geminiHome, "antigravity-acp", "acp_token.json"),
+    join4(resolveGeminiHome(env), "antigravity-acp", "acp_token.json")
+  );
+}
+function isIdeNamedPipeMcpProxyUnreachable(serverConfig) {
+  if (!serverConfig || typeof serverConfig !== "object") {
+    return false;
+  }
+  const args = Array.isArray(serverConfig.args) ? serverConfig.args : [];
+  const usesIdeProxy = args.some(
+    (arg) => typeof arg === "string" && (arg.includes("mcp_proxy_bundle.js") || arg.endsWith("-antigravityide"))
+  );
+  if (!usesIdeProxy) return false;
+  const pipeId = args.find(
+    (arg) => typeof arg === "string" && arg.endsWith("-antigravityide")
+  );
+  if (!pipeId) return true;
+  if (process.platform === "win32") {
+    const pipePath = `\\\\.\\pipe\\datacloud-mcp-${pipeId}`;
+    return !existsSync3(pipePath);
+  }
+  return true;
+}
+function writeFileIfChanged(filePath, contents) {
+  try {
+    if (readFileSync3(filePath, "utf8") === contents) return;
+  } catch {
+  }
+  writeFileSync2(filePath, contents, "utf8");
+}
+function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
+  const disabledDeadMcpServers = [];
+  const sourceMcpConfigPath = join4(sourceGeminiHome, "config", "mcp_config.json");
+  const targetMcpConfigDir = join4(managedGeminiHome, "config");
+  const targetMcpConfigPath = join4(targetMcpConfigDir, "mcp_config.json");
+  mkdirSync3(targetMcpConfigDir, { recursive: true });
+  if (existsSync3(sourceMcpConfigPath)) {
+    try {
+      const raw = JSON.parse(readFileSync3(sourceMcpConfigPath, "utf8"));
+      const sourceServers = raw && typeof raw.mcpServers === "object" && raw.mcpServers !== null ? raw.mcpServers : {};
+      const sanitizedServers = {};
+      for (const [serverName, serverCfg] of Object.entries(sourceServers)) {
+        if (!serverCfg || typeof serverCfg !== "object") continue;
+        if (serverCfg.disabled === true) continue;
+        if (isIdeNamedPipeMcpProxyUnreachable(serverCfg)) {
+          disabledDeadMcpServers.push(serverName);
+          continue;
+        }
+        sanitizedServers[serverName] = serverCfg;
+      }
+      writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ ...raw, mcpServers: sanitizedServers }, null, 2) + "\n");
+    } catch {
+      writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n");
+    }
+  } else if (!existsSync3(targetMcpConfigPath)) {
+    writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
+  }
+  return disabledDeadMcpServers;
+}
+function prepareSanitizedGeminiHome(options) {
+  const env = options?.env ?? process.env;
+  const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  const sourceAcpDir = join4(sourceGeminiHome, "antigravity-acp");
+  const managedAcpDir = join4(managedGeminiHome, "antigravity-acp");
+  mkdirSync3(managedAcpDir, { recursive: true });
+  if (managedGeminiHome !== sourceGeminiHome) {
+    syncFileNewer(join4(sourceAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
+    syncFileNewer(join4(sourceAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
+  }
+  const managedEnv = { ...env, GEMINI_HOME: managedGeminiHome };
+  const currentAuthType = readConfiguredNativeAuthType(managedEnv);
+  const settingsFile = join4(managedAcpDir, "settings.json");
+  const explicitlyCleared = isAuthExplicitlyCleared(managedEnv);
+  if (!currentAuthType && !explicitlyCleared && !existsSync3(settingsFile) && existsSync3(join4(managedAcpDir, "acp_token.json"))) {
+    const defaultMethod = options?.authMethod ?? "oauth-personal";
+    writeSettingsFileAtomically(settingsFile, defaultMethod);
+  }
+  const disabledDeadMcpServers = sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome);
+  return {
+    geminiHome: managedGeminiHome,
+    disabledDeadMcpServers
+  };
+}
+
+// src/account-identity.ts
+var generation = 0;
+var ownWrites = /* @__PURE__ */ new Map();
+function fingerprintCredentials(env, authMethod) {
   const tokenPath = getNativeAcpTokenPath(env);
   const tokenInfo = memoizeByStat(tokenPath, () => {
-    if (!existsSync3(tokenPath)) return "no-token";
+    if (!existsSync4(tokenPath)) return "no-token";
     try {
-      const contents = readFileSync3(tokenPath, "utf8");
+      const contents = readFileSync4(tokenPath, "utf8");
       let identity = contents;
       try {
         const token = JSON.parse(contents);
@@ -42092,7 +42320,7 @@ function computeCredentialFingerprint(env, authMethod) {
   const appCreds = gacPath ? memoizeByStat(gacPath, () => {
     let cloudIdentity = gacPath;
     try {
-      cloudIdentity += ":" + readFileSync3(gacPath, "utf8");
+      cloudIdentity += ":" + readFileSync4(gacPath, "utf8");
     } catch {
       cloudIdentity += ":unreadable";
     }
@@ -42109,472 +42337,388 @@ function computeCredentialFingerprint(env, authMethod) {
   const cleared = isAuthExplicitlyCleared(env) ? "cleared" : "uncleared";
   return `${authMethod}:${configured}:${cleared}:${tokenInfo}:${apiKey}:${appCreds}:${cloudProject}`;
 }
-function setupStdoutHandler(stdout, onMessage) {
-  if (!stdout) return;
-  const stdoutDecoder = new StringDecoder("utf8");
-  let stdoutBuffer = "";
-  stdout.on("data", (chunk) => {
-    stdoutBuffer += typeof chunk === "string" ? chunk : stdoutDecoder.write(chunk);
-    let newlineIdx;
-    while ((newlineIdx = stdoutBuffer.indexOf("\n")) >= 0) {
-      const line = stdoutBuffer.slice(0, newlineIdx).trim();
-      stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
-      if (!line) continue;
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed && typeof parsed === "object") {
-          onMessage(parsed);
-        }
-      } catch {
-      }
-    }
-  });
-}
-function setupStderrHandler(stderr, onLine) {
-  if (!stderr) return;
-  const stderrDecoder = new StringDecoder("utf8");
-  let stderrBuffer = "";
-  stderr.on("data", (chunk) => {
-    stderrBuffer += typeof chunk === "string" ? chunk : stderrDecoder.write(chunk);
-    let newlineIdx;
-    while ((newlineIdx = stderrBuffer.indexOf("\n")) >= 0) {
-      const line = stderrBuffer.slice(0, newlineIdx).trim();
-      stderrBuffer = stderrBuffer.slice(newlineIdx + 1);
-      if (line) onLine(line);
-    }
-  });
-}
-function attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, onClose) {
-  setupStdoutHandler(child.stdout, (parsed) => {
-    if (typeof parsed.method === "string") {
-      if (parsed.id !== void 0) {
-        const reply = parsed.method === "session/request_permission" ? { result: { outcome: { outcome: "cancelled" } } } : { error: { code: -32601, message: "Not supported by the diagnostic client" } };
-        child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: parsed.id, ...reply }) + "\n");
-      } else for (const listener of notificationListeners) listener(parsed.method, parsed.params);
-      return;
-    }
-    const entry = pending.get(Number(parsed.id));
-    if (!entry) return;
-    clearTimeout(entry.timer);
-    pending.delete(Number(parsed.id));
-    if (parsed.error) {
-      const err = new Error(parsed.error?.data?.message || parsed.error?.message || `ACP error ${parsed.error?.code}`);
-      err.code = parsed.error?.code;
-      err.data = parsed.error?.data;
-      entry.reject(err);
-    } else {
-      entry.resolve(parsed.result);
-    }
-  });
-  setupStderrHandler(child.stderr, (line) => {
-    for (const listener of stderrListeners) listener(line);
-  });
-  const rejectAll = (err) => {
-    for (const [, entry] of pending) {
-      clearTimeout(entry.timer);
-      entry.reject(err);
-    }
-    pending.clear();
+function fingerprintAccount(env, authMethod) {
+  const { managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
+  return {
+    managed: fingerprintCredentials(withGeminiHome(env, managedGeminiHome), authMethod),
+    source: fingerprintCredentials(env, authMethod)
   };
-  child.on("error", (err) => rejectAll(err));
-  child.stdin?.on?.("error", (err) => rejectAll(err));
-  child.on("close", (code) => {
-    onClose();
-    rejectAll(new Error(`Native ACP server exited (code ${code ?? "null"})`));
-  });
-  return rejectAll;
 }
-function createHarnessRequester(child, pending, isClosed, getNextId) {
-  return function request(method, params, timeoutMs = 2e4) {
-    if (isClosed()) return Promise.reject(new Error("Native ACP server is already closed"));
-    const id2 = getNextId();
-    return new Promise((resolveReq, rejectReq) => {
-      const timer = setTimeout(() => {
-        pending.delete(id2);
-        rejectReq(new Error(`ACP request "${method}" timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      pending.set(id2, { resolve: resolveReq, reject: rejectReq, timer });
+function combine(fingerprints) {
+  return `${fingerprints.managed}
+${fingerprints.source}`;
+}
+function hashCredentialId(managedFingerprint) {
+  return createHash2("sha256").update(managedFingerprint).digest("hex").slice(0, 16);
+}
+var AccountSnapshot = class _AccountSnapshot {
+  constructor(target2, home) {
+    this.target = target2;
+    this.home = home;
+    this.effectiveEnv = withGeminiHome(target2.env, home.geminiHome);
+    this.fingerprints = fingerprintAccount(target2.env ?? process.env, target2.authMethod);
+  }
+  home;
+  /** The caller's environment pointed at the managed home the runtime uses. */
+  effectiveEnv;
+  generation = generation;
+  fingerprints;
+  get fingerprint() {
+    return this.fingerprints.managed;
+  }
+  /** Read live so keys follow this diagnostic's own auth-type write. */
+  get configuredAuthType() {
+    return readConfiguredNativeAuthType(this.effectiveEnv);
+  }
+  /** Identifies cached readiness for this runtime and auth configuration. */
+  get readinessKey() {
+    const { command, args, authMethod } = this.target;
+    return JSON.stringify({ command, args, authMethod, configuredAuthType: this.configuredAuthType });
+  }
+  /** Where readiness for this account is cached, as of now. */
+  get slot() {
+    return { key: this.readinessKey, fingerprint: this.fingerprint };
+  }
+  /** Identifies catalog and usage refreshes for this runtime and account. */
+  get refreshKey() {
+    const { command, args, authMethod, cwd, env } = this.target;
+    return JSON.stringify([
+      command,
+      args,
+      authMethod,
+      cwd,
+      getZccDataDir(env),
+      resolveSourceAndManagedGeminiHome(env).managedGeminiHome,
+      this.fingerprint
+    ]);
+  }
+  /** Opaque, so UIs can drop results that belong to a previous sign-in. */
+  get credentialId() {
+    return hashCredentialId(this.fingerprint);
+  }
+  /** A fresh snapshot of the same target, for an account that just changed on purpose (sign-in). */
+  recapture() {
+    return new _AccountSnapshot(this.target, this.home);
+  }
+  isCurrent() {
+    if (this.generation !== generation) return false;
+    const now = fingerprintAccount(this.target.env ?? process.env, this.target.authMethod);
+    if (combine(now) === combine(this.fingerprints)) return true;
+    const write = ownWrites.get(this.home.geminiHome);
+    if (write && write.before === combine(this.fingerprints) && write.after === combine(now)) {
+      this.fingerprints = now;
+      return true;
+    }
+    return false;
+  }
+  /**
+   * Records the auth type a headless authenticate just accepted. Only this synchronous write may move
+   * the snapshot forward; any other change since capture still fails validation.
+   */
+  commitHeadlessAuthType() {
+    if (!this.isCurrent()) {
+      throw new Error("Antigravity sign-in changed during authentication. Retry to load the current account.");
+    }
+    const before = combine(this.fingerprints);
+    writeAuthTypeSettings(this.target.authMethod, this.target.env);
+    const after = fingerprintAccount(this.target.env ?? process.env, this.target.authMethod);
+    if (combine(after) !== before) ownWrites.set(this.home.geminiHome, { before, after: combine(after) });
+    this.fingerprints = after;
+  }
+};
+function captureAccount(target2) {
+  return new AccountSnapshot(target2, prepareSanitizedGeminiHome({ env: target2.env, authMethod: target2.authMethod }));
+}
+
+// src/keyed-refresh.ts
+function remember(map2, key, value, maxKeys) {
+  map2.delete(key);
+  if (map2.size >= maxKeys) map2.delete(map2.keys().next().value);
+  map2.set(key, value);
+}
+var KeyedRefresh = class {
+  constructor(policy = {}) {
+    this.policy = policy;
+  }
+  running = /* @__PURE__ */ new Map();
+  successes = /* @__PURE__ */ new Map();
+  retryAfter = /* @__PURE__ */ new Map();
+  now() {
+    return this.policy.now ? this.policy.now() : Date.now();
+  }
+  /** A success cached for `key` within the TTL. */
+  cached(key) {
+    const hit = this.successes.get(key);
+    return hit && this.policy.successTtlMs !== void 0 && this.now() - hit.at < this.policy.successTtlMs ? hit.result : void 0;
+  }
+  /**
+   * Joins the refresh already running for `key`. Otherwise, if `key` failed within the backoff and
+   * `whileBackingOff` is given, answers with it; otherwise starts `task`.
+   */
+  run(key, task, options = {}) {
+    const running = this.running.get(key);
+    if (running) return running;
+    const retry = this.retryAfter.get(key);
+    if (options.whileBackingOff && retry !== void 0 && retry > this.now()) return Promise.resolve(options.whileBackingOff());
+    const refresh = task().then((run) => {
+      this.settle(key, run);
+      return run.result;
+    }).finally(() => this.running.delete(key));
+    this.running.set(key, refresh);
+    return refresh;
+  }
+  settle(startKey, run) {
+    if (run.outcome === "discard") return;
+    const maxKeys = this.policy.maxKeys ?? 32;
+    if (run.key !== startKey) this.retryAfter.delete(startKey);
+    if (run.outcome === "success") {
+      this.retryAfter.delete(run.key);
+      if (this.policy.successTtlMs !== void 0) remember(this.successes, run.key, { result: run.result, at: this.now() }, maxKeys);
+    } else if (this.policy.failureBackoffMs !== void 0) {
+      remember(this.retryAfter, run.key, this.now() + this.policy.failureBackoffMs, maxKeys);
+    }
+  }
+};
+
+// src/native-usage.ts
+function parseNativeQuotaWindows(text) {
+  const windows = [];
+  let inQuotas = false;
+  let group = "";
+  for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith("### ")) {
+      inQuotas = line.trim() === "### Quota Limits";
+      continue;
+    }
+    if (!inQuotas) continue;
+    const heading = /^- \*\*([^*]+)\*\*$/.exec(line);
+    if (heading) {
+      group = heading[1];
+      continue;
+    }
+    const match = /^\s+- \*\*([^*]+):\*\* (\d+(?:\.\d+)?)% remaining \(resets ([^)]+)\)\s*$/.exec(line);
+    if (!group || !match) continue;
+    const remaining = Number(match[2]);
+    if (remaining < 0 || remaining > 100) continue;
+    const resetTime = Date.parse(match[3]);
+    windows.push({
+      label: `${group} \u2014 ${match[1]}`,
+      usedPercent: 100 - remaining,
+      resetsAt: Number.isFinite(resetTime) ? new Date(resetTime).toISOString() : null
+    });
+  }
+  return windows;
+}
+
+// src/readiness-store.ts
+import { randomUUID } from "node:crypto";
+import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync5, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname5, join as join5 } from "node:path";
+function readinessResult(state, subject, fields = {}) {
+  return {
+    state,
+    agentVersion: null,
+    protocolVersion: 1,
+    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
+    selectedAuthMethod: subject.authMethod,
+    configuredAuthType: subject.configuredAuthType,
+    models: [],
+    modes: [],
+    ...subject.disabledDeadMcpServers ? { disabledDeadMcpServers: subject.disabledDeadMcpServers } : {},
+    checkedAt: Date.now(),
+    ...fields
+  };
+}
+function runtimeMissingResult(command, subject) {
+  return readinessResult("runtime_missing", subject, {
+    protocolVersion: null,
+    advertisedAuthMethods: [],
+    error: `Native ACP binary not found at "${command}".`
+  });
+}
+var READINESS_CACHE_TTL_MS = 10 * 60 * 1e3;
+function isPersistedResult(raw) {
+  return raw?.result && typeof raw.result === "object" && Number.isFinite(raw.result.checkedAt) && Array.isArray(raw.result.models) && raw.result.models.every((model) => typeof model?.id === "string" && typeof model?.name === "string") && Array.isArray(raw.result.modes) && Array.isArray(raw.result.advertisedAuthMethods);
+}
+var ReadinessStore = class {
+  constructor(options = {}) {
+    this.options = options;
+  }
+  memory = null;
+  now() {
+    return this.options.now ? this.options.now() : Date.now();
+  }
+  isFresh(result) {
+    return this.now() - result.checkedAt < (this.options.ttlMs ?? READINESS_CACHE_TTL_MS);
+  }
+  /**
+   * The freshest result for the slot from memory or disk, newer winning. With `allowStale`, an
+   * expired catalog for the same account is returned as `authenticated` with `catalogStale`; it
+   * also outlives a fresher transient failure, whose error it carries.
+   */
+  lookup(slot, env, options = {}) {
+    const memory = this.memory && this.memory.key === slot.key && this.memory.fingerprint === slot.fingerprint && this.isFresh(this.memory.result) ? this.memory.result : null;
+    const persisted = this.readPersisted(slot, env);
+    if (persisted && this.isFresh(persisted) && (!memory || persisted.checkedAt > memory.checkedAt)) {
+      this.memory = { ...slot, result: persisted };
+      return persisted;
+    }
+    const stale = options.allowStale && persisted && persisted.state === "session_ready" && persisted.models.length > 0 ? { ...persisted, state: "authenticated", catalogStale: true } : null;
+    if (memory && stale && memory.state === "runtime_launches") return { ...stale, error: memory.error };
+    return memory ?? stale;
+  }
+  /** Transient runtime failures stay in this process; every other result is shared through disk. */
+  put(slot, result, env) {
+    this.memory = { ...slot, result };
+    if (result.state !== "runtime_launches") this.writePersisted(slot, result, env);
+  }
+  invalidate(env) {
+    this.memory = null;
+    try {
+      const filePath = this.path(env);
+      forgetStatMemo(filePath);
+      rmSync3(filePath, { force: true });
+    } catch {
+    }
+  }
+  path(env) {
+    return join5(getZccDataDir(env), "state", "antigravity-native-readiness.json");
+  }
+  readPersisted(slot, env) {
+    const filePath = this.path(env);
+    const raw = memoizeByStat(filePath, () => {
       try {
-        child.stdin?.write(JSON.stringify({ jsonrpc: "2.0", id: id2, method, params }) + "\n");
-      } catch (err) {
-        clearTimeout(timer);
-        pending.delete(id2);
-        rejectReq(err);
+        return existsSync5(filePath) ? JSON.parse(readFileSync5(filePath, "utf8")) : null;
+      } catch {
+        return null;
       }
     });
-  };
-}
-function createNativeRpcHarness(options, suppressBrowser) {
-  const spawnFn = options.spawnImpl ?? spawn;
-  const env = {
-    ...process.env,
-    ...options.env ?? {},
-    ...suppressBrowser ? { BROWSER: "echo" } : {}
-  };
-  const child = spawnFn(options.command, options.args, {
-    cwd: options.cwd || process.cwd(),
-    env,
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true
-  });
-  const pending = /* @__PURE__ */ new Map();
-  const stderrListeners = [];
-  const notificationListeners = [];
-  let nextId = 1;
-  let closed = false;
-  const rejectAll = attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, () => {
-    closed = true;
-  });
-  const request = createHarnessRequester(child, pending, () => closed, () => nextId++);
-  return {
-    child,
-    request,
-    onStderrLine(listener) {
-      stderrListeners.push(listener);
-    },
-    onNotification(listener) {
-      notificationListeners.push(listener);
-    },
-    close(reason) {
-      if (closed) return;
-      closed = true;
-      rejectAll(reason ?? new Error("Native ACP probe closed"));
-      killProcessTree(child);
+    return raw && raw.key === slot.key && (raw.fingerprint || "") === slot.fingerprint && isPersistedResult(raw) ? raw.result : null;
+  }
+  writePersisted(slot, result, env) {
+    try {
+      const filePath = this.path(env);
+      mkdirSync4(dirname5(filePath), { recursive: true });
+      const temporary = `${filePath}.${randomUUID()}.tmp`;
+      try {
+        writeFileSync3(temporary, JSON.stringify({ key: slot.key, result, fingerprint: slot.fingerprint }, null, 2) + "\n", { mode: 384 });
+        renameSync2(temporary, filePath);
+      } finally {
+        rmSync3(temporary, { force: true });
+        forgetStatMemo(filePath);
+      }
+    } catch {
     }
-  };
-}
-var cachedReadiness = null;
-var READINESS_CACHE_TTL_MS = 10 * 60 * 1e3;
+  }
+};
+var readinessStore = new ReadinessStore();
+
+// src/native-auth.ts
 var NATIVE_PROBE_TIMEOUT_MS = 2e4;
 var USAGE_CACHE_TTL_MS = 6e4;
 var USAGE_COMMANDS_WAIT_MS = 1e3;
 var USAGE_MAX_TEXT_CHARS = 32768;
 var CATALOG_RETRY_BACKOFF_MS = 3e4;
-var CATALOG_RETRY_MAX_KEYS = 32;
-var CATALOG_UPDATE_WAIT_MS = 1e3;
-var CATALOG_UPDATE_MAX_SESSIONS = 16;
-var authGeneration = 0;
-function clearCachedNativeReadiness(env = process.env) {
-  cachedReadiness = null;
-  authGeneration++;
-  try {
-    const filePath = getPersistedReadinessPath(env);
-    statMemo.delete(filePath);
-    rmSync2(filePath, { force: true });
-  } catch {
-  }
+function extractModesFromSessionResult(sessionResult) {
+  const available = sessionResult?.modes?.availableModes;
+  if (!Array.isArray(available)) return [];
+  return available.map((m) => typeof m?.id === "string" ? m.id : null).filter((id2) => Boolean(id2));
 }
-function checkLocalCredentialPresence(authMethod, effectiveEnv, configuredAuthType) {
-  if (authMethod === "gemini-api-key") {
-    return Boolean(effectiveEnv.GEMINI_API_KEY) ? { authenticated: true, note: "API key detected in environment (unverified session)" } : { authenticated: false };
-  }
+function describeSession(session) {
+  const tierName = session?._meta?.antigravity?.tier?.name;
+  return {
+    models: extractModelsFromSessionResult(session),
+    modes: extractModesFromSessionResult(session),
+    tierName: typeof tierName === "string" ? tierName : null
+  };
+}
+function fromInitialize(info) {
+  return { agentVersion: info.agentVersion, protocolVersion: info.protocolVersion, advertisedAuthMethods: info.advertisedAuthMethods };
+}
+function subjectOf(account, configuredAuthType = account.configuredAuthType) {
+  return { authMethod: account.target.authMethod, configuredAuthType, disabledDeadMcpServers: account.home.disabledDeadMcpServers };
+}
+function hasLocalCredentials(authMethod, effectiveEnv, configuredAuthType) {
+  if (authMethod === "gemini-api-key") return Boolean(effectiveEnv.GEMINI_API_KEY);
   if (authMethod === "agent-platform") {
-    const hasPlatformCreds = Boolean(
-      effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS || effectiveEnv.CLOUD_ML_PROJECT_ID || effectiveEnv.GOOGLE_CLOUD_PROJECT
-    );
-    return hasPlatformCreds ? { authenticated: true, note: "Platform credentials detected (unverified session)" } : { authenticated: false };
+    return Boolean(effectiveEnv.GOOGLE_APPLICATION_CREDENTIALS || effectiveEnv.CLOUD_ML_PROJECT_ID || effectiveEnv.GOOGLE_CLOUD_PROJECT);
   }
-  if (!isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && configuredAuthType) {
-    return { authenticated: true, note: "Local credentials present (unverified session)" };
-  }
-  return { authenticated: false };
-}
-function checkCachedReadiness(cacheKey, fingerprint, effectiveEnv, allowStaleCatalog = false) {
-  const memory = cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS ? cachedReadiness.result : null;
-  const persisted = readPersistedReadiness(cacheKey, effectiveEnv);
-  const result = persisted && persisted.fingerprint === fingerprint ? persisted.result : null;
-  if (result && Date.now() - result.checkedAt < READINESS_CACHE_TTL_MS && (!memory || result.checkedAt > memory.checkedAt)) {
-    cachedReadiness = { key: cacheKey, fingerprint, result };
-    return result;
-  }
-  const staleCatalog = allowStaleCatalog && result && result.state === "session_ready" && result.models.length > 0 ? { ...result, state: "authenticated", catalogStale: true } : null;
-  if (memory && staleCatalog && memory.state === "runtime_launches") return { ...staleCatalog, error: memory.error };
-  if (memory) return memory;
-  return staleCatalog;
-}
-function computeEffectiveCredentialFingerprint(env, authMethod) {
-  const { managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
-  return computeCredentialFingerprint({ ...env, GEMINI_HOME: managedGeminiHome }, authMethod);
-}
-function captureAuthIdentity(env, authMethod) {
-  const sourceEnv = env ?? process.env;
-  return {
-    generation: authGeneration,
-    fingerprint: computeEffectiveCredentialFingerprint(sourceEnv, authMethod),
-    sourceFingerprint: computeCredentialFingerprint(sourceEnv, authMethod)
-  };
-}
-function isAuthIdentityCurrent(identity, env, authMethod) {
-  return identity.generation === authGeneration && identity.fingerprint === computeEffectiveCredentialFingerprint(env ?? process.env, authMethod) && identity.sourceFingerprint === computeCredentialFingerprint(env ?? process.env, authMethod);
-}
-function buildNativeRefreshKey(options, fingerprint) {
-  return JSON.stringify([
-    options.command,
-    options.args,
-    options.authMethod,
-    options.cwd,
-    getZccDataDir(options.env),
-    resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
-    fingerprint
-  ]);
-}
-function buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized) {
-  return {
-    state: "authenticated",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: configuredAuthType ?? options.authMethod,
-    models: [],
-    modes: ["default", "auto_edit", "yolo"],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-}
-function buildSignInRequiredFastReadiness(options, sanitized) {
-  return {
-    state: "sign_in_required",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: null,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.',
-    checkedAt: Date.now()
-  };
+  return !isAuthExplicitlyCleared(effectiveEnv) && hasNativeAcpToken(effectiveEnv) && Boolean(configuredAuthType);
 }
 function getFastNativeReadiness(options) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  return getPreparedNativeReadiness(options, sanitized);
+  return readPreparedReadiness(captureAccount(options));
 }
-function getPreparedNativeReadiness(options, sanitized, fingerprint = computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)) {
-  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
-  const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const cacheKey = JSON.stringify({
-    command: options.command,
-    args: options.args,
-    authMethod: options.authMethod,
-    configuredAuthType
-  });
-  const cached2 = existsSync3(options.command) ? checkCachedReadiness(cacheKey, fingerprint, effectiveEnv, true) : null;
-  if (cached2) {
-    return { ...cached2, disabledDeadMcpServers: sanitized.disabledDeadMcpServers };
-  }
-  if (!existsSync3(options.command)) {
-    return {
-      state: "runtime_missing",
-      agentVersion: null,
-      protocolVersion: null,
-      advertisedAuthMethods: [],
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Native ACP binary not found at "${options.command}".`,
-      checkedAt: Date.now()
-    };
-  }
-  const credCheck = checkLocalCredentialPresence(options.authMethod, effectiveEnv, configuredAuthType);
-  if (credCheck.authenticated) {
-    return buildAuthenticatedFastReadiness(options, configuredAuthType, sanitized);
-  }
-  return buildSignInRequiredFastReadiness(options, sanitized);
-}
-var headlessAuthGroups = /* @__PURE__ */ new Map();
-async function performInitializeAndAuth(harness, options, identity) {
-  if (options.configuredAuthType || options.authMethod !== "gemini-api-key" && options.authMethod !== "agent-platform") {
-    return initializeNativeSession(harness, options, identity);
-  }
-  const key = JSON.stringify([resolveSourceAndManagedGeminiHome(options.env), options.authMethod, identity.current]);
-  const group = headlessAuthGroups.get(key) ?? { current: identity.current, settingsWritten: false, users: 0 };
-  group.users++;
-  headlessAuthGroups.set(key, group);
-  try {
-    return await initializeNativeSession(harness, options, identity, group);
-  } finally {
-    if (--group.users === 0) headlessAuthGroups.delete(key);
-  }
-}
-async function initializeNativeSession(harness, options, identity, headlessGroup) {
-  const initResult = await harness.request(
-    "initialize",
-    {
-      protocolVersion: 1,
-      clientInfo: { name: "zcc", title: "Zana Command Center", version: "1.0.0" },
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true }
-      }
-    },
-    options.timeoutMs
-  );
-  const protocolVersion = typeof initResult?.protocolVersion === "number" ? initResult.protocolVersion : null;
-  const agentVersion = typeof initResult?.agentInfo?.version === "string" ? initResult.agentInfo.version : null;
-  const advertisedAuthMethods = Array.isArray(initResult?.authMethods) ? initResult.authMethods.map((m) => typeof m?.id === "string" ? m.id : null).filter(Boolean) : [];
-  if (headlessGroup) {
-    await harness.request("authenticate", { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
-    if (!isAuthIdentityCurrent(headlessGroup.current, options.env, options.authMethod)) {
-      throw new Error("Antigravity sign-in changed during authentication. Retry to load the current account.");
-    }
-    if (!headlessGroup.settingsWritten) {
-      writeNativeAcpAuthType(options.authMethod, options.env);
-      headlessGroup.current = captureAuthIdentity(options.env, options.authMethod);
-      headlessGroup.settingsWritten = true;
-    }
-    identity.current = headlessGroup.current;
-  }
-  return { protocolVersion, agentVersion, advertisedAuthMethods };
-}
-function checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized) {
-  if (!options.forceRefresh && cachedReadiness && cachedReadiness.key === cacheKey && cachedReadiness.fingerprint === fingerprint && Date.now() - cachedReadiness.result.checkedAt < READINESS_CACHE_TTL_MS) {
-    return cachedReadiness.result;
-  }
-  if (!existsSync3(options.command)) {
-    return {
-      state: "runtime_missing",
-      agentVersion: null,
-      protocolVersion: null,
-      advertisedAuthMethods: [],
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Native ACP binary not found at "${options.command}".`,
-      checkedAt: Date.now()
-    };
-  }
-  return null;
-}
-function buildProbeSessionResult(sessionRace, initInfo, options, effectiveEnv, sanitized, cacheKey, fingerprint) {
-  const models = extractModelsFromSessionResult(sessionRace);
-  const modes = extractModesFromSessionResult(sessionRace);
-  const tierName = typeof sessionRace?._meta?.antigravity?.tier?.name === "string" ? sessionRace._meta.antigravity.tier.name : null;
-  if (!options.env?.GEMINI_HOME) {
-    syncFileNewer(
-      join4(sanitized.geminiHome, "antigravity-acp", "acp_token.json"),
-      join4(resolveGeminiHome(options.env), "antigravity-acp", "acp_token.json")
+function readPreparedReadiness(account) {
+  const { target: target2, home, effectiveEnv } = account;
+  const configuredAuthType = account.configuredAuthType;
+  if (!existsSync6(target2.command)) return runtimeMissingResult(target2.command, subjectOf(account));
+  const cached2 = readinessStore.lookup(account.slot, effectiveEnv, { allowStale: true });
+  if (cached2) return { ...cached2, disabledDeadMcpServers: home.disabledDeadMcpServers };
+  if (hasLocalCredentials(target2.authMethod, effectiveEnv, configuredAuthType)) {
+    return readinessResult(
+      "authenticated",
+      subjectOf(account, configuredAuthType ?? target2.authMethod),
+      { modes: ["default", "auto_edit", "yolo"] }
     );
   }
-  const readyResult = {
-    state: "session_ready",
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType: readConfiguredNativeAuthType(effectiveEnv) ?? options.authMethod,
-    models,
-    modes,
-    tierName,
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    checkedAt: Date.now()
-  };
-  cachedReadiness = { key: cacheKey, fingerprint, result: readyResult };
-  writePersistedReadiness(cacheKey, readyResult, fingerprint, effectiveEnv);
-  return readyResult;
+  return readinessResult(
+    "sign_in_required",
+    subjectOf(account, null),
+    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' }
+  );
 }
-function checkInitCompatibility(initInfo, options, configuredAuthType, sanitized) {
-  if (initInfo.protocolVersion !== 1) {
-    return {
-      state: "runtime_launches",
-      agentVersion: initInfo.agentVersion,
-      protocolVersion: initInfo.protocolVersion,
-      advertisedAuthMethods: initInfo.advertisedAuthMethods,
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Unsupported ACP protocolVersion returned: ${initInfo.protocolVersion}`,
-      checkedAt: Date.now()
-    };
+async function initializeFor(session, account, configuredAuthType) {
+  const info = await session.initialize();
+  const { authMethod } = account.target;
+  if (!configuredAuthType && isHeadlessAuthMethod(authMethod)) {
+    await session.authenticate(authMethod, { headless: true });
+    account.commitHeadlessAuthType();
   }
-  if (initInfo.advertisedAuthMethods.length > 0 && !initInfo.advertisedAuthMethods.includes(options.authMethod)) {
-    return {
-      state: "runtime_launches",
-      agentVersion: initInfo.agentVersion,
-      protocolVersion: initInfo.protocolVersion,
-      advertisedAuthMethods: initInfo.advertisedAuthMethods,
-      selectedAuthMethod: options.authMethod,
-      configuredAuthType,
-      models: [],
-      modes: [],
-      disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-      error: `Selected auth method "${options.authMethod}" is not advertised.`,
-      checkedAt: Date.now()
-    };
+  return info;
+}
+function openDiagnosticSession(options, account, operation) {
+  return NativeAcpSession.open({
+    command: options.command,
+    args: options.args,
+    cwd: options.cwd,
+    env: account.effectiveEnv,
+    spawnImpl: options.spawnImpl,
+    timeoutMs: options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS,
+    operation
+  });
+}
+function incompatibility(info, authMethod) {
+  if (info.protocolVersion !== 1) return `Unsupported ACP protocolVersion returned: ${info.protocolVersion}`;
+  if (info.advertisedAuthMethods.length > 0 && !info.advertisedAuthMethods.includes(authMethod)) {
+    return `Selected auth method "${authMethod}" is not advertised.`;
   }
   return null;
 }
-function formatProbeFailureResult(err, interactiveLoginTriggeredOnStderr, options, configuredAuthType, sanitized) {
-  const message = err?.message || String(err);
-  const isAuthRequired = interactiveLoginTriggeredOnStderr || /authentication required|no authentication method selected|credentials (?:missing|invalid|expired)/i.test(message) || err?.data?.recovery?.kind === "authRequired";
-  return {
-    state: isAuthRequired ? "sign_in_required" : "runtime_launches",
-    agentVersion: null,
-    protocolVersion: 1,
-    advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS],
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: isAuthRequired ? 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' : message,
-    checkedAt: Date.now()
-  };
+function failureResult(error62, signInRequested, subject) {
+  const message = error62?.message || String(error62);
+  const isAuthRequired = signInRequested || /authentication required|no authentication method selected|credentials (?:missing|invalid|expired)/i.test(message) || error62?.data?.recovery?.kind === "authRequired";
+  return isAuthRequired ? readinessResult(
+    "sign_in_required",
+    subject,
+    { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' }
+  ) : readinessResult("runtime_launches", subject, { error: message });
 }
-function setupStderrAuthDetector(harness) {
-  let triggered = false;
-  let resolve6 = null;
-  const promise2 = new Promise((res) => {
-    resolve6 = () => res("stderr_auth_required");
+function accountChangedResult(subject, fields) {
+  return readinessResult("runtime_launches", subject, {
+    ...fields,
+    error: "Antigravity sign-in changed while models were being discovered. Retry to load the current account."
   });
-  harness.onStderrLine((line) => {
-    if (line.includes("Credentials missing or invalid") || line.includes("Launching browser login flow") || line.includes("Open the following link to authenticate")) {
-      triggered = true;
-      resolve6?.();
-    }
-  });
-  return { isTriggered: () => triggered, promise: promise2 };
 }
-function createNativeDiagnostic(options, operation, sanitized) {
-  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
-  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
-  const harness = createNativeRpcHarness({ ...options, env: effectiveEnv }, true);
-  const detector = setupStderrAuthDetector(harness);
-  const deadline = setTimeout(() => harness.close(new Error(`Native ACP ${operation} timed out after ${timeoutMs}ms`)), timeoutMs);
-  return {
-    sanitized,
-    effectiveEnv,
-    timeoutMs,
-    harness,
-    detector,
-    dispose() {
-      clearTimeout(deadline);
-      harness.close();
-    }
-  };
-}
-var usageRefreshes = /* @__PURE__ */ new Map();
-var usageCache = null;
+var usageRefresh = new KeyedRefresh({ successTtlMs: USAGE_CACHE_TTL_MS });
 async function queryNativeUsage(options) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
-  if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
-    return usageCache.result;
-  }
-  const running = usageRefreshes.get(key);
-  if (running) return running;
-  const request = performNativeUsageQuery(options, identity, sanitized).then((result) => {
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
-      return { supported: true, usage: {
+  const account = captureAccount(options);
+  const key = account.refreshKey;
+  const cached2 = options.forceRefresh ? void 0 : usageRefresh.cached(key);
+  if (cached2) return cached2;
+  return usageRefresh.run(key, async () => {
+    const result = await performNativeUsageQuery(options, account);
+    if (!account.isCurrent()) {
+      return { outcome: "discard", key, result: { supported: true, usage: {
         status: "error",
         planLabel: null,
         accountEmail: null,
@@ -42582,64 +42726,12 @@ async function queryNativeUsage(options) {
         checkedAt: Date.now(),
         source: "native-acp-/usage",
         message: "Antigravity sign-in changed while usage was being checked. Retry to load the current account."
-      } };
+      } } };
     }
-    if (result.usage.status === "ok") usageCache = { key: buildNativeRefreshKey(options, identity.current.fingerprint), result };
-    return result;
-  }).finally(() => usageRefreshes.delete(key));
-  usageRefreshes.set(key, request);
-  return request;
-}
-function trackUsageSessionUpdates(harness) {
-  let advertised = false;
-  let text = "";
-  let unexpectedTools = false;
-  let commandsReceived = () => {
-  };
-  const commandsReady = new Promise((resolve6) => {
-    commandsReceived = resolve6;
+    return { result, outcome: result.usage.status === "ok" ? "success" : "failure", key: account.refreshKey };
   });
-  let commandTimer;
-  harness.onNotification((method, params) => {
-    if (method !== "session/update") return;
-    const update = params?.update;
-    if (update?.sessionUpdate === "available_commands_update") {
-      advertised = Array.isArray(update.availableCommands) && update.availableCommands.some((command) => command?.name === "usage");
-      if (advertised) commandsReceived();
-    }
-    if (update?.sessionUpdate === "tool_call") {
-      unexpectedTools = true;
-      harness.close();
-    }
-    if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
-      text += update.content.text;
-      if (text.length > USAGE_MAX_TEXT_CHARS) {
-        harness.close(new Error(`Native usage output exceeded ${USAGE_MAX_TEXT_CHARS} characters; the diagnostic session was stopped.`));
-      }
-    }
-  });
-  return {
-    get advertised() {
-      return advertised;
-    },
-    get text() {
-      return text;
-    },
-    get unexpectedTools() {
-      return unexpectedTools;
-    },
-    waitForCommands(timeoutMs) {
-      if (advertised) return Promise.resolve();
-      return Promise.race([commandsReady, new Promise((resolve6) => {
-        commandTimer = setTimeout(resolve6, timeoutMs);
-      })]);
-    },
-    dispose() {
-      clearTimeout(commandTimer);
-    }
-  };
 }
-async function performNativeUsageQuery(options, identity, preparedHome) {
+async function performNativeUsageQuery(options, account) {
   const usage = {
     status: "error",
     planLabel: null,
@@ -42648,206 +42740,214 @@ async function performNativeUsageQuery(options, identity, preparedHome) {
     checkedAt: Date.now(),
     source: "native-acp-/usage"
   };
-  if (!existsSync3(options.command)) return { supported: true, usage: { ...usage, status: "not_installed" } };
-  const diagnostic = createNativeDiagnostic(options, "usage check", preparedHome);
-  const { sanitized, effectiveEnv, harness, timeoutMs, detector } = diagnostic;
-  const tracker = trackUsageSessionUpdates(harness);
+  if (!existsSync6(options.command)) return { supported: true, usage: { ...usage, status: "not_installed" } };
+  const session = openDiagnosticSession(options, account, "usage check");
   try {
-    const init = await performInitializeAndAuth(harness, {
-      authMethod: options.authMethod,
-      timeoutMs,
-      configuredAuthType: readConfiguredNativeAuthType(effectiveEnv),
-      env: options.env
-    }, identity);
+    const init = await initializeFor(session, account, account.configuredAuthType);
     if (init.protocolVersion !== 1) throw new Error("Unsupported Native ACP protocol version.");
-    const session = await Promise.race([harness.request("session/new", { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    if (session === "stderr_auth_required") return { supported: true, usage: { ...usage, status: "unauthenticated" } };
-    usage.planLabel = typeof session?._meta?.antigravity?.tier?.name === "string" ? session._meta.antigravity.tier.name : null;
-    await tracker.waitForCommands(USAGE_COMMANDS_WAIT_MS);
-    if (!tracker.advertised) throw new Error("This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.");
-    const result = await harness.request("session/prompt", { sessionId: session.sessionId, prompt: [{ type: "text", text: "/usage" }] }, timeoutMs);
-    if (result?.stopReason !== "end_turn" || tracker.unexpectedTools) throw new Error("Native usage command did not complete successfully.");
-    usage.windows = parseNativeQuotaWindows(tracker.text);
+    const opened = await session.newSession();
+    if (opened.kind === "sign_in_required") return { supported: true, usage: { ...usage, status: "unauthenticated" } };
+    usage.planLabel = describeSession(opened.session).tierName ?? null;
+    if (!await session.waitForCommand("usage", USAGE_COMMANDS_WAIT_MS)) {
+      throw new Error("This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.");
+    }
+    const result = await session.runCommand(opened.session.sessionId, "usage", { maxTextChars: USAGE_MAX_TEXT_CHARS });
+    if (result.stopReason !== "end_turn") throw new Error("Native usage command did not complete successfully.");
+    usage.windows = parseNativeQuotaWindows(result.text);
     if (usage.windows.length === 0) throw new Error("Native usage returned no recognized quota windows. Check usage in Google Antigravity Settings.");
     return { supported: true, usage: { ...usage, status: "ok", checkedAt: Date.now() } };
   } catch (error62) {
-    const failure2 = formatProbeFailureResult(
-      error62,
-      detector.isTriggered(),
-      options,
-      readConfiguredNativeAuthType(effectiveEnv),
-      sanitized
-    );
+    const failure2 = failureResult(error62, session.signInRequested, subjectOf(account));
     return { supported: true, usage: {
       ...usage,
       status: failure2.state === "sign_in_required" ? "unauthenticated" : "error",
-      message: tracker.unexpectedTools ? "Native usage unexpectedly requested tools; the diagnostic session was stopped." : failure2.error
+      message: failure2.error
     } };
   } finally {
-    tracker.dispose();
-    diagnostic.dispose();
+    session.close();
   }
 }
-var catalogRefreshes = /* @__PURE__ */ new Map();
-var catalogRetryAfter = /* @__PURE__ */ new Map();
-function isNativeCatalogSettled(readiness, forceRefresh) {
+var catalogRefresh = new KeyedRefresh({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
+function isCatalogSettled(readiness, forceRefresh) {
   return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" || readiness.state === "session_ready" && readiness.models.length > 0);
 }
-async function getNativeCatalog(options) {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
-  const previous = getPreparedNativeReadiness(options, sanitized, identity.current.fingerprint);
-  if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
-  const key = buildNativeRefreshKey(options, identity.current.fingerprint);
-  const running = catalogRefreshes.get(key);
-  if (running) return running;
-  const retry = catalogRetryAfter.get(key);
-  if (!options.forceRefresh && retry && retry > Date.now()) return previous;
-  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity, sanitized).then((result) => {
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) return result;
-    const retryKey = buildNativeRefreshKey(options, identity.current.fingerprint);
-    if (retryKey !== key) catalogRetryAfter.delete(key);
-    if (result.state !== "session_ready" || result.models.length === 0) {
-      if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value);
-      catalogRetryAfter.set(retryKey, Date.now() + CATALOG_RETRY_BACKOFF_MS);
-      if (result.state !== "sign_in_required" && result.state !== "session_ready" && previous.models.length > 0) {
-        return { ...previous, state: "authenticated", catalogStale: true, error: result.error };
-      }
-    } else catalogRetryAfter.delete(retryKey);
-    return result;
-  }).finally(() => catalogRefreshes.delete(key));
-  catalogRefreshes.set(key, refresh);
-  return refresh;
+function resolveNativeCatalog(options) {
+  const account = captureAccount(options);
+  const previous = readPreparedReadiness(account);
+  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
 }
-async function runNativeReadinessProbe(options, identity, sanitized) {
-  const effectiveEnv = { ...options.env ?? process.env, GEMINI_HOME: sanitized.geminiHome };
-  const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-  const fingerprint = identity.current.fingerprint;
-  const cacheKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType });
-  const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized);
-  if (earlyResult) return earlyResult;
-  const diagnostic = createNativeDiagnostic(options, "session verification", sanitized);
-  const { harness, detector, timeoutMs } = diagnostic;
-  const catalogUpdates = trackCatalogUpdates(harness);
+function refreshCatalog(options, account, previous) {
+  const key = account.refreshKey;
+  return catalogRefresh.run(key, async () => {
+    const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);
+    if (!account.isCurrent()) return { result, outcome: "discard", key };
+    if (result.state === "session_ready" && result.models.length > 0) return { result, outcome: "success", key: account.refreshKey };
+    const keepPrevious = result.state !== "sign_in_required" && result.state !== "session_ready" && previous.models.length > 0;
+    return {
+      outcome: "failure",
+      key: account.refreshKey,
+      result: keepPrevious ? { ...previous, state: "authenticated", catalogStale: true, error: result.error } : result
+    };
+  }, { whileBackingOff: options.forceRefresh ? void 0 : () => previous });
+}
+async function runNativeReadinessProbe(options, account) {
+  const { effectiveEnv } = account;
+  const startSlot = account.slot;
+  const subject = subjectOf(account);
+  if (!existsSync6(options.command)) return runtimeMissingResult(options.command, subject);
+  const cached2 = options.forceRefresh ? null : readinessStore.lookup(startSlot, effectiveEnv);
+  if (cached2) return cached2;
+  const session = openDiagnosticSession(options, account, "session verification");
   try {
-    const initInfo = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs, configuredAuthType, env: options.env }, identity);
-    const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, sanitized);
-    if (compatError) return compatError;
-    const sessionRace = await Promise.race([harness.request("session/new", { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    const signInRequired = () => sessionRace === "stderr_auth_required" || detector.isTriggered();
-    if (!signInRequired()) await catalogUpdates.applyTo(sessionRace);
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
-      return buildAuthChangedResult(initInfo, options, configuredAuthType, sanitized);
-    }
-    if (signInRequired()) {
-      const signInResult = buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, sanitized);
-      cachedReadiness = { key: cacheKey, fingerprint, result: signInResult };
-      writePersistedReadiness(cacheKey, signInResult, fingerprint, effectiveEnv);
+    const initInfo = await initializeFor(session, account, subject.configuredAuthType);
+    const incompatible = incompatibility(initInfo, options.authMethod);
+    if (incompatible) return readinessResult("runtime_launches", subject, { ...fromInitialize(initInfo), error: incompatible });
+    const opened = await session.newSession({ awaitCatalog: true });
+    if (!account.isCurrent()) return accountChangedResult(subject, fromInitialize(initInfo));
+    if (opened.kind === "sign_in_required") {
+      const signInResult = readinessResult("sign_in_required", subject, {
+        ...fromInitialize(initInfo),
+        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.'
+      });
+      readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
     }
-    const updatedAuthType = readConfiguredNativeAuthType(effectiveEnv);
-    const updatedKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType: updatedAuthType });
-    return buildProbeSessionResult(
-      sessionRace,
-      initInfo,
-      options,
-      effectiveEnv,
-      sanitized,
-      updatedKey,
-      computeCredentialFingerprint(effectiveEnv, options.authMethod)
+    syncTokenToSource(account.home, account.target.env);
+    const ready = readinessResult(
+      "session_ready",
+      subjectOf(account, account.configuredAuthType ?? options.authMethod),
+      { ...fromInitialize(initInfo), ...describeSession(opened.session) }
     );
-  } catch (err) {
-    const failedResult = formatProbeFailureResult(err, detector.isTriggered(), options, configuredAuthType, sanitized);
-    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
-      return buildAuthChangedResult(failedResult, options, configuredAuthType, sanitized);
-    }
-    cachedReadiness = { key: cacheKey, fingerprint, result: failedResult };
-    if (failedResult.state === "sign_in_required") writePersistedReadiness(cacheKey, failedResult, fingerprint, effectiveEnv);
-    return failedResult;
+    readinessStore.put(account.slot, ready, effectiveEnv);
+    return ready;
+  } catch (error62) {
+    const failed = failureResult(error62, session.signInRequested, subject);
+    if (!account.isCurrent()) return accountChangedResult(subject, {});
+    readinessStore.put(startSlot, failed, effectiveEnv);
+    return failed;
   } finally {
-    catalogUpdates.dispose();
-    diagnostic.dispose();
+    session.close();
   }
 }
-function trackCatalogUpdates(harness) {
-  const updates = /* @__PURE__ */ new Map();
-  let waiter = null;
-  let waitTimer;
-  harness.onNotification((method, params) => {
-    if (method !== "session/update" || typeof params?.sessionId !== "string" || params.update?.sessionUpdate !== "config_option_update" || !Array.isArray(params.update.configOptions)) return;
-    if (updates.size < CATALOG_UPDATE_MAX_SESSIONS || updates.has(params.sessionId)) updates.set(params.sessionId, params.update.configOptions);
-    if (waiter && waiter.sessionId === params.sessionId) waiter.resolve();
-  });
-  return {
-    async applyTo(sessionResult) {
-      const sessionId = sessionResult?.sessionId;
-      if (typeof sessionId !== "string") return;
-      if (!updates.has(sessionId) && extractModelsFromSessionResult(sessionResult).length === 0) {
-        await new Promise((resolve6) => {
-          waiter = { sessionId, resolve: resolve6 };
-          waitTimer = setTimeout(resolve6, CATALOG_UPDATE_WAIT_MS);
-        });
-      }
-      const update = updates.get(sessionId);
-      if (update) sessionResult.configOptions = update;
-    },
-    dispose() {
-      clearTimeout(waitTimer);
-      waiter = null;
-    }
-  };
-}
-function buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, sanitized) {
-  return {
-    state: "sign_in_required",
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.',
-    checkedAt: Date.now()
-  };
-}
-function buildAuthChangedResult(initInfo, options, configuredAuthType, sanitized) {
-  return {
-    state: "runtime_launches",
-    agentVersion: initInfo.agentVersion,
-    protocolVersion: initInfo.protocolVersion,
-    advertisedAuthMethods: initInfo.advertisedAuthMethods,
-    selectedAuthMethod: options.authMethod,
-    configuredAuthType,
-    models: [],
-    modes: [],
-    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
-    error: "Antigravity sign-in changed while models were being discovered. Retry to load the current account.",
-    checkedAt: Date.now()
-  };
-}
 
-// host.ts
-function buildDefaultNativeLaunchSpec(authMethod = "oauth-personal") {
-  const runtime = resolveNativeAcpRuntime();
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
+// src/provider-config.ts
+var NATIVE_REASONING = {
+  configId: "thinking_level",
+  supportedLevels: ["low", "medium", "high"],
+  defaultLevel: "medium"
+};
+function nativeReasoning() {
+  return { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+}
+function normalizeAuthMethod(value) {
+  return isValidGoogleAuthMethod(value) ? value : "oauth-personal";
+}
+function normalizeExecutable(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : void 0;
+}
+function resolveRuntime(customExecutable) {
+  return resolveNativeAcpRuntime({ customExecutable });
+}
+function launchEnv(authMethod, home, env) {
+  return {
+    BROWSER: "echo",
+    GEMINI_HOME: home.geminiHome,
+    AGY_ACP_AUTH_METHOD: authMethod,
+    ...authMethod === "gemini-api-key" && env.GEMINI_API_KEY ? { GEMINI_API_KEY: env.GEMINI_API_KEY } : {}
+  };
+}
+function buildNativeLaunchSpec(options = {}) {
+  const authMethod = options.authMethod ?? "oauth-personal";
+  const runtime = resolveRuntime(options.customExecutable);
+  const home = options.home ?? prepareSanitizedGeminiHome({ env: options.env, authMethod });
   return {
     displayName: "Antigravity",
     command: runtime.executable,
     args: runtime.args,
-    env: {
-      BROWSER: "echo",
-      GEMINI_HOME: sanitized.geminiHome,
-      AGY_ACP_AUTH_METHOD: authMethod
-    },
-    nativeReasoning: {
-      configId: "thinking_level",
-      supportedLevels: ["low", "medium", "high"],
-      defaultLevel: "medium"
-    }
+    env: launchEnv(authMethod, home, options.env ?? process.env),
+    nativeReasoning: nativeReasoning()
   };
 }
+function completeLaunchSpec(spec, authMethod, home, env = process.env) {
+  const existing = spec.env && typeof spec.env === "object" ? spec.env : {};
+  const defaults = launchEnv(authMethod, home, env);
+  let changed = spec.env !== existing;
+  const next = { ...existing };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (next[key] === void 0) {
+      next[key] = value;
+      changed = true;
+    }
+  }
+  if (!next.GEMINI_HOME) {
+    next.GEMINI_HOME = home.geminiHome;
+    changed = true;
+  }
+  spec.env = next;
+  if (!spec.nativeReasoning) {
+    spec.nativeReasoning = nativeReasoning();
+    changed = true;
+  }
+  return changed;
+}
+function notInstalledMessage(runtime) {
+  return !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
+}
+function healthFromReadiness(runtime, readiness) {
+  if (!runtime.installed || !readiness) {
+    return { status: "not_installed", statusMessage: notInstalledMessage(runtime), planLabel: null, installedVersion: null };
+  }
+  if (readiness.state === "runtime_missing") {
+    return {
+      status: "not_installed",
+      statusMessage: readiness.error || notInstalledMessage(runtime),
+      planLabel: null,
+      installedVersion: null
+    };
+  }
+  const installedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
+  const planLabel = readiness.tierName ?? null;
+  if (readiness.state === "session_ready") return { status: "ready", statusMessage: null, planLabel, installedVersion };
+  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google." : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.');
+  return { status: readiness.state === "sign_in_required" ? "unauthenticated" : "unknown", statusMessage, planLabel, installedVersion };
+}
+function formatEffortDescription(level) {
+  return `${level.charAt(0).toUpperCase() + level.slice(1)} reasoning effort`;
+}
+function mapDiscoveredModels(models, stale = false) {
+  return models.map((m, idx) => {
+    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
+    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
+    return {
+      id: m.id,
+      model: m.id,
+      displayName: stale ? `${m.name} (cached)` : m.name,
+      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
+      supportedReasoningEfforts: levels.map((level) => ({ reasoningEffort: level, description: formatEffortDescription(level) })),
+      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
+      isDefault: idx === 0
+    };
+  });
+}
+function modelListNotInstalled() {
+  return { error: { code: -32e3, message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings \u2192 Antigravity Provider.` } };
+}
+function modelListFromReadiness(readiness) {
+  if (readiness.state === "sign_in_required") {
+    const message = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
+    return { error: { code: -32e3, message, data: { recovery: { kind: "authRequired", message, retryable: false } } } };
+  }
+  if (readiness.models.length === 0) {
+    return { error: { code: -32e3, message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' } };
+  }
+  return { result: {
+    models: mapDiscoveredModels(readiness.models, readiness.catalogStale),
+    selectedOnlyModels: [],
+    _meta: { checkedAt: readiness.checkedAt, stale: readiness.catalogStale === true, ...readiness.error ? { warning: readiness.error } : {} }
+  } };
+}
+
+// host.ts
 function getProviderOptionsFromParams(params) {
   if (!params || typeof params !== "object") return void 0;
   if (params.options?.providerOptions && typeof params.options.providerOptions === "object") {
@@ -42858,34 +42958,18 @@ function getProviderOptionsFromParams(params) {
   }
   return void 0;
 }
-function enrichLaunchSpecEnv(spec, authMethod) {
-  const sanitized = prepareSanitizedGeminiHome({ authMethod });
-  spec.env = {
-    BROWSER: "echo",
-    GEMINI_HOME: sanitized.geminiHome,
-    AGY_ACP_AUTH_METHOD: authMethod,
-    ...spec.env && typeof spec.env === "object" ? spec.env : {}
-  };
-  if (!spec.env.GEMINI_HOME) {
-    spec.env.GEMINI_HOME = sanitized.geminiHome;
-  }
-  if (!spec.nativeReasoning) {
-    spec.nativeReasoning = {
-      configId: "thinking_level",
-      supportedLevels: ["low", "medium", "high"],
-      defaultLevel: "medium"
-    };
-  }
-}
 function resolveAuthMethod(providerOptions) {
-  return isValidGoogleAuthMethod(providerOptions?.antigravityAuthMethod) ? providerOptions.antigravityAuthMethod : "oauth-personal";
+  return normalizeAuthMethod(providerOptions?.antigravityAuthMethod);
 }
-function normalizeLaunchInOptionsContainer(container, authMethod) {
+function resolveRequestRuntime(providerOptions) {
+  return resolveRuntime(normalizeExecutable(providerOptions?.acpLaunchSpec?.command));
+}
+function normalizeLaunchInOptionsContainer(container, authMethod, prepareHome) {
   if (!container.providerOptions) {
     container.providerOptions = {
       acpDialect: "generic",
       parameterizedModelPicker: true,
-      acpLaunchSpec: buildDefaultNativeLaunchSpec(authMethod)
+      acpLaunchSpec: buildNativeLaunchSpec({ authMethod, home: prepareHome() })
     };
     return true;
   }
@@ -42893,40 +42977,47 @@ function normalizeLaunchInOptionsContainer(container, authMethod) {
   if (!po.acpLaunchSpec) {
     po.acpDialect = po.acpDialect || "generic";
     po.parameterizedModelPicker = true;
-    po.acpLaunchSpec = buildDefaultNativeLaunchSpec(authMethod);
+    po.acpLaunchSpec = buildNativeLaunchSpec({ authMethod, home: prepareHome() });
     return true;
   }
-  enrichLaunchSpecEnv(po.acpLaunchSpec, authMethod);
-  return true;
+  return completeLaunchSpec(po.acpLaunchSpec, authMethod, prepareHome());
 }
 function ensureLaunchSpec(params) {
   if (!params || typeof params !== "object") return false;
   let modified = false;
+  const homes = /* @__PURE__ */ new Map();
+  const homeFor = (authMethod) => () => {
+    if (!homes.has(authMethod)) homes.set(authMethod, prepareSanitizedGeminiHome({ authMethod }));
+    return homes.get(authMethod);
+  };
   if (params.options && typeof params.options === "object") {
     const authMethod = resolveAuthMethod(params.options.providerOptions);
-    modified = normalizeLaunchInOptionsContainer(params.options, authMethod) || modified;
+    modified = normalizeLaunchInOptionsContainer(params.options, authMethod, homeFor(authMethod)) || modified;
   }
   const rootAuthMethod = resolveAuthMethod(
     params.providerOptions ?? params.options?.providerOptions
   );
-  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod) || modified;
+  modified = normalizeLaunchInOptionsContainer(params, rootAuthMethod, homeFor(rootAuthMethod)) || modified;
   return modified;
 }
 function writeBridgeJsonRpc(payload) {
   process.stdout.write(JSON.stringify(payload) + "\n");
 }
-function sendHealthResponse(id2, status, statusMessage, planLabel, version2) {
+function writeOutcome(id2, outcome) {
+  writeBridgeJsonRpc({ jsonrpc: "2.0", id: id2, ...outcome });
+}
+function handleNativeProviderHealth(id2, params) {
+  const providerOptions = getProviderOptionsFromParams(params);
+  const runtime = resolveRequestRuntime(providerOptions);
+  const readiness = runtime.installed ? getFastNativeReadiness({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(providerOptions) }) : void 0;
   writeBridgeJsonRpc({
     jsonrpc: "2.0",
     id: id2,
     result: {
       supported: true,
       health: {
-        status,
-        statusMessage,
+        ...healthFromReadiness(runtime, readiness),
         accountEmail: null,
-        planLabel,
-        installedVersion: version2,
         minimumSupportedVersion: PINNED_NATIVE_ACP_VERSION,
         canInstall: false,
         canUpdate: false,
@@ -42935,165 +43026,24 @@ function sendHealthResponse(id2, status, statusMessage, planLabel, version2) {
     }
   });
 }
-function formatNonReadyHealthMessage(readiness) {
-  if (readiness.error) {
-    return readiness.error;
-  }
-  if (readiness.state === "sign_in_required") {
-    return "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google.";
-  }
-  if (readiness.state === "authenticated") {
-    return 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.';
-  }
-  return 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.';
-}
-function handleNativeProviderHealth(id2, params) {
-  const providerOptions = getProviderOptionsFromParams(params);
-  const customCommand = providerOptions?.acpLaunchSpec?.command;
-  const runtime = resolveNativeAcpRuntime({
-    customExecutable: typeof customCommand === "string" ? customCommand : void 0
-  });
-  if (!runtime.installed) {
-    const msg = !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
-    sendHealthResponse(id2, "not_installed", msg, null, null);
-    return;
-  }
-  const authMethod = resolveAuthMethod(providerOptions);
-  const readiness = getFastNativeReadiness({
-    command: runtime.executable,
-    args: runtime.args,
-    authMethod
-  });
-  if (readiness.state === "runtime_missing") {
-    sendHealthResponse(
-      id2,
-      "not_installed",
-      readiness.error || `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`,
-      null,
-      null
-    );
-    return;
-  }
-  const reportedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
-  if (readiness.state !== "session_ready") {
-    sendHealthResponse(
-      id2,
-      readiness.state === "sign_in_required" ? "unauthenticated" : "unknown",
-      formatNonReadyHealthMessage(readiness),
-      readiness.tierName ?? null,
-      reportedVersion
-    );
-    return;
-  }
-  sendHealthResponse(id2, "ready", null, readiness.tierName ?? null, reportedVersion);
-}
-function formatEffortDescription(level) {
-  const capitalized = level.charAt(0).toUpperCase() + level.slice(1);
-  return `${capitalized} reasoning effort`;
-}
-function mapDiscoveredModels(models, stale = false) {
-  return models.map((m, idx) => {
-    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
-    const supportedReasoningEfforts = levels.map((level) => ({
-      reasoningEffort: level,
-      description: formatEffortDescription(level)
-    }));
-    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
-    return {
-      id: m.id,
-      model: m.id,
-      displayName: stale ? `${m.name} (cached)` : m.name,
-      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts,
-      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
-      isDefault: idx === 0
-    };
-  });
-}
-function sendModelListError(id2, readiness) {
-  if (readiness.state === "sign_in_required") {
-    const authMessage = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      error: {
-        code: -32e3,
-        message: authMessage,
-        data: {
-          recovery: {
-            kind: "authRequired",
-            message: authMessage,
-            retryable: false
-          }
-        }
-      }
-    });
-    return;
-  }
-  writeBridgeJsonRpc({
-    jsonrpc: "2.0",
-    id: id2,
-    error: {
-      code: -32e3,
-      message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.'
-    }
-  });
-}
 function handleNativeModelList(id2, params) {
   const providerOptions = getProviderOptionsFromParams(params);
-  const customCommand = providerOptions?.acpLaunchSpec?.command;
-  const runtime = resolveNativeAcpRuntime({
-    customExecutable: typeof customCommand === "string" ? customCommand : void 0
-  });
+  const runtime = resolveRequestRuntime(providerOptions);
   if (!runtime.installed) {
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      error: {
-        code: -32e3,
-        message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings \u2192 Antigravity Provider.`
-      }
-    });
+    writeOutcome(id2, modelListNotInstalled());
     return;
   }
-  const authMethod = resolveAuthMethod(providerOptions);
-  const forceRefresh = params?.forceRefresh === true;
-  const readiness = getFastNativeReadiness({
+  const catalog = resolveNativeCatalog({
     command: runtime.executable,
     args: runtime.args,
-    authMethod
+    authMethod: resolveAuthMethod(providerOptions),
+    forceRefresh: params?.forceRefresh === true
   });
-  const respond = (result) => {
-    if (result.models.length === 0 || result.state === "sign_in_required") {
-      sendModelListError(id2, result);
-      return;
-    }
-    writeBridgeJsonRpc({
-      jsonrpc: "2.0",
-      id: id2,
-      result: {
-        models: mapDiscoveredModels(result.models, result.catalogStale),
-        selectedOnlyModels: [],
-        _meta: {
-          checkedAt: result.checkedAt,
-          stale: result.catalogStale === true,
-          ...result.error ? { warning: result.error } : {}
-        }
-      }
-    });
-  };
-  if (isNativeCatalogSettled(readiness, forceRefresh)) {
-    respond(readiness);
+  if (!(catalog instanceof Promise)) {
+    writeOutcome(id2, modelListFromReadiness(catalog));
     return;
   }
-  void getNativeCatalog({
-    command: runtime.executable,
-    args: runtime.args,
-    authMethod,
-    forceRefresh
-  }).then(respond).catch((error62) => {
-    sendModelListError(id2, { ...readiness, error: error62 instanceof Error ? error62.message : String(error62) });
-  });
+  void catalog.then((result) => writeOutcome(id2, modelListFromReadiness(result))).catch((error62) => writeBridgeError(id2, error62));
 }
 function isLegacyAgyThreadResume(msg) {
   if (!msg || msg.method !== "thread/resume" || !msg.params) return null;
@@ -43158,7 +43108,7 @@ function dispatchBridgeMessage(msg) {
   if (msg.method === "provider/usage" && msg.id !== void 0) {
     return runLocalHandler(msg.id, () => {
       const options = getProviderOptionsFromParams(msg.params);
-      const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
+      const runtime = resolveRequestRuntime(options);
       void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) }).then((result) => writeBridgeJsonRpc({ jsonrpc: "2.0", id: msg.id, result })).catch((error62) => writeBridgeError(msg.id, error62));
     });
   }
