@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -9,7 +9,7 @@ import {
   writeFileSync
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { StringDecoder } from 'node:string_decoder';
+import { NativeAcpSession, type InitializeInfo } from './acp-session.js';
 import {
   captureAccount,
   currentCredentialId,
@@ -30,7 +30,7 @@ import {
   type GoogleAcpAuthMethod,
   type PreparedGeminiHome
 } from './gemini-home.js';
-import { getZccDataDir, killProcessTree } from './native-runtime.js';
+import { getZccDataDir } from './native-runtime.js';
 import { parseNativeQuotaWindows, type NativeUsageResult } from './native-usage.js';
 
 export {
@@ -238,186 +238,6 @@ function writePersistedReadiness(
   }
 }
 
-export interface NativeAcpSpawnOptions {
-  command: string;
-  args: string[];
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  spawnImpl?: typeof spawn;
-}
-
-interface RpcHarness {
-  child: ChildProcess;
-  request(method: string, params: Record<string, unknown>, timeoutMs?: number): Promise<any>;
-  onStderrLine(listener: (line: string) => void): void;
-  onNotification(listener: (method: string, params: any) => void): void;
-  close(reason?: Error): void;
-}
-
-function setupStdoutHandler(
-  stdout: NodeJS.ReadableStream | null,
-  onMessage: (parsed: any) => void
-): void {
-  if (!stdout) return;
-  const stdoutDecoder = new StringDecoder('utf8');
-  let stdoutBuffer = '';
-  stdout.on('data', (chunk: Buffer | string) => {
-    stdoutBuffer += typeof chunk === 'string' ? chunk : stdoutDecoder.write(chunk);
-    let newlineIdx: number;
-    while ((newlineIdx = stdoutBuffer.indexOf('\n')) >= 0) {
-      const line = stdoutBuffer.slice(0, newlineIdx).trim();
-      stdoutBuffer = stdoutBuffer.slice(newlineIdx + 1);
-      if (!line) continue;
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed && typeof parsed === 'object') {
-          onMessage(parsed);
-        }
-      } catch {
-        // Skip unparseable lines
-      }
-    }
-  });
-}
-
-function setupStderrHandler(
-  stderr: NodeJS.ReadableStream | null,
-  onLine: (line: string) => void
-): void {
-  if (!stderr) return;
-  const stderrDecoder = new StringDecoder('utf8');
-  let stderrBuffer = '';
-  stderr.on('data', (chunk: Buffer | string) => {
-    stderrBuffer += typeof chunk === 'string' ? chunk : stderrDecoder.write(chunk);
-    let newlineIdx: number;
-    while ((newlineIdx = stderrBuffer.indexOf('\n')) >= 0) {
-      const line = stderrBuffer.slice(0, newlineIdx).trim();
-      stderrBuffer = stderrBuffer.slice(newlineIdx + 1);
-      if (line) onLine(line);
-    }
-  });
-}
-
-function attachHarnessProcessHandlers(
-  child: ChildProcess,
-  pending: Map<number, { resolve: (val: any) => void; reject: (err: any) => void; timer: ReturnType<typeof setTimeout> }>,
-  stderrListeners: Array<(line: string) => void>,
-  notificationListeners: Array<(method: string, params: any) => void>,
-  onClose: () => void
-) {
-  setupStdoutHandler(child.stdout, (parsed) => {
-    if (typeof parsed.method === 'string') {
-      if (parsed.id !== undefined) {
-        // Diagnostics never approve tools or service arbitrary filesystem requests.
-        const reply = parsed.method === 'session/request_permission'
-          ? { result: { outcome: { outcome: 'cancelled' } } }
-          : { error: { code: -32601, message: 'Not supported by the diagnostic client' } };
-        child.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id: parsed.id, ...reply }) + '\n');
-      } else for (const listener of notificationListeners) listener(parsed.method, parsed.params);
-      return;
-    }
-    const entry = pending.get(Number(parsed.id));
-    if (!entry) return;
-    clearTimeout(entry.timer);
-    pending.delete(Number(parsed.id));
-    if (parsed.error) {
-      const err: any = new Error(parsed.error?.data?.message || parsed.error?.message || `ACP error ${parsed.error?.code}`);
-      err.code = parsed.error?.code;
-      err.data = parsed.error?.data;
-      entry.reject(err);
-    } else {
-      entry.resolve(parsed.result);
-    }
-  });
-
-  setupStderrHandler(child.stderr, (line) => {
-    for (const listener of stderrListeners) listener(line);
-  });
-
-  const rejectAll = (err: Error) => {
-    for (const [, entry] of pending) {
-      clearTimeout(entry.timer);
-      entry.reject(err);
-    }
-    pending.clear();
-  };
-  child.on('error', (err) => rejectAll(err));
-  child.stdin?.on?.('error', (err: Error) => rejectAll(err));
-  child.on('close', (code) => {
-    onClose();
-    rejectAll(new Error(`Native ACP server exited (code ${code ?? 'null'})`));
-  });
-
-  return rejectAll;
-}
-
-function createHarnessRequester(
-  child: ChildProcess,
-  pending: Map<number, { resolve: (val: any) => void; reject: (err: any) => void; timer: ReturnType<typeof setTimeout> }>,
-  isClosed: () => boolean,
-  getNextId: () => number
-) {
-  return function request(method: string, params: Record<string, unknown>, timeoutMs = 20_000): Promise<any> {
-    if (isClosed()) return Promise.reject(new Error('Native ACP server is already closed'));
-    const id = getNextId();
-    return new Promise((resolveReq, rejectReq) => {
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        rejectReq(new Error(`ACP request "${method}" timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      pending.set(id, { resolve: resolveReq, reject: rejectReq, timer });
-      try {
-        child.stdin?.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-      } catch (err: any) {
-        clearTimeout(timer);
-        pending.delete(id);
-        rejectReq(err);
-      }
-    });
-  };
-}
-
-function createNativeRpcHarness(
-  options: NativeAcpSpawnOptions,
-  suppressBrowser: boolean
-): RpcHarness {
-  const spawnFn = options.spawnImpl ?? spawn;
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...(options.env ?? {}),
-    ...(suppressBrowser ? { BROWSER: 'echo' } : {})
-  };
-
-  const child = spawnFn(options.command, options.args, {
-    cwd: options.cwd || process.cwd(),
-    env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true
-  });
-
-  const pending = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void; timer: ReturnType<typeof setTimeout> }>();
-  const stderrListeners: Array<(line: string) => void> = [];
-  const notificationListeners: Array<(method: string, params: any) => void> = [];
-  let nextId = 1;
-  let closed = false;
-
-  const rejectAll = attachHarnessProcessHandlers(child, pending, stderrListeners, notificationListeners, () => { closed = true; });
-  const request = createHarnessRequester(child, pending, () => closed, () => nextId++);
-
-  return {
-    child,
-    request,
-    onStderrLine(listener: (line: string) => void) { stderrListeners.push(listener); },
-    onNotification(listener: (method: string, params: any) => void) { notificationListeners.push(listener); },
-    close(reason?: Error) {
-      if (closed) return;
-      closed = true;
-      rejectAll(reason ?? new Error('Native ACP probe closed'));
-      killProcessTree(child);
-    }
-  };
-}
-
 let cachedReadiness: {
   key: string;
   fingerprint: string;
@@ -431,9 +251,6 @@ const USAGE_COMMANDS_WAIT_MS = 1000;
 const USAGE_MAX_TEXT_CHARS = 32_768;
 const CATALOG_RETRY_BACKOFF_MS = 30_000;
 const CATALOG_RETRY_MAX_KEYS = 32;
-/** How long to wait for a late config_option_update when session/new returned no models. */
-const CATALOG_UPDATE_WAIT_MS = 1000;
-const CATALOG_UPDATE_MAX_SESSIONS = 16;
 
 export function getCachedNativeReadiness(): NativeReadinessResult | null {
   if (!cachedReadiness) return null;
@@ -605,40 +422,24 @@ function getPreparedNativeReadiness(account: AccountSnapshot): NativeReadinessRe
 }
 
 /** Initializes the runtime and, for env-credential methods without a configured auth type, authenticates headlessly. */
-async function performInitializeAndAuth(
-  harness: RpcHarness,
+async function initializeFor(
+  session: NativeAcpSession,
   account: AccountSnapshot,
-  options: { timeoutMs: number; configuredAuthType: string | null }
-): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] }> {
-  const initResult = await harness.request(
-    'initialize',
-    {
-      protocolVersion: 1,
-      clientInfo: { name: 'zcc', title: 'Zana Command Center', version: '1.0.0' },
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-        _meta: { parameterizedModelPicker: true }
-      }
-    },
-    options.timeoutMs
-  );
-
-  const protocolVersion = typeof initResult?.protocolVersion === 'number' ? initResult.protocolVersion : null;
-  const agentVersion = typeof initResult?.agentInfo?.version === 'string' ? initResult.agentInfo.version : null;
-  const advertisedAuthMethods: string[] = Array.isArray(initResult?.authMethods)
-    ? initResult.authMethods.map((m: any) => (typeof m?.id === 'string' ? m.id : null)).filter(Boolean)
-    : [];
-
+  configuredAuthType: string | null
+): Promise<InitializeInfo> {
+  const info = await session.initialize();
   const { authMethod } = account.target;
-  if (!options.configuredAuthType && isHeadlessAuthMethod(authMethod)) {
-    await harness.request('authenticate', { methodId: authMethod, _meta: { headless: true } }, options.timeoutMs);
+  if (!configuredAuthType && isHeadlessAuthMethod(authMethod)) {
+    await session.authenticate(authMethod, { headless: true });
     account.commitHeadlessAuthType();
   }
-
-  return { protocolVersion, agentVersion, advertisedAuthMethods };
+  return info;
 }
 
+function openDiagnosticSession(options: NativeProbeOptions, account: AccountSnapshot, operation: string): NativeAcpSession {
+  return NativeAcpSession.open({ command: options.command, args: options.args, cwd: options.cwd, env: account.effectiveEnv,
+    spawnImpl: options.spawnImpl, timeoutMs: options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS, operation });
+}
 function checkProbeCachedOrMissing(
   options: { command: string; args: string[]; authMethod: GoogleAcpAuthMethod; forceRefresh?: boolean },
   cacheKey: string,
@@ -773,35 +574,6 @@ function formatProbeFailureResult(
   };
 }
 
-function setupStderrAuthDetector(harness: RpcHarness) {
-  let triggered = false;
-  let resolve: (() => void) | null = null;
-  const promise = new Promise<'stderr_auth_required'>((res) => {
-    resolve = () => res('stderr_auth_required');
-  });
-  harness.onStderrLine((line) => {
-    if (
-      line.includes('Credentials missing or invalid') ||
-      line.includes('Launching browser login flow') ||
-      line.includes('Open the following link to authenticate')
-    ) {
-      triggered = true;
-      resolve?.();
-    }
-  });
-  return { isTriggered: () => triggered, promise };
-}
-
-/** Both diagnostics use the same isolated runtime, auth detection, deadline and cleanup. */
-function createNativeDiagnostic(options: NativeProbeOptions, operation: string, account: AccountSnapshot) {
-  const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
-  const harness = createNativeRpcHarness({ ...options, env: account.effectiveEnv }, true);
-  const detector = setupStderrAuthDetector(harness);
-  const deadline = setTimeout(() => harness.close(new Error(`Native ACP ${operation} timed out after ${timeoutMs}ms`)), timeoutMs);
-  return { timeoutMs, harness, detector,
-    dispose() { clearTimeout(deadline); harness.close(); } };
-}
-
 export interface NativeProbeOptions extends NativeTarget {
   timeoutMs?: number;
   forceRefresh?: boolean;
@@ -833,79 +605,34 @@ export async function queryNativeUsage(options: NativeProbeOptions): Promise<Nat
   return request;
 }
 
-interface UsageSessionTracker {
-  readonly advertised: boolean;
-  readonly text: string;
-  readonly unexpectedTools: boolean;
-  /** Resolves once /usage is advertised or the wait elapses; other command updates do not end the wait. */
-  waitForCommands(timeoutMs: number): Promise<void>;
-  dispose(): void;
-}
-
-function trackUsageSessionUpdates(harness: RpcHarness): UsageSessionTracker {
-  let advertised = false;
-  let text = '';
-  let unexpectedTools = false;
-  let commandsReceived: () => void = () => {};
-  const commandsReady = new Promise<void>(resolve => { commandsReceived = resolve; });
-  let commandTimer: ReturnType<typeof setTimeout> | undefined;
-  harness.onNotification((method, params) => {
-    if (method !== 'session/update') return;
-    const update = params?.update;
-    if (update?.sessionUpdate === 'available_commands_update') {
-      advertised = Array.isArray(update.availableCommands) && update.availableCommands.some((command: any) => command?.name === 'usage');
-      // A partial command list may precede the one that includes usage; keep waiting until it appears.
-      if (advertised) commandsReceived();
-    }
-    if (update?.sessionUpdate === 'tool_call') { unexpectedTools = true; harness.close(); }
-    if (update?.sessionUpdate === 'agent_message_chunk' && update.content?.type === 'text') {
-      text += update.content.text;
-      if (text.length > USAGE_MAX_TEXT_CHARS) {
-        harness.close(new Error(`Native usage output exceeded ${USAGE_MAX_TEXT_CHARS} characters; the diagnostic session was stopped.`));
-      }
-    }
-  });
-  return {
-    get advertised() { return advertised; },
-    get text() { return text; },
-    get unexpectedTools() { return unexpectedTools; },
-    waitForCommands(timeoutMs) {
-      if (advertised) return Promise.resolve();
-      return Promise.race([commandsReady, new Promise<void>(resolve => { commandTimer = setTimeout(resolve, timeoutMs); })]);
-    },
-    dispose() { clearTimeout(commandTimer); }
-  };
-}
-
 async function performNativeUsageQuery(options: NativeProbeOptions, account: AccountSnapshot): Promise<NativeUsageResult> {
   const usage: NativeUsageResult['usage'] = { status: 'error', planLabel: null, accountEmail: null,
     windows: [], checkedAt: Date.now(), source: 'native-acp-/usage' };
   if (!existsSync(options.command)) return { supported: true, usage: { ...usage, status: 'not_installed' } };
-  const diagnostic = createNativeDiagnostic(options, 'usage check', account);
-  const { harness, timeoutMs, detector } = diagnostic;
-  const tracker = trackUsageSessionUpdates(harness);
+  const session = openDiagnosticSession(options, account, 'usage check');
   try {
-    const init = await performInitializeAndAuth(harness, account, { timeoutMs, configuredAuthType: account.configuredAuthType });
+    const init = await initializeFor(session, account, account.configuredAuthType);
     if (init.protocolVersion !== 1) throw new Error('Unsupported Native ACP protocol version.');
-    const session = await Promise.race([harness.request('session/new', { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    if (session === 'stderr_auth_required') return { supported: true, usage: { ...usage, status: 'unauthenticated' } };
-    usage.planLabel = typeof session?._meta?.antigravity?.tier?.name === 'string' ? session._meta.antigravity.tier.name : null;
+    const opened = await session.newSession();
+    if (opened.kind === 'sign_in_required') return { supported: true, usage: { ...usage, status: 'unauthenticated' } };
+    const tierName = opened.session?._meta?.antigravity?.tier?.name;
+    usage.planLabel = typeof tierName === 'string' ? tierName : null;
     // Native notifications can arrive after the session/new response in a separate stdout chunk.
-    await tracker.waitForCommands(USAGE_COMMANDS_WAIT_MS);
-    if (!tracker.advertised) throw new Error('This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.');
-    const result = await harness.request('session/prompt', { sessionId: session.sessionId, prompt: [{ type: 'text', text: '/usage' }] }, timeoutMs);
-    if (result?.stopReason !== 'end_turn' || tracker.unexpectedTools) throw new Error('Native usage command did not complete successfully.');
-    usage.windows = parseNativeQuotaWindows(tracker.text);
+    if (!await session.waitForCommand('usage', USAGE_COMMANDS_WAIT_MS)) {
+      throw new Error('This Native ACP runtime does not advertise /usage. Check usage in Google Antigravity Settings.');
+    }
+    const result = await session.runCommand(opened.session.sessionId, 'usage', { maxTextChars: USAGE_MAX_TEXT_CHARS });
+    if (result.stopReason !== 'end_turn') throw new Error('Native usage command did not complete successfully.');
+    usage.windows = parseNativeQuotaWindows(result.text);
     if (usage.windows.length === 0) throw new Error('Native usage returned no recognized quota windows. Check usage in Google Antigravity Settings.');
     return { supported: true, usage: { ...usage, status: 'ok', checkedAt: Date.now() } };
   } catch (error: any) {
-    const failure = formatProbeFailureResult(error, detector.isTriggered(), options,
+    const failure = formatProbeFailureResult(error, session.signInRequested, options,
       account.configuredAuthType, account.home);
     return { supported: true, usage: { ...usage, status: failure.state === 'sign_in_required' ? 'unauthenticated' : 'error',
-      message: tracker.unexpectedTools ? 'Native usage unexpectedly requested tools; the diagnostic session was stopped.' : failure.error } };
+      message: failure.error } };
   } finally {
-    tracker.dispose();
-    diagnostic.dispose();
+    session.close();
   }
 }
 
@@ -967,32 +694,27 @@ async function runNativeReadinessProbe(
   const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, home);
   if (earlyResult) return earlyResult;
 
-  const diagnostic = createNativeDiagnostic(options, 'session verification', account);
-  const { harness, detector, timeoutMs } = diagnostic;
-  const catalogUpdates = trackCatalogUpdates(harness);
-
+  const session = openDiagnosticSession(options, account, 'session verification');
   try {
-    const initInfo = await performInitializeAndAuth(harness, account, { timeoutMs, configuredAuthType });
+    const initInfo = await initializeFor(session, account, configuredAuthType);
     const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, home);
     if (compatError) return compatError;
 
-    const sessionRace = await Promise.race([harness.request('session/new', { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    const signInRequired = () => sessionRace === 'stderr_auth_required' || detector.isTriggered();
-    if (!signInRequired()) await catalogUpdates.applyTo(sessionRace);
+    const opened = await session.newSession({ awaitCatalog: true });
     // Sign-out or an account switch during discovery must not persist the previous account's result.
     if (!account.isCurrent()) {
       return buildAuthChangedResult(initInfo, options, configuredAuthType, home);
     }
-    if (signInRequired()) {
+    if (opened.kind === 'sign_in_required') {
       const signInResult = buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, home);
       cachedReadiness = { key: cacheKey, fingerprint, result: signInResult };
       writePersistedReadiness(cacheKey, signInResult, fingerprint, effectiveEnv);
       return signInResult;
     }
 
-    return buildProbeSessionResult(sessionRace, initInfo, account);
+    return buildProbeSessionResult(opened.session, initInfo, account);
   } catch (err: any) {
-    const failedResult = formatProbeFailureResult(err, detector.isTriggered(), options, configuredAuthType, home);
+    const failedResult = formatProbeFailureResult(err, session.signInRequested, options, configuredAuthType, home);
     // A failure from an obsolete account must not overwrite a newer sign-in's readiness.
     if (!account.isCurrent()) {
       return buildAuthChangedResult(failedResult, options, configuredAuthType, home);
@@ -1001,43 +723,8 @@ async function runNativeReadinessProbe(
     if (failedResult.state === 'sign_in_required') writePersistedReadiness(cacheKey, failedResult, fingerprint, effectiveEnv);
     return failedResult;
   } finally {
-    catalogUpdates.dispose();
-    diagnostic.dispose();
+    session.close();
   }
-}
-
-interface CatalogUpdateTracker {
-  /** Adopts the latest config_option_update for the session, briefly awaiting one if session/new had no models. */
-  applyTo(sessionResult: any): Promise<void>;
-  dispose(): void;
-}
-
-function trackCatalogUpdates(harness: RpcHarness): CatalogUpdateTracker {
-  const updates = new Map<string, any[]>();
-  let waiter: { sessionId: string; resolve: () => void } | null = null;
-  let waitTimer: ReturnType<typeof setTimeout> | undefined;
-  harness.onNotification((method, params) => {
-    if (method !== 'session/update' || typeof params?.sessionId !== 'string'
-      || params.update?.sessionUpdate !== 'config_option_update' || !Array.isArray(params.update.configOptions)) return;
-    if (updates.size < CATALOG_UPDATE_MAX_SESSIONS || updates.has(params.sessionId)) updates.set(params.sessionId, params.update.configOptions);
-    if (waiter && waiter.sessionId === params.sessionId) waiter.resolve();
-  });
-  return {
-    async applyTo(sessionResult) {
-      const sessionId = sessionResult?.sessionId;
-      if (typeof sessionId !== 'string') return;
-      // Native notifications can arrive after the session/new response in a separate stdout chunk.
-      if (!updates.has(sessionId) && extractModelsFromSessionResult(sessionResult).length === 0) {
-        await new Promise<void>(resolve => {
-          waiter = { sessionId, resolve };
-          waitTimer = setTimeout(resolve, CATALOG_UPDATE_WAIT_MS);
-        });
-      }
-      const update = updates.get(sessionId);
-      if (update) sessionResult.configOptions = update;
-    },
-    dispose() { clearTimeout(waitTimer); waiter = null; }
-  };
 }
 
 function buildProbeSignInRequiredResult(
@@ -1085,7 +772,7 @@ function buildAuthChangedResult(
 
 function buildSignInSuccessResult(
   sessionResult: any,
-  initResult: any,
+  initInfo: InitializeInfo,
   account: AccountSnapshot,
   advertisedAuthMethods: string[]
 ): NativeReadinessResult {
@@ -1102,8 +789,8 @@ function buildSignInSuccessResult(
 
   const readyResult: NativeReadinessResult = {
     state: 'session_ready',
-    agentVersion: typeof initResult?.agentInfo?.version === 'string' ? initResult.agentInfo.version : null,
-    protocolVersion: typeof initResult?.protocolVersion === 'number' ? initResult.protocolVersion : 1,
+    agentVersion: initInfo.agentVersion,
+    protocolVersion: initInfo.protocolVersion ?? 1,
     advertisedAuthMethods,
     selectedAuthMethod: target.authMethod,
     configuredAuthType: target.authMethod,
@@ -1135,27 +822,33 @@ export async function startNativeAcpSignIn(options: {
   }
   const account = captureAccount(options);
   const { home, effectiveEnv } = account;
-  const timeoutMs = options.timeoutMs ?? 120_000;
-  const harness = createNativeRpcHarness({ command: options.command, args: options.args, cwd: options.cwd, env: effectiveEnv, spawnImpl: options.spawnImpl }, false);
-  harness.onStderrLine((line) => {
+  const session = NativeAcpSession.open({ command: options.command, args: options.args, cwd: options.cwd, env: effectiveEnv,
+    spawnImpl: options.spawnImpl, timeoutMs: 20_000, operation: 'sign-in', interactive: true });
+  session.onStderrLine((line) => {
     const match = line.match(/https:\/\/accounts\.google\.com\/o\/oauth2\/\S+/);
     if (match && match[0]) options.onAuthUrl?.(match[0]);
   });
 
   try {
-    const initResult = await harness.request('initialize', { protocolVersion: 1, clientInfo: { name: 'zcc', title: 'Zana Command Center', version: '1.0.0' }, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, _meta: { parameterizedModelPicker: true } } }, 20_000);
-    const advertisedAuthMethods: string[] = Array.isArray(initResult?.authMethods) ? initResult.authMethods.map((m: any) => m?.id).filter(Boolean) : [...GOOGLE_ACP_AUTH_METHODS];
-    if (advertisedAuthMethods.length > 0 && !advertisedAuthMethods.includes(options.authMethod)) {
+    const initInfo = await session.initialize();
+    const advertisedAuthMethods = initInfo.advertisedAuthMethods.length > 0
+      ? initInfo.advertisedAuthMethods
+      : [...GOOGLE_ACP_AUTH_METHODS];
+    if (initInfo.protocolVersion !== null && initInfo.protocolVersion !== 1) {
+      throw new Error(`Unsupported ACP protocolVersion returned: ${initInfo.protocolVersion}`);
+    }
+    if (!advertisedAuthMethods.includes(options.authMethod)) {
       throw new Error(`Authentication method "${options.authMethod}" is not supported by native server.`);
     }
 
-    await harness.request('authenticate', { methodId: options.authMethod }, timeoutMs);
-    const sessionResult = await harness.request('session/new', { cwd: options.cwd || process.cwd(), mcpServers: [] }, 25_000);
+    await session.authenticate(options.authMethod, { timeoutMs: options.timeoutMs ?? 120_000 });
+    const opened = await session.newSession({ awaitCatalog: true, timeoutMs: 25_000 });
+    if (opened.kind === 'sign_in_required') throw new Error('Google sign-in did not complete. Try signing in again.');
 
-    return buildSignInSuccessResult(sessionResult, initResult, account, advertisedAuthMethods);
+    return buildSignInSuccessResult(opened.session, initInfo, account, advertisedAuthMethods);
   } catch (err: any) {
     return { state: 'sign_in_required', agentVersion: null, protocolVersion: 1, advertisedAuthMethods: [...GOOGLE_ACP_AUTH_METHODS], selectedAuthMethod: options.authMethod, configuredAuthType: readConfiguredNativeAuthType(effectiveEnv), models: [], modes: [], disabledDeadMcpServers: home.disabledDeadMcpServers, error: err?.message || 'Interactive Google sign-in failed or timed out.', checkedAt: Date.now() };
   } finally {
-    harness.close();
+    session.close();
   }
 }
