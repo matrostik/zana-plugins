@@ -189,6 +189,13 @@ async function buildHostArtifact() {
     external: []
   });
 
+  // Source contents inherit Git checkout line endings; canonicalize them for bundle parity.
+  const sourceMapPath = `${hostOutfile}.map`;
+  const sourceMap = JSON.parse(readFileSync(sourceMapPath, 'utf8'));
+  sourceMap.sourcesContent = sourceMap.sourcesContent.map(source =>
+    typeof source === 'string' ? source.replace(/\r\n/g, '\n') : source);
+  writeFileSync(sourceMapPath, JSON.stringify(sourceMap) + '\n', 'utf8');
+
   const hostBytes = readFileSync(hostOutfile, 'utf8');
   const hostDigest = createHash('sha256').update(Buffer.from(hostBytes, 'utf8')).digest('hex');
   writeArtifactMetadata(join(distDir, 'host.meta.json'), {

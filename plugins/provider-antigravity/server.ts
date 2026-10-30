@@ -2,10 +2,12 @@ import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import {
   clearCachedNativeReadiness,
   getFastNativeReadiness,
+  getNativeCredentialId,
   GOOGLE_ACP_AUTH_METHODS,
   isValidGoogleAuthMethod,
   prepareSanitizedGeminiHome,
   probeNativeAcpReadiness,
+  queryNativeUsage,
   startNativeAcpSignIn,
   writeNativeAcpAuthType,
   type DiscoveredNativeModel,
@@ -43,6 +45,10 @@ export interface DoctorStatusResult {
   tierName: string | null;
   disabledDeadMcpServers: string[];
   error?: string;
+  checkedAt?: number;
+  catalogStale?: boolean;
+  /** Opaque hash that changes when the signed-in credentials change. */
+  credentialId?: string;
 }
 
 function normalizeAuthMethod(value: unknown): GoogleAcpAuthMethod {
@@ -75,7 +81,7 @@ function buildNativeLaunchSpec(options?: {
     env,
     nativeReasoning: {
       configId: 'thinking_level',
-      supportedLevels: ['low', 'medium', 'high'] as const,
+      supportedLevels: ['low', 'medium', 'high'],
       defaultLevel: 'medium' as const
     }
   };
@@ -110,14 +116,16 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
       expiredHint: 'Your Antigravity sign-in expired. Open Settings → Antigravity Provider to re-authenticate.',
       installUrl: 'https://antigravity.google'
     },
-    maintenance: { health: true, usage: false, installation: true },
+    maintenance: { health: true, usage: true, installation: true },
     capabilities: ANTIGRAVITY_CAPABILITIES,
     reasoningLevels: [
       { id: 'low', label: 'Low Effort' },
       { id: 'medium', label: 'Medium Effort' },
       { id: 'high', label: 'High Effort' }
     ],
-    composerActions: [],
+    // Zana itself prefixes Plan turns with a `/plan` command mention for providers declaring this
+    // action; the native ACP server handles `/plan` as its own slash command, so no host mapping is needed.
+    composerActions: ['plan'],
     models: {
       scope: 'host' as const
     },
@@ -185,6 +193,9 @@ function formatInstalledDoctorResult(
     modes: readiness.modes,
     tierName: readiness.tierName ?? null,
     disabledDeadMcpServers: readiness.disabledDeadMcpServers ?? [],
+    checkedAt: readiness.checkedAt,
+    catalogStale: readiness.catalogStale === true,
+    credentialId: getNativeCredentialId(authMethod),
     ...(readiness.error ? { error: readiness.error } : {})
   };
 }
@@ -267,6 +278,11 @@ function registerRpcMethods(
   settings: any,
   state: { getPendingAuthUrl: () => string | null; setPendingAuthUrl: (url: string | null) => void }
 ) {
+  zcc.rpc.method('usage:status', async () => {
+    const current = await settings.get();
+    const runtime = resolveNativeAcpRuntime({ customExecutable: current.nativeExecutable || undefined });
+    return queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: normalizeAuthMethod(current.authMethod) });
+  });
   zcc.rpc.method('doctor:status', async (args: unknown): Promise<DoctorStatusResult> => {
     const opts = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
     return buildDoctorStatus(settings, {

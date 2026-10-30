@@ -128,6 +128,30 @@ Small, self-contained PR straight to `master`. Never carried inside a plugin bra
 
 Merging to master publishes immediately — there is no separate release step.
 
+CI installs the repository's locked verification dependencies with `npm ci`.
+It checks out the Zana SDK at the commit pinned in `.github/workflows/ci.yml`,
+including the SDK's workspace dependencies, then runs `npm run prepare:sdk`
+to link and build its runtime entries. Plugins without their own lockfile use
+the repository's TypeScript and Vitest; plugins with local tools retain priority.
+Global tool installations and an adjacent Zana checkout are not required.
+Regenerate `package-lock.json` with npm 10 (the Node 22 runner's npm); the
+CI-runner tests reject extraneous platform packages from incompatible locks.
+
+To reproduce CI in a clean checkout, create `.zana-sdk` at that same pinned
+commit with the workflow's sparse paths, then run:
+
+```powershell
+npm ci
+npm run prepare:sdk
+npm run test:ci
+npm run verify:plugins
+```
+
+Build Antigravity bundles with this layout before committing them. Its host
+bundle and source map include dependency paths, so bundles built against an
+adjacent checkout differ from the pinned CI build. The build normalizes source
+map contents to LF so Windows and Linux checkouts produce identical artifacts.
+
 ```mermaid
 flowchart LR
   B["branch → PR"] --> CI["CI green"] --> MG["merge to master<br/>= PUBLISH"]

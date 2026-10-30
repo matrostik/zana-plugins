@@ -7,6 +7,14 @@ const root = resolve('.');
 const pluginsDir = join(root, 'plugins');
 const zanaSdkDir = join(root, '.zana-sdk', 'packages', 'plugin-sdk');
 
+function findTool(pluginDir, relativePath) {
+  for (const directory of [pluginDir, root]) {
+    const candidate = join(directory, 'node_modules', relativePath);
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`Missing local tool ${relativePath}; run npm ci at the repository root.`);
+}
+
 function getChangedFiles() {
   const base = process.env.CI_BASE_REF ? `origin/${process.env.CI_BASE_REF}` : 'origin/master';
   const head = process.env.CI_HEAD_SHA || 'HEAD';
@@ -87,7 +95,7 @@ for (const id of targetPlugins) {
   if (existsSync(join(pDir, 'tsconfig.json'))) {
     console.log(`[TYPECHECK] Running TypeScript compiler in ${id}...`);
     try {
-      execFileSync('npx', ['tsc', '--noEmit'], { cwd: pDir, stdio: 'inherit', shell: true });
+      execFileSync(process.execPath, [findTool(pDir, 'typescript/bin/tsc'), '--noEmit'], { cwd: pDir, stdio: 'inherit' });
       console.log(`[TYPECHECK:PASS] ${id} passed typecheck.`);
     } catch (err) {
       console.error(`[TYPECHECK:FAIL] ${id} failed typecheck!`);
@@ -100,10 +108,7 @@ for (const id of targetPlugins) {
   if (existsSync(vitestConfig)) {
     console.log(`[TEST] Running Vitest with Coverage for ${id}...`);
     try {
-      const localVitest = join(pDir, 'node_modules', 'vitest', 'vitest.mjs');
-      if (!existsSync(localVitest)) {
-        throw new Error(`Local Vitest not found at ${localVitest}`);
-      }
+      const localVitest = findTool(pDir, 'vitest/vitest.mjs');
       execFileSync(process.execPath, [localVitest, 'run', '--coverage'], {
         cwd: pDir,
         stdio: 'inherit',
@@ -112,6 +117,7 @@ for (const id of targetPlugins) {
       console.log(`[TEST:PASS] ${id} tests and coverage thresholds passed!`);
     } catch (err) {
       console.error(`[TEST:FAIL] ${id} tests failed or coverage floor not met!`);
+      console.error(err.message);
       hasFailures = true;
     }
   } else {

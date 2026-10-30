@@ -1,3 +1,4 @@
+import './src/test-environment.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -206,14 +207,14 @@ describe('host.ts provider bridge and launch helpers', () => {
     );
 
     const authOutput = invokeBridgeRpc({ jsonrpc: '2.0', id: 2, method: 'provider/health' });
-    expect(authOutput.result.health.status).toBe('unauthenticated');
+    expect(authOutput.result.health.status).toBe('unknown');
     expect(authOutput.result.health.statusMessage).toContain('not verified');
 
     vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
       makeReadinessFixture({ state: 'runtime_launches', error: 'Handshake incomplete' })
     );
     const launchOutput = invokeBridgeRpc({ jsonrpc: '2.0', id: 3, method: 'provider/health' });
-    expect(launchOutput.result.health.status).toBe('unauthenticated');
+    expect(launchOutput.result.health.status).toBe('unknown');
     expect(launchOutput.result.health.statusMessage).toBe('Handshake incomplete');
   });
 
@@ -265,6 +266,62 @@ describe('host.ts provider bridge and launch helpers', () => {
     );
     const signIn = invokeBridgeRpc({ jsonrpc: '2.0', id: 7, method: 'model/list' });
     expect(signIn.error.data.recovery.kind).toBe('authRequired');
+  });
+
+  it('refreshes a cold catalog and returns models rather than requiring a Settings visit', async () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(makeReadinessFixture({ state: 'authenticated' }));
+    vi.spyOn(nativeAuth, 'getNativeCatalog').mockResolvedValue(makeReadinessFixture({
+      models: [{ id: 'gemini', name: 'Gemini' }]
+    }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 71, method: 'model/list' }));
+    await vi.waitFor(() => expect(write).toHaveBeenCalled());
+    const response = JSON.parse(String(write.mock.calls[0][0]));
+    expect(response.result.models[0].id).toBe('gemini');
+    expect(nativeAuth.getNativeCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns observed quota windows through provider/usage', async () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'queryNativeUsage').mockResolvedValue({ supported: true, usage: {
+      status: 'ok', planLabel: 'Pro', accountEmail: null, checkedAt: 123, source: 'native-acp-/usage',
+      windows: [{ label: 'Gemini — Weekly', usedPercent: 86, resetsAt: null }]
+    } });
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 72, method: 'provider/usage' }));
+    await vi.waitFor(() => expect(write).toHaveBeenCalled());
+    expect(JSON.parse(String(write.mock.calls[0][0])).result.usage.windows[0].usedPercent).toBe(86);
+  });
+
+  it('answers provider/usage and model/list with an error when synchronous setup throws', () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'queryNativeUsage').mockImplementation(() => { throw new Error('EACCES: usage home'); });
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockImplementation(() => { throw new Error('EACCES: catalog home'); });
+    const forwarded = vi.spyOn(realAcpBridge, 'handleLine').mockImplementation(() => undefined);
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 74, method: 'provider/usage' }));
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 75, method: 'model/list' }));
+    const responses = write.mock.calls.map(call => JSON.parse(String(call[0])));
+    expect(responses).toEqual([
+      expect.objectContaining({ id: 74, error: expect.objectContaining({ message: 'EACCES: usage home' }) }),
+      expect.objectContaining({ id: 75, error: expect.objectContaining({ message: 'EACCES: catalog home' }) })
+    ]);
+    expect(forwarded).not.toHaveBeenCalled();
+  });
+
+  it('labels a stale catalog visibly while preserving the selectable model identity', async () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    const stale = makeReadinessFixture({ state: 'authenticated', catalogStale: true,
+      models: [{ id: 'gemini', name: 'Gemini' }], error: 'Backend unavailable' });
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(stale);
+    vi.spyOn(nativeAuth, 'getNativeCatalog').mockResolvedValue(stale);
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 73, method: 'model/list' }));
+    await vi.waitFor(() => expect(write).toHaveBeenCalled());
+    const response = JSON.parse(String(write.mock.calls[0][0]));
+    expect(response.result.models[0]).toMatchObject({ id: 'gemini', model: 'gemini', displayName: 'Gemini (cached)' });
+    expect(response.result._meta.stale).toBe(true);
   });
 
   it('maps model/list reasoning efforts from session metadata and omits when unadvertised', () => {
@@ -327,8 +384,10 @@ describe('host.ts provider bridge and launch helpers', () => {
   });
 
   it('handles invalid lines and lifecycle methods on bridge', () => {
-    const origClose = realAcpBridge.onClose;
-    (realAcpBridge as any).onClose = () => {};
+    vi.spyOn(realAcpBridge, 'handleLine').mockImplementation(() => {});
+    for (const key of ['start', 'onClose', 'onSigterm', 'onSigint'] as const) {
+      if (realAcpBridge[key]) vi.spyOn(realAcpBridge, key).mockImplementation(() => {});
+    }
 
     expect(() => experimental_providerBridge.handleLine('INVALID-JSON-LINE')).not.toThrow();
     expect(() => experimental_providerBridge.start?.({} as any)).not.toThrow();
@@ -336,6 +395,5 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(() => experimental_providerBridge.onSigterm?.()).not.toThrow();
     expect(() => experimental_providerBridge.onSigint?.()).not.toThrow();
 
-    (realAcpBridge as any).onClose = origClose;
   });
 });
