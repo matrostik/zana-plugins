@@ -107,6 +107,18 @@ describe('NativeAcpSession', () => {
     await expect(run).rejects.toThrow('unexpectedly requested tools');
   });
 
+  it('fails a command whose reply arrives in the same chunk as excessive output', async () => {
+    const { server, session } = open({ 'session/prompt': () => NO_REPLY });
+    const run = session.runCommand('s1', 'usage', { maxTextChars: 10 });
+    const child = server.processes[0] as any;
+    const id = 1; // The prompt is the session's first request.
+    child.stdout.emit('data', [
+      JSON.stringify({ jsonrpc: '2.0', id, result: { stopReason: 'end_turn' } }),
+      JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'This output exceeds 10 characters.' } } } })
+    ].join('\n') + '\n');
+    await expect(run).rejects.toThrow('output exceeded 10 characters');
+  });
+
   it('keeps a catalog that session/new already carried without waiting', async () => {
     const { session } = open({ 'session/new': () => ({ sessionId: 's1', configOptions: [{ id: 'model', options: [{ value: 'gemini' }] }] }) });
     const started = Date.now();

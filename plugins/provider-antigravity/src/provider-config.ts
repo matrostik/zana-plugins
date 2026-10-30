@@ -14,6 +14,10 @@ export const NATIVE_REASONING = {
   defaultLevel: 'medium' as const
 };
 
+export function nativeReasoning(): typeof NATIVE_REASONING & { supportedLevels: string[] } {
+  return { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+}
+
 export function normalizeAuthMethod(value: unknown): GoogleAcpAuthMethod {
   return isValidGoogleAuthMethod(value) ? value : 'oauth-personal';
 }
@@ -58,7 +62,7 @@ export function buildNativeLaunchSpec(options: {
     command: runtime.executable,
     args: runtime.args,
     env: launchEnv(authMethod, home, options.env ?? process.env),
-    nativeReasoning: { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] }
+    nativeReasoning: nativeReasoning()
   };
 }
 
@@ -75,7 +79,7 @@ export function completeLaunchSpec(spec: Record<string, any>, authMethod: Google
   if (!next.GEMINI_HOME) { next.GEMINI_HOME = home.geminiHome; changed = true; }
   spec.env = next;
   if (!spec.nativeReasoning) {
-    spec.nativeReasoning = { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+    spec.nativeReasoning = nativeReasoning();
     changed = true;
   }
   return changed;

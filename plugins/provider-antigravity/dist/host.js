@@ -40,9 +40,9 @@ var __toESM = (mod, isNodeMode, target2) => (target2 = mod != null ? __create(__
   mod
 ));
 
-// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js
+// ../../node_modules/isexe/windows.js
 var require_windows = __commonJS({
-  "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js"(exports, module) {
+  "../../node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require("fs");
@@ -80,9 +80,9 @@ var require_windows = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js
+// ../../node_modules/isexe/mode.js
 var require_mode = __commonJS({
-  "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js"(exports, module) {
+  "../../node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require("fs");
@@ -113,9 +113,9 @@ var require_mode = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js
+// ../../node_modules/isexe/index.js
 var require_isexe = __commonJS({
-  "../../../zana/node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js"(exports, module) {
+  "../../node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
@@ -168,9 +168,9 @@ var require_isexe = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/which@2.0.2/node_modules/which/which.js
+// ../../node_modules/which/which.js
 var require_which = __commonJS({
-  "../../../zana/node_modules/.pnpm/which@2.0.2/node_modules/which/which.js"(exports, module) {
+  "../../node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
     var path5 = __require("path");
     var COLON = isWindows ? ";" : ":";
@@ -264,9 +264,9 @@ var require_which = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js
+// ../../node_modules/path-key/index.js
 var require_path_key = __commonJS({
-  "../../../zana/node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js"(exports, module) {
+  "../../node_modules/path-key/index.js"(exports, module) {
     "use strict";
     var pathKey = (options = {}) => {
       const environment = options.env || process.env;
@@ -281,9 +281,9 @@ var require_path_key = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js
+// ../../node_modules/cross-spawn/lib/util/resolveCommand.js
 var require_resolveCommand = __commonJS({
-  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
     var path5 = __require("path");
     var which = require_which();
@@ -323,9 +323,9 @@ var require_resolveCommand = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js
+// ../../node_modules/cross-spawn/lib/util/escape.js
 var require_escape = __commonJS({
-  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
     var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
     function escapeCommand(arg) {
@@ -348,17 +348,17 @@ var require_escape = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js
+// ../../node_modules/shebang-regex/index.js
 var require_shebang_regex = __commonJS({
-  "../../../zana/node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js"(exports, module) {
+  "../../node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
 
-// ../../../zana/node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js
+// ../../node_modules/shebang-command/index.js
 var require_shebang_command = __commonJS({
-  "../../../zana/node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js"(exports, module) {
+  "../../node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
     var shebangRegex = require_shebang_regex();
     module.exports = (string4 = "") => {
@@ -376,9 +376,9 @@ var require_shebang_command = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js
+// ../../node_modules/cross-spawn/lib/util/readShebang.js
 var require_readShebang = __commonJS({
-  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
     var fs3 = __require("fs");
     var shebangCommand = require_shebang_command();
@@ -398,9 +398,9 @@ var require_readShebang = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js
+// ../../node_modules/cross-spawn/lib/parse.js
 var require_parse = __commonJS({
-  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
     var path5 = __require("path");
     var resolveCommand = require_resolveCommand();
@@ -460,9 +460,9 @@ var require_parse = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js
+// ../../node_modules/cross-spawn/lib/enoent.js
 var require_enoent = __commonJS({
-  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
     var isWin = process.platform === "win32";
     function notFoundError(original, syscall) {
@@ -510,9 +510,9 @@ var require_enoent = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js
+// ../../node_modules/cross-spawn/index.js
 var require_cross_spawn = __commonJS({
-  "../../../zana/node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js"(exports, module) {
+  "../../node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
     var cp = __require("child_process");
     var parse3 = require_parse();
@@ -537,7 +537,7 @@ var require_cross_spawn = __commonJS({
   }
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
+// ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -800,7 +800,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/index.js
+// ../../node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -1117,7 +1117,7 @@ __export(core_exports2, {
   withParser: () => withParser
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js
+// ../../node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1973,7 +1973,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/core.js
+// ../../node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2095,7 +2095,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/errors.js
+// ../../node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -2287,7 +2287,7 @@ function prettifyError(error62) {
   return lines.join("\n");
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/parse.js
+// ../../node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -2447,7 +2447,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js
+// ../../node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   anyString: () => anyString,
@@ -2619,7 +2619,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/checks.js
+// ../../node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -3095,7 +3095,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/doc.js
+// ../../node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -3136,14 +3136,14 @@ ${content.join("\n")}
   }
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/versions.js
+// ../../node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 7
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/schemas.js
+// ../../node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -5585,7 +5585,7 @@ function handleRefineResult(result, payload, input2, inst) {
   }
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/memoizer.js
+// ../../node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -5862,7 +5862,7 @@ function isBackEdge(ctx, value) {
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/index.js
+// ../../node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -5930,7 +5930,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ar.js
+// ../../node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6042,7 +6042,7 @@ function ar_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/az.js
+// ../../node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6153,7 +6153,7 @@ function az_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/be.js
+// ../../node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6322,7 +6322,7 @@ function be_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/bg.js
+// ../../node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6448,7 +6448,7 @@ function bg_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/bn.js
+// ../../node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -6562,7 +6562,7 @@ function bn_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ca.js
+// ../../node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6676,7 +6676,7 @@ function ca_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ckb.js
+// ../../node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -6809,7 +6809,7 @@ function ckb_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/cs.js
+// ../../node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6926,7 +6926,7 @@ function cs_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/da.js
+// ../../node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7047,7 +7047,7 @@ function da_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/de.js
+// ../../node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7161,7 +7161,7 @@ function de_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/el.js
+// ../../node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7274,7 +7274,7 @@ function el_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/en.js
+// ../../node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7399,7 +7399,7 @@ function en_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/eo.js
+// ../../node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7514,7 +7514,7 @@ function eo_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/es.js
+// ../../node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7651,7 +7651,7 @@ function es_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fa.js
+// ../../node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7771,7 +7771,7 @@ function fa_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fi.js
+// ../../node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7889,7 +7889,7 @@ function fi_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fr.js
+// ../../node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8019,7 +8019,7 @@ function fr_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/fr-CA.js
+// ../../node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8132,7 +8132,7 @@ function fr_CA_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/gu.js
+// ../../node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -8246,7 +8246,7 @@ function gu_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/he.js
+// ../../node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8448,7 +8448,7 @@ function he_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hi.js
+// ../../node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -8560,7 +8560,7 @@ function hi_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hr.js
+// ../../node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8687,7 +8687,7 @@ function hr_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hu.js
+// ../../node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8801,7 +8801,7 @@ function hu_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/hy.js
+// ../../node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8960,7 +8960,7 @@ function hy_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/id.js
+// ../../node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -9072,7 +9072,7 @@ function id_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/is.js
+// ../../node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -9187,7 +9187,7 @@ function is_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/it.js
+// ../../node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -9301,7 +9301,7 @@ function it_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ja.js
+// ../../node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9414,7 +9414,7 @@ function ja_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ka.js
+// ../../node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9532,7 +9532,7 @@ function ka_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/km.js
+// ../../node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9648,12 +9648,12 @@ function km_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/kh.js
+// ../../node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/kn.js
+// ../../node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -9769,7 +9769,7 @@ function kn_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ko.js
+// ../../node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9886,7 +9886,7 @@ function ko_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/lt.js
+// ../../node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -10094,7 +10094,7 @@ function lt_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/mk.js
+// ../../node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -10209,7 +10209,7 @@ function mk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ms.js
+// ../../node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -10322,7 +10322,7 @@ function ms_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ne.js
+// ../../node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -10434,7 +10434,7 @@ function ne_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/nl.js
+// ../../node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -10550,7 +10550,7 @@ function nl_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/nn.js
+// ../../node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -10664,7 +10664,7 @@ function nn_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/no.js
+// ../../node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10778,7 +10778,7 @@ function no_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ota.js
+// ../../node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10893,7 +10893,7 @@ function ota_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ps.js
+// ../../node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -11013,7 +11013,7 @@ function ps_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pl.js
+// ../../node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -11128,7 +11128,7 @@ function pl_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pt.js
+// ../../node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11272,7 +11272,7 @@ function pt_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/pt-BR.js
+// ../../node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11417,7 +11417,7 @@ function pt_BR_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ro.js
+// ../../node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -11540,7 +11540,7 @@ function ro_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ru.js
+// ../../node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11709,7 +11709,7 @@ function ru_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sk.js
+// ../../node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -11826,7 +11826,7 @@ function sk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sl.js
+// ../../node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -11941,7 +11941,7 @@ function sl_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/sv.js
+// ../../node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -12057,7 +12057,7 @@ function sv_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ta.js
+// ../../node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -12173,7 +12173,7 @@ function ta_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tg.js
+// ../../node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -12290,7 +12290,7 @@ function tg_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/th.js
+// ../../node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -12406,7 +12406,7 @@ function th_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tk.js
+// ../../node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -12514,7 +12514,7 @@ function tk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/tr.js
+// ../../node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -12625,7 +12625,7 @@ function tr_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/uk.js
+// ../../node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -12739,12 +12739,12 @@ function uk_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ua.js
+// ../../node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/ur.js
+// ../../node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -12860,7 +12860,7 @@ function ur_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/uz.js
+// ../../node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -12974,7 +12974,7 @@ function uz_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/vi.js
+// ../../node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -13088,7 +13088,7 @@ function vi_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/zh-CN.js
+// ../../node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -13203,7 +13203,7 @@ function zh_CN_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/zh-TW.js
+// ../../node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -13316,7 +13316,7 @@ function zh_TW_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/locales/yo.js
+// ../../node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -13429,7 +13429,7 @@ function yo_default() {
   };
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/registries.js
+// ../../node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -13479,7 +13479,7 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/compile.js
+// ../../node_modules/zod/v4/core/compile.js
 var INVALID = Symbol.for("zod.compile.invalid");
 var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
@@ -15089,7 +15089,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   return accessor;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/api.js
+// ../../node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -16148,7 +16148,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/to-json-schema.js
+// ../../node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target2, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -16678,7 +16678,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema-processors.js
+// ../../node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -17426,7 +17426,7 @@ function toJSONSchema(input2, params) {
   return finalize(ctx, input2);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema-generator.js
+// ../../node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -17504,10 +17504,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/json-schema.js
+// ../../node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -17688,7 +17688,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/checks.js
+// ../../node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -17723,7 +17723,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/errors.js
+// ../../node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -17769,7 +17769,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, void 0
   Parent: Error
 });
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/parse.js
+// ../../node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -17783,7 +17783,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -19248,7 +19248,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/compat.js
+// ../../node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -19274,7 +19274,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/iso.js
+// ../../node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19299,7 +19299,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/from-json-schema.js
+// ../../node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -20032,7 +20032,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/visit.js
+// ../../node_modules/zod/v4/core/visit.js
 var RESOLVING = Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
@@ -20187,7 +20187,7 @@ function visit(schema, fnOrHandlers) {
   return run(schema);
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/deep-partial.js
+// ../../node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -20199,7 +20199,7 @@ function deepPartial(schema) {
   });
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/in-out.js
+// ../../node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -20229,7 +20229,7 @@ function output(schema) {
   });
 }
 
-// ../../../zana/node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/coerce.js
+// ../../node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -20254,7 +20254,7 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// ../../../zana/packages/domain/src/bb-thread/active-thinking.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/active-thinking.ts
 var activeThinkingSchema = external_exports.object({
   id: external_exports.string(),
   text: external_exports.string(),
@@ -20262,7 +20262,7 @@ var activeThinkingSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/shared-types.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/shared-types.ts
 var reasoningLevelValues = [
   "none",
   "low",
@@ -20632,7 +20632,7 @@ var projectExecutionDefaultsSchema = external_exports.object({
   permissionMode: permissionModeSchema
 });
 
-// ../../../zana/packages/domain/src/bb-thread/acp-cli.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/acp-cli.ts
 var ACP_DEFAULT_MODEL_ID = "acp-default";
 var providerSkillRootPathSchema = external_exports.string().min(1).refine((value) => {
   const normalized = value.replaceAll("\\", "/");
@@ -20683,16 +20683,16 @@ var acpNativeReasoningSchema = external_exports.object({
   supportedLevels: external_exports.array(reasoningLevelSchema).min(1),
   levelValues: acpReasoningCliLevelValueOverridesSchema.optional(),
   defaultLevel: reasoningLevelSchema.optional()
-}).strict().superRefine((nativeReasoning, context) => {
-  const supportedLevels = new Set(nativeReasoning.supportedLevels);
-  if (supportedLevels.size !== nativeReasoning.supportedLevels.length) {
+}).strict().superRefine((nativeReasoning2, context) => {
+  const supportedLevels = new Set(nativeReasoning2.supportedLevels);
+  if (supportedLevels.size !== nativeReasoning2.supportedLevels.length) {
     context.addIssue({
       code: "custom",
       message: "supportedLevels must not contain duplicates",
       path: ["supportedLevels"]
     });
   }
-  if (nativeReasoning.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning.defaultLevel)) {
+  if (nativeReasoning2.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning2.defaultLevel)) {
     context.addIssue({
       code: "custom",
       message: "defaultLevel must be one of supportedLevels",
@@ -20715,7 +20715,7 @@ var acpPermissionCliSchema = external_exports.object({
   }
 });
 
-// ../../../zana/packages/domain/src/bb-thread/app-settings.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/app-settings.ts
 var appSettingsSchema = external_exports.object({
   /** Show shortcut hints after holding Command or Control. */
   showKeyboardHints: external_exports.boolean(),
@@ -20753,7 +20753,7 @@ var appSettingsSchema = external_exports.object({
   onboardingCompletedAt: external_exports.string().nullable()
 }).strict();
 
-// ../../../zana/packages/domain/src/bb-thread/app-keybindings.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/app-keybindings.ts
 var THREAD_JUMP_APP_COMMAND_IDS = [
   "thread.jump.1",
   "thread.jump.2",
@@ -20891,7 +20891,7 @@ var appKeybindingOverridesSchema = external_exports.array(appKeybindingOverrideS
   }
 });
 
-// ../../../zana/packages/domain/src/bb-thread/json-value.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/json-value.ts
 var jsonValueSchema = external_exports.lazy(
   () => external_exports.union([
     external_exports.string(),
@@ -20907,7 +20907,7 @@ var jsonObjectSchema = external_exports.record(
   jsonValueSchema
 );
 
-// ../../../zana/packages/domain/src/bb-thread/code-theme.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/code-theme.ts
 var DEFAULT_CODE_THEME_DARK = "pierre-dark";
 var DEFAULT_CODE_THEME_LIGHT = "pierre-light";
 var codeThemeNameSchema = external_exports.string().min(1).max(128).regex(
@@ -20937,7 +20937,7 @@ var uiCodeThemeDeclarationSchema = external_exports.object({
   light: external_exports.string().min(1).max(256).optional()
 }).strict();
 
-// ../../../zana/packages/domain/src/bb-thread/app-theme.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/app-theme.ts
 var builtInThemeIdSchema = external_exports.enum([
   "default",
   "nord",
@@ -20995,7 +20995,7 @@ var appThemeSelectionSchema = external_exports.object({
   faviconColor: faviconColorPreferenceSchema
 });
 
-// ../../../zana/packages/domain/src/bb-thread/background-task.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/background-task.ts
 var backgroundTaskStatusValues = [
   "pending",
   "running",
@@ -21055,7 +21055,7 @@ var backgroundTaskUsageSchema = external_exports.object({
   durationMs: external_exports.number()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-interaction-limits.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-interaction-limits.ts
 var PLUGIN_INTERACTION_MAX_TITLE_LENGTH = 160;
 var PLUGIN_INTERACTION_MAX_PAYLOAD_BYTES = 64 * 1024;
 var PLUGIN_INTERACTION_MAX_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1e3;
@@ -21063,7 +21063,7 @@ function jsonByteLength(value) {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
 
-// ../../../zana/packages/domain/src/bb-thread/item-presentation.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/item-presentation.ts
 var THREAD_EVENT_ITEM_PRESENTATION_DETAIL_MAX_LENGTH = 280;
 var threadEventItemPresentationLabelSchema = external_exports.object({
   /** Present-tense row title while the item is in flight ("Reading file"). */
@@ -21101,7 +21101,7 @@ var threadEventItemPresentationSchema = external_exports.object({
   }).optional()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/provider-extension-kind.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-extension-kind.ts
 var EXTENSION_KIND_PATTERN = /^[a-z0-9-]+\/[a-z0-9-]+$/u;
 function isExtensionKind(value) {
   return EXTENSION_KIND_PATTERN.test(value);
@@ -21110,7 +21110,7 @@ var extensionKindSchema = external_exports.string().refine(isExtensionKind, {
   message: 'extension kinds are "<pluginId>/<name>" (lowercase letters, digits, and "-")'
 });
 
-// ../../../zana/packages/domain/src/bb-thread/pending-interactions.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/pending-interactions.ts
 var pendingInteractionStatusSchema = external_exports.enum([
   "pending",
   "resolving",
@@ -21515,10 +21515,10 @@ var interactionLifecycleSchema = external_exports.union([
   pluginExtensionInteractionLifecycleSchema
 ]);
 
-// ../../../zana/packages/domain/src/bb-thread/protocol-ids.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/protocol-ids.ts
 var clientTurnRequestIdSchema = external_exports.string().regex(/^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u);
 
-// ../../../zana/packages/domain/src/bb-thread/system-message.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/system-message.ts
 var systemMessageKindValues = [
   "ownership-assigned",
   "ownership-removed",
@@ -21542,7 +21542,7 @@ var systemMessageSubjectSchema = external_exports.discriminatedUnion("kind", [
   })
 ]);
 
-// ../../../zana/packages/domain/src/bb-thread/thread-events.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-events.ts
 var systemEventTypeValues = [
   "client/thread/start",
   "client/turn/requested",
@@ -21747,7 +21747,7 @@ var systemProviderTurnWatchdogEventDataSchema = external_exports.object({
   firedAt: external_exports.number().int().nonnegative()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/thread-event-scope.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-event-scope.ts
 var threadEventScopeKindValues = ["thread", "turn"];
 var threadEventScopeKindSchema = external_exports.enum(threadEventScopeKindValues);
 var threadEventScopeSchema = external_exports.discriminatedUnion("kind", [
@@ -21935,7 +21935,7 @@ function validateThreadEventScope(args) {
   return { valid: true };
 }
 
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-goal.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-goal.ts
 var threadTimelineGoalStatusSchema = external_exports.enum([
   "active",
   "paused",
@@ -21952,7 +21952,7 @@ var threadTimelineGoalSchema = external_exports.object({
   timeUsedSeconds: external_exports.number()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/provider-event.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-event.ts
 var threadEventItemStatusSchema = external_exports.enum([
   "pending",
   "completed",
@@ -22679,7 +22679,7 @@ var threadEventTypeSchema = external_exports.string().refine(
   "Invalid thread event type"
 );
 
-// ../../../zana/packages/domain/src/bb-thread/change-kinds.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/change-kinds.ts
 var THREAD_CHANGE_KINDS = [
   "thread-created",
   "thread-deleted",
@@ -22883,7 +22883,7 @@ var changedMessageLenientSchema = external_exports.discriminatedUnion("entity", 
   systemChangedMessageLenientSchema
 ]);
 
-// ../../../zana/packages/domain/src/bb-thread/claude-task-tools.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/claude-task-tools.ts
 var claudeTaskToolNameValues = [
   "TaskCreate",
   "TaskGet",
@@ -22955,7 +22955,7 @@ var claudeTaskToolOutputSchema = external_exports.union([
   claudeTaskUpdateOutputSchema
 ]);
 
-// ../../../zana/packages/domain/src/bb-thread/environment.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/environment.ts
 var environmentStatusValues = [
   "provisioning",
   "ready",
@@ -23005,7 +23005,7 @@ var environmentSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/experiments.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/experiments.ts
 var experimentKeys = [
   "claudeCodeMockCliTraffic",
   "newOnboarding",
@@ -23014,7 +23014,7 @@ var experimentKeys = [
 var experimentKeySchema = external_exports.enum(experimentKeys);
 var experimentsSchema = external_exports.record(experimentKeySchema, external_exports.boolean());
 
-// ../../../zana/packages/domain/src/bb-thread/feature-flags.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/feature-flags.ts
 var featureFlagsSchema = external_exports.object({
   placeholder: external_exports.boolean(),
   /**
@@ -23032,7 +23032,7 @@ var featureFlagsSchema = external_exports.object({
   timelineWindowEventBudget: external_exports.number().int().positive()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/git-checkout.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/git-checkout.ts
 var gitBranchForbiddenCharacterPattern = /[\u0000-\u001f\u007f\\:~^?*\[]/u;
 var gitBranchWhitespacePattern = /[ \t]/u;
 var gitReservedBranchNames = /* @__PURE__ */ new Set([
@@ -23127,7 +23127,7 @@ var projectSourceCheckoutSchema = external_exports.object({
   selectedBranch: gitBranchRefClassificationSchema.nullable()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/host.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/host.ts
 var hostTypeValues = ["persistent"];
 var hostTypeSchema = external_exports.enum(hostTypeValues);
 var hostStatusValues = ["connected", "disconnected"];
@@ -23171,7 +23171,7 @@ var hostSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/provider-skill-roots.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-skill-roots.ts
 function isAbsoluteProviderSkillRootPath(value) {
   if (value.length === 0) {
     return false;
@@ -23192,7 +23192,7 @@ function isRelativeProviderSkillRootPath(value) {
   return !normalized.startsWith("/") && !/^[a-zA-Z]:\//u.test(normalized) && normalized.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
-// ../../../zana/packages/domain/src/bb-thread/native-roots.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/native-roots.ts
 var PROVIDER_NATIVE_ROOTS_MAX = 32;
 var PROVIDER_NATIVE_ROOT_NAME_PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}:$/u;
 var nativeRootNamePrefixSchema = external_exports.string().refine(
@@ -23377,7 +23377,7 @@ var providerNativeRootSetSchema = external_exports.object({
   resolved: providerResolvedNativeRootsSchema
 }).strict();
 
-// ../../../zana/packages/domain/src/bb-thread/legacy-thread-events.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/legacy-thread-events.ts
 var LEGACY_CODEX_GOAL_EXTENSION_KIND = "provider-codex/goal";
 var LEGACY_THREAD_EVENT_TYPES = [
   "thread/goal/updated",
@@ -23644,7 +23644,7 @@ function upgradeLegacyToolItem(item) {
   return item;
 }
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-catalog-category.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-catalog-category.ts
 var PLUGIN_CATALOG_CATEGORY_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var pluginCatalogCategoryIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
 var pluginMarketplaceCollectionIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
@@ -23750,7 +23750,7 @@ var PLUGIN_CATALOG_CATEGORIES = [
 ];
 var pluginCatalogCategoryById = new Map(PLUGIN_CATALOG_CATEGORIES.map((category) => [category.id, category]));
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-icon.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-icon.ts
 function isPluginOwnedIconPath(icon) {
   return icon.startsWith("./");
 }
@@ -23763,10 +23763,10 @@ function isNamespacedGlyph(glyph) {
   return NAMESPACED_GLYPH_PATTERN.test(glyph);
 }
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-id.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-id.ts
 var pluginIdSchema = external_exports.string().regex(/^[a-z0-9][a-z0-9-]*$/u);
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-metadata.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-metadata.ts
 var PLUGIN_METADATA_MAX_BYTES = 256 * 1024;
 function exceedsPluginMetadataLimit(metadataJson) {
   return new TextEncoder().encode(metadataJson).byteLength > PLUGIN_METADATA_MAX_BYTES;
@@ -23780,7 +23780,7 @@ var pluginMetadataSchema = jsonObjectSchema.superRefine((value, ctx) => {
   }
 });
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-manifest.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-manifest.ts
 var requiredManifestString = external_exports.string().trim().min(1);
 var pluginBrandingIconsSchema = external_exports.record(
   external_exports.string().max(
@@ -23856,7 +23856,7 @@ var pluginPackageJsonSchema = external_exports.object({
   bb: pluginBbManifestSchema
 }).passthrough();
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
 var MARKETPLACE_MAX_SCREENSHOTS = 6;
 var NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var TAG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -23996,11 +23996,11 @@ var marketplaceEntryV2Schema = external_exports.object({
   ...marketplaceEntryMetadataShape(false)
 });
 
-// ../../../zana/packages/domain/src/bb-thread/plugin-sdk-version.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-sdk-version.ts
 var PLUGIN_SDK_VERSION = "0.4.8";
 var PLUGIN_SDK_MAJOR = Number(PLUGIN_SDK_VERSION.split(".", 1)[0]);
 
-// ../../../zana/packages/domain/src/bb-thread/project.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/project.ts
 var projectKindValues = ["standard", "personal"];
 var projectKindSchema = external_exports.enum(projectKindValues);
 var projectSchema = external_exports.object({
@@ -24026,7 +24026,7 @@ var localPathProjectSourceSchema = baseProjectSourceSchema.extend({
   path: external_exports.string()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/prompt-history.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/prompt-history.ts
 var promptHistoryScopeValues = ["project", "thread"];
 var promptHistoryScopeSchema = external_exports.enum(promptHistoryScopeValues);
 var promptHistoryEntrySchema = external_exports.object({
@@ -24035,11 +24035,11 @@ var promptHistoryEntrySchema = external_exports.object({
   input: external_exports.array(promptInputSchema).min(1)
 });
 
-// ../../../zana/packages/domain/src/bb-thread/provider-fork.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-fork.ts
 var PROVIDER_FORK_VALUES = ["none", "tip", "checkpoint"];
 var providerForkSchema = external_exports.enum(PROVIDER_FORK_VALUES);
 
-// ../../../zana/packages/domain/src/bb-thread/provider-types.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-types.ts
 var modelReasoningEffortSchema = external_exports.object({
   reasoningEffort: reasoningLevelSchema,
   description: external_exports.string()
@@ -24210,7 +24210,7 @@ var dynamicToolSchema = external_exports.object({
   presentation: threadEventItemPresentationSchema.optional()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/queued-message.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/queued-message.ts
 var queuedMessageWaitingOnKindValues = [
   "time",
   "thread-busy",
@@ -24282,7 +24282,7 @@ var queuedMessageSystemNoticeSchema = external_exports.object({
   subject: systemMessageSubjectSchema.nullable()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/raw-thread-id.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/raw-thread-id.ts
 var GENERATED_ID_ALPHABET = "23456789abcdefghijkmnpqrstuvwxyz";
 var GENERATED_ID_SUFFIX_LENGTH = 10;
 var THREAD_ID_PREFIX = "thr_";
@@ -24290,7 +24290,7 @@ var RAW_THREAD_ID_PATTERN_SOURCE = `${THREAD_ID_PREFIX}[${GENERATED_ID_ALPHABET}
 var rawThreadIdPattern = new RegExp(`^${RAW_THREAD_ID_PATTERN_SOURCE}$`, "u");
 var rawThreadIdSchema = external_exports.string().regex(rawThreadIdPattern);
 
-// ../../../zana/packages/domain/src/bb-thread/reasoning-efforts.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/reasoning-efforts.ts
 var NONE_REASONING_EFFORT = {
   reasoningEffort: "none",
   description: "No extended thinking"
@@ -24337,7 +24337,7 @@ function reasoningEffortsForLevels(levels) {
   return levels.map((level) => ({ ...REASONING_EFFORT_BY_LEVEL[level] }));
 }
 
-// ../../../zana/packages/domain/src/bb-thread/stored-thread-event.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/stored-thread-event.ts
 var threadEventRowInputSchema = external_exports.object({
   id: external_exports.string(),
   scope: threadEventScopeSchema,
@@ -24419,7 +24419,7 @@ var threadEventRowSchema = threadEventRowInputSchema.transform(
   (row) => parseThreadEventRowInput(row)
 );
 
-// ../../../zana/packages/domain/src/bb-thread/terminal.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/terminal.ts
 var TERMINAL_COLS_MAX = 500;
 var TERMINAL_ROWS_MAX = 200;
 var TERMINAL_DATA_MAX_BYTES = 64 * 1024;
@@ -24463,7 +24463,7 @@ var terminalDataBase64Schema = external_exports.string().min(1).max(TERMINAL_DAT
   }
 );
 
-// ../../../zana/packages/domain/src/bb-thread/thread-git-diff.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-git-diff.ts
 var workspaceDiffTargetSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     type: external_exports.literal("uncommitted")
@@ -24508,7 +24508,7 @@ var threadGitDiffResponseSchema = external_exports.object({
   mergeBaseRef: external_exports.string().nullable()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/thread-search.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-search.ts
 var threadSearchSourceKindValues = [
   "title",
   "title_fallback",
@@ -24520,7 +24520,7 @@ var threadSearchSourceKindSchema = external_exports.enum(
   threadSearchSourceKindValues
 );
 
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
 var threadTimelineActivePromptModeSchema = external_exports.object({
   mode: external_exports.literal("plan"),
   /**
@@ -24534,7 +24534,7 @@ var threadTimelineActivePromptModeSchema = external_exports.object({
   prompt: external_exports.string()
 }).strict();
 
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
 var threadTimelineModelFallbackSchema = external_exports.object({
   sourceSeq: external_exports.number().int().nonnegative(),
   detectedAt: external_exports.number(),
@@ -24544,7 +24544,7 @@ var threadTimelineModelFallbackSchema = external_exports.object({
   message: external_exports.string()
 });
 
-// ../../../zana/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
 var threadTimelinePendingTodoItemStatusSchema = external_exports.enum([
   "pending",
   "in_progress",
@@ -24561,11 +24561,11 @@ var threadTimelinePendingTodosSchema = external_exports.object({
   items: external_exports.array(threadTimelinePendingTodoItemSchema)
 });
 
-// ../../../zana/packages/domain/src/bb-thread/thread-visibility.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-visibility.ts
 var threadVisibilityValues = ["visible", "hidden"];
 var threadVisibilitySchema = external_exports.enum(threadVisibilityValues);
 
-// ../../../zana/packages/domain/src/bb-thread/thread-status.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-status.ts
 var threadStatusValues = [
   "pending",
   "idle",
@@ -24576,11 +24576,11 @@ var threadStatusValues = [
 ];
 var threadStatusSchema = external_exports.enum(threadStatusValues);
 
-// ../../../zana/packages/domain/src/bb-thread/thread-origin-kind.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-origin-kind.ts
 var threadOriginKindValues = ["fork"];
 var threadOriginKindSchema = external_exports.enum(threadOriginKindValues);
 
-// ../../../zana/packages/domain/src/bb-thread/thread.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread.ts
 var threadRuntimeDisplayStatusValues = [
   ...threadStatusValues,
   "provisioning",
@@ -24857,7 +24857,7 @@ var threadListEntrySchema = threadWithRuntimeSchema.extend({
   environmentWorkspaceDisplayKind: environmentWorkspaceDisplayKindSchema
 });
 
-// ../../../zana/packages/domain/src/bb-thread/update-state.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/update-state.ts
 var RUN_STATE_PRESENTATION = {
   "in-progress": { icon: "Loading", label: "In progress", inFlight: true },
   succeeded: { icon: "CircleCheck", label: "Succeeded", inFlight: false },
@@ -24901,10 +24901,10 @@ var UPDATE_STATE_PRESENTATION = {
   offline: { icon: "CircleX", label: "Offline", tone: "muted" }
 };
 
-// ../../../zana/packages/domain/src/bb-thread/prompt-attachment-limits.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/prompt-attachment-limits.ts
 var PROMPT_ATTACHMENT_MAX_BYTES = 35 * 1024 * 1024;
 
-// ../../../zana/packages/provider-bridge-acp/src/launch-spec.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/launch-spec.ts
 var acpNativeSkillRootsSchema = external_exports.object({
   user: external_exports.array(providerNativeRootInputSchema).default([]),
   project: external_exports.array(providerNativeRootInputSchema).default([])
@@ -24942,11 +24942,11 @@ var acpLaunchSpecSchema = external_exports.object({
   permissionCli: acpPermissionCliSchema.optional()
 }).strict();
 
-// ../../../zana/packages/provider-bridge-protocol/src/version.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/version.ts
 var PROVIDER_BRIDGE_PROTOCOL_VERSION = 2;
 var THREAD_DELTA_GRAMMAR_V3 = 3;
 
-// ../../../zana/packages/provider-bridge-protocol/src/handshake.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/handshake.ts
 var bridgeGrammarVersionsSchema = external_exports.tuple([external_exports.number().int().positive(), external_exports.number().int().positive()]).refine(([min, max]) => min <= max, {
   message: "grammarVersions must be an ascending [min, max] range"
 });
@@ -25054,7 +25054,7 @@ var initializeResultSchema = external_exports.object({
   )
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/execution-options.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/execution-options.ts
 var bridgeExecutionOptionsSchema = external_exports.object({
   model: external_exports.string().min(1).optional(),
   serviceTier: serviceTierSchema.optional(),
@@ -25066,7 +25066,7 @@ var bridgeExecutionOptionsSchema = external_exports.object({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 }).and(runtimePermissionPolicySchema);
 
-// ../../../zana/packages/provider-bridge-protocol/src/requests.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/requests.ts
 var BRIDGE_REQUEST_METHODS = {
   initialize: "initialize",
   modelList: "model/list",
@@ -25094,7 +25094,6 @@ var bridgeRequestMethodValues = Object.values(
 var sessionKindSchema = external_exports.enum(["interactive", "automated"]);
 var sessionConstructionFields = {
   sessionKind: sessionKindSchema.optional().catch(void 0),
-  providerId: external_exports.string().min(1).optional(),
   threadId: external_exports.string().min(1),
   cwd: external_exports.string().min(1),
   options: bridgeExecutionOptionsSchema,
@@ -25188,7 +25187,7 @@ var modelListResultSchema = external_exports.object({
   }).optional()
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/errors.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/errors.ts
 var BRIDGE_JSON_RPC_ERRORS = {
   /** Standard JSON-RPC: params failed schema validation. */
   INVALID_PARAMS: -32602,
@@ -25212,7 +25211,7 @@ var providerRecoveryHintSchema = external_exports.object({
 });
 var bridgeErrorDataSchema = external_exports.object({ recovery: providerRecoveryHintSchema.optional() }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/notifications.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/notifications.ts
 var BRIDGE_NOTIFICATION_METHODS = {
   threadIdentity: "thread/identity",
   sessionReplaced: "session/replaced",
@@ -25254,7 +25253,7 @@ var errorNotificationSchema = external_exports.object({
   message: external_exports.string().min(1)
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-requests.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-requests.ts
 var BRIDGE_INBOUND_REQUEST_METHODS = {
   toolCall: "item/tool/call",
   interactionRequest: "interaction/request"
@@ -25286,7 +25285,7 @@ var interactionRequestParamsSchema = external_exports.object({
   payload: pendingInteractionPayloadSchema
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/thread-delta.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/thread-delta.ts
 var THREAD_DELTA_NOTIFICATION_METHOD = "thread/delta";
 var deltaPresentationSchema = threadEventItemPresentationSchema;
 var THREAD_DELTA_KEY_SEPARATOR = "";
@@ -25798,7 +25797,7 @@ var threadDeltaNotificationParamsSchema = external_exports.object({
   deltas: external_exports.array(threadDeltaSchema)
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/provider-maintenance.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/provider-maintenance.ts
 var providerMaintenanceParamsSchema = external_exports.object({
   providerId: external_exports.string().min(1),
   cwd: external_exports.string().min(1).optional(),
@@ -25931,7 +25930,7 @@ var providerInstallationRunResultSchema = external_exports.discriminatedUnion(
   ]
 );
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
 var bashArgsSchema = external_exports.object({
   command: external_exports.string().optional(),
   cwd: external_exports.string().optional()
@@ -25941,7 +25940,7 @@ var textBlockSchema = external_exports.object({
   text: external_exports.string()
 });
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -25950,7 +25949,7 @@ function getStringProperty(value, key) {
   return typeof next === "string" ? next : void 0;
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
 var contentWrapperSchema = external_exports.object({
   content: external_exports.array(external_exports.unknown())
 }).passthrough();
@@ -26027,7 +26026,7 @@ function describeResultContentBlock(block) {
   return `[${type}]`;
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
 var MAX_JSON_RPC_LINE_BYTES = 64 * 1024 * 1024;
 function createBoundedLineFramer(args) {
   const maxLineBytes = args.maxLineBytes ?? MAX_JSON_RPC_LINE_BYTES;
@@ -26105,7 +26104,7 @@ function createBoundedLineFramer(args) {
   return { push, end, clear: clearLine };
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
 var BridgeRecoveryError = class extends Error {
   code;
   recovery;
@@ -26168,7 +26167,7 @@ function runBridgeRequest(args) {
   });
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
 import {
   closeSync,
   mkdirSync,
@@ -26378,7 +26377,7 @@ function experimental_recordProviderChildIo(child, scope) {
   getBridgeRecorder()?.recordChildIo(child, scope);
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
 function withoutBridgeRuntimeEnv(env) {
   const childEnv = { ...env };
   delete childEnv.ELECTRON_RUN_AS_NODE;
@@ -26386,7 +26385,7 @@ function withoutBridgeRuntimeEnv(env) {
   return childEnv;
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
 var providerToolCallResponseSchema = external_exports.object({
   success: external_exports.boolean(),
   contentItems: external_exports.array(
@@ -26507,7 +26506,7 @@ function buildBridgeToolCallContent(result) {
   return blocks;
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
 var recordSchema = external_exports.record(external_exports.string(), external_exports.unknown());
 var jsonRpcEnvelopeSchema = external_exports.object({
   jsonrpc: external_exports.literal("2.0"),
@@ -26551,7 +26550,7 @@ var errorEnvelopeSchema = external_exports.object({
   }).passthrough().optional()
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
 import { extname } from "node:path";
 function mimeTypeFromExtension(filePath) {
   switch (extname(filePath).toLowerCase()) {
@@ -26571,7 +26570,7 @@ function mimeTypeFromExtension(filePath) {
   }
 }
 
-// ../../../zana/packages/agent-process-utils/src/index.ts
+// ../../.zana-sdk/packages/agent-process-utils/src/index.ts
 var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 function spawnPortableProcess(request) {
   return (0, import_cross_spawn.default)(request.command, request.args, {
@@ -26700,7 +26699,7 @@ function killProcessGroup(args) {
   args.child.kill(args.signal);
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
 import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -26755,7 +26754,7 @@ function clampPercent(value) {
   );
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
 var PRESENTATION_TITLE_MAX_LENGTH = 160;
 function presentationTitle(text) {
   const firstLine = text.trim().split("\n", 1)[0]?.trim() ?? "";
@@ -26827,12 +26826,12 @@ function toolPresentation(tool) {
   };
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
 function experimental_defineProviderBridge(definition) {
   return { experimental_apiVersion: 1, ...definition };
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
 var normalizedToolCallRequestSchema = external_exports.object({
   providerThreadId: external_exports.string().min(1),
   threadId: external_exports.string().min(1).optional(),
@@ -26844,7 +26843,7 @@ var normalizedToolCallRequestSchema = external_exports.object({
   arguments: external_exports.unknown()
 });
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
 function createProviderVisibilityMetadata(args) {
   return {
     parseRawEvent: args.parseRawEvent,
@@ -26855,10 +26854,10 @@ function createProviderVisibilityMetadata(args) {
   };
 }
 
-// ../../../zana/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
 var ignoredJsonRpcResultSchema = external_exports.unknown();
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/bridge.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
 import { execFile as execFile3 } from "node:child_process";
 import { randomBytes as randomBytes2 } from "node:crypto";
 import { promises as fs2, readFileSync } from "node:fs";
@@ -26867,7 +26866,7 @@ import { dirname as dirname2, isAbsolute, basename as basename3, relative, resol
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
-// ../../../zana/packages/provider-bridge-acp/src/wire.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/wire.ts
 var acpTextContentBlockSchema = external_exports.object({
   type: external_exports.literal("text"),
   text: external_exports.string()
@@ -27185,7 +27184,7 @@ var acpWriteTextFileParamsSchema = external_exports.object({
   content: external_exports.string()
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge-protocol.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge-protocol.ts
 var acpModelListParamsSchema = modelListParamsSchema.extend({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 });
@@ -27302,10 +27301,10 @@ var acpWarningNotificationParamsSchema = external_exports.object({
   details: external_exports.string().optional()
 }).passthrough();
 
-// ../../../zana/packages/provider-bridge-acp/src/dialect.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
 import { basename } from "node:path";
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -27314,7 +27313,7 @@ import path2 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/launch-health.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/launch-health.ts
 import { stat } from "node:fs/promises";
 var PROBE_TIMEOUT_MS = 5e3;
 var PROBE_OUTPUT_MAX_BYTES = 64 * 1024;
@@ -27367,7 +27366,7 @@ ${output2.stderr}`);
   };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 var execFileAsync2 = promisify(execFile);
 var USAGE_FETCH_TIMEOUT_MS = 15e3;
 var CURSOR_DASHBOARD_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService";
@@ -27693,7 +27692,7 @@ async function readCursorUsage() {
   }
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/presentation.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/presentation.ts
 function stripCodeTicks(text) {
   const trimmed = text.trim();
   return trimmed.length >= 2 && trimmed.startsWith("`") && trimmed.endsWith("`") ? trimmed.slice(1, -1) : trimmed;
@@ -27789,7 +27788,7 @@ function toolKindPresentation(args) {
   );
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/dialect.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
 var GENERIC_ACP_DIALECT = { id: "acp" };
 var grokToolMetaSchema = external_exports.object({
   "x.ai/tool": external_exports.object({
@@ -28049,7 +28048,7 @@ function resolveAcpDialect(launch) {
   return byCommand === void 0 ? GENERIC_ACP_DIALECT : DIALECTS_BY_ID.get(byCommand) ?? GENERIC_ACP_DIALECT;
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/tool-call-operation.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/tool-call-operation.ts
 import path3 from "node:path";
 var acpRawInputCommandSchema = external_exports.object({ command: external_exports.string() }).passthrough();
 var acpRawInputPathSchema = external_exports.object({
@@ -28143,7 +28142,7 @@ function resolveAcpFileChangeWriteScope(paths) {
   return candidate;
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/tool-classification.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/tool-classification.ts
 var ZCC_TOOL_SERVER = "zcc";
 function isInjectedToolCandidate(event) {
   if (event.kind !== void 0 && event.kind !== "other") {
@@ -28513,7 +28512,7 @@ function classifyAcpToolCall2(event, injected, options) {
   }
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/visibility.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/visibility.ts
 var NORMALIZED_ACP_METHODS = /* @__PURE__ */ new Set([
   "thread/identity",
   "error",
@@ -28578,7 +28577,7 @@ var acpVisibilityMetadata = createProviderVisibilityMetadata({
   describeParsedRawEvent: describeParsedAcpRawEvent
 });
 
-// ../../../zana/packages/provider-bridge-acp/src/system-instruction-echo.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/system-instruction-echo.ts
 var SYSTEM_INSTRUCTIONS_OPEN = "<system_instructions>";
 var SYSTEM_INSTRUCTIONS_CLOSE = "</system_instructions>";
 var SYSTEM_INSTRUCTION_ECHO_MAX_CHARS = 256 * 1024;
@@ -28660,7 +28659,7 @@ function consumeEchoBuffer(buffer, expectedEcho) {
   return { emit: buffer, buffer: "", done: true };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/delta-translation.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/delta-translation.ts
 var ASSISTANT_STREAM_KEY = "assistant";
 var THOUGHT_STREAM_KEY = "thought";
 var ACP_PLAN_STEP_STATUS_BY_ENTRY_STATUS = {
@@ -29454,7 +29453,7 @@ function createAcpDeltaTranslator(options = {}) {
   };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/interactions.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/interactions.ts
 function classifyAcpPermission(toolCall, options) {
   const own2 = classifyAcpToolCall(toolCall, options);
   if (own2.kind !== "generic" || !toolCall.startedToolCall) {
@@ -29571,10 +29570,10 @@ function resolveAcpPermissionDecision(args) {
   return { decision: args.resolution.decision };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/session-params.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
 import path4 from "node:path";
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/model-catalog.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/model-catalog.ts
 var ACP_NATIVE_REASONING_EFFORTS = [
   {
     reasoningEffort: "medium",
@@ -29933,7 +29932,7 @@ function splitPrimaryModels(catalogModels, primaryModels) {
   };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/cursor-model-selection.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/cursor-model-selection.ts
 var CURSOR_LEGACY_FAMILY_SELECTIONS = {
   "claude-4-sonnet": { modelId: "claude-sonnet-4" },
   "claude-4.5-opus": { modelId: "claude-opus-4-5" },
@@ -30020,7 +30019,7 @@ function buildCursorParameterizedModelCatalog(models) {
   return [...normalized.values()].map((entry) => entry.model);
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/session-params.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
 function sanitizeAcpSkillDescription(description) {
   const sanitized = description.replace(/[\r\n]+/gu, " ").replace(/\s+/gu, " ").replace(/[<>]/gu, "").trim();
   return sanitized.length > 0 ? sanitized : "(description unavailable)";
@@ -30183,7 +30182,7 @@ function buildAcpSessionParams(args) {
   };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/agent-connection.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/agent-connection.ts
 import { createInterface } from "node:readline";
 var STDERR_TAIL_MAX_CHUNKS = 40;
 var CLOSED_STDIN_ERROR_CODES = /* @__PURE__ */ new Set(["EPIPE", "ERR_STREAM_DESTROYED"]);
@@ -30457,14 +30456,14 @@ function createAcpAgentConnection(options) {
   };
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 import { execFile as execFile2 } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat as stat2, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename as basename2, dirname, join as join2, resolve as resolve2 } from "node:path";
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
 import { createConnection } from "node:net";
 import { createInterface as createInterface2 } from "node:readline";
 var ACP_BRIDGE_MCP_SERVER_NAME = "zcc";
@@ -30712,7 +30711,7 @@ function runAcpDynamicToolMcpServer() {
   });
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 var CURSOR_MCP_APPROVAL_FILE = "mcp-approvals.json";
 var CURSOR_APPROVAL_LOCK_STALE_MS = 3e4;
 var CURSOR_APPROVAL_LOCK_TIMEOUT_MS = 5e3;
@@ -30874,7 +30873,7 @@ async function revokeCursorSessionMcpServer(approval) {
   );
 }
 
-// ../../../zana/packages/provider-bridge-acp/src/bridge/bridge.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
 var sessionsByBbThreadId = /* @__PURE__ */ new Map();
 var bbThreadIdByProviderThreadId = /* @__PURE__ */ new Map();
 var pendingRuntimeRequests = /* @__PURE__ */ new Map();
@@ -31104,8 +31103,8 @@ function applyReasoningCliToModel(model, reasoningCli) {
 function modelHasOnlyAgentManagedReasoning(model) {
   return model.supportedReasoningEfforts.length === 1 && model.supportedReasoningEfforts[0]?.reasoningEffort === "medium" && model.defaultReasoningEffort === "medium";
 }
-function applyNativeReasoningHintToModel(model, nativeReasoning) {
-  const reasoningSupport = reasoningSupportFromCli(nativeReasoning);
+function applyNativeReasoningHintToModel(model, nativeReasoning2) {
+  const reasoningSupport = reasoningSupportFromCli(nativeReasoning2);
   return reasoningSupport === void 0 || !modelHasOnlyAgentManagedReasoning(model) ? model : {
     ...model,
     ...reasoningSupport
@@ -31124,13 +31123,13 @@ function resolveHintReasoningValue(args) {
   }
   return args.hint.supportedLevels.includes(args.reasoningLevel) ? args.reasoningLevel : void 0;
 }
-function nativeReasoningToThoughtLevelOption(nativeReasoning) {
-  if (nativeReasoning === void 0) {
+function nativeReasoningToThoughtLevelOption(nativeReasoning2) {
+  if (nativeReasoning2 === void 0) {
     return void 0;
   }
-  const options = nativeReasoning.supportedLevels.flatMap((level) => {
+  const options = nativeReasoning2.supportedLevels.flatMap((level) => {
     const value = resolveHintReasoningValue({
-      hint: nativeReasoning,
+      hint: nativeReasoning2,
       reasoningLevel: level
     });
     return value === void 0 ? [] : [
@@ -31140,12 +31139,12 @@ function nativeReasoningToThoughtLevelOption(nativeReasoning) {
       }
     ];
   });
-  const currentValue = nativeReasoning.defaultLevel === void 0 ? void 0 : resolveHintReasoningValue({
-    hint: nativeReasoning,
-    reasoningLevel: nativeReasoning.defaultLevel
+  const currentValue = nativeReasoning2.defaultLevel === void 0 ? void 0 : resolveHintReasoningValue({
+    hint: nativeReasoning2,
+    reasoningLevel: nativeReasoning2.defaultLevel
   });
   return {
-    id: nativeReasoning.configId,
+    id: nativeReasoning2.configId,
     category: "thought_level",
     type: "select",
     ...currentValue !== void 0 ? { currentValue } : {},
@@ -33069,13 +33068,13 @@ var experimental_providerBridge = experimental_defineProviderBridge({
   onSigint: shutdownBridge
 });
 
-// ../../../zana/packages/provider-bridge-acp/src/probe.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/probe.ts
 var acpAgentProbeSchema = external_exports.union([
   external_exports.object({ reachable: external_exports.literal(true), fork: external_exports.boolean() }),
   external_exports.object({ reachable: external_exports.literal(false), reason: external_exports.string() })
 ]);
 
-// ../../../zana/packages/plugin-sdk/dist/provider-bridge.js
+// ../../.zana-sdk/packages/plugin-sdk/dist/provider-bridge.js
 var __create2 = Object.create;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -33108,7 +33107,7 @@ var __toESM2 = (mod, isNodeMode, target2) => (target2 = mod != null ? __create2(
   mod
 ));
 var require_windows2 = __commonJS2({
-  "../../node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/windows.js"(exports, module) {
+  "node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require2("fs");
@@ -33146,7 +33145,7 @@ var require_windows2 = __commonJS2({
   }
 });
 var require_mode2 = __commonJS2({
-  "../../node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/mode.js"(exports, module) {
+  "node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require2("fs");
@@ -33177,7 +33176,7 @@ var require_mode2 = __commonJS2({
   }
 });
 var require_isexe2 = __commonJS2({
-  "../../node_modules/.pnpm/isexe@2.0.0/node_modules/isexe/index.js"(exports, module) {
+  "node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require2("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
@@ -33230,7 +33229,7 @@ var require_isexe2 = __commonJS2({
   }
 });
 var require_which2 = __commonJS2({
-  "../../node_modules/.pnpm/which@2.0.2/node_modules/which/which.js"(exports, module) {
+  "node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
     var path22 = __require2("path");
     var COLON = isWindows ? ";" : ":";
@@ -33324,7 +33323,7 @@ var require_which2 = __commonJS2({
   }
 });
 var require_path_key2 = __commonJS2({
-  "../../node_modules/.pnpm/path-key@3.1.1/node_modules/path-key/index.js"(exports, module) {
+  "node_modules/path-key/index.js"(exports, module) {
     "use strict";
     var pathKey = (options = {}) => {
       const environment = options.env || process.env;
@@ -33339,7 +33338,7 @@ var require_path_key2 = __commonJS2({
   }
 });
 var require_resolveCommand2 = __commonJS2({
-  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+  "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
     var path22 = __require2("path");
     var which = require_which2();
@@ -33379,7 +33378,7 @@ var require_resolveCommand2 = __commonJS2({
   }
 });
 var require_escape2 = __commonJS2({
-  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+  "node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
     var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
     function escapeCommand(arg) {
@@ -33402,13 +33401,13 @@ var require_escape2 = __commonJS2({
   }
 });
 var require_shebang_regex2 = __commonJS2({
-  "../../node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex/index.js"(exports, module) {
+  "node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
 var require_shebang_command2 = __commonJS2({
-  "../../node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command/index.js"(exports, module) {
+  "node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
     var shebangRegex = require_shebang_regex2();
     module.exports = (string4 = "") => {
@@ -33426,7 +33425,7 @@ var require_shebang_command2 = __commonJS2({
   }
 });
 var require_readShebang2 = __commonJS2({
-  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+  "node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
     var fs3 = __require2("fs");
     var shebangCommand = require_shebang_command2();
@@ -33446,7 +33445,7 @@ var require_readShebang2 = __commonJS2({
   }
 });
 var require_parse2 = __commonJS2({
-  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/parse.js"(exports, module) {
+  "node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
     var path22 = __require2("path");
     var resolveCommand = require_resolveCommand2();
@@ -33506,7 +33505,7 @@ var require_parse2 = __commonJS2({
   }
 });
 var require_enoent2 = __commonJS2({
-  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+  "node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
     var isWin = process.platform === "win32";
     function notFoundError(original, syscall) {
@@ -33554,7 +33553,7 @@ var require_enoent2 = __commonJS2({
   }
 });
 var require_cross_spawn2 = __commonJS2({
-  "../../node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn/index.js"(exports, module) {
+  "node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
     var cp = __require2("child_process");
     var parse3 = require_parse2();
@@ -33972,16 +33971,16 @@ var acpNativeReasoningSchema2 = external_exports.object({
   supportedLevels: external_exports.array(reasoningLevelSchema2).min(1),
   levelValues: acpReasoningCliLevelValueOverridesSchema2.optional(),
   defaultLevel: reasoningLevelSchema2.optional()
-}).strict().superRefine((nativeReasoning, context) => {
-  const supportedLevels = new Set(nativeReasoning.supportedLevels);
-  if (supportedLevels.size !== nativeReasoning.supportedLevels.length) {
+}).strict().superRefine((nativeReasoning2, context) => {
+  const supportedLevels = new Set(nativeReasoning2.supportedLevels);
+  if (supportedLevels.size !== nativeReasoning2.supportedLevels.length) {
     context.addIssue({
       code: "custom",
       message: "supportedLevels must not contain duplicates",
       path: ["supportedLevels"]
     });
   }
-  if (nativeReasoning.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning.defaultLevel)) {
+  if (nativeReasoning2.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning2.defaultLevel)) {
     context.addIssue({
       code: "custom",
       message: "defaultLevel must be one of supportedLevels",
@@ -38277,7 +38276,6 @@ var bridgeRequestMethodValues2 = Object.values(
 var sessionKindSchema2 = external_exports.enum(["interactive", "automated"]);
 var sessionConstructionFields2 = {
   sessionKind: sessionKindSchema2.optional().catch(void 0),
-  providerId: external_exports.string().min(1).optional(),
   threadId: external_exports.string().min(1),
   cwd: external_exports.string().min(1),
   options: bridgeExecutionOptionsSchema2,
@@ -41715,14 +41713,84 @@ function forEachLine(stream, onLine) {
     }
   });
 }
-function hasCatalogModels(session) {
-  const model = Array.isArray(session?.configOptions) ? session.configOptions.find((option) => option?.id === "model" || option?.category === "model") : void 0;
-  if (Array.isArray(model?.options)) {
-    return model.options.flatMap((option) => Array.isArray(option?.options) ? option.options : [option]).some((option) => typeof option?.value === "string" && option.value);
-  }
-  const legacy = session?.models?.availableModels;
-  return Array.isArray(legacy) && legacy.some((item) => typeof (item?.id || item?.modelId) === "string");
+function extractSessionReasoningMetadata(sessionResult) {
+  const configOptions = sessionResult?.configOptions;
+  if (!Array.isArray(configOptions)) return {};
+  const reasoningOpt = configOptions.find(
+    (opt) => opt?.id === "thinking_level" || opt?.id === "reasoning_effort" || opt?.category === "reasoning" || opt?.category === "thinking_level"
+  );
+  if (!reasoningOpt || !Array.isArray(reasoningOpt.options)) return {};
+  const levels = reasoningOpt.options.map((o) => typeof o?.value === "string" ? o.value : typeof o?.id === "string" ? o.id : null).filter((v) => Boolean(v));
+  if (levels.length === 0) return {};
+  const rawDefault = reasoningOpt.currentValue ?? reasoningOpt.defaultValue;
+  const defaultLevel = typeof rawDefault === "string" && levels.includes(rawDefault) ? rawDefault : levels[0];
+  return {
+    supportedReasoningEfforts: levels,
+    ...defaultLevel ? { defaultReasoningEffort: defaultLevel } : {}
+  };
 }
+function extractModelReasoningMetadata(item, sessionReasoning) {
+  const rawEfforts = item?.supportedReasoningEfforts ?? item?.reasoningLevels ?? item?.thinkingLevels;
+  if (Array.isArray(rawEfforts)) {
+    const levels = rawEfforts.map(
+      (e) => typeof e === "string" ? e : typeof e?.reasoningEffort === "string" ? e.reasoningEffort : typeof e?.value === "string" ? e.value : null
+    ).filter((v) => Boolean(v));
+    if (levels.length === 0) return {};
+    const rawDefault = item?.defaultReasoningEffort ?? item?.defaultThinkingLevel;
+    const defaultLevel = typeof rawDefault === "string" && levels.includes(rawDefault) ? rawDefault : levels[0];
+    return {
+      supportedReasoningEfforts: levels,
+      ...defaultLevel ? { defaultReasoningEffort: defaultLevel } : {}
+    };
+  }
+  return sessionReasoning;
+}
+function extractModelsFromSessionResult(sessionResult) {
+  const models = [];
+  const seen = /* @__PURE__ */ new Set();
+  const sessionReasoning = extractSessionReasoningMetadata(sessionResult);
+  const configOptions = sessionResult?.configOptions;
+  let authoritativeCatalog = false;
+  if (Array.isArray(configOptions)) {
+    const modelOpt = configOptions.find(
+      (opt) => opt?.id === "model" || opt?.category === "model"
+    );
+    if (Array.isArray(modelOpt?.options)) {
+      authoritativeCatalog = true;
+      for (const opt of modelOpt.options.flatMap((option) => Array.isArray(option?.options) ? option.options : [option])) {
+        const id2 = opt?.value;
+        if (typeof id2 === "string" && id2 && !seen.has(id2)) {
+          seen.add(id2);
+          models.push({
+            id: id2,
+            name: typeof opt?.name === "string" && opt.name ? opt.name : id2,
+            ...typeof opt?.description === "string" ? { description: opt.description } : {},
+            ...extractModelReasoningMetadata(opt, sessionReasoning)
+          });
+        }
+      }
+    }
+  }
+  if (!authoritativeCatalog) {
+    const availableModels = sessionResult?.models?.availableModels;
+    if (Array.isArray(availableModels)) {
+      for (const item of availableModels) {
+        const id2 = item?.id || item?.modelId;
+        if (typeof id2 === "string" && id2 && !seen.has(id2)) {
+          seen.add(id2);
+          models.push({
+            id: id2,
+            name: typeof item?.name === "string" && item.name ? item.name : id2,
+            ...typeof item?.description === "string" ? { description: item.description } : {},
+            ...extractModelReasoningMetadata(item, sessionReasoning)
+          });
+        }
+      }
+    }
+  }
+  return models;
+}
+var extractCatalog = extractModelsFromSessionResult;
 var NativeAcpSession = class _NativeAcpSession {
   constructor(options) {
     this.options = options;
@@ -41829,6 +41897,7 @@ var NativeAcpSession = class _NativeAcpSession {
     let text = "";
     const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
     let requestedTools = false;
+    let outputLimitError = null;
     this.notificationListeners.push((method, params) => {
       if (method !== "session/update") return;
       const update = params?.update;
@@ -41839,12 +41908,14 @@ var NativeAcpSession = class _NativeAcpSession {
       if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") {
         text += update.content.text;
         if (text.length > options.maxTextChars) {
-          this.close(new Error(`Native ${name} output exceeded ${options.maxTextChars} characters; the diagnostic session was stopped.`));
+          outputLimitError = new Error(`Native ${name} output exceeded ${options.maxTextChars} characters; the diagnostic session was stopped.`);
+          this.close(outputLimitError);
         }
       }
     });
     const result = await this.request("session/prompt", { sessionId, prompt: [{ type: "text", text: `/${name}` }] });
     if (requestedTools) throw toolsRequested;
+    if (outputLimitError) throw outputLimitError;
     return { stopReason: result?.stopReason, text };
   }
   close(reason) {
@@ -41931,7 +42002,7 @@ var NativeAcpSession = class _NativeAcpSession {
   async applyCatalogUpdate(session) {
     const sessionId = session?.sessionId;
     if (typeof sessionId !== "string") return;
-    if (!this.catalogUpdates.has(sessionId) && !hasCatalogModels(session)) {
+    if (!this.catalogUpdates.has(sessionId) && extractCatalog(session).length === 0) {
       await new Promise((resolve6) => {
         const timer = this.later(CATALOG_UPDATE_WAIT_MS, resolve6);
         this.notificationListeners.push(() => {
@@ -42548,83 +42619,6 @@ var USAGE_CACHE_TTL_MS = 6e4;
 var USAGE_COMMANDS_WAIT_MS = 1e3;
 var USAGE_MAX_TEXT_CHARS = 32768;
 var CATALOG_RETRY_BACKOFF_MS = 3e4;
-function extractSessionReasoningMetadata(sessionResult) {
-  const configOptions = sessionResult?.configOptions;
-  if (!Array.isArray(configOptions)) return {};
-  const reasoningOpt = configOptions.find(
-    (opt) => opt?.id === "thinking_level" || opt?.id === "reasoning_effort" || opt?.category === "reasoning" || opt?.category === "thinking_level"
-  );
-  if (!reasoningOpt || !Array.isArray(reasoningOpt.options)) return {};
-  const levels = reasoningOpt.options.map((o) => typeof o?.value === "string" ? o.value : typeof o?.id === "string" ? o.id : null).filter((v) => Boolean(v));
-  if (levels.length === 0) return {};
-  const rawDefault = reasoningOpt.currentValue ?? reasoningOpt.defaultValue;
-  const defaultLevel = typeof rawDefault === "string" && levels.includes(rawDefault) ? rawDefault : levels[0];
-  return {
-    supportedReasoningEfforts: levels,
-    ...defaultLevel ? { defaultReasoningEffort: defaultLevel } : {}
-  };
-}
-function extractModelReasoningMetadata(item, sessionReasoning) {
-  const rawEfforts = item?.supportedReasoningEfforts ?? item?.reasoningLevels ?? item?.thinkingLevels;
-  if (Array.isArray(rawEfforts)) {
-    const levels = rawEfforts.map(
-      (e) => typeof e === "string" ? e : typeof e?.reasoningEffort === "string" ? e.reasoningEffort : typeof e?.value === "string" ? e.value : null
-    ).filter((v) => Boolean(v));
-    if (levels.length === 0) return {};
-    const rawDefault = item?.defaultReasoningEffort ?? item?.defaultThinkingLevel;
-    const defaultLevel = typeof rawDefault === "string" && levels.includes(rawDefault) ? rawDefault : levels[0];
-    return {
-      supportedReasoningEfforts: levels,
-      ...defaultLevel ? { defaultReasoningEffort: defaultLevel } : {}
-    };
-  }
-  return sessionReasoning;
-}
-function extractModelsFromSessionResult(sessionResult) {
-  const models = [];
-  const seen = /* @__PURE__ */ new Set();
-  const sessionReasoning = extractSessionReasoningMetadata(sessionResult);
-  const configOptions = sessionResult?.configOptions;
-  let authoritativeCatalog = false;
-  if (Array.isArray(configOptions)) {
-    const modelOpt = configOptions.find(
-      (opt) => opt?.id === "model" || opt?.category === "model"
-    );
-    if (Array.isArray(modelOpt?.options)) {
-      authoritativeCatalog = true;
-      for (const opt of modelOpt.options.flatMap((option) => Array.isArray(option?.options) ? option.options : [option])) {
-        const id2 = opt?.value;
-        if (typeof id2 === "string" && id2 && !seen.has(id2)) {
-          seen.add(id2);
-          models.push({
-            id: id2,
-            name: typeof opt?.name === "string" && opt.name ? opt.name : id2,
-            ...typeof opt?.description === "string" ? { description: opt.description } : {},
-            ...extractModelReasoningMetadata(opt, sessionReasoning)
-          });
-        }
-      }
-    }
-  }
-  if (!authoritativeCatalog) {
-    const availableModels = sessionResult?.models?.availableModels;
-    if (Array.isArray(availableModels)) {
-      for (const item of availableModels) {
-        const id2 = item?.id || item?.modelId;
-        if (typeof id2 === "string" && id2 && !seen.has(id2)) {
-          seen.add(id2);
-          models.push({
-            id: id2,
-            name: typeof item?.name === "string" && item.name ? item.name : id2,
-            ...typeof item?.description === "string" ? { description: item.description } : {},
-            ...extractModelReasoningMetadata(item, sessionReasoning)
-          });
-        }
-      }
-    }
-  }
-  return models;
-}
 function extractModesFromSessionResult(sessionResult) {
   const available = sessionResult?.modes?.availableModes;
   if (!Array.isArray(available)) return [];
@@ -42842,6 +42836,9 @@ var NATIVE_REASONING = {
   supportedLevels: ["low", "medium", "high"],
   defaultLevel: "medium"
 };
+function nativeReasoning() {
+  return { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+}
 function normalizeAuthMethod(value) {
   return isValidGoogleAuthMethod(value) ? value : "oauth-personal";
 }
@@ -42868,7 +42865,7 @@ function buildNativeLaunchSpec(options = {}) {
     command: runtime.executable,
     args: runtime.args,
     env: launchEnv(authMethod, home, options.env ?? process.env),
-    nativeReasoning: { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] }
+    nativeReasoning: nativeReasoning()
   };
 }
 function completeLaunchSpec(spec, authMethod, home, env = process.env) {
@@ -42888,7 +42885,7 @@ function completeLaunchSpec(spec, authMethod, home, env = process.env) {
   }
   spec.env = next;
   if (!spec.nativeReasoning) {
-    spec.nativeReasoning = { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+    spec.nativeReasoning = nativeReasoning();
     changed = true;
   }
   return changed;

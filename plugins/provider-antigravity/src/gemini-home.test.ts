@@ -93,10 +93,10 @@ describe('gemini-home', () => {
     mkdirSync(join(home, 'config'), { recursive: true });
     writeFileSync(join(home, 'config', 'mcp_config.json'), JSON.stringify({ mcpServers: { a: { command: 'node' } } }));
     const target = join(prepareSanitizedGeminiHome({ env }).geminiHome, 'config', 'mcp_config.json');
-    const past = new Date(Date.now() - 60_000);
+    const past = new Date(Math.floor((Date.now() - 60_000) / 1000) * 1000);
     utimesSync(target, past, past);
     prepareSanitizedGeminiHome({ env });
-    expect(statSync(target).mtimeMs).toBe(past.getTime());
+    expect(Math.round(statSync(target).mtimeMs)).toBe(past.getTime());
   });
 
   it('sanitizes dead MCP pipes in a separate ZCC home without modifying source', () => {

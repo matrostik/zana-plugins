@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { killProcessTree } from './native-runtime.js';
+import type { DiscoveredNativeModel } from './readiness-store.js';
 
 export interface NativeSessionOptions {
   command: string;
@@ -58,18 +59,113 @@ function forEachLine(stream: NodeJS.ReadableStream | null, onLine: (line: string
   });
 }
 
-/** Mirrors the catalog extractor: a model config option is authoritative, even when empty. */
-function hasCatalogModels(session: any): boolean {
-  const model = Array.isArray(session?.configOptions)
-    ? session.configOptions.find((option: any) => option?.id === 'model' || option?.category === 'model')
-    : undefined;
-  if (Array.isArray(model?.options)) {
-    return model.options.flatMap((option: any) => Array.isArray(option?.options) ? option.options : [option])
-      .some((option: any) => typeof option?.value === 'string' && option.value);
-  }
-  const legacy = session?.models?.availableModels;
-  return Array.isArray(legacy) && legacy.some((item: any) => typeof (item?.id || item?.modelId) === 'string');
+function extractSessionReasoningMetadata(sessionResult: any): {
+  supportedReasoningEfforts?: string[];
+  defaultReasoningEffort?: string;
+} {
+  const configOptions = sessionResult?.configOptions;
+  if (!Array.isArray(configOptions)) return {};
+  const reasoningOpt = configOptions.find(
+    (opt: any) =>
+      opt?.id === 'thinking_level' ||
+      opt?.id === 'reasoning_effort' ||
+      opt?.category === 'reasoning' ||
+      opt?.category === 'thinking_level'
+  );
+  if (!reasoningOpt || !Array.isArray(reasoningOpt.options)) return {};
+  const levels = reasoningOpt.options
+    .map((o: any) => (typeof o?.value === 'string' ? o.value : typeof o?.id === 'string' ? o.id : null))
+    .filter((v: string | null): v is string => Boolean(v));
+  if (levels.length === 0) return {};
+  const rawDefault = reasoningOpt.currentValue ?? reasoningOpt.defaultValue;
+  const defaultLevel =
+    typeof rawDefault === 'string' && levels.includes(rawDefault) ? rawDefault : levels[0];
+  return {
+    supportedReasoningEfforts: levels,
+    ...(defaultLevel ? { defaultReasoningEffort: defaultLevel } : {})
+  };
 }
+
+function extractModelReasoningMetadata(
+  item: any,
+  sessionReasoning: { supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }
+): { supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string } {
+  const rawEfforts = item?.supportedReasoningEfforts ?? item?.reasoningLevels ?? item?.thinkingLevels;
+  if (Array.isArray(rawEfforts)) {
+    const levels = rawEfforts
+      .map((e: any) =>
+        typeof e === 'string'
+          ? e
+          : typeof e?.reasoningEffort === 'string'
+          ? e.reasoningEffort
+          : typeof e?.value === 'string'
+          ? e.value
+          : null
+      )
+      .filter((v: string | null): v is string => Boolean(v));
+    if (levels.length === 0) return {};
+    const rawDefault = item?.defaultReasoningEffort ?? item?.defaultThinkingLevel;
+    const defaultLevel =
+      typeof rawDefault === 'string' && levels.includes(rawDefault) ? rawDefault : levels[0];
+    return {
+      supportedReasoningEfforts: levels,
+      ...(defaultLevel ? { defaultReasoningEffort: defaultLevel } : {})
+    };
+  }
+  return sessionReasoning;
+}
+
+export function extractModelsFromSessionResult(sessionResult: any): DiscoveredNativeModel[] {
+  const models: DiscoveredNativeModel[] = [];
+  const seen = new Set<string>();
+  const sessionReasoning = extractSessionReasoningMetadata(sessionResult);
+
+  const configOptions = sessionResult?.configOptions;
+  let authoritativeCatalog = false;
+  if (Array.isArray(configOptions)) {
+    const modelOpt = configOptions.find(
+      (opt: any) => opt?.id === 'model' || opt?.category === 'model'
+    );
+    if (Array.isArray(modelOpt?.options)) {
+      authoritativeCatalog = true;
+      for (const opt of modelOpt.options.flatMap((option: any) =>
+        Array.isArray(option?.options) ? option.options : [option])) {
+        const id = opt?.value;
+        if (typeof id === 'string' && id && !seen.has(id)) {
+          seen.add(id);
+          models.push({
+            id,
+            name: typeof opt?.name === 'string' && opt.name ? opt.name : id,
+            ...(typeof opt?.description === 'string' ? { description: opt.description } : {}),
+            ...extractModelReasoningMetadata(opt, sessionReasoning)
+          });
+        }
+      }
+    }
+  }
+
+  if (!authoritativeCatalog) {
+    const availableModels = sessionResult?.models?.availableModels;
+    if (Array.isArray(availableModels)) {
+      for (const item of availableModels) {
+        const id = item?.id || item?.modelId;
+        if (typeof id === 'string' && id && !seen.has(id)) {
+          seen.add(id);
+          models.push({
+            id,
+            name: typeof item?.name === 'string' && item.name ? item.name : id,
+            ...(typeof item?.description === 'string' ? { description: item.description } : {}),
+            ...extractModelReasoningMetadata(item, sessionReasoning)
+          });
+        }
+      }
+    }
+  }
+
+  return models;
+}
+
+export const extractCatalog = extractModelsFromSessionResult;
 
 /**
  * One short-lived Native ACP conversation used for diagnostics and sign-in. It owns the process,
@@ -190,6 +286,7 @@ export class NativeAcpSession {
     let text = '';
     const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
     let requestedTools = false;
+    let outputLimitError: Error | null = null;
     this.notificationListeners.push((method, params) => {
       if (method !== 'session/update') return;
       const update = params?.update;
@@ -200,13 +297,15 @@ export class NativeAcpSession {
       if (update?.sessionUpdate === 'agent_message_chunk' && update.content?.type === 'text') {
         text += update.content.text;
         if (text.length > options.maxTextChars) {
-          this.close(new Error(`Native ${name} output exceeded ${options.maxTextChars} characters; the diagnostic session was stopped.`));
+          outputLimitError = new Error(`Native ${name} output exceeded ${options.maxTextChars} characters; the diagnostic session was stopped.`);
+          this.close(outputLimitError);
         }
       }
     });
     const result = await this.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: `/${name}` }] });
     // A tool call can arrive in the same chunk as the reply; it still fails the command.
     if (requestedTools) throw toolsRequested;
+    if (outputLimitError) throw outputLimitError;
     return { stopReason: result?.stopReason, text };
   }
 
@@ -306,7 +405,7 @@ export class NativeAcpSession {
     const sessionId = session?.sessionId;
     if (typeof sessionId !== 'string') return;
     // Native notifications can arrive after the session/new response in a separate stdout chunk.
-    if (!this.catalogUpdates.has(sessionId) && !hasCatalogModels(session)) {
+    if (!this.catalogUpdates.has(sessionId) && extractCatalog(session).length === 0) {
       await new Promise<void>(resolve => {
         const timer = this.later(CATALOG_UPDATE_WAIT_MS, resolve);
         this.notificationListeners.push(() => {

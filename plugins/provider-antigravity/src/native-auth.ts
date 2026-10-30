@@ -1,6 +1,11 @@
 import type { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { NativeAcpSession, type InitializeInfo } from './acp-session.js';
+import {
+  NativeAcpSession,
+  extractCatalog,
+  extractModelsFromSessionResult,
+  type InitializeInfo
+} from './acp-session.js';
 import {
   captureAccount,
   currentCredentialId,
@@ -35,6 +40,7 @@ export {
   prepareSanitizedGeminiHome,
   type GoogleAcpAuthMethod
 } from './gemini-home.js';
+export { extractCatalog, extractModelsFromSessionResult } from './acp-session.js';
 export type { DiscoveredNativeModel, NativeReadinessResult, NativeSetupState } from './readiness-store.js';
 
 const NATIVE_PROBE_TIMEOUT_MS = 20_000;
@@ -62,112 +68,6 @@ export function clearCachedNativeReadiness(env: NodeJS.ProcessEnv = process.env)
 /** Opaque account identity so UIs can drop results that belong to a previous sign-in. */
 export function getNativeCredentialId(authMethod: GoogleAcpAuthMethod, env: NodeJS.ProcessEnv = process.env): string {
   return currentCredentialId(authMethod, env);
-}
-
-function extractSessionReasoningMetadata(sessionResult: any): {
-  supportedReasoningEfforts?: string[];
-  defaultReasoningEffort?: string;
-} {
-  const configOptions = sessionResult?.configOptions;
-  if (!Array.isArray(configOptions)) return {};
-  const reasoningOpt = configOptions.find(
-    (opt: any) =>
-      opt?.id === 'thinking_level' ||
-      opt?.id === 'reasoning_effort' ||
-      opt?.category === 'reasoning' ||
-      opt?.category === 'thinking_level'
-  );
-  if (!reasoningOpt || !Array.isArray(reasoningOpt.options)) return {};
-  const levels = reasoningOpt.options
-    .map((o: any) => (typeof o?.value === 'string' ? o.value : typeof o?.id === 'string' ? o.id : null))
-    .filter((v: string | null): v is string => Boolean(v));
-  if (levels.length === 0) return {};
-  const rawDefault = reasoningOpt.currentValue ?? reasoningOpt.defaultValue;
-  const defaultLevel =
-    typeof rawDefault === 'string' && levels.includes(rawDefault) ? rawDefault : levels[0];
-  return {
-    supportedReasoningEfforts: levels,
-    ...(defaultLevel ? { defaultReasoningEffort: defaultLevel } : {})
-  };
-}
-
-function extractModelReasoningMetadata(
-  item: any,
-  sessionReasoning: { supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }
-): { supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string } {
-  const rawEfforts = item?.supportedReasoningEfforts ?? item?.reasoningLevels ?? item?.thinkingLevels;
-  if (Array.isArray(rawEfforts)) {
-    const levels = rawEfforts
-      .map((e: any) =>
-        typeof e === 'string'
-          ? e
-          : typeof e?.reasoningEffort === 'string'
-          ? e.reasoningEffort
-          : typeof e?.value === 'string'
-          ? e.value
-          : null
-      )
-      .filter((v: string | null): v is string => Boolean(v));
-    if (levels.length === 0) return {};
-    const rawDefault = item?.defaultReasoningEffort ?? item?.defaultThinkingLevel;
-    const defaultLevel =
-      typeof rawDefault === 'string' && levels.includes(rawDefault) ? rawDefault : levels[0];
-    return {
-      supportedReasoningEfforts: levels,
-      ...(defaultLevel ? { defaultReasoningEffort: defaultLevel } : {})
-    };
-  }
-  return sessionReasoning;
-}
-
-export function extractModelsFromSessionResult(sessionResult: any): DiscoveredNativeModel[] {
-  const models: DiscoveredNativeModel[] = [];
-  const seen = new Set<string>();
-  const sessionReasoning = extractSessionReasoningMetadata(sessionResult);
-
-  const configOptions = sessionResult?.configOptions;
-  let authoritativeCatalog = false;
-  if (Array.isArray(configOptions)) {
-    const modelOpt = configOptions.find(
-      (opt: any) => opt?.id === 'model' || opt?.category === 'model'
-    );
-    if (Array.isArray(modelOpt?.options)) {
-      authoritativeCatalog = true;
-      for (const opt of modelOpt.options.flatMap((option: any) =>
-        Array.isArray(option?.options) ? option.options : [option])) {
-        const id = opt?.value;
-        if (typeof id === 'string' && id && !seen.has(id)) {
-          seen.add(id);
-          models.push({
-            id,
-            name: typeof opt?.name === 'string' && opt.name ? opt.name : id,
-            ...(typeof opt?.description === 'string' ? { description: opt.description } : {}),
-            ...extractModelReasoningMetadata(opt, sessionReasoning)
-          });
-        }
-      }
-    }
-  }
-
-  if (!authoritativeCatalog) {
-    const availableModels = sessionResult?.models?.availableModels;
-    if (Array.isArray(availableModels)) {
-      for (const item of availableModels) {
-        const id = item?.id || item?.modelId;
-        if (typeof id === 'string' && id && !seen.has(id)) {
-          seen.add(id);
-          models.push({
-            id,
-            name: typeof item?.name === 'string' && item.name ? item.name : id,
-            ...(typeof item?.description === 'string' ? { description: item.description } : {}),
-            ...extractModelReasoningMetadata(item, sessionReasoning)
-          });
-        }
-      }
-    }
-  }
-
-  return models;
 }
 
 function extractModesFromSessionResult(sessionResult: any): string[] {

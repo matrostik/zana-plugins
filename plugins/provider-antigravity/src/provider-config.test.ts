@@ -7,6 +7,7 @@ import {
   doctorStatus,
   healthFromReadiness,
   modelListFromReadiness,
+  nativeReasoning,
   readProviderSettings
 } from './provider-config.js';
 import { readinessResult, type NativeReadinessResult } from './readiness-store.js';
@@ -39,6 +40,14 @@ describe('provider config', () => {
     expect(apiKey.env).toEqual({ BROWSER: 'echo', GEMINI_HOME: '/managed/home', AGY_ACP_AUTH_METHOD: 'gemini-api-key', GEMINI_API_KEY: 'secret' });
     expect(apiKey.nativeReasoning).toEqual({ configId: 'thinking_level', supportedLevels: ['low', 'medium', 'high'], defaultLevel: 'medium' });
     expect(buildNativeLaunchSpec({ authMethod: 'oauth-personal', env, home }).env.GEMINI_API_KEY).toBeUndefined();
+  });
+
+  it('returns a fresh defensive copy of nativeReasoning', () => {
+    const r1 = nativeReasoning();
+    const r2 = nativeReasoning();
+    expect(r1).toEqual(r2);
+    expect(r1).not.toBe(r2);
+    expect(r1.supportedLevels).not.toBe(r2.supportedLevels);
   });
 
   it('completes a caller launch spec in place and reports whether anything was missing', () => {
