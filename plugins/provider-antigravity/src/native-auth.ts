@@ -744,6 +744,11 @@ const USAGE_COMMANDS_WAIT_MS = 1000;
 const USAGE_MAX_TEXT_CHARS = 32_768;
 const CATALOG_RETRY_BACKOFF_MS = 30_000;
 const CATALOG_RETRY_MAX_KEYS = 32;
+/** How long to wait for a late config_option_update when session/new returned no models. */
+const CATALOG_UPDATE_WAIT_MS = 1000;
+const CATALOG_UPDATE_MAX_SESSIONS = 16;
+/** Bumped on every in-process invalidation (sign-in, sign-out, auth type or runtime change). */
+let authGeneration = 0;
 
 export function getCachedNativeReadiness(): NativeReadinessResult | null {
   if (!cachedReadiness) return null;
@@ -755,6 +760,7 @@ export function getCachedNativeReadiness(): NativeReadinessResult | null {
 
 export function clearCachedNativeReadiness(env: NodeJS.ProcessEnv = process.env): void {
   cachedReadiness = null;
+  authGeneration++;
   try {
     const filePath = getPersistedReadinessPath(env);
     statMemo.delete(filePath);
@@ -824,6 +830,28 @@ function checkCachedReadiness(
 function computeEffectiveCredentialFingerprint(env: NodeJS.ProcessEnv, authMethod: GoogleAcpAuthMethod): string {
   const { managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
   return computeCredentialFingerprint({ ...env, GEMINI_HOME: managedGeminiHome }, authMethod);
+}
+
+interface NativeAuthIdentity {
+  generation: number;
+  fingerprint: string;
+}
+
+/** The account a discovery started against; the fingerprint also catches sign-out in another process. */
+function captureAuthIdentity(env: NodeJS.ProcessEnv | undefined, authMethod: GoogleAcpAuthMethod): NativeAuthIdentity {
+  return { generation: authGeneration, fingerprint: computeEffectiveCredentialFingerprint(env ?? process.env, authMethod) };
+}
+
+function isAuthIdentityCurrent(identity: NativeAuthIdentity, env: NodeJS.ProcessEnv | undefined, authMethod: GoogleAcpAuthMethod): boolean {
+  return identity.generation === authGeneration
+    && identity.fingerprint === computeEffectiveCredentialFingerprint(env ?? process.env, authMethod);
+}
+
+/** Shared key for catalog and usage refreshes so both follow the same account identity. */
+function buildNativeRefreshKey(options: { command: string; args: string[]; authMethod: GoogleAcpAuthMethod; cwd?: string; env?: NodeJS.ProcessEnv }): string {
+  return JSON.stringify([options.command, options.args, options.authMethod, options.cwd,
+    getZccDataDir(options.env), resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
+    computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)]);
 }
 
 /** Opaque account identity so UIs can drop results that belong to a previous sign-in. */
@@ -923,7 +951,7 @@ export function getFastNativeReadiness(options: {
 async function performInitializeAndAuth(
   harness: RpcHarness,
   options: { authMethod: GoogleAcpAuthMethod; timeoutMs: number; configuredAuthType: string | null; env?: NodeJS.ProcessEnv }
-): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] }> {
+): Promise<{ protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[]; authTypeWritten: boolean }> {
   const initResult = await harness.request(
     'initialize',
     {
@@ -950,9 +978,10 @@ async function performInitializeAndAuth(
   ) {
     await harness.request('authenticate', { methodId: options.authMethod, _meta: { headless: true } }, options.timeoutMs);
     writeNativeAcpAuthType(options.authMethod, options.env);
+    return { protocolVersion, agentVersion, advertisedAuthMethods, authTypeWritten: true };
   }
 
-  return { protocolVersion, agentVersion, advertisedAuthMethods };
+  return { protocolVersion, agentVersion, advertisedAuthMethods, authTypeWritten: false };
 }
 
 function checkProbeCachedOrMissing(
@@ -1131,13 +1160,12 @@ export interface NativeProbeOptions {
 const usageRefreshes = new Map<string, Promise<NativeUsageResult>>();
 let usageCache: { key: string; result: NativeUsageResult } | null = null;
 
-export function queryNativeUsage(options: NativeProbeOptions): Promise<NativeUsageResult> {
-  const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
-  const env = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
-  const key = JSON.stringify([options.command, options.args, options.authMethod, getZccDataDir(env),
-    sanitized.geminiHome, computeCredentialFingerprint(env, options.authMethod)]);
+export async function queryNativeUsage(options: NativeProbeOptions): Promise<NativeUsageResult> {
+  // Sync source credentials first so the key describes the account the query would use.
+  prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
+  const key = buildNativeRefreshKey(options);
   if (!options.forceRefresh && usageCache?.key === key && Date.now() - usageCache.result.usage.checkedAt < USAGE_CACHE_TTL_MS) {
-    return Promise.resolve(usageCache.result);
+    return usageCache.result;
   }
   const running = usageRefreshes.get(key);
   if (running) return running;
@@ -1153,7 +1181,7 @@ interface UsageSessionTracker {
   readonly advertised: boolean;
   readonly text: string;
   readonly unexpectedTools: boolean;
-  /** Resolves once /usage is advertised or the wait elapses. */
+  /** Resolves once /usage is advertised or the wait elapses; other command updates do not end the wait. */
   waitForCommands(timeoutMs: number): Promise<void>;
   dispose(): void;
 }
@@ -1170,12 +1198,15 @@ function trackUsageSessionUpdates(harness: RpcHarness): UsageSessionTracker {
     const update = params?.update;
     if (update?.sessionUpdate === 'available_commands_update') {
       advertised = Array.isArray(update.availableCommands) && update.availableCommands.some((command: any) => command?.name === 'usage');
-      commandsReceived();
+      // A partial command list may precede the one that includes usage; keep waiting until it appears.
+      if (advertised) commandsReceived();
     }
     if (update?.sessionUpdate === 'tool_call') { unexpectedTools = true; harness.close(); }
     if (update?.sessionUpdate === 'agent_message_chunk' && update.content?.type === 'text') {
       text += update.content.text;
-      if (text.length > USAGE_MAX_TEXT_CHARS) harness.close();
+      if (text.length > USAGE_MAX_TEXT_CHARS) {
+        harness.close(new Error(`Native usage output exceeded ${USAGE_MAX_TEXT_CHARS} characters; the diagnostic session was stopped.`));
+      }
     }
   });
   return {
@@ -1231,38 +1262,54 @@ async function performNativeUsageQuery(options: NativeProbeOptions): Promise<Nat
 const catalogRefreshes = new Map<string, Promise<NativeReadinessResult>>();
 const catalogRetryAfter = new Map<string, number>();
 
-/** True when a catalog request can be answered from readiness alone, without probing. */
+/**
+ * True when a catalog request can be answered from readiness alone, without probing. An empty
+ * session_ready catalog stays unsettled so a missed late config_option_update is retried after backoff.
+ */
 export function isNativeCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boolean): boolean {
   return !forceRefresh && (readiness.state === 'runtime_missing' || readiness.state === 'sign_in_required'
     || (readiness.state === 'session_ready' && readiness.models.length > 0));
 }
 
 /** Refresh only on explicit catalog requests, never on ordinary health reads. */
-export function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
+export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
   const previous = getFastNativeReadiness(options);
-  if (isNativeCatalogSettled(previous, options.forceRefresh)) return Promise.resolve(previous);
-  const key = JSON.stringify([options.command, options.args, options.authMethod, options.cwd,
-    getZccDataDir(options.env), resolveSourceAndManagedGeminiHome(options.env).managedGeminiHome,
-    computeEffectiveCredentialFingerprint(options.env ?? process.env, options.authMethod)]);
+  if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
+  const key = buildNativeRefreshKey(options);
   const running = catalogRefreshes.get(key);
   if (running) return running;
   const retry = catalogRetryAfter.get(key);
-  if (!options.forceRefresh && retry && retry > Date.now()) return Promise.resolve(previous);
-  const refresh = probeNativeAcpReadiness({ ...options, forceRefresh: true }).then(result => {
+  if (!options.forceRefresh && retry && retry > Date.now()) return previous;
+  // The probe rebases this identity after its own headless auth-type write.
+  const identity = { current: captureAuthIdentity(options.env, options.authMethod) };
+  const refresh = runNativeReadinessProbe({ ...options, forceRefresh: true }, identity).then(result => {
+    // Never fall back to, or back off on behalf of, a catalog that belongs to a previous sign-in.
+    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) return result;
+    // Re-key after the probe: its own auth-type write changes the fingerprint the next request will use.
+    const retryKey = buildNativeRefreshKey(options);
+    if (retryKey !== key) catalogRetryAfter.delete(key);
     if (result.state !== 'session_ready' || result.models.length === 0) {
       if (catalogRetryAfter.size >= CATALOG_RETRY_MAX_KEYS) catalogRetryAfter.delete(catalogRetryAfter.keys().next().value!);
-      catalogRetryAfter.set(key, Date.now() + CATALOG_RETRY_BACKOFF_MS);
+      catalogRetryAfter.set(retryKey, Date.now() + CATALOG_RETRY_BACKOFF_MS);
       if (result.state !== 'sign_in_required' && result.state !== 'session_ready' && previous.models.length > 0) {
         return { ...previous, state: 'authenticated' as const, catalogStale: true, error: result.error };
       }
-    } else catalogRetryAfter.delete(key);
+    } else catalogRetryAfter.delete(retryKey);
     return result;
   }).finally(() => catalogRefreshes.delete(key));
   catalogRefreshes.set(key, refresh);
   return refresh;
 }
 
-export async function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
+export function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
+  return runNativeReadinessProbe(options, { current: captureAuthIdentity(options.env, options.authMethod) });
+}
+
+/** Probes readiness, keeping `identity` on the account the discovery is attributed to. */
+async function runNativeReadinessProbe(
+  options: NativeProbeOptions,
+  identity: { current: NativeAuthIdentity }
+): Promise<NativeReadinessResult> {
   const sanitized = prepareSanitizedGeminiHome({ env: options.env, authMethod: options.authMethod });
   const effectiveEnv: NodeJS.ProcessEnv = { ...(options.env ?? process.env), GEMINI_HOME: sanitized.geminiHome };
   const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
@@ -1271,47 +1318,130 @@ export async function probeNativeAcpReadiness(options: NativeProbeOptions): Prom
 
   const earlyResult = checkProbeCachedOrMissing(options, cacheKey, fingerprint, configuredAuthType, sanitized);
   if (earlyResult) return earlyResult;
+  identity.current = captureAuthIdentity(options.env, options.authMethod);
 
   const timeoutMs = options.timeoutMs ?? NATIVE_PROBE_TIMEOUT_MS;
   const harness = createNativeRpcHarness({ command: options.command, args: options.args, cwd: options.cwd, env: effectiveEnv, spawnImpl: options.spawnImpl }, true);
   const detector = setupStderrAuthDetector(harness);
-  const catalogUpdates = new Map<string, any[]>();
-  harness.onNotification((method, params) => {
-    if (method === 'session/update' && typeof params?.sessionId === 'string'
-      && params.update?.sessionUpdate === 'config_option_update' && Array.isArray(params.update.configOptions)) {
-      if (catalogUpdates.size < 16 || catalogUpdates.has(params.sessionId)) catalogUpdates.set(params.sessionId, params.update.configOptions);
-    }
-  });
+  const catalogUpdates = trackCatalogUpdates(harness);
   const deadline = setTimeout(() => harness.close(new Error(`Native ACP session verification timed out after ${timeoutMs}ms`)), timeoutMs);
 
   try {
     const initInfo = await performInitializeAndAuth(harness, { authMethod: options.authMethod, timeoutMs, configuredAuthType, env: options.env });
+    // The probe's own headless auth-type write is not an account change.
+    if (initInfo.authTypeWritten) identity.current = captureAuthIdentity(options.env, options.authMethod);
     const compatError = checkInitCompatibility(initInfo, options, configuredAuthType, sanitized);
     if (compatError) return compatError;
 
     const sessionRace = await Promise.race([harness.request('session/new', { cwd: options.cwd || process.cwd(), mcpServers: [] }, timeoutMs), detector.promise]);
-    if (sessionRace === 'stderr_auth_required' || detector.isTriggered()) {
-      const signInResult: NativeReadinessResult = { state: 'sign_in_required', agentVersion: initInfo.agentVersion, protocolVersion: initInfo.protocolVersion, advertisedAuthMethods: initInfo.advertisedAuthMethods, selectedAuthMethod: options.authMethod, configuredAuthType, models: [], modes: [], disabledDeadMcpServers: sanitized.disabledDeadMcpServers, error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.', checkedAt: Date.now() };
+    const signInRequired = () => sessionRace === 'stderr_auth_required' || detector.isTriggered();
+    if (!signInRequired()) await catalogUpdates.applyTo(sessionRace);
+    // Sign-out or an account switch during discovery must not persist the previous account's result.
+    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
+      return buildAuthChangedResult(initInfo, options, configuredAuthType, sanitized);
+    }
+    if (signInRequired()) {
+      const signInResult = buildProbeSignInRequiredResult(initInfo, options, configuredAuthType, sanitized);
       cachedReadiness = { key: cacheKey, fingerprint, result: signInResult };
       writePersistedReadiness(cacheKey, signInResult, fingerprint, effectiveEnv);
       return signInResult;
     }
 
-    const configUpdate = catalogUpdates.get(sessionRace?.sessionId);
-    if (configUpdate) sessionRace.configOptions = configUpdate;
     const updatedAuthType = readConfiguredNativeAuthType(effectiveEnv);
     const updatedKey = JSON.stringify({ command: options.command, args: options.args, authMethod: options.authMethod, configuredAuthType: updatedAuthType });
     return buildProbeSessionResult(sessionRace, initInfo, options, effectiveEnv, sanitized, updatedKey,
       computeCredentialFingerprint(effectiveEnv, options.authMethod));
   } catch (err: any) {
     const failedResult = formatProbeFailureResult(err, detector.isTriggered(), options, configuredAuthType, sanitized);
+    // A failure from an obsolete account must not overwrite a newer sign-in's readiness.
+    if (!isAuthIdentityCurrent(identity.current, options.env, options.authMethod)) {
+      return buildAuthChangedResult(failedResult, options, configuredAuthType, sanitized);
+    }
     cachedReadiness = { key: cacheKey, fingerprint, result: failedResult };
     if (failedResult.state === 'sign_in_required') writePersistedReadiness(cacheKey, failedResult, fingerprint, effectiveEnv);
     return failedResult;
   } finally {
+    catalogUpdates.dispose();
     clearTimeout(deadline);
     harness.close();
   }
+}
+
+interface CatalogUpdateTracker {
+  /** Adopts the latest config_option_update for the session, briefly awaiting one if session/new had no models. */
+  applyTo(sessionResult: any): Promise<void>;
+  dispose(): void;
+}
+
+function trackCatalogUpdates(harness: RpcHarness): CatalogUpdateTracker {
+  const updates = new Map<string, any[]>();
+  let waiter: { sessionId: string; resolve: () => void } | null = null;
+  let waitTimer: ReturnType<typeof setTimeout> | undefined;
+  harness.onNotification((method, params) => {
+    if (method !== 'session/update' || typeof params?.sessionId !== 'string'
+      || params.update?.sessionUpdate !== 'config_option_update' || !Array.isArray(params.update.configOptions)) return;
+    if (updates.size < CATALOG_UPDATE_MAX_SESSIONS || updates.has(params.sessionId)) updates.set(params.sessionId, params.update.configOptions);
+    if (waiter && waiter.sessionId === params.sessionId) waiter.resolve();
+  });
+  return {
+    async applyTo(sessionResult) {
+      const sessionId = sessionResult?.sessionId;
+      if (typeof sessionId !== 'string') return;
+      // Native notifications can arrive after the session/new response in a separate stdout chunk.
+      if (!updates.has(sessionId) && extractModelsFromSessionResult(sessionResult).length === 0) {
+        await new Promise<void>(resolve => {
+          waiter = { sessionId, resolve };
+          waitTimer = setTimeout(resolve, CATALOG_UPDATE_WAIT_MS);
+        });
+      }
+      const update = updates.get(sessionId);
+      if (update) sessionResult.configOptions = update;
+    },
+    dispose() { clearTimeout(waitTimer); waiter = null; }
+  };
+}
+
+function buildProbeSignInRequiredResult(
+  initInfo: { protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] },
+  options: { authMethod: GoogleAcpAuthMethod },
+  configuredAuthType: string | null,
+  sanitized: { disabledDeadMcpServers: string[] }
+): NativeReadinessResult {
+  return {
+    state: 'sign_in_required',
+    agentVersion: initInfo.agentVersion,
+    protocolVersion: initInfo.protocolVersion,
+    advertisedAuthMethods: initInfo.advertisedAuthMethods,
+    selectedAuthMethod: options.authMethod,
+    configuredAuthType,
+    models: [],
+    modes: [],
+    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+    error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.',
+    checkedAt: Date.now()
+  };
+}
+
+/** Uncached result for a discovery whose account was signed out or switched while it ran. */
+function buildAuthChangedResult(
+  initInfo: { protocolVersion: number | null; agentVersion: string | null; advertisedAuthMethods: string[] },
+  options: { authMethod: GoogleAcpAuthMethod },
+  configuredAuthType: string | null,
+  sanitized: { disabledDeadMcpServers: string[] }
+): NativeReadinessResult {
+  return {
+    state: 'runtime_launches',
+    agentVersion: initInfo.agentVersion,
+    protocolVersion: initInfo.protocolVersion,
+    advertisedAuthMethods: initInfo.advertisedAuthMethods,
+    selectedAuthMethod: options.authMethod,
+    configuredAuthType,
+    models: [],
+    modes: [],
+    disabledDeadMcpServers: sanitized.disabledDeadMcpServers,
+    error: 'Antigravity sign-in changed while models were being discovered. Retry to load the current account.',
+    checkedAt: Date.now()
+  };
 }
 
 function buildSignInSuccessResult(

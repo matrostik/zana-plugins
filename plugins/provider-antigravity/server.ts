@@ -123,6 +123,8 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
       { id: 'medium', label: 'Medium Effort' },
       { id: 'high', label: 'High Effort' }
     ],
+    // Zana itself prefixes Plan turns with a `/plan` command mention for providers declaring this
+    // action; the native ACP server handles `/plan` as its own slash command, so no host mapping is needed.
     composerActions: ['plan'],
     models: {
       scope: 'host' as const

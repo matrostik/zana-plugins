@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import './test-environment.js';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,7 @@ import {
   getNativeAcpTokenPath,
   hasNativeAcpToken,
   isAuthExplicitlyCleared,
+  isNativeCatalogSettled,
   isValidGoogleAuthMethod,
   prepareSanitizedGeminiHome,
   probeNativeAcpReadiness,
@@ -369,6 +370,226 @@ describe('native-auth.ts unit tests', () => {
     const result = await probeNativeAcpReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal',
       env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
     expect(result.models.map(model => model.id)).toEqual(['updated']);
+  });
+
+  it('waits briefly for a catalog update delivered after the session/new response', async () => {
+    const home = makeTempDir('catalog-late-update-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        emit({ id: msg.id, result: msg.method === 'initialize' ? { protocolVersion: 1, authMethods: [] } : { sessionId: 's1' } });
+        if (msg.method === 'session/new') {
+          setTimeout(() => emit({ method: 'session/update', params: { sessionId: 's1', update: {
+            sessionUpdate: 'config_option_update', configOptions: [{ id: 'model', options: [{ value: 'late', name: 'Late' }] }]
+          } } }), 20);
+        }
+      });
+    });
+    const result = await probeNativeAcpReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal',
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
+    expect(result.models.map(model => model.id)).toEqual(['late']);
+  });
+
+  it('discards a catalog whose account signed out while discovery was running', async () => {
+    const home = makeTempDir('catalog-signout-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home };
+    writeNativeAcpAuthType('oauth-personal', env);
+    writeFileSync(join(home, 'antigravity-acp/acp_token.json'), '{"refresh_token":"account-one"}');
+    const child = createMockChild();
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      if (msg.method === 'session/new') writeNativeAcpAuthType(null, env);
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ id: msg.id, result: msg.method === 'initialize'
+        ? { protocolVersion: 1, authMethods: [] }
+        : { sessionId: 's1', configOptions: [{ id: 'model', options: [{ value: 'gemini', name: 'Gemini' }] }] } }) + '\n'));
+    });
+    const result = await probeNativeAcpReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env,
+      spawnImpl: () => child, forceRefresh: true });
+    expect(result.state).not.toBe('session_ready');
+    expect(result.models).toEqual([]);
+    expect(result.error).toContain('sign-in changed');
+    expect(getCachedNativeReadiness()).toBeNull();
+  });
+
+  it('does not fall back to the previous account catalog when credentials change mid-refresh', async () => {
+    const home = makeTempDir('catalog-account-switch-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home };
+    writeNativeAcpAuthType('oauth-personal', env);
+    writeFileSync(join(home, 'antigravity-acp/acp_token.json'), '{"refresh_token":"account-one"}');
+    const managedToken = join(prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' }).geminiHome, 'antigravity-acp/acp_token.json');
+    const child = createMockChild();
+    let switchAccount = false;
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      // Another process switches accounts without touching this process's in-memory generation.
+      if (msg.method === 'session/new' && switchAccount) writeFileSync(managedToken, '{"refresh_token":"account-two"}');
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ id: msg.id, ...(switchAccount && msg.method === 'session/new'
+        ? { error: { code: -32000, message: 'Backend unavailable' } }
+        : { result: msg.method === 'initialize'
+          ? { protocolVersion: 1, authMethods: [] }
+          : { sessionId: 's1', configOptions: [{ id: 'model', options: [{ value: 'gemini', name: 'Gemini' }] }] } })
+      }) + '\n'));
+    });
+    const options = { command: fakeExe, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl: vi.fn(() => child) };
+    expect((await getNativeCatalog(options)).models[0].id).toBe('gemini');
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 11 * 60 * 1000);
+    switchAccount = true;
+    const afterSwitch = await getNativeCatalog(options);
+    expect(afterSwitch.models).toEqual([]);
+    expect(afterSwitch.catalogStale).toBeUndefined();
+  });
+
+  it('keeps an empty session_ready catalog unsettled so a missed late update is retried', () => {
+    const empty = { state: 'session_ready', models: [] } as unknown as Parameters<typeof isNativeCatalogSettled>[0];
+    const ready = { state: 'session_ready', models: [{ id: 'gemini' }] } as unknown as Parameters<typeof isNativeCatalogSettled>[0];
+    expect(isNativeCatalogSettled(empty)).toBe(false);
+    expect(isNativeCatalogSettled(ready)).toBe(true);
+    expect(isNativeCatalogSettled(ready, true)).toBe(false);
+  });
+
+  it('backs off a failed catalog probe that wrote its own headless auth type', async () => {
+    const home = makeTempDir('catalog-headless-backoff-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home, GEMINI_API_KEY: 'test-key' };
+    const child = createMockChild();
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ id: msg.id, ...(msg.method === 'session/new'
+        ? { error: { code: -32000, message: 'Backend unavailable' } }
+        : { result: msg.method === 'initialize' ? { protocolVersion: 1, authMethods: [{ id: 'gemini-api-key' }] } : {} }) }) + '\n'));
+    });
+    const spawnImpl = vi.fn(() => child);
+    const options = { command: fakeExe, args: [], authMethod: 'gemini-api-key' as const, env, spawnImpl };
+    expect((await getNativeCatalog(options)).error).toContain('Backend unavailable');
+    expect(readConfiguredNativeAuthType({ ...env, GEMINI_HOME: prepareSanitizedGeminiHome({ env }).geminiHome })).toBe('gemini-api-key');
+    await getNativeCatalog(options);
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache a probe failure whose account changed while discovery was running', async () => {
+    const home = makeTempDir('catalog-failure-switch-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home };
+    writeNativeAcpAuthType('oauth-personal', env);
+    writeFileSync(join(home, 'antigravity-acp/acp_token.json'), '{"refresh_token":"account-one"}');
+    const managedToken = join(prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' }).geminiHome, 'antigravity-acp/acp_token.json');
+    const child = createMockChild();
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      if (msg.method === 'session/new') writeFileSync(managedToken, '{"refresh_token":"account-two"}');
+      queueMicrotask(() => child.stdout.emit('data', JSON.stringify({ id: msg.id, ...(msg.method === 'session/new'
+        ? { error: { code: -32000, message: 'Backend unavailable' } }
+        : { result: { protocolVersion: 1, authMethods: [] } }) }) + '\n'));
+    });
+    const result = await probeNativeAcpReadiness({ command: fakeExe, args: [], authMethod: 'oauth-personal', env,
+      spawnImpl: () => child, forceRefresh: true });
+    expect(result.error).toContain('sign-in changed');
+    expect(getCachedNativeReadiness()).toBeNull();
+  });
+
+  it('re-queries usage when the source account changes within the usage cache TTL', async () => {
+    const home = makeTempDir('usage-account-switch-');
+    const dataDir = makeTempDir('usage-account-switch-data-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: dataDir };
+    writeNativeAcpAuthType('oauth-personal', env);
+    const sourceToken = join(home, 'antigravity-acp/acp_token.json');
+    writeFileSync(sourceToken, '{"refresh_token":"account-one"}');
+    const child = createMockChild();
+    const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [] } });
+        if (msg.method === 'session/new') {
+          emit({ id: msg.id, result: { sessionId: 's1' } });
+          emit({ method: 'session/update', params: { sessionId: 's1', update: {
+            sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } });
+        }
+        if (msg.method === 'session/prompt') {
+          emit({ method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: '### Quota Limits\n- **Gemini**\n  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)' } } } });
+          emit({ id: msg.id, result: { stopReason: 'end_turn' } });
+        }
+      });
+    });
+    const spawnImpl = vi.fn(() => child);
+    const options = { command: fakeExe, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl };
+    // Start from a synced managed home so the cached usage is keyed on account one.
+    prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
+    expect((await queryNativeUsage(options)).usage.status).toBe('ok');
+    writeFileSync(sourceToken, '{"refresh_token":"account-two"}');
+    const future = new Date(Date.now() + 60_000);
+    utimesSync(sourceToken, future, future);
+    await queryNativeUsage(options);
+    expect(spawnImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps waiting for /usage when an earlier command update omits it', async () => {
+    const home = makeTempDir('usage-late-command-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+    const commands = (names: string[]) => ({ method: 'session/update', params: { sessionId: 's1', update: {
+      sessionUpdate: 'available_commands_update', availableCommands: names.map(name => ({ name })) } } });
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [] } });
+        if (msg.method === 'session/new') {
+          emit({ id: msg.id, result: { sessionId: 's1' } });
+          setTimeout(() => emit(commands(['plan'])), 5);
+          setTimeout(() => emit(commands(['plan', 'usage'])), 15);
+        }
+        if (msg.method === 'session/prompt') {
+          emit({ method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: '### Quota Limits\n- **Gemini**\n  - **Weekly:** 14% remaining (resets Oct 31, 2026, 06:11 UTC)' } } } });
+          emit({ id: msg.id, result: { stopReason: 'end_turn' } });
+        }
+      });
+    });
+    const result = await queryNativeUsage({ command: fakeExe, args: [], authMethod: 'oauth-personal',
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
+    expect(result.usage.status).toBe('ok');
+  });
+
+  it('reports oversized usage output instead of a generic probe close', async () => {
+    const home = makeTempDir('usage-oversized-');
+    const fakeExe = join(home, 'agy.exe');
+    writeFileSync(fakeExe, 'exe');
+    const child = createMockChild();
+    const emit = (message: unknown) => child.stdout.emit('data', JSON.stringify(message) + '\n');
+    child.stdin.write.mockImplementation((chunk: string) => {
+      const msg = JSON.parse(chunk);
+      queueMicrotask(() => {
+        if (msg.method === 'initialize') emit({ id: msg.id, result: { protocolVersion: 1, authMethods: [] } });
+        if (msg.method === 'session/new') {
+          emit({ id: msg.id, result: { sessionId: 's1' } });
+          emit({ method: 'session/update', params: { sessionId: 's1', update: {
+            sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'usage' }] } } });
+        }
+        if (msg.method === 'session/prompt') {
+          emit({ method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: 'x'.repeat(40_000) } } } });
+        }
+      });
+    });
+    const result = await queryNativeUsage({ command: fakeExe, args: [], authMethod: 'oauth-personal',
+      env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
+    expect(result.usage.status).toBe('error');
+    expect(result.usage.message).toContain('exceeded');
   });
 
   it('getFastNativeReadiness validates local oauth and api-key credentials', () => {

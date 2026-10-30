@@ -294,6 +294,22 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(JSON.parse(String(write.mock.calls[0][0])).result.usage.windows[0].usedPercent).toBe(86);
   });
 
+  it('answers provider/usage and model/list with an error when synchronous setup throws', () => {
+    vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
+    vi.spyOn(nativeAuth, 'queryNativeUsage').mockImplementation(() => { throw new Error('EACCES: usage home'); });
+    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockImplementation(() => { throw new Error('EACCES: catalog home'); });
+    const forwarded = vi.spyOn(realAcpBridge, 'handleLine').mockImplementation(() => undefined);
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 74, method: 'provider/usage' }));
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 75, method: 'model/list' }));
+    const responses = write.mock.calls.map(call => JSON.parse(String(call[0])));
+    expect(responses).toEqual([
+      expect.objectContaining({ id: 74, error: expect.objectContaining({ message: 'EACCES: usage home' }) }),
+      expect.objectContaining({ id: 75, error: expect.objectContaining({ message: 'EACCES: catalog home' }) })
+    ]);
+    expect(forwarded).not.toHaveBeenCalled();
+  });
+
   it('labels a stale catalog visibly while preserving the selectable model identity', async () => {
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
     const stale = makeReadinessFixture({ state: 'authenticated', catalogStale: true,

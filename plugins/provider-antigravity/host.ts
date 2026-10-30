@@ -384,23 +384,36 @@ export function transformLegacyResumeForNative(msg: any): {
   };
 }
 
+function writeBridgeError(id: string | number, error: unknown): void {
+  writeBridgeJsonRpc({ jsonrpc: '2.0', id,
+    error: { code: -32000, message: error instanceof Error ? error.message : String(error) } });
+}
+
+/** Answer a locally handled request with an error instead of letting a setup throw reach the ACP bridge. */
+function runLocalHandler(id: string | number, handler: () => void): { handled: true; rewritten: false } {
+  try {
+    handler();
+  } catch (error) {
+    writeBridgeError(id, error);
+  }
+  return { handled: true, rewritten: false };
+}
+
 function dispatchBridgeMessage(msg: any): { handled: boolean; rewritten: boolean } {
   if (msg.method === 'provider/usage' && msg.id !== undefined) {
-    const options = getProviderOptionsFromParams(msg.params);
-    const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
-    void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) })
-      .then(result => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id, result }))
-      .catch(error => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id,
-        error: { code: -32000, message: error instanceof Error ? error.message : String(error) } }));
-    return { handled: true, rewritten: false };
+    return runLocalHandler(msg.id, () => {
+      const options = getProviderOptionsFromParams(msg.params);
+      const runtime = resolveNativeAcpRuntime({ customExecutable: options?.acpLaunchSpec?.command });
+      void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) })
+        .then(result => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id, result }))
+        .catch(error => writeBridgeError(msg.id, error));
+    });
   }
   if (msg.method === 'provider/health' && msg.id !== undefined) {
-    handleNativeProviderHealth(msg.id, msg.params);
-    return { handled: true, rewritten: false };
+    return runLocalHandler(msg.id, () => handleNativeProviderHealth(msg.id, msg.params));
   }
   if (msg.method === 'model/list' && msg.id !== undefined) {
-    handleNativeModelList(msg.id, msg.params);
-    return { handled: true, rewritten: false };
+    return runLocalHandler(msg.id, () => handleNativeModelList(msg.id, msg.params));
   }
   if (msg.method === 'thread/resume') {
     const migration = transformLegacyResumeForNative(msg);
