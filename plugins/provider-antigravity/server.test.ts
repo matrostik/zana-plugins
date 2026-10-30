@@ -8,6 +8,7 @@ import plugin from './server.js';
 import { ensureLaunchSpec, transformLegacyResumeForNative } from './host.js';
 import * as nativeRuntime from './src/native-runtime.js';
 import * as nativeAuth from './src/native-auth.js';
+import { readConfiguredNativeAuthType } from './src/gemini-home.js';
 import {
   checkCompanionFiles,
   computeSha256Hex,
@@ -20,7 +21,6 @@ import {
   extractModelsFromSessionResult,
   prepareSanitizedGeminiHome,
   probeNativeAcpReadiness,
-  readConfiguredNativeAuthType,
   writeNativeAcpAuthType
 } from './src/native-auth.js';
 

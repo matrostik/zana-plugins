@@ -4,25 +4,17 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { captureAccount } from './account-identity.js';
+import { isAuthExplicitlyCleared, prepareSanitizedGeminiHome, readConfiguredNativeAuthType } from './gemini-home.js';
 import {
   clearCachedNativeReadiness,
-  computeCredentialFingerprint,
   extractModelsFromSessionResult,
   getCachedNativeReadiness,
   getFastNativeReadiness,
   getNativeCatalog,
-  getNativeAcpSettingsPath,
-  getNativeAcpTokenPath,
-  hasNativeAcpToken,
-  isAuthExplicitlyCleared,
   isNativeCatalogSettled,
-  isValidGoogleAuthMethod,
-  prepareSanitizedGeminiHome,
   probeNativeAcpReadiness,
-  readConfiguredNativeAuthType,
-  readNativeAcpSettings,
   queryNativeUsage,
-  resolveGeminiHome,
   startNativeAcpSignIn,
   writeNativeAcpAuthType
 } from './native-auth.js';
@@ -67,98 +59,6 @@ afterEach(() => {
 });
 
 describe('native-auth.ts unit tests', () => {
-  it('validates google auth methods', () => {
-    expect(isValidGoogleAuthMethod('oauth-personal')).toBe(true);
-    expect(isValidGoogleAuthMethod('oauth-business')).toBe(true);
-    expect(isValidGoogleAuthMethod('gemini-api-key')).toBe(true);
-    expect(isValidGoogleAuthMethod('agent-platform')).toBe(true);
-    expect(isValidGoogleAuthMethod('invalid-auth')).toBe(false);
-    expect(isValidGoogleAuthMethod(null)).toBe(false);
-    expect(isValidGoogleAuthMethod(123)).toBe(false);
-  });
-
-  it('resolves gemini home and settings/token paths', () => {
-    process.env.GEMINI_HOME = 'C:/CustomGeminiHome';
-    expect(resolveGeminiHome()).toContain('CustomGeminiHome');
-    expect(getNativeAcpSettingsPath()).toContain('settings.json');
-    expect(getNativeAcpTokenPath()).toContain('acp_token.json');
-
-    delete process.env.GEMINI_HOME;
-    expect(resolveGeminiHome()).toContain('.gemini');
-  });
-
-  it('reads and checks token and settings under various conditions', () => {
-    const home = makeTempDir('gemini-auth-test-');
-    const env = { ...process.env, GEMINI_HOME: home };
-    const acpDir = join(home, 'antigravity-acp');
-    mkdirSync(acpDir, { recursive: true });
-
-    expect(hasNativeAcpToken(env)).toBe(false);
-    writeFileSync(join(acpDir, 'acp_token.json'), '{}');
-    expect(hasNativeAcpToken(env)).toBe(false);
-
-    writeFileSync(join(acpDir, 'acp_token.json'), JSON.stringify({ access_token: '1234567890', refresh_token: 'abcdef' }));
-    expect(hasNativeAcpToken(env)).toBe(true);
-    expect(readNativeAcpSettings(env)).toBeNull();
-
-    writeFileSync(join(acpDir, 'settings.json'), 'INVALID_JSON');
-    expect(readNativeAcpSettings(env)).toBeNull();
-
-    writeNativeAcpAuthType('oauth-business', env);
-    expect(readConfiguredNativeAuthType(env)).toBe('oauth-business');
-
-    writeNativeAcpAuthType(null, env);
-    expect(readConfiguredNativeAuthType(env)).toBeNull();
-    expect(isAuthExplicitlyCleared(env)).toBe(true);
-  });
-
-  it('prepareSanitizedGeminiHome sanitizes dead MCP pipes in a separate ZCC home without modifying source', () => {
-    const home = makeTempDir('gemini-mcp-test-');
-    const stateHome = makeTempDir('gemini-state-');
-    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: stateHome };
-
-    const acpDir = join(home, 'antigravity-acp');
-    mkdirSync(acpDir, { recursive: true });
-    writeFileSync(join(acpDir, 'acp_token.json'), JSON.stringify({ token: 'abc-token-1234567' }));
-
-    const configDir = join(home, 'config');
-    mkdirSync(configDir, { recursive: true });
-    writeFileSync(
-      join(configDir, 'mcp_config.json'),
-      JSON.stringify({
-        mcpServers: {
-          activeServer: { command: 'node', args: ['server.js'] },
-          deadProxy: { command: 'node', args: ['some/path/mcp_proxy_bundle.js', 'tool-antigravityide'] }
-        }
-      })
-    );
-
-    const res = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
-    expect(res.geminiHome).not.toBe(home);
-    expect(res.disabledDeadMcpServers).toContain('deadProxy');
-    expect(readConfiguredNativeAuthType({ ...env, GEMINI_HOME: res.geminiHome })).toBe('oauth-personal');
-
-    const sourceMcp = JSON.parse(readFileSync(join(configDir, 'mcp_config.json'), 'utf8'));
-    expect(sourceMcp.mcpServers.deadProxy).toBeDefined();
-  });
-
-  it('prepareSanitizedGeminiHome syncs between managed home and user home', () => {
-    const userHome = makeTempDir('user-home-');
-    const stateHome = makeTempDir('state-home-');
-    const env: NodeJS.ProcessEnv = { USERPROFILE: userHome, HOME: userHome, ZCC_DATA_DIR: stateHome };
-    delete env.GEMINI_HOME;
-
-    const userAcp = join(userHome, '.gemini', 'antigravity-acp');
-    mkdirSync(userAcp, { recursive: true });
-    writeFileSync(join(userAcp, 'acp_token.json'), JSON.stringify({ token: 'user-token-12345' }));
-
-    const res = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
-    expect(res.geminiHome).toContain(stateHome);
-
-    const syncedToken = join(stateHome, 'state', 'antigravity-gemini-home', 'antigravity-acp', 'acp_token.json');
-    expect(readFileSync(syncedToken, 'utf8')).toContain('user-token-12345');
-  });
-
   it('extractModelsFromSessionResult extracts models and reasoning configuration metadata', () => {
     expect(extractModelsFromSessionResult(null)).toEqual([]);
     expect(extractModelsFromSessionResult({})).toEqual([]);
@@ -209,16 +109,6 @@ describe('native-auth.ts unit tests', () => {
       models: { availableModels: [{ id: 'removed', name: 'Removed' }] } })).toEqual([]);
   });
 
-  it('invalidates cloud credentials when their contents change at the same path', () => {
-    const home = makeTempDir('cloud-identity-');
-    const credentialsPath = join(home, 'credentials.json');
-    const env = { GEMINI_HOME: home, GOOGLE_APPLICATION_CREDENTIALS: credentialsPath };
-    writeFileSync(credentialsPath, '{"account":"one"}');
-    const first = computeCredentialFingerprint(env, 'agent-platform');
-    writeFileSync(credentialsPath, '{"account":"two"}');
-    expect(computeCredentialFingerprint(env, 'agent-platform')).not.toBe(first);
-  });
-
   it('preserves generic server errors instead of reporting them as expired authentication', async () => {
     const home = makeTempDir('probe-network-');
     const fakeExe = join(home, 'agy.exe');
@@ -233,14 +123,6 @@ describe('native-auth.ts unit tests', () => {
       env: { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home }, spawnImpl: () => child, forceRefresh: true });
     expect(result.state).toBe('runtime_launches');
     expect(result.error).toContain('Backend temporarily unavailable');
-  });
-
-  it('invalidates equal-length API keys when the account changes', () => {
-    const home = makeTempDir('key-identity-');
-    const env = { GEMINI_HOME: home, GEMINI_API_KEY: 'account-one' };
-    expect(computeCredentialFingerprint(env, 'gemini-api-key')).not.toBe(
-      computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'account-two' }, 'gemini-api-key')
-    );
   });
 
   it('shares concurrent catalog refresh and keeps a stale catalog after a transient failure', async () => {
@@ -1099,28 +981,6 @@ describe('native-auth.ts unit tests', () => {
     expect(capturedUrls).toHaveLength(1);
   });
 
-  it('handles corrupted settings JSON and computes credential fingerprints', () => {
-    const home = makeTempDir('corrupt-settings-');
-    const env: NodeJS.ProcessEnv = { ...process.env, GEMINI_HOME: home };
-    const acpDir = join(home, 'antigravity-acp');
-    mkdirSync(acpDir, { recursive: true });
-
-    writeFileSync(join(acpDir, 'settings.json'), '[1, 2, 3]');
-    expect(readNativeAcpSettings(env)).toBeNull();
-    writeFileSync(join(acpDir, 'settings.json'), '42');
-    expect(readNativeAcpSettings(env)).toBeNull();
-
-    const fp1 = computeCredentialFingerprint(env, 'oauth-personal');
-    expect(fp1).toContain('no-token');
-    writeFileSync(join(acpDir, 'acp_token.json'), '{"token":"1234567890123"}');
-    expect(computeCredentialFingerprint(env, 'oauth-personal')).not.toEqual(fp1);
-    expect(computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'secret-key' }, 'gemini-api-key')).toContain('key:');
-    expect(computeCredentialFingerprint({ ...env, GEMINI_API_KEY: 'secret-key' }, 'gemini-api-key')).not.toContain('secret-key');
-    expect(
-      computeCredentialFingerprint({ ...env, GOOGLE_APPLICATION_CREDENTIALS: 'creds.json' }, 'agent-platform')
-    ).toContain('gac');
-  });
-
   it('handles readiness cache TTL expiry and persisted disk cache hits', () => {
     const home = makeTempDir('cache-test-');
     const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: home };
@@ -1132,12 +992,11 @@ describe('native-auth.ts unit tests', () => {
     mkdirSync(acpDir, { recursive: true });
     writeFileSync(join(acpDir, 'acp_token.json'), '{"token":"valid-test-token"}');
 
-    const sanitized = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
-    const effectiveEnv = { ...env, GEMINI_HOME: sanitized.geminiHome };
+    const account = captureAccount({ command: fakeExe, args: [], authMethod: 'oauth-personal', env });
+    const sanitized = account.home;
     const persistPath = join(home, 'state', 'antigravity-native-readiness.json');
-    const configuredAuthType = readConfiguredNativeAuthType(effectiveEnv);
-    const key = JSON.stringify({ command: fakeExe, args: [], authMethod: 'oauth-personal', configuredAuthType });
-    const fingerprint = computeCredentialFingerprint(effectiveEnv, 'oauth-personal');
+    const key = account.readinessKey;
+    const fingerprint = account.fingerprint;
     const writeCache = (checkedAt: number) =>
       writeFileSync(
         persistPath,
