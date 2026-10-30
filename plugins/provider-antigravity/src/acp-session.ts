@@ -15,8 +15,8 @@ export interface NativeSessionOptions {
   /** Names the session in its deadline error, e.g. "session verification". */
   operation: string;
   /**
-   * Interactive sign-in: the runtime may open a browser, there is no overall deadline, and
-   * stderr sign-in prompts only count once a session is requested.
+   * Interactive sign-in: the runtime may open a browser, there is no overall deadline, and stderr
+   * sign-in prompts are expected output rather than a sign-in failure.
    */
   interactive?: boolean;
 }
@@ -155,19 +155,18 @@ export class NativeAcpSession {
    * when session/new itself carried no models.
    */
   async newSession(options: { awaitCatalog?: boolean; timeoutMs?: number } = {}): Promise<NewSessionOutcome> {
-    const baseline = this.options.interactive ? this.signInPrompts : 0;
-    const signIn = new Promise<'sign_in_required'>(resolve => {
-      if (this.signInPrompts > baseline) resolve('sign_in_required');
-      else this.signInWaiters.push(() => resolve('sign_in_required'));
-    });
-    const promptedSince = () => this.signInPrompts > baseline;
-    const session = await Promise.race([
-      this.request('session/new', { cwd: this.options.cwd || process.cwd(), mcpServers: [] }, options.timeoutMs),
-      signIn
+    const prompted = () => !this.options.interactive && this.signInRequested;
+    const request = this.request('session/new', { cwd: this.options.cwd || process.cwd(), mcpServers: [] }, options.timeoutMs);
+    const session = this.options.interactive ? await request : await Promise.race([
+      request,
+      new Promise<'sign_in_required'>(resolve => {
+        if (this.signInRequested) resolve('sign_in_required');
+        else this.signInWaiters.push(() => resolve('sign_in_required'));
+      })
     ]);
-    if (session === 'sign_in_required' || promptedSince()) return { kind: 'sign_in_required' };
+    if (session === 'sign_in_required' || prompted()) return { kind: 'sign_in_required' };
     if (options.awaitCatalog) await this.applyCatalogUpdate(session);
-    return promptedSince() ? { kind: 'sign_in_required' } : { kind: 'ready', session };
+    return prompted() ? { kind: 'sign_in_required' } : { kind: 'ready', session };
   }
 
   /** Resolves true once the runtime advertises `/name`, or false after `waitMs`. */
@@ -184,16 +183,19 @@ export class NativeAcpSession {
   }
 
   /**
-   * Runs a local slash command and collects its text output. The session is stopped if the
-   * command requests a tool or its output exceeds `maxTextChars`.
+   * Runs a local slash command and collects its text output. The session is stopped, and the
+   * command fails, if it requests a tool or its output exceeds `maxTextChars`.
    */
   async runCommand(sessionId: string, name: string, options: { maxTextChars: number }): Promise<{ stopReason: unknown; text: string }> {
     let text = '';
+    const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
+    let requestedTools = false;
     this.notificationListeners.push((method, params) => {
       if (method !== 'session/update') return;
       const update = params?.update;
       if (update?.sessionUpdate === 'tool_call') {
-        this.close(new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`));
+        requestedTools = true;
+        this.close(toolsRequested);
       }
       if (update?.sessionUpdate === 'agent_message_chunk' && update.content?.type === 'text') {
         text += update.content.text;
@@ -203,6 +205,8 @@ export class NativeAcpSession {
       }
     });
     const result = await this.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: `/${name}` }] });
+    // A tool call can arrive in the same chunk as the reply; it still fails the command.
+    if (requestedTools) throw toolsRequested;
     return { stopReason: result?.stopReason, text };
   }
 

@@ -78,16 +78,33 @@ describe('NativeAcpSession', () => {
     session.close();
   });
 
-  it('ignores sign-in prompts printed before an interactive session is requested', async () => {
+  it('treats sign-in prompts as expected output during interactive sign-in', async () => {
     const { session } = open({
       authenticate: (_params, context) => {
         context.stderr('Open the following link to authenticate: https://accounts.google.com/o/oauth2/auth');
         return {};
+      },
+      // A runtime may keep prompting until the browser flow completes.
+      'session/new': (_params, context) => {
+        context.stderr('Launching browser login flow');
+        return new Promise(resolve => context.after(10, () => resolve({ sessionId: 's1' })));
       }
     }, { interactive: true });
     await session.authenticate('oauth-personal');
     expect(await session.newSession()).toEqual({ kind: 'ready', session: { sessionId: 's1' } });
     session.close();
+  });
+
+  it('fails a command whose tool call arrives together with its reply', async () => {
+    const { server, session } = open({ 'session/prompt': () => NO_REPLY });
+    const run = session.runCommand('s1', 'usage', { maxTextChars: 100 });
+    const child = server.processes[0] as any;
+    const id = 1; // The prompt is the session's first request.
+    child.stdout.emit('data', [
+      JSON.stringify({ jsonrpc: '2.0', id, result: { stopReason: 'end_turn' } }),
+      JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 's1', update: { sessionUpdate: 'tool_call' } } })
+    ].join('\n') + '\n');
+    await expect(run).rejects.toThrow('unexpectedly requested tools');
   });
 
   it('keeps a catalog that session/new already carried without waiting', async () => {
