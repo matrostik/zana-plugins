@@ -342,16 +342,26 @@ const catalogRefresh = new KeyedRefresh<NativeReadinessResult>({ failureBackoffM
  * True when a catalog request can be answered from readiness alone, without probing. An empty
  * session_ready catalog stays unsettled so a missed late config_option_update is retried after backoff.
  */
-export function isNativeCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boolean): boolean {
+function isCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boolean): boolean {
   return !forceRefresh && (readiness.state === 'runtime_missing' || readiness.state === 'sign_in_required'
     || (readiness.state === 'session_ready' && readiness.models.length > 0));
 }
 
-/** Refresh only on explicit catalog requests, never on ordinary health reads. */
-export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
+/**
+ * The model catalog, synchronously when cached readiness already settles it, otherwise after one
+ * shared, backed-off refresh. Refresh only on explicit catalog requests, never on health reads.
+ */
+export function resolveNativeCatalog(options: NativeProbeOptions): NativeReadinessResult | Promise<NativeReadinessResult> {
   const account = captureAccount(options);
   const previous = readPreparedReadiness(account);
-  if (isNativeCatalogSettled(previous, options.forceRefresh)) return previous;
+  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
+}
+
+export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
+  return resolveNativeCatalog(options);
+}
+
+function refreshCatalog(options: NativeProbeOptions, account: AccountSnapshot, previous: NativeReadinessResult): Promise<NativeReadinessResult> {
   const key = account.refreshKey;
   return catalogRefresh.run(key, async () => {
     const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);

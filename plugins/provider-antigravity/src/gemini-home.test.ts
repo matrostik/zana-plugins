@@ -1,5 +1,5 @@
 import './test-environment.js';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -74,6 +74,29 @@ describe('gemini-home', () => {
     writeAuthTypeSettings(null, env);
     expect(readConfiguredNativeAuthType(env)).toBeNull();
     expect(isAuthExplicitlyCleared(env)).toBe(true);
+  });
+
+  it('does not restore an auth type the user explicitly cleared', () => {
+    const home = makeTempDir('gemini-cleared-');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: makeTempDir('gemini-cleared-data-') };
+    mkdirSync(join(home, 'antigravity-acp'), { recursive: true });
+    writeFileSync(join(home, 'antigravity-acp', 'acp_token.json'), JSON.stringify({ refresh_token: 'account-one' }));
+    writeAuthTypeSettings(null, env);
+    const prepared = prepareSanitizedGeminiHome({ env, authMethod: 'oauth-personal' });
+    expect(readConfiguredNativeAuthType({ ...env, GEMINI_HOME: prepared.geminiHome })).toBeNull();
+    expect(isAuthExplicitlyCleared({ ...env, GEMINI_HOME: prepared.geminiHome })).toBe(true);
+  });
+
+  it('leaves an unchanged sanitized MCP config untouched', () => {
+    const home = makeTempDir('gemini-mcp-stable-');
+    const env = { ...process.env, GEMINI_HOME: home, ZCC_DATA_DIR: makeTempDir('gemini-mcp-stable-data-') };
+    mkdirSync(join(home, 'config'), { recursive: true });
+    writeFileSync(join(home, 'config', 'mcp_config.json'), JSON.stringify({ mcpServers: { a: { command: 'node' } } }));
+    const target = join(prepareSanitizedGeminiHome({ env }).geminiHome, 'config', 'mcp_config.json');
+    const past = new Date(Date.now() - 60_000);
+    utimesSync(target, past, past);
+    prepareSanitizedGeminiHome({ env });
+    expect(statSync(target).mtimeMs).toBe(past.getTime());
   });
 
   it('sanitizes dead MCP pipes in a separate ZCC home without modifying source', () => {

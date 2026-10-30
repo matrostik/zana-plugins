@@ -10,7 +10,7 @@ import {
   extractModelsFromSessionResult,
   getFastNativeReadiness,
   getNativeCatalog,
-  isNativeCatalogSettled,
+  resolveNativeCatalog,
   probeNativeAcpReadiness,
   queryNativeUsage,
   startNativeAcpSignIn,
@@ -259,12 +259,19 @@ describe('native-auth.ts unit tests', () => {
     expect(afterSwitch.catalogStale).toBeUndefined();
   });
 
-  it('keeps an empty session_ready catalog unsettled so a missed late update is retried', () => {
-    const empty = { state: 'session_ready', models: [] } as unknown as Parameters<typeof isNativeCatalogSettled>[0];
-    const ready = { state: 'session_ready', models: [{ id: 'gemini' }] } as unknown as Parameters<typeof isNativeCatalogSettled>[0];
-    expect(isNativeCatalogSettled(empty)).toBe(false);
-    expect(isNativeCatalogSettled(ready)).toBe(true);
-    expect(isNativeCatalogSettled(ready, true)).toBe(false);
+  it('retries an empty session_ready catalog after the backoff, then settles on a non-empty one', async () => {
+    const { command, env } = signedIn('catalog-empty-retry-');
+    let models: string[] = [];
+    const server = new FakeAcpServer({ 'session/new': () => catalogSession(...models) });
+    const options = { command, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl: server.spawnImpl };
+    expect((await getNativeCatalog(options)).models).toEqual([]);
+    await getNativeCatalog(options);
+    expect(server.spawnCount).toBe(1);
+    models = ['gemini'];
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+    expect((await getNativeCatalog(options)).models.map(model => model.id)).toEqual(['gemini']);
+    expect(resolveNativeCatalog(options)).toMatchObject({ state: 'session_ready' });
+    expect(server.spawnCount).toBe(2);
   });
 
   it('backs off a failed catalog probe that wrote its own headless auth type', async () => {

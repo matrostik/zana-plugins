@@ -263,6 +263,16 @@ function isIdeNamedPipeMcpProxyUnreachable(serverConfig: any): boolean {
   return true;
 }
 
+/** Preparing the home runs on hot paths; leave files alone when their contents already match. */
+function writeFileIfChanged(filePath: string, contents: string): void {
+  try {
+    if (readFileSync(filePath, 'utf8') === contents) return;
+  } catch {
+    // Missing or unreadable: write it
+  }
+  writeFileSync(filePath, contents, 'utf8');
+}
+
 function sanitizeMcpConfigFile(
   sourceGeminiHome: string,
   managedGeminiHome: string
@@ -290,13 +300,9 @@ function sanitizeMcpConfigFile(
         }
         sanitizedServers[serverName] = serverCfg;
       }
-      writeFileSync(
-        targetMcpConfigPath,
-        JSON.stringify({ ...raw, mcpServers: sanitizedServers }, null, 2) + '\n',
-        'utf8'
-      );
+      writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ ...raw, mcpServers: sanitizedServers }, null, 2) + '\n');
     } catch {
-      writeFileSync(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + '\n', 'utf8');
+      writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + '\n');
     }
   } else if (!existsSync(targetMcpConfigPath)) {
     writeFileSync(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + '\n', 'utf8');

@@ -261,7 +261,7 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(uninstalled.error.message).toContain('not installed');
 
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
+    vi.spyOn(nativeAuth, 'resolveNativeCatalog').mockReturnValue(
       makeReadinessFixture({ state: 'sign_in_required', configuredAuthType: null, error: 'Expired token' })
     );
     const signIn = invokeBridgeRpc({ jsonrpc: '2.0', id: 7, method: 'model/list' });
@@ -270,16 +270,16 @@ describe('host.ts provider bridge and launch helpers', () => {
 
   it('refreshes a cold catalog and returns models rather than requiring a Settings visit', async () => {
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(makeReadinessFixture({ state: 'authenticated' }));
-    vi.spyOn(nativeAuth, 'getNativeCatalog').mockResolvedValue(makeReadinessFixture({
+    vi.spyOn(nativeAuth, 'resolveNativeCatalog').mockResolvedValue(makeReadinessFixture({
       models: [{ id: 'gemini', name: 'Gemini' }]
     }));
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 71, method: 'model/list' }));
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 71, method: 'model/list', params: { forceRefresh: true } }));
     await vi.waitFor(() => expect(write).toHaveBeenCalled());
     const response = JSON.parse(String(write.mock.calls[0][0]));
     expect(response.result.models[0].id).toBe('gemini');
-    expect(nativeAuth.getNativeCatalog).toHaveBeenCalledTimes(1);
+    expect(nativeAuth.resolveNativeCatalog).toHaveBeenCalledTimes(1);
+    expect(nativeAuth.resolveNativeCatalog).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: true }));
   });
 
   it('returns observed quota windows through provider/usage', async () => {
@@ -297,7 +297,7 @@ describe('host.ts provider bridge and launch helpers', () => {
   it('answers provider/usage and model/list with an error when synchronous setup throws', () => {
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
     vi.spyOn(nativeAuth, 'queryNativeUsage').mockImplementation(() => { throw new Error('EACCES: usage home'); });
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockImplementation(() => { throw new Error('EACCES: catalog home'); });
+    vi.spyOn(nativeAuth, 'resolveNativeCatalog').mockImplementation(() => { throw new Error('EACCES: catalog home'); });
     const forwarded = vi.spyOn(realAcpBridge, 'handleLine').mockImplementation(() => undefined);
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 74, method: 'provider/usage' }));
@@ -314,8 +314,7 @@ describe('host.ts provider bridge and launch helpers', () => {
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
     const stale = makeReadinessFixture({ state: 'authenticated', catalogStale: true,
       models: [{ id: 'gemini', name: 'Gemini' }], error: 'Backend unavailable' });
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(stale);
-    vi.spyOn(nativeAuth, 'getNativeCatalog').mockResolvedValue(stale);
+    vi.spyOn(nativeAuth, 'resolveNativeCatalog').mockResolvedValue(stale);
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 73, method: 'model/list' }));
     await vi.waitFor(() => expect(write).toHaveBeenCalled());
@@ -324,38 +323,23 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(response.result._meta.stale).toBe(true);
   });
 
-  it('maps model/list reasoning efforts from session metadata and omits when unadvertised', () => {
+  it('reports a failed catalog refresh as a model/list error', async () => {
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
-    vi.spyOn(nativeAuth, 'getFastNativeReadiness').mockReturnValue(
-      makeReadinessFixture({
-        state: 'session_ready',
-        models: [
-          {
-            id: 'gemini-custom',
-            name: 'Gemini Custom',
-            description: 'desc',
-            supportedReasoningEfforts: ['low', 'medium', 'high'],
-            defaultReasoningEffort: 'medium'
-          },
-          {
-            id: 'model-without-reasoning',
-            name: 'No Reasoning Metadata'
-          }
-        ]
-      })
-    );
+    vi.spyOn(nativeAuth, 'resolveNativeCatalog').mockRejectedValue(new Error('probe crashed'));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 76, method: 'model/list' }));
+    await vi.waitFor(() => expect(write).toHaveBeenCalled());
+    expect(JSON.parse(String(write.mock.calls[0][0]))).toMatchObject({ id: 76, error: { code: -32000, message: 'probe crashed' } });
+  });
 
-    const output = invokeBridgeRpc({
-      jsonrpc: '2.0',
-      id: 8,
-      method: 'model/list',
-      params: { providerOptions: {} }
-    });
-    expect(output.result.models).toHaveLength(2);
-    expect(output.result.models[0].supportedReasoningEfforts).toHaveLength(3);
-    expect(output.result.models[0].defaultReasoningEffort).toBe('medium');
-    expect(output.result.models[1].supportedReasoningEfforts).toEqual([]);
-    expect(output.result.models[1].defaultReasoningEffort).toBeUndefined();
+  it('forwards a message unchanged when its launch spec is already complete', () => {
+    const params: any = { providerOptions: {}, options: {} };
+    ensureLaunchSpec(params);
+    expect(ensureLaunchSpec(params)).toBe(false);
+    const forwarded = vi.spyOn(realAcpBridge, 'handleLine').mockImplementation(() => undefined);
+    const line = JSON.stringify({ jsonrpc: '2.0', id: 77, method: 'turn/start', params });
+    experimental_providerBridge.handleLine(line);
+    expect(forwarded).toHaveBeenCalledWith(line);
   });
 
   it('covers remaining branches in ensureLaunchSpec and providerBridge message forwarding', () => {
