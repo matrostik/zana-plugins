@@ -40,6 +40,68 @@ afterEach(() => {
 });
 
 describe('antigravity provider plugin', () => {
+  it('returns freshly discovered models without depending on the host catalog SDK', async () => {
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog').mockResolvedValue({ state: 'session_ready',
+      models: [{ id: 'fresh', name: 'Fresh' }], modes: [], checkedAt: Date.now() } as any);
+    const login = vi.spyOn(nativeAuth, 'startNativeAcpSignIn');
+    const refresh = vi.fn(async () => ({ models: [], selectedOnlyModels: [] }));
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    expect(await harness.callRpc('auth:recover')).toMatchObject({ ready: true, models: [{ id: 'fresh' }] });
+    expect(probe).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: false }));
+    expect(login).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    await harness.dispose();
+  });
+
+  it('returns the model catalog verified during sign-in even when the host catalog SDK is unavailable', async () => {
+    vi.spyOn(nativeAuth, 'startNativeAcpSignIn').mockResolvedValue({ state: 'session_ready', models: [{ id: 'new', name: 'New model' }], modes: [] } as any);
+    const refresh = vi.fn(async () => { throw new Error('Host unavailable'); });
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    await expect(harness.callRpc('auth:login')).resolves.toMatchObject({ ready: true, models: [{ id: 'new' }] });
+    expect(refresh).not.toHaveBeenCalled();
+    await harness.dispose();
+  });
+
+  it('shares concurrent native recovery independently of a stale host catalog error', async () => {
+    let finish!: (value: any) => void;
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const refresh = vi.fn(async () => ({ models: [], selectedOnlyModels: [], modelLoadError: { code: 'provider_unavailable', detail: 'Bridge offline' } }));
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    const requests = Promise.all([harness.callRpc('auth:recover', { forceRefresh: true }), harness.callRpc('auth:recover')]);
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    finish({ state: 'session_ready', models: [], modes: [], checkedAt: Date.now() });
+    const results = await requests;
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: true }));
+    expect(refresh).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ ready: true });
+    expect(results[0].error).toBeUndefined();
+    await harness.dispose();
+  });
+
+  it('keeps failed background recovery noninteractive and permits a later retry', async () => {
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog')
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValue({ state: 'sign_in_required', models: [], modes: [] } as any);
+    const login = vi.spyOn(nativeAuth, 'startNativeAcpSignIn');
+    const refresh = vi.fn();
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    await expect(harness.callRpc('auth:recover')).rejects.toThrow('Network unavailable');
+    expect(await harness.callRpc('auth:recover')).toMatchObject({ ready: false, state: 'sign_in_required' });
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(login).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    await harness.dispose();
+  });
+
   it('registers the Antigravity Native ACP provider without hardcoded fallback catalog', async () => {
     const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity' });
     plugin(zcc);

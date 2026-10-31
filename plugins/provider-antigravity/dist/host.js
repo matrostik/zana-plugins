@@ -42664,7 +42664,7 @@ function readPreparedReadiness(account) {
   return readinessResult(
     "sign_in_required",
     subjectOf(account, null),
-    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' }
+    { error: 'Google OAuth credentials are not configured yet. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".' }
   );
 }
 async function initializeFor(session, account, configuredAuthType) {
@@ -42700,7 +42700,7 @@ function failureResult(error62, signInRequested, subject) {
   return isAuthRequired ? readinessResult(
     "sign_in_required",
     subject,
-    { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' }
+    { error: 'Native ACP requires authentication. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".' }
   ) : readinessResult("runtime_launches", subject, { error: message });
 }
 function accountChangedResult(subject, fields) {
@@ -42768,13 +42768,13 @@ async function performNativeUsageQuery(options, account) {
   }
 }
 var catalogRefresh = new KeyedRefresh({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
-function isCatalogSettled(readiness, forceRefresh) {
-  return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" || readiness.state === "session_ready" && readiness.models.length > 0);
+function isCatalogSettled(readiness, account, forceRefresh) {
+  return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" && !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType) || readiness.state === "session_ready" && readiness.models.length > 0);
 }
 function resolveNativeCatalog(options) {
   const account = captureAccount(options);
   const previous = readPreparedReadiness(account);
-  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
+  return isCatalogSettled(previous, account, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
 }
 function refreshCatalog(options, account, previous) {
   const key = account.refreshKey;
@@ -42791,6 +42791,11 @@ function refreshCatalog(options, account, previous) {
   }, { whileBackingOff: options.forceRefresh ? void 0 : () => previous });
 }
 async function runNativeReadinessProbe(options, account) {
+  const result = await probeNativeSession(options, account);
+  if (result.state !== "sign_in_required" || !account.isCurrent() || !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType)) return result;
+  return probeNativeSession({ ...options, forceRefresh: true }, account);
+}
+async function probeNativeSession(options, account) {
   const { effectiveEnv } = account;
   const startSlot = account.slot;
   const subject = subjectOf(account);
@@ -42807,7 +42812,7 @@ async function runNativeReadinessProbe(options, account) {
     if (opened.kind === "sign_in_required") {
       const signInResult = readinessResult("sign_in_required", subject, {
         ...fromInitialize(initInfo),
-        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.'
+        error: 'Google OAuth credentials are missing or expired. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".'
       });
       readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
@@ -42908,7 +42913,7 @@ function healthFromReadiness(runtime, readiness) {
   const installedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
   const planLabel = readiness.tierName ?? null;
   if (readiness.state === "session_ready") return { status: "ready", statusMessage: null, planLabel, installedVersion };
-  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google." : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.');
+  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? 'Sign in required. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".' : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.');
   return { status: readiness.state === "sign_in_required" ? "unauthenticated" : "unknown", statusMessage, planLabel, installedVersion };
 }
 function formatEffortDescription(level) {
@@ -42934,7 +42939,7 @@ function modelListNotInstalled() {
 }
 function modelListFromReadiness(readiness) {
   if (readiness.state === "sign_in_required") {
-    const message = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
+    const message = readiness.error || 'Google Antigravity Native ACP is not authenticated. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".';
     return { error: { code: -32e3, message, data: { recovery: { kind: "authRequired", message, retryable: false } } } };
   }
   if (readiness.models.length === 0) {

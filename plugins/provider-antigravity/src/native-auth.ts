@@ -132,7 +132,7 @@ function readPreparedReadiness(account: AccountSnapshot): NativeReadinessResult 
       { modes: ['default', 'auto_edit', 'yolo'] });
   }
   return readinessResult('sign_in_required', subjectOf(account, null),
-    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' });
+    { error: 'Google OAuth credentials are not configured yet. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".' });
 }
 
 /** Initializes the runtime and, for env-credential methods without a configured auth type, authenticates headlessly. */
@@ -172,7 +172,7 @@ function failureResult(error: any, signInRequested: boolean, subject: ReadinessS
     error?.data?.recovery?.kind === 'authRequired';
   return isAuthRequired
     ? readinessResult('sign_in_required', subject,
-      { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' })
+      { error: 'Native ACP requires authentication. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".' })
     : readinessResult('runtime_launches', subject, { error: message });
 }
 
@@ -242,8 +242,9 @@ const catalogRefresh = new KeyedRefresh<NativeReadinessResult>({ failureBackoffM
  * True when a catalog request can be answered from readiness alone, without probing. An empty
  * session_ready catalog stays unsettled so a missed late config_option_update is retried after backoff.
  */
-function isCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boolean): boolean {
-  return !forceRefresh && (readiness.state === 'runtime_missing' || readiness.state === 'sign_in_required'
+function isCatalogSettled(readiness: NativeReadinessResult, account: AccountSnapshot, forceRefresh?: boolean): boolean {
+  return !forceRefresh && (readiness.state === 'runtime_missing'
+    || (readiness.state === 'sign_in_required' && !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType))
     || (readiness.state === 'session_ready' && readiness.models.length > 0));
 }
 
@@ -254,7 +255,7 @@ function isCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boole
 export function resolveNativeCatalog(options: NativeProbeOptions): NativeReadinessResult | Promise<NativeReadinessResult> {
   const account = captureAccount(options);
   const previous = readPreparedReadiness(account);
-  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
+  return isCatalogSettled(previous, account, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
 }
 
 export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
@@ -284,6 +285,18 @@ async function runNativeReadinessProbe(
   options: NativeProbeOptions,
   account: AccountSnapshot
 ): Promise<NativeReadinessResult> {
+  const result = await probeNativeSession(options, account);
+  if (result.state !== 'sign_in_required' || !account.isCurrent()
+    || !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType)) return result;
+  // A fresh runtime can renew saved credentials. Never start an interactive OAuth
+  // authenticate in background discovery, and never replay a user turn here.
+  return probeNativeSession({ ...options, forceRefresh: true }, account);
+}
+
+async function probeNativeSession(
+  options: NativeProbeOptions,
+  account: AccountSnapshot
+): Promise<NativeReadinessResult> {
   const { effectiveEnv } = account;
   // Failures are attributed to the configuration the probe started with.
   const startSlot = account.slot;
@@ -303,7 +316,7 @@ async function runNativeReadinessProbe(
     if (!account.isCurrent()) return accountChangedResult(subject, fromInitialize(initInfo));
     if (opened.kind === 'sign_in_required') {
       const signInResult = readinessResult('sign_in_required', subject, { ...fromInitialize(initInfo),
-        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.' });
+        error: 'Google OAuth credentials are missing or expired. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".' });
       readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
     }

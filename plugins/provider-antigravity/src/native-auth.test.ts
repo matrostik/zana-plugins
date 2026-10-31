@@ -62,6 +62,42 @@ afterEach(() => {
 });
 
 describe('native-auth.ts unit tests', () => {
+  it('silently retries an expired session once and discovers refreshed models for concurrent callers', async () => {
+    const { command, env } = signedIn('silent-recovery-');
+    const server = new FakeAcpServer({ 'session/new': (_params, context) =>
+      context.spawn === 0 ? fail('credentials expired') : catalogSession('refreshed') });
+    const options = { command, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl: server.spawnImpl };
+    const results = await Promise.all([getNativeCatalog(options), getNativeCatalog(options)]);
+    expect(results.map(result => result.models.map(model => model.id))).toEqual([['refreshed'], ['refreshed']]);
+    expect(server.spawnCount).toBe(2);
+    expect(server.methods()).not.toContain('authenticate');
+    expect(server.endedCount).toBe(2);
+  });
+
+  it('bounds failed silent recovery and retries after cooldown without visiting settings', async () => {
+    const { command, env } = signedIn('silent-cooldown-');
+    let expired = true;
+    const server = new FakeAcpServer({ 'session/new': () => expired ? fail('credentials expired') : catalogSession('recovered') });
+    const options = { command, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl: server.spawnImpl };
+    expect((await getNativeCatalog(options)).state).toBe('sign_in_required');
+    expect(server.spawnCount).toBe(2);
+    expect((await getNativeCatalog(options)).state).toBe('sign_in_required');
+    expect(server.spawnCount).toBe(2);
+    expired = false;
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + 31_000);
+    expect((await getNativeCatalog(options)).models.map(model => model.id)).toEqual(['recovered']);
+    expect(server.spawnCount).toBe(3);
+  });
+
+  it('does not attempt silent recovery after explicit sign-out', async () => {
+    const { command, env } = signedIn('silent-signout-');
+    writeNativeAcpAuthType(null, env);
+    const server = new FakeAcpServer();
+    expect((await getNativeCatalog({ command, args: [], authMethod: 'oauth-personal', env, spawnImpl: server.spawnImpl })).state).toBe('sign_in_required');
+    expect(server.spawnCount).toBe(0);
+  });
+
   it('extractModelsFromSessionResult extracts models and reasoning configuration metadata', () => {
     expect(extractModelsFromSessionResult(null)).toEqual([]);
     expect(extractModelsFromSessionResult({})).toEqual([]);

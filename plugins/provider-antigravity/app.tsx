@@ -397,7 +397,62 @@ export function AntigravitySettingsSection() {
   );
 }
 
+export function AntigravityAccountPanel() {
+  const rpc = useRpc();
+  const [status, setStatus] = useState<DoctorStatusResult | null>(null);
+  const [recovering, setRecovering] = useState(true);
+  const [busy, setBusy] = useState<'login' | 'logout' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const requestVersion = useRef(0);
+  const { handleSignIn } = useAuthActions(rpc, setStatus, setBusy, setError, pollTimer);
+  const recover = useCallback(async (forceRefresh = false) => {
+    const version = ++requestVersion.current;
+    setRecovering(true);
+    setError(null);
+    try {
+      const result = await rpc.call('auth:recover', { forceRefresh }) as DoctorStatusResult;
+      if (requestVersion.current === version) setStatus(result);
+    } catch (err: any) {
+      if (requestVersion.current === version) setError(err?.message || 'Could not reconnect Antigravity.');
+    } finally {
+      if (requestVersion.current === version) setRecovering(false);
+    }
+  }, [rpc]);
+  useEffect(() => {
+    ensureStyles();
+    void recover();
+    return () => {
+      requestVersion.current++;
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
+  }, [recover]);
+  return <div className="agy-account-panel">
+    <h2>Antigravity account</h2>
+    <p className="agy-desc">Checks the account on this computer. Saved credentials are renewed automatically when possible.</p>
+    <p role="status" aria-live="polite">{recovering ? 'Checking saved credentials…'
+      : busy === 'login' ? 'Complete Google sign-in in your browser…'
+      : status?.ready ? 'Connected'
+      : status?.state === 'sign_in_required' ? 'Google sign-in is required. Reconnect here to continue.'
+      : 'Antigravity could not connect.'}</p>
+    {(error || status?.error) && <p className="agy-desc agy-desc-error" role="alert">{error || status?.error}</p>}
+    <div className="agy-actions">
+      <button className="agy-btn" disabled={recovering || busy !== null} onClick={() => void recover(true)}>Check again</button>
+      <button className="agy-btn" disabled={recovering || busy !== null || !status?.installed} onClick={handleSignIn}>Reconnect Antigravity</button>
+    </div>
+    {status?.pendingAuthUrl && <a href={status.pendingAuthUrl} target="_blank" rel="noreferrer">Open Google sign-in</a>}
+    <DiscoveredModelsList status={status} />
+    {status?.ready && <p className="agy-desc">If the model picker still shows an earlier error, use its refresh button to reload these models.</p>}
+  </div>;
+}
+
 export default definePluginApp((app) => {
+  app.slots.threadPanelAction({
+    id: 'antigravity-account',
+    title: 'Antigravity account',
+    icon: 'KeyRound',
+    component: AntigravityAccountPanel
+  });
   app.slots.settingsSection({
     id: 'antigravity-provider',
     title: 'Antigravity Provider',
@@ -413,6 +468,9 @@ function ensureStyles() {
   const style = document.createElement('style');
   style.id = id;
   style.textContent = `
+    .agy-account-panel { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; overflow: auto; }
+    .agy-account-panel h2 { font-size: 16px; margin: 0; }
+    .agy-account-panel .agy-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .agy-settings-panel { display: flex; flex-direction: column; gap: 16px; max-width: 680px; }
     .agy-status-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-default, #2a2a2a); background: var(--bg-surface, #141414); }
     .agy-status-header { display: flex; flex-direction: column; gap: 10px; }

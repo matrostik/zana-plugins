@@ -112,7 +112,7 @@ export function healthFromReadiness(runtime: ResolvedNativeRuntime, readiness?: 
   if (readiness.state === 'session_ready') return { status: 'ready', statusMessage: null, planLabel, installedVersion };
   const statusMessage = readiness.error
     || (readiness.state === 'sign_in_required'
-      ? 'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.'
+      ? 'Sign in required. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".'
       : readiness.state === 'authenticated'
       ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.'
       : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.');
@@ -153,7 +153,7 @@ export function modelListNotInstalled(): JsonRpcOutcome {
 export function modelListFromReadiness(readiness: NativeReadinessResult): JsonRpcOutcome {
   if (readiness.state === 'sign_in_required') {
     const message = readiness.error
-      || 'Google Antigravity Native ACP is not authenticated. Open Settings → Antigravity Provider to sign in.';
+      || 'Google Antigravity Native ACP is not authenticated. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".';
     return { error: { code: -32000, message, data: { recovery: { kind: 'authRequired', message, retryable: false } } } };
   }
   if (readiness.models.length === 0) {

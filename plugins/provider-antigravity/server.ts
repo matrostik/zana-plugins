@@ -2,6 +2,7 @@ import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import {
   clearCachedNativeReadiness,
   getFastNativeReadiness,
+  getNativeCatalog,
   getNativeCredentialId,
   GOOGLE_ACP_AUTH_METHODS,
   prepareSanitizedGeminiHome,
@@ -53,8 +54,8 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
       acpLaunchSpec: initialLaunchSpec
     },
     strings: {
-      signInHint: 'Open Settings → Antigravity Provider and click "Sign In with Google" to authenticate.',
-      expiredHint: 'Your Antigravity sign-in expired. Open Settings → Antigravity Provider to re-authenticate.',
+      signInHint: 'Open the thread side panel → Antigravity account and click "Reconnect Antigravity" to sign in.',
+      expiredHint: 'Your Antigravity sign-in needs attention. Open the thread side panel → Antigravity account to reconnect.',
       installUrl: 'https://antigravity.google'
     },
     maintenance: { health: true, usage: true, installation: true },
@@ -76,7 +77,7 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
 
 async function buildDoctorStatus(
   settings: any,
-  options?: { probeNative?: boolean; forceRefresh?: boolean },
+  options?: { probeNative?: boolean; catalog?: boolean; forceRefresh?: boolean },
   pendingAuthUrl: string | null = null
 ): Promise<DoctorStatusResult> {
   const { authMethod, customExecutable } = readProviderSettings(await settings.get());
@@ -87,7 +88,7 @@ async function buildDoctorStatus(
   }
 
   const target = { command: runtime.executable, args: runtime.args, authMethod };
-  const readiness = options?.probeNative
+  const readiness = options?.catalog ? await getNativeCatalog({ ...target, forceRefresh: options.forceRefresh }) : options?.probeNative
     ? await probeNativeAcpReadiness({ ...target, forceRefresh: options?.forceRefresh })
     : getFastNativeReadiness(target);
   return doctorStatus(runtime, { authMethod, pendingAuthUrl, readiness, credentialId: getNativeCredentialId(authMethod) });
@@ -125,7 +126,8 @@ async function handleAuthLogin(
     throw new Error(signInResult.error || 'Interactive Google sign-in failed or timed out.');
   }
 
-  return buildDoctorStatus(settings, { probeNative: false, forceRefresh: true });
+  return doctorStatus(runtime, { authMethod, pendingAuthUrl: null, readiness: signInResult,
+    credentialId: getNativeCredentialId(authMethod) });
 }
 
 function registerRpcMethods(
@@ -133,6 +135,15 @@ function registerRpcMethods(
   settings: any,
   state: { getPendingAuthUrl: () => string | null; setPendingAuthUrl: (url: string | null) => void }
 ) {
+  let recovery: Promise<DoctorStatusResult> | null = null;
+  zcc.rpc.method('auth:recover', (args: unknown) => {
+    if (!recovery) {
+      const forceRefresh = !!args && typeof args === 'object' && (args as Record<string, unknown>).forceRefresh === true;
+      recovery = buildDoctorStatus(settings, { catalog: true, forceRefresh })
+        .finally(() => { recovery = null; });
+    }
+    return recovery;
+  });
   zcc.rpc.method('usage:status', async () => {
     const { authMethod, customExecutable } = readProviderSettings(await settings.get());
     const runtime = resolveRuntime(customExecutable);
@@ -160,7 +171,11 @@ function registerRpcMethods(
     return buildDoctorStatus(settings, { probeNative: false, forceRefresh: true });
   });
 
-  zcc.rpc.method('auth:login', (args: unknown) => handleAuthLogin(settings, args, state));
+  let login: Promise<DoctorStatusResult> | null = null;
+  zcc.rpc.method('auth:login', (args: unknown) => {
+    if (!login) login = handleAuthLogin(settings, args, state).finally(() => { login = null; });
+    return login;
+  });
 
   zcc.rpc.method('auth:logout', async (): Promise<DoctorStatusResult> => {
     writeNativeAcpAuthType(null);

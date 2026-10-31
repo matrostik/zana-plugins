@@ -20,7 +20,7 @@
     },
     "server": "./server.mjs",
     "app": "./app.js",
-    "host": "./dist/host.js",
+    "host": "./host.ts",
     "extra": {
       "threadProvider": true
     }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import './src/test-environment.js';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadPluginApp, renderSlot } from '@zana-ai/zcc-plugin-sdk/testing/app';
 import type { DoctorStatusResult } from './server.js';
 
@@ -53,6 +53,37 @@ async function renderSettingsSlot(rpcHandlers: Record<string, (input: any) => an
 }
 
 describe('antigravity provider app slots', () => {
+  it('recovers an account from the thread panel and starts browser sign-in only on click', async () => {
+    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+    expect(app.threadPanelActions).toHaveLength(1);
+    const login = vi.fn(() => makeDoctorStatus({ models: [{ id: 'fresh', name: 'Fresh model' }] }));
+    const slot = renderSlot(app.threadPanelActions[0]!, { pluginId: 'provider-antigravity', threadId: 'thread-1', params: null }, { rpc: {
+      'auth:recover': () => makeDoctorStatus({ ready: false, authenticated: false, state: 'sign_in_required' }),
+      'doctor:status': () => makeDoctorStatus({ ready: false, state: 'sign_in_required' }),
+      'auth:login': login
+    } });
+    await slot.findByText('Google sign-in is required. Reconnect here to continue.');
+    expect(login).not.toHaveBeenCalled();
+    ((await slot.findByText('Reconnect Antigravity')) as HTMLElement).click();
+    await slot.findByText('Fresh model (fresh)');
+    expect(login).toHaveBeenCalledTimes(1);
+    await slot.findByText('Connected');
+    slot.lifecycle.unmount();
+  });
+
+  it('shows silent recovery errors in the thread panel without starting interactive sign-in', async () => {
+    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+    expect(app.threadPanelActions).toHaveLength(1);
+    const login = vi.fn();
+    const slot = renderSlot(app.threadPanelActions[0]!, { pluginId: 'provider-antigravity', threadId: 'thread-1', params: null }, { rpc: {
+      'auth:recover': () => { throw new Error('Host unavailable'); },
+      'auth:login': login
+    } });
+    await slot.findByText('Host unavailable');
+    expect(login).not.toHaveBeenCalled();
+    slot.lifecycle.unmount();
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
   });
