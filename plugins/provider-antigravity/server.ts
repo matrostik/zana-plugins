@@ -22,6 +22,7 @@ import {
   normalizeAuthMethod,
   readProviderSettings,
   resolveRuntime,
+  SIDE_PANEL_RECONNECT_HINT,
   type DoctorStatusResult
 } from './src/provider-config.js';
 import type { NativeReadinessResult } from './src/readiness-store.js';
@@ -57,8 +58,8 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
       acpLaunchSpec: initialLaunchSpec
     },
     strings: {
-      signInHint: 'Open the thread side panel → Antigravity account and click "Reconnect Antigravity" to sign in.',
-      expiredHint: 'Your Antigravity sign-in needs attention. Open the thread side panel → Antigravity account to reconnect.',
+      signInHint: `${SIDE_PANEL_RECONNECT_HINT.replace(/\.$/, '')} to sign in.`,
+      expiredHint: `Your Antigravity sign-in needs attention. ${SIDE_PANEL_RECONNECT_HINT.replace(/\.$/, '')} to reconnect.`,
       installUrl: 'https://antigravity.google'
     },
     maintenance: { health: true, usage: true, installation: true },

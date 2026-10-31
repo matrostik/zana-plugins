@@ -98,6 +98,16 @@ describe('native-auth.ts unit tests', () => {
     expect(server.spawnCount).toBe(0);
   });
 
+  it('probeNativeAcpReadiness does not retry on sign_in_required even if local credentials exist', async () => {
+    const { command, env } = signedIn('probe-no-retry-');
+    const server = new FakeAcpServer({ 'session/new': () => fail('credentials expired') });
+    const options = { command, args: [], authMethod: 'oauth-personal' as const, env, spawnImpl: server.spawnImpl };
+    const result = await probeNativeAcpReadiness(options);
+    expect(result.state).toBe('sign_in_required');
+    expect(server.spawnCount).toBe(1);
+    expect(server.endedCount).toBe(1);
+  });
+
   it('extractModelsFromSessionResult extracts models and reasoning configuration metadata', () => {
     expect(extractModelsFromSessionResult(null)).toEqual([]);
     expect(extractModelsFromSessionResult({})).toEqual([]);

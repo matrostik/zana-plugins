@@ -397,6 +397,14 @@ export function AntigravitySettingsSection() {
   );
 }
 
+export function formatAccountPanelError(message: string | null | undefined): string | null {
+  if (!message) return null;
+  const stripped = message
+    .replace(/\s*Open the thread side panel → Antigravity account and click "[^"]+"\./g, '')
+    .trim();
+  return stripped || message;
+}
+
 export function AntigravityAccountPanel() {
   const rpc = useRpc();
   const [status, setStatus] = useState<DoctorStatusResult | null>(null);
@@ -435,7 +443,7 @@ export function AntigravityAccountPanel() {
       : status?.ready ? 'Connected'
       : status?.state === 'sign_in_required' ? 'Google sign-in is required. Reconnect here to continue.'
       : 'Antigravity could not connect.'}</p>
-    {(error || status?.error) && <p className="agy-desc agy-desc-error" role="alert">{error || status?.error}</p>}
+    {(error || status?.error) && <p className="agy-desc agy-desc-error" role="alert">{formatAccountPanelError(error || status?.error)}</p>}
     <div className="agy-actions">
       <button className="agy-btn" disabled={recovering || busy !== null} onClick={() => void recover(true)}>Check again</button>
       <button className="agy-btn" disabled={recovering || busy !== null || status?.installed === false} onClick={handleSignIn}>Reconnect Antigravity</button>

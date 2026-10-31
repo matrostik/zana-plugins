@@ -101,6 +101,23 @@ describe('antigravity provider app slots', () => {
     slot.lifecycle.unmount();
   });
 
+  it('strips navigation guidance from errors displayed inside the thread panel', async () => {
+    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+    expect(app.threadPanelActions).toHaveLength(1);
+    const slot = renderSlot(app.threadPanelActions[0]!, { pluginId: 'provider-antigravity', threadId: 'thread-1', params: null }, { rpc: {
+      'auth:recover': () => makeDoctorStatus({
+        ready: false,
+        authenticated: false,
+        state: 'sign_in_required',
+        error: 'Google OAuth credentials are missing or expired. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".'
+      }),
+      'auth:login': vi.fn()
+    } });
+    await slot.findByText('Google OAuth credentials are missing or expired.');
+    expect(slot.queryByText(/Open the thread side panel/)).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
   });

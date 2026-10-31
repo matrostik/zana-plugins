@@ -26,6 +26,11 @@ import {
 import { KeyedRefresh } from './keyed-refresh.js';
 import { parseNativeQuotaWindows, type NativeUsageResult } from './native-usage.js';
 import {
+  AUTH_CREDENTIALS_MISSING_ERROR,
+  AUTH_NOT_CONFIGURED_ERROR,
+  AUTH_REQUIRED_ERROR
+} from './provider-config.js';
+import {
   readinessResult,
   readinessStore,
   runtimeMissingResult,
@@ -132,7 +137,7 @@ function readPreparedReadiness(account: AccountSnapshot): NativeReadinessResult 
       { modes: ['default', 'auto_edit', 'yolo'] });
   }
   return readinessResult('sign_in_required', subjectOf(account, null),
-    { error: 'Google OAuth credentials are not configured yet. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".' });
+    { error: AUTH_NOT_CONFIGURED_ERROR });
 }
 
 /** Initializes the runtime and, for env-credential methods without a configured auth type, authenticates headlessly. */
@@ -172,7 +177,7 @@ function failureResult(error: any, signInRequested: boolean, subject: ReadinessS
     error?.data?.recovery?.kind === 'authRequired';
   return isAuthRequired
     ? readinessResult('sign_in_required', subject,
-      { error: 'Native ACP requires authentication. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".' })
+      { error: AUTH_REQUIRED_ERROR })
     : readinessResult('runtime_launches', subject, { error: message });
 }
 
@@ -265,7 +270,13 @@ export async function getNativeCatalog(options: NativeProbeOptions): Promise<Nat
 function refreshCatalog(options: NativeProbeOptions, account: AccountSnapshot, previous: NativeReadinessResult): Promise<NativeReadinessResult> {
   const key = account.refreshKey;
   return catalogRefresh.run(key, async () => {
-    const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);
+    let result = await probeNativeSession({ ...options, forceRefresh: true }, account);
+    if (result.state === 'sign_in_required' && account.isCurrent()
+      && hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType)) {
+      // A fresh runtime can renew saved credentials. Never start an interactive OAuth
+      // authenticate in background discovery, and never replay a user turn here.
+      result = await probeNativeSession({ ...options, forceRefresh: true }, account);
+    }
     // Never fall back to, or back off on behalf of, a catalog that belongs to a previous sign-in.
     if (!account.isCurrent()) return { result, outcome: 'discard', key };
     // Re-keyed after the probe: its own auth-type write changes the fingerprint the next request will use.
@@ -277,20 +288,7 @@ function refreshCatalog(options: NativeProbeOptions, account: AccountSnapshot, p
 }
 
 export async function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
-  return runNativeReadinessProbe(options, captureAccount(options));
-}
-
-/** Probes readiness and attributes the result to `account`. */
-async function runNativeReadinessProbe(
-  options: NativeProbeOptions,
-  account: AccountSnapshot
-): Promise<NativeReadinessResult> {
-  const result = await probeNativeSession(options, account);
-  if (result.state !== 'sign_in_required' || !account.isCurrent()
-    || !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType)) return result;
-  // A fresh runtime can renew saved credentials. Never start an interactive OAuth
-  // authenticate in background discovery, and never replay a user turn here.
-  return probeNativeSession({ ...options, forceRefresh: true }, account);
+  return probeNativeSession(options, captureAccount(options));
 }
 
 async function probeNativeSession(
@@ -316,7 +314,7 @@ async function probeNativeSession(
     if (!account.isCurrent()) return accountChangedResult(subject, fromInitialize(initInfo));
     if (opened.kind === 'sign_in_required') {
       const signInResult = readinessResult('sign_in_required', subject, { ...fromInitialize(initInfo),
-        error: 'Google OAuth credentials are missing or expired. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".' });
+        error: AUTH_CREDENTIALS_MISSING_ERROR });
       readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
     }
