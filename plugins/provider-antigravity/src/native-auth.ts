@@ -26,6 +26,11 @@ import {
 import { KeyedRefresh } from './keyed-refresh.js';
 import { parseNativeQuotaWindows, type NativeUsageResult } from './native-usage.js';
 import {
+  AUTH_CREDENTIALS_MISSING_ERROR,
+  AUTH_NOT_CONFIGURED_ERROR,
+  AUTH_REQUIRED_ERROR
+} from './provider-config.js';
+import {
   readinessResult,
   readinessStore,
   runtimeMissingResult,
@@ -132,7 +137,7 @@ function readPreparedReadiness(account: AccountSnapshot): NativeReadinessResult 
       { modes: ['default', 'auto_edit', 'yolo'] });
   }
   return readinessResult('sign_in_required', subjectOf(account, null),
-    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' });
+    { error: AUTH_NOT_CONFIGURED_ERROR });
 }
 
 /** Initializes the runtime and, for env-credential methods without a configured auth type, authenticates headlessly. */
@@ -172,7 +177,7 @@ function failureResult(error: any, signInRequested: boolean, subject: ReadinessS
     error?.data?.recovery?.kind === 'authRequired';
   return isAuthRequired
     ? readinessResult('sign_in_required', subject,
-      { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' })
+      { error: AUTH_REQUIRED_ERROR })
     : readinessResult('runtime_launches', subject, { error: message });
 }
 
@@ -242,8 +247,9 @@ const catalogRefresh = new KeyedRefresh<NativeReadinessResult>({ failureBackoffM
  * True when a catalog request can be answered from readiness alone, without probing. An empty
  * session_ready catalog stays unsettled so a missed late config_option_update is retried after backoff.
  */
-function isCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boolean): boolean {
-  return !forceRefresh && (readiness.state === 'runtime_missing' || readiness.state === 'sign_in_required'
+function isCatalogSettled(readiness: NativeReadinessResult, account: AccountSnapshot, forceRefresh?: boolean): boolean {
+  return !forceRefresh && (readiness.state === 'runtime_missing'
+    || (readiness.state === 'sign_in_required' && !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType))
     || (readiness.state === 'session_ready' && readiness.models.length > 0));
 }
 
@@ -254,7 +260,7 @@ function isCatalogSettled(readiness: NativeReadinessResult, forceRefresh?: boole
 export function resolveNativeCatalog(options: NativeProbeOptions): NativeReadinessResult | Promise<NativeReadinessResult> {
   const account = captureAccount(options);
   const previous = readPreparedReadiness(account);
-  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
+  return isCatalogSettled(previous, account, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
 }
 
 export async function getNativeCatalog(options: NativeProbeOptions): Promise<NativeReadinessResult> {
@@ -264,7 +270,13 @@ export async function getNativeCatalog(options: NativeProbeOptions): Promise<Nat
 function refreshCatalog(options: NativeProbeOptions, account: AccountSnapshot, previous: NativeReadinessResult): Promise<NativeReadinessResult> {
   const key = account.refreshKey;
   return catalogRefresh.run(key, async () => {
-    const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);
+    let result = await probeNativeSession({ ...options, forceRefresh: true }, account);
+    if (result.state === 'sign_in_required' && account.isCurrent()
+      && hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType)) {
+      // A fresh runtime can renew saved credentials. Never start an interactive OAuth
+      // authenticate in background discovery, and never replay a user turn here.
+      result = await probeNativeSession({ ...options, forceRefresh: true }, account);
+    }
     // Never fall back to, or back off on behalf of, a catalog that belongs to a previous sign-in.
     if (!account.isCurrent()) return { result, outcome: 'discard', key };
     // Re-keyed after the probe: its own auth-type write changes the fingerprint the next request will use.
@@ -276,11 +288,10 @@ function refreshCatalog(options: NativeProbeOptions, account: AccountSnapshot, p
 }
 
 export async function probeNativeAcpReadiness(options: NativeProbeOptions): Promise<NativeReadinessResult> {
-  return runNativeReadinessProbe(options, captureAccount(options));
+  return probeNativeSession(options, captureAccount(options));
 }
 
-/** Probes readiness and attributes the result to `account`. */
-async function runNativeReadinessProbe(
+async function probeNativeSession(
   options: NativeProbeOptions,
   account: AccountSnapshot
 ): Promise<NativeReadinessResult> {
@@ -303,7 +314,7 @@ async function runNativeReadinessProbe(
     if (!account.isCurrent()) return accountChangedResult(subject, fromInitialize(initInfo));
     if (opened.kind === 'sign_in_required') {
       const signInResult = readinessResult('sign_in_required', subject, { ...fromInitialize(initInfo),
-        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.' });
+        error: AUTH_CREDENTIALS_MISSING_ERROR });
       readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
     }

@@ -42510,6 +42510,133 @@ function parseNativeQuotaWindows(text) {
   return windows;
 }
 
+// src/provider-config.ts
+var SIDE_PANEL_RECONNECT_HINT = 'Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".';
+var SIDE_PANEL_CHECK_AGAIN_HINT = 'Open the thread side panel \u2192 Antigravity account and click "Check again".';
+var AUTH_SIGN_IN_REQUIRED_ERROR = `Sign in required. ${SIDE_PANEL_RECONNECT_HINT}`;
+var AUTH_UNAUTHENTICATED_ERROR = `Google Antigravity Native ACP is not authenticated. ${SIDE_PANEL_RECONNECT_HINT}`;
+var AUTH_CREDENTIALS_MISSING_ERROR = `Google OAuth credentials are missing or expired. ${SIDE_PANEL_RECONNECT_HINT}`;
+var AUTH_NOT_CONFIGURED_ERROR = `Google OAuth credentials are not configured yet. ${SIDE_PANEL_RECONNECT_HINT}`;
+var AUTH_REQUIRED_ERROR = `Native ACP requires authentication. ${SIDE_PANEL_RECONNECT_HINT}`;
+var SESSION_NOT_VERIFIED_HINT = `Local credentials present, but Native ACP session is not verified. ${SIDE_PANEL_CHECK_AGAIN_HINT}`;
+var RUNTIME_LAUNCHED_NOT_VERIFIED_HINT = `Native ACP runtime launched, but session readiness is not verified. ${SIDE_PANEL_CHECK_AGAIN_HINT}`;
+var NO_MODELS_DISCOVERED_ERROR = `No models discovered from Google Antigravity Native ACP session. ${SIDE_PANEL_CHECK_AGAIN_HINT}`;
+var NATIVE_REASONING = {
+  configId: "thinking_level",
+  supportedLevels: ["low", "medium", "high"],
+  defaultLevel: "medium"
+};
+function nativeReasoning() {
+  return { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
+}
+function normalizeAuthMethod(value) {
+  return isValidGoogleAuthMethod(value) ? value : "oauth-personal";
+}
+function normalizeExecutable(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : void 0;
+}
+function resolveRuntime(customExecutable) {
+  return resolveNativeAcpRuntime({ customExecutable });
+}
+function launchEnv(authMethod, home, env) {
+  return {
+    BROWSER: "echo",
+    GEMINI_HOME: home.geminiHome,
+    AGY_ACP_AUTH_METHOD: authMethod,
+    ...authMethod === "gemini-api-key" && env.GEMINI_API_KEY ? { GEMINI_API_KEY: env.GEMINI_API_KEY } : {}
+  };
+}
+function buildNativeLaunchSpec(options = {}) {
+  const authMethod = options.authMethod ?? "oauth-personal";
+  const runtime = resolveRuntime(options.customExecutable);
+  const home = options.home ?? prepareSanitizedGeminiHome({ env: options.env, authMethod });
+  return {
+    displayName: "Antigravity",
+    command: runtime.executable,
+    args: runtime.args,
+    env: launchEnv(authMethod, home, options.env ?? process.env),
+    nativeReasoning: nativeReasoning()
+  };
+}
+function completeLaunchSpec(spec, authMethod, home, env = process.env) {
+  const existing = spec.env && typeof spec.env === "object" ? spec.env : {};
+  const defaults = launchEnv(authMethod, home, env);
+  let changed = spec.env !== existing;
+  const next = { ...existing };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (next[key] === void 0) {
+      next[key] = value;
+      changed = true;
+    }
+  }
+  if (!next.GEMINI_HOME) {
+    next.GEMINI_HOME = home.geminiHome;
+    changed = true;
+  }
+  spec.env = next;
+  if (!spec.nativeReasoning) {
+    spec.nativeReasoning = nativeReasoning();
+    changed = true;
+  }
+  return changed;
+}
+function notInstalledMessage(runtime) {
+  return !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
+}
+function healthFromReadiness(runtime, readiness) {
+  if (!runtime.installed || !readiness) {
+    return { status: "not_installed", statusMessage: notInstalledMessage(runtime), planLabel: null, installedVersion: null };
+  }
+  if (readiness.state === "runtime_missing") {
+    return {
+      status: "not_installed",
+      statusMessage: readiness.error || notInstalledMessage(runtime),
+      planLabel: null,
+      installedVersion: null
+    };
+  }
+  const installedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
+  const planLabel = readiness.tierName ?? null;
+  if (readiness.state === "session_ready") return { status: "ready", statusMessage: null, planLabel, installedVersion };
+  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? AUTH_SIGN_IN_REQUIRED_ERROR : readiness.state === "authenticated" ? SESSION_NOT_VERIFIED_HINT : RUNTIME_LAUNCHED_NOT_VERIFIED_HINT);
+  return { status: readiness.state === "sign_in_required" ? "unauthenticated" : "unknown", statusMessage, planLabel, installedVersion };
+}
+function formatEffortDescription(level) {
+  return `${level.charAt(0).toUpperCase() + level.slice(1)} reasoning effort`;
+}
+function mapDiscoveredModels(models, stale = false) {
+  return models.map((m, idx) => {
+    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
+    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
+    return {
+      id: m.id,
+      model: m.id,
+      displayName: stale ? `${m.name} (cached)` : m.name,
+      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
+      supportedReasoningEfforts: levels.map((level) => ({ reasoningEffort: level, description: formatEffortDescription(level) })),
+      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
+      isDefault: idx === 0
+    };
+  });
+}
+function modelListNotInstalled() {
+  return { error: { code: -32e3, message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings \u2192 Antigravity Provider.` } };
+}
+function modelListFromReadiness(readiness) {
+  if (readiness.state === "sign_in_required") {
+    const message = readiness.error || AUTH_UNAUTHENTICATED_ERROR;
+    return { error: { code: -32e3, message, data: { recovery: { kind: "authRequired", message, retryable: false } } } };
+  }
+  if (readiness.models.length === 0) {
+    return { error: { code: -32e3, message: readiness.error || NO_MODELS_DISCOVERED_ERROR } };
+  }
+  return { result: {
+    models: mapDiscoveredModels(readiness.models, readiness.catalogStale),
+    selectedOnlyModels: [],
+    _meta: { checkedAt: readiness.checkedAt, stale: readiness.catalogStale === true, ...readiness.error ? { warning: readiness.error } : {} }
+  } };
+}
+
 // src/readiness-store.ts
 import { randomUUID } from "node:crypto";
 import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync5, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
@@ -42664,7 +42791,7 @@ function readPreparedReadiness(account) {
   return readinessResult(
     "sign_in_required",
     subjectOf(account, null),
-    { error: 'Google OAuth credentials are not configured yet. Click "Sign In with Google" in Settings.' }
+    { error: AUTH_NOT_CONFIGURED_ERROR }
   );
 }
 async function initializeFor(session, account, configuredAuthType) {
@@ -42700,7 +42827,7 @@ function failureResult(error62, signInRequested, subject) {
   return isAuthRequired ? readinessResult(
     "sign_in_required",
     subject,
-    { error: 'Native ACP requires authentication. Select an auth method and click "Sign In with Google" in Settings.' }
+    { error: AUTH_REQUIRED_ERROR }
   ) : readinessResult("runtime_launches", subject, { error: message });
 }
 function accountChangedResult(subject, fields) {
@@ -42768,18 +42895,21 @@ async function performNativeUsageQuery(options, account) {
   }
 }
 var catalogRefresh = new KeyedRefresh({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
-function isCatalogSettled(readiness, forceRefresh) {
-  return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" || readiness.state === "session_ready" && readiness.models.length > 0);
+function isCatalogSettled(readiness, account, forceRefresh) {
+  return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" && !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType) || readiness.state === "session_ready" && readiness.models.length > 0);
 }
 function resolveNativeCatalog(options) {
   const account = captureAccount(options);
   const previous = readPreparedReadiness(account);
-  return isCatalogSettled(previous, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
+  return isCatalogSettled(previous, account, options.forceRefresh) ? previous : refreshCatalog(options, account, previous);
 }
 function refreshCatalog(options, account, previous) {
   const key = account.refreshKey;
   return catalogRefresh.run(key, async () => {
-    const result = await runNativeReadinessProbe({ ...options, forceRefresh: true }, account);
+    let result = await probeNativeSession({ ...options, forceRefresh: true }, account);
+    if (result.state === "sign_in_required" && account.isCurrent() && hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType)) {
+      result = await probeNativeSession({ ...options, forceRefresh: true }, account);
+    }
     if (!account.isCurrent()) return { result, outcome: "discard", key };
     if (result.state === "session_ready" && result.models.length > 0) return { result, outcome: "success", key: account.refreshKey };
     const keepPrevious = result.state !== "sign_in_required" && result.state !== "session_ready" && previous.models.length > 0;
@@ -42790,7 +42920,7 @@ function refreshCatalog(options, account, previous) {
     };
   }, { whileBackingOff: options.forceRefresh ? void 0 : () => previous });
 }
-async function runNativeReadinessProbe(options, account) {
+async function probeNativeSession(options, account) {
   const { effectiveEnv } = account;
   const startSlot = account.slot;
   const subject = subjectOf(account);
@@ -42807,7 +42937,7 @@ async function runNativeReadinessProbe(options, account) {
     if (opened.kind === "sign_in_required") {
       const signInResult = readinessResult("sign_in_required", subject, {
         ...fromInitialize(initInfo),
-        error: 'Google OAuth credentials are missing or expired. Click "Sign In with Google" to authenticate.'
+        error: AUTH_CREDENTIALS_MISSING_ERROR
       });
       readinessStore.put(startSlot, signInResult, effectiveEnv);
       return signInResult;
@@ -42828,123 +42958,6 @@ async function runNativeReadinessProbe(options, account) {
   } finally {
     session.close();
   }
-}
-
-// src/provider-config.ts
-var NATIVE_REASONING = {
-  configId: "thinking_level",
-  supportedLevels: ["low", "medium", "high"],
-  defaultLevel: "medium"
-};
-function nativeReasoning() {
-  return { ...NATIVE_REASONING, supportedLevels: [...NATIVE_REASONING.supportedLevels] };
-}
-function normalizeAuthMethod(value) {
-  return isValidGoogleAuthMethod(value) ? value : "oauth-personal";
-}
-function normalizeExecutable(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : void 0;
-}
-function resolveRuntime(customExecutable) {
-  return resolveNativeAcpRuntime({ customExecutable });
-}
-function launchEnv(authMethod, home, env) {
-  return {
-    BROWSER: "echo",
-    GEMINI_HOME: home.geminiHome,
-    AGY_ACP_AUTH_METHOD: authMethod,
-    ...authMethod === "gemini-api-key" && env.GEMINI_API_KEY ? { GEMINI_API_KEY: env.GEMINI_API_KEY } : {}
-  };
-}
-function buildNativeLaunchSpec(options = {}) {
-  const authMethod = options.authMethod ?? "oauth-personal";
-  const runtime = resolveRuntime(options.customExecutable);
-  const home = options.home ?? prepareSanitizedGeminiHome({ env: options.env, authMethod });
-  return {
-    displayName: "Antigravity",
-    command: runtime.executable,
-    args: runtime.args,
-    env: launchEnv(authMethod, home, options.env ?? process.env),
-    nativeReasoning: nativeReasoning()
-  };
-}
-function completeLaunchSpec(spec, authMethod, home, env = process.env) {
-  const existing = spec.env && typeof spec.env === "object" ? spec.env : {};
-  const defaults = launchEnv(authMethod, home, env);
-  let changed = spec.env !== existing;
-  const next = { ...existing };
-  for (const [key, value] of Object.entries(defaults)) {
-    if (next[key] === void 0) {
-      next[key] = value;
-      changed = true;
-    }
-  }
-  if (!next.GEMINI_HOME) {
-    next.GEMINI_HOME = home.geminiHome;
-    changed = true;
-  }
-  spec.env = next;
-  if (!spec.nativeReasoning) {
-    spec.nativeReasoning = nativeReasoning();
-    changed = true;
-  }
-  return changed;
-}
-function notInstalledMessage(runtime) {
-  return !runtime.companionFilesPresent && runtime.missingCompanionFiles.length > 0 ? `Missing companion file(s): ${runtime.missingCompanionFiles.join(", ")}` : `Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed.`;
-}
-function healthFromReadiness(runtime, readiness) {
-  if (!runtime.installed || !readiness) {
-    return { status: "not_installed", statusMessage: notInstalledMessage(runtime), planLabel: null, installedVersion: null };
-  }
-  if (readiness.state === "runtime_missing") {
-    return {
-      status: "not_installed",
-      statusMessage: readiness.error || notInstalledMessage(runtime),
-      planLabel: null,
-      installedVersion: null
-    };
-  }
-  const installedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
-  const planLabel = readiness.tierName ?? null;
-  if (readiness.state === "session_ready") return { status: "ready", statusMessage: null, planLabel, installedVersion };
-  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? "Sign in required. Open Settings \u2192 Antigravity Provider to authenticate with Google." : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.');
-  return { status: readiness.state === "sign_in_required" ? "unauthenticated" : "unknown", statusMessage, planLabel, installedVersion };
-}
-function formatEffortDescription(level) {
-  return `${level.charAt(0).toUpperCase() + level.slice(1)} reasoning effort`;
-}
-function mapDiscoveredModels(models, stale = false) {
-  return models.map((m, idx) => {
-    const levels = Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts.filter((l) => typeof l === "string" && l.length > 0) : [];
-    const defaultReasoningEffort = levels.length > 0 ? m.defaultReasoningEffort && levels.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : levels[0] : void 0;
-    return {
-      id: m.id,
-      model: m.id,
-      displayName: stale ? `${m.name} (cached)` : m.name,
-      description: m.description || `Google Antigravity Native ACP model (${m.id})`,
-      supportedReasoningEfforts: levels.map((level) => ({ reasoningEffort: level, description: formatEffortDescription(level) })),
-      ...defaultReasoningEffort ? { defaultReasoningEffort } : {},
-      isDefault: idx === 0
-    };
-  });
-}
-function modelListNotInstalled() {
-  return { error: { code: -32e3, message: `Google Antigravity Native ACP runtime (v${PINNED_NATIVE_ACP_VERSION}) is not installed on this host. Install it in Settings \u2192 Antigravity Provider.` } };
-}
-function modelListFromReadiness(readiness) {
-  if (readiness.state === "sign_in_required") {
-    const message = readiness.error || "Google Antigravity Native ACP is not authenticated. Open Settings \u2192 Antigravity Provider to sign in.";
-    return { error: { code: -32e3, message, data: { recovery: { kind: "authRequired", message, retryable: false } } } };
-  }
-  if (readiness.models.length === 0) {
-    return { error: { code: -32e3, message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' } };
-  }
-  return { result: {
-    models: mapDiscoveredModels(readiness.models, readiness.catalogStale),
-    selectedOnlyModels: [],
-    _meta: { checkedAt: readiness.checkedAt, stale: readiness.catalogStale === true, ...readiness.error ? { warning: readiness.error } : {} }
-  } };
 }
 
 // host.ts

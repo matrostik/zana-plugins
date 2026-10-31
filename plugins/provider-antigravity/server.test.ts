@@ -40,6 +40,99 @@ afterEach(() => {
 });
 
 describe('antigravity provider plugin', () => {
+  it('returns freshly discovered models without depending on the host catalog SDK', async () => {
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog').mockResolvedValue({ state: 'session_ready',
+      models: [{ id: 'fresh', name: 'Fresh' }], modes: [], checkedAt: Date.now() } as any);
+    const login = vi.spyOn(nativeAuth, 'startNativeAcpSignIn');
+    const refresh = vi.fn(async () => ({ models: [], selectedOnlyModels: [] }));
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    expect(await harness.callRpc('auth:recover')).toMatchObject({ ready: true, models: [{ id: 'fresh' }] });
+    expect(probe).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: false }));
+    expect(login).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    await harness.dispose();
+  });
+
+  it('returns the model catalog verified during sign-in even when the host catalog SDK is unavailable', async () => {
+    vi.spyOn(nativeAuth, 'startNativeAcpSignIn').mockResolvedValue({ state: 'session_ready', models: [{ id: 'new', name: 'New model' }], modes: [] } as any);
+    const refresh = vi.fn(async () => { throw new Error('Host unavailable'); });
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    await expect(harness.callRpc('auth:login')).resolves.toMatchObject({ ready: true, models: [{ id: 'new' }] });
+    expect(refresh).not.toHaveBeenCalled();
+    await harness.dispose();
+  });
+
+  it('shares concurrent native recovery independently of a stale host catalog error', async () => {
+    let finish!: (value: any) => void;
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const refresh = vi.fn(async () => ({ models: [], selectedOnlyModels: [], modelLoadError: { code: 'provider_unavailable', detail: 'Bridge offline' } }));
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    const requests = Promise.all([harness.callRpc('auth:recover', { forceRefresh: true }), harness.callRpc('auth:recover')]);
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    finish({ state: 'session_ready', models: [], modes: [], checkedAt: Date.now() });
+    const results = await requests;
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: true }));
+    expect(refresh).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ ready: true });
+    expect(results[0].error).toBeUndefined();
+    await harness.dispose();
+  });
+
+  it('chains a forced catalog refresh when a forced recovery call arrives while unforced recovery is in flight', async () => {
+    let finishUnforced!: (value: any) => void;
+    let finishForced!: (value: any) => void;
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog')
+      .mockImplementationOnce(() => new Promise(resolve => { finishUnforced = resolve; }))
+      .mockImplementationOnce(() => new Promise(resolve => { finishForced = resolve; }));
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity' });
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+
+    const unforcedReq = harness.callRpc('auth:recover');
+    await vi.waitFor(() => expect(finishUnforced).toBeDefined());
+
+    const forcedReq = harness.callRpc('auth:recover', { forceRefresh: true });
+
+    finishUnforced({ state: 'session_ready', models: [{ id: 'stale' }], modes: [], checkedAt: 1000, catalogStale: true });
+    const unforcedResult = await unforcedReq;
+    expect(unforcedResult).toMatchObject({ models: [{ id: 'stale' }] });
+
+    await vi.waitFor(() => expect(finishForced).toBeDefined());
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(probe).toHaveBeenNthCalledWith(1, expect.objectContaining({ forceRefresh: false }));
+    expect(probe).toHaveBeenNthCalledWith(2, expect.objectContaining({ forceRefresh: true }));
+
+    finishForced({ state: 'session_ready', models: [{ id: 'fresh' }], modes: [], checkedAt: 2000, catalogStale: false });
+    const forcedResult = await forcedReq;
+    expect(forcedResult).toMatchObject({ models: [{ id: 'fresh' }] });
+
+    await harness.dispose();
+  });
+
+  it('keeps failed background recovery noninteractive and permits a later retry', async () => {
+    const probe = vi.spyOn(nativeAuth, 'getNativeCatalog')
+      .mockRejectedValueOnce(new Error('Network unavailable'))
+      .mockResolvedValue({ state: 'sign_in_required', models: [], modes: [] } as any);
+    const login = vi.spyOn(nativeAuth, 'startNativeAcpSignIn');
+    const refresh = vi.fn();
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity', loadProviderModels: refresh } as any);
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+    await expect(harness.callRpc('auth:recover')).rejects.toThrow('Network unavailable');
+    expect(await harness.callRpc('auth:recover')).toMatchObject({ ready: false, state: 'sign_in_required' });
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(login).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+    await harness.dispose();
+  });
+
   it('registers the Antigravity Native ACP provider without hardcoded fallback catalog', async () => {
     const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity' });
     plugin(zcc);
@@ -184,6 +277,37 @@ describe('antigravity provider plugin', () => {
     finishSignIn();
     expect(((await login) as any).pendingAuthUrl).toBeNull();
     expect(((await harness.callRpc('doctor:status')) as any).pendingAuthUrl).toBeNull();
+    await harness.dispose();
+  });
+
+  it('rejects concurrent login requesting a different authMethod while deduplicating matching authMethod', async () => {
+    let finishSignIn!: (value: any) => void;
+    const signIn = vi.spyOn(nativeAuth, 'startNativeAcpSignIn').mockImplementation(
+      () => new Promise(resolve => { finishSignIn = resolve; })
+    );
+    const { zcc, harness } = createFakePluginHost({ pluginId: 'provider-antigravity' });
+    plugin(zcc);
+    harness.setSettings({ nativeExecutable: fakeRuntime() });
+
+    const login1 = harness.callRpc('auth:login', { authMethod: 'oauth-personal' });
+    await vi.waitFor(() => expect(finishSignIn).toBeDefined());
+
+    // Concurrent call with SAME authMethod shares in-flight promise
+    const loginSame = harness.callRpc('auth:login', { authMethod: 'oauth-personal' });
+
+    // Concurrent call with DIFFERENT authMethod is rejected
+    await expect(
+      harness.callRpc('auth:login', { authMethod: 'oauth-business' })
+    ).rejects.toThrow('Cannot start sign-in for "oauth-business" while sign-in for "oauth-personal" is in progress.');
+
+    // Original calls succeed
+    finishSignIn({ state: 'session_ready', models: [{ id: 'model-1' }], modes: [] });
+    const res1 = await login1;
+    const resSame = await loginSame;
+    expect(res1).toMatchObject({ ready: true, authMethod: 'oauth-personal' });
+    expect(resSame).toBe(res1);
+    expect(signIn).toHaveBeenCalledTimes(1);
+
     await harness.dispose();
   });
 

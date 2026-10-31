@@ -5,6 +5,8 @@ Google Antigravity ACP thread provider for Zana Command Center, powered directly
 ## 0.3.0 — Catalog recovery, Plan and subscription usage
 
 - Model selection refreshes an expired or cold catalog automatically. Concurrent refreshes share one probe; transient failures preserve the last catalog for the same credentials. Sign-out and credential changes invalidate it.
+- Authentication failures with saved credentials get one noninteractive retry through a fresh native runtime. Failed catalog recovery backs off for 30 seconds; explicit sign-out disables automatic recovery. Google may still require browser sign-in.
+- Open **Antigravity account** from the thread side panel to check credentials or **Reconnect Antigravity** without visiting settings. Recovery returns the verified native model catalog directly. If the model picker still shows an earlier error, use its existing refresh button. No Zana core changes are required.
 - Supports grouped ACP model options and catalog updates. Native model configuration is authoritative over legacy model aliases.
 - Plan appears in the composer and uses the native `/plan` command. Keep Plan selected for planning follow-ups; select Agent explicitly to implement.
 - Settings includes **Check subscription usage**, showing per-pool quota remaining, reset times, and the check timestamp. Provider usage reporting uses the same native `/usage` command. Baseline quota and AI credits are distinct; the command does not currently return an AI-credit balance.
@@ -36,6 +38,7 @@ The saved-mode recovery control belongs to Zana itself and is implemented separa
 4. **Provider config (`src/provider-config.ts`)**: settings normalization, the launch spec (`_meta.parameterizedModelPicker: true`, `nativeReasoning.configId: 'thinking_level'`), and the projections into thread health, `model/list` replies and the Settings doctor status.
 
 5. **Host Provider Bridge (`host.ts`)**:
+   - The manifest declares `host.ts` as its source entry; the build emits `dist/host.js`. Path installs must never use the emitted bundle as the next build's input.
    - Launches `agy_acp_server` as a persistent per-thread ACP server.
    - Intercepts `provider/health`, `model/list`, and `provider/usage`.
    - Transparently upgrades legacy `agy-*` `providerThreadId` resume requests into fresh `thread/start` sessions.

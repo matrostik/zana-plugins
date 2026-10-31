@@ -7,6 +7,19 @@ import {
 import { PINNED_NATIVE_ACP_VERSION, resolveNativeAcpRuntime, type ResolvedNativeRuntime } from './native-runtime.js';
 import type { DiscoveredNativeModel, NativeReadinessResult, NativeSetupState } from './readiness-store.js';
 
+export const SIDE_PANEL_RECONNECT_HINT = 'Open the thread side panel → Antigravity account and click "Reconnect Antigravity".';
+export const SIDE_PANEL_CHECK_AGAIN_HINT = 'Open the thread side panel → Antigravity account and click "Check again".';
+
+export const AUTH_SIGN_IN_REQUIRED_ERROR = `Sign in required. ${SIDE_PANEL_RECONNECT_HINT}`;
+export const AUTH_UNAUTHENTICATED_ERROR = `Google Antigravity Native ACP is not authenticated. ${SIDE_PANEL_RECONNECT_HINT}`;
+export const AUTH_CREDENTIALS_MISSING_ERROR = `Google OAuth credentials are missing or expired. ${SIDE_PANEL_RECONNECT_HINT}`;
+export const AUTH_NOT_CONFIGURED_ERROR = `Google OAuth credentials are not configured yet. ${SIDE_PANEL_RECONNECT_HINT}`;
+export const AUTH_REQUIRED_ERROR = `Native ACP requires authentication. ${SIDE_PANEL_RECONNECT_HINT}`;
+
+export const SESSION_NOT_VERIFIED_HINT = `Local credentials present, but Native ACP session is not verified. ${SIDE_PANEL_CHECK_AGAIN_HINT}`;
+export const RUNTIME_LAUNCHED_NOT_VERIFIED_HINT = `Native ACP runtime launched, but session readiness is not verified. ${SIDE_PANEL_CHECK_AGAIN_HINT}`;
+export const NO_MODELS_DISCOVERED_ERROR = `No models discovered from Google Antigravity Native ACP session. ${SIDE_PANEL_CHECK_AGAIN_HINT}`;
+
 /** Native reasoning is the runtime's thinking_level session option. */
 export const NATIVE_REASONING = {
   configId: 'thinking_level',
@@ -112,10 +125,10 @@ export function healthFromReadiness(runtime: ResolvedNativeRuntime, readiness?: 
   if (readiness.state === 'session_ready') return { status: 'ready', statusMessage: null, planLabel, installedVersion };
   const statusMessage = readiness.error
     || (readiness.state === 'sign_in_required'
-      ? 'Sign in required. Open Settings → Antigravity Provider to authenticate with Google.'
+      ? AUTH_SIGN_IN_REQUIRED_ERROR
       : readiness.state === 'authenticated'
-      ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.'
-      : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.');
+      ? SESSION_NOT_VERIFIED_HINT
+      : RUNTIME_LAUNCHED_NOT_VERIFIED_HINT);
   return { status: readiness.state === 'sign_in_required' ? 'unauthenticated' : 'unknown', statusMessage, planLabel, installedVersion };
 }
 
@@ -152,13 +165,11 @@ export function modelListNotInstalled(): JsonRpcOutcome {
 /** The model/list reply for a catalog: models, or an error that says how to recover. */
 export function modelListFromReadiness(readiness: NativeReadinessResult): JsonRpcOutcome {
   if (readiness.state === 'sign_in_required') {
-    const message = readiness.error
-      || 'Google Antigravity Native ACP is not authenticated. Open Settings → Antigravity Provider to sign in.';
+    const message = readiness.error || AUTH_UNAUTHENTICATED_ERROR;
     return { error: { code: -32000, message, data: { recovery: { kind: 'authRequired', message, retryable: false } } } };
   }
   if (readiness.models.length === 0) {
-    return { error: { code: -32000, message: readiness.error
-      || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings → Antigravity Provider.' } };
+    return { error: { code: -32000, message: readiness.error || NO_MODELS_DISCOVERED_ERROR } };
   }
   return { result: {
     models: mapDiscoveredModels(readiness.models, readiness.catalogStale),
