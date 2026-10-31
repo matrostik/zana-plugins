@@ -704,7 +704,7 @@ describe('local views', () => {
 
     expect(formatLocalDetail(localDetail({ review: null, snapshot: null }))).toContain('Not reviewed yet');
     expect(text).toContain('(stale: files changed since this review)');
-    expect(text).toContain('Latest rerun failed: crashed; showing previous completed results.');
+    expect(text).toContain('Latest rerun failed: crashed; showing selected review.');
   });
 });
 
@@ -783,6 +783,35 @@ describe('views', () => {
   });
 
   describe('getPrDetail', () => {
+    it.each([
+      ['failed', 'sha1'], ['cancelled', 'sha1'], ['failed', 'sha2'], ['cancelled', 'sha2']
+    ] as const)('recovers completed results and preserves a %s rerun at %s', (status, headSha) => {
+      const pr = pullRequest({ headSha });
+      const completed = review({ id: 'rev', prId: pr.id, status: 'completed', headSha: 'sha1' });
+      const latest = review({ id: 'rerun', prId: pr.id, status, headSha, error: status === 'failed' ? 'Provider unavailable' : null });
+      const store = createStore({
+        pullRequests: [pr],
+        reviews: [latest, completed],
+        findings: [finding()],
+        runs: [run()]
+      });
+      const result = getPrDetail(store, pr.id)!;
+      expect(result.review).toEqual({ ...completed, stale: headSha !== completed.headSha });
+      expect(result).toMatchObject({ latestAttempt: latest });
+      expect(result.findings).toEqual([finding()]);
+      expect(result.runs).toEqual([run()]);
+    });
+
+    it.each(['queued', 'running', 'failed', 'cancelled'] as const)('keeps the latest %s review when no completed fallback applies', (status) => {
+      const pr = pullRequest();
+      const latest = review({ id: 'rerun', prId: pr.id, status, headSha: pr.headSha });
+      const reviews = [latest];
+      if (status === 'queued' || status === 'running') reviews.push(review({ prId: pr.id, status: 'completed' }));
+      const result = getPrDetail(createStore({ pullRequests: [pr], reviews }), pr.id)!;
+      expect(result.review).toEqual({ ...latest, stale: false });
+      expect(result).not.toHaveProperty('latestAttempt');
+    });
+
     it('returns null for an unknown pull request', () => {
       expect(getPrDetail(createStore({}), 'missing')).toBeNull();
     });
@@ -833,6 +862,21 @@ describe('views', () => {
   });
 
   describe('formatPrDetail', () => {
+    it.each(['failed', 'cancelled'] as const)('reports a %s rerun alongside completed findings on the same commit', (status) => {
+      const base = detailFixture('completed');
+      const data = {
+        ...base,
+        findings: [finding()],
+        latestAttempt: review({ id: 'rerun', status, headSha: base.review!.headSha, error: status === 'failed' ? 'Provider unavailable' : null })
+      };
+      const output = formatPrDetail(data);
+      expect(output).toContain(`Latest rerun ${status}`);
+      expect(output).toContain('showing previous completed results.');
+      if (status === 'failed') expect(output).toContain('Provider unavailable');
+      expect(output).toContain('Risk 2/10');
+      expect(output).toContain('Null token crashes login');
+    });
+
     it('suggests a review command when the pull request is not reviewed', () => {
       const output = formatPrDetail({ ...detailFixture('completed'), review: null });
       expect(output.split('\n').at(-1)).toBe('Not reviewed yet. Run: zcc codenod review https://github.com/acme/api/pull/1');

@@ -117,6 +117,7 @@ function createHarness(options: HarnessOptions = {}) {
     reviews: () => reviews,
     threads,
     waiter,
+    fixProviders: async () => [{ providerId: 'cursor', displayName: 'Cursor', permissionModes: ['edit', 'full'], error: null, models: [{ id: 'fix-model', label: 'Fix model', reasoningLevels: [] }] }],
     specGlobForProject: async () => 'docs/*.md',
     publish,
     log,
@@ -376,15 +377,29 @@ describe('local reviews', () => {
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 3;\n');
     const spawnsBefore = harness.spawned.length;
 
-    const confirm = await harness.local.fix(review.id, []);
-    const fixed = await harness.local.fix(review.id, [], true);
+    const agent = { providerId: 'cursor', model: 'fix-model', permissionMode: 'edit' };
+    const confirm = await harness.local.fix(review.id, [], false, agent);
+    const fixed = await harness.local.fix(review.id, [], true, agent);
 
     expect(confirm).toEqual({ needsConfirmation: true, reason: 'Files changed since this review.' });
     expect(fixed).toMatchObject({ needsConfirmation: false, threadId: `thread-${spawnsBefore + 1}` });
+    expect(fixed).not.toHaveProperty('priority');
+    expect(fixed).not.toHaveProperty('usedFallback');
     const args = harness.spawned.at(-1)!.args;
     expect(args).toMatchObject({ projectId: 'app', visibility: 'visible', environment: { kind: 'unmanaged' } });
-    expect(args.permissionMode).toBeUndefined();
+    expect(args).toMatchObject({ providerId: 'cursor', model: 'fix-model', permissionMode: 'edit' });
     expect(String(args.prompt)).toContain('Do NOT commit');
+
+    const spawnCount = harness.threads.spawn.mock.calls.length;
+    await expect(harness.local.fix(review.id, [], true, { ...agent, providerId: 'missing' })).rejects.toThrow(/model is unavailable/);
+    await expect(harness.local.fix(review.id, [], true, { ...agent, model: 'removed' })).rejects.toThrow(/model is unavailable/);
+    await expect(harness.local.fix(review.id, [], true, { ...agent, permissionMode: 'read-only' })).rejects.toThrow(/mode is unavailable/);
+    expect(harness.threads.spawn).toHaveBeenCalledTimes(spawnCount);
+    harness.threads.spawn.mockRejectedValueOnce(new Error('Provider quota exceeded'));
+    await expect(harness.local.fix(review.id, [], true, agent)).rejects.toThrow(/Provider quota exceeded/);
+    expect(harness.threads.spawn).toHaveBeenCalledTimes(spawnCount + 1);
+    await harness.local.fix(review.id, [], true, { ...agent, permissionMode: 'full' });
+    expect(harness.spawned.at(-1)?.args.permissionMode).toBe('full');
   });
 
   it('starts Deep Review with full access in a worktree of the snapshot', async () => {
@@ -476,6 +491,13 @@ describe('local reviews', () => {
     expect(olderDetail.review?.id).toBe(first.id);
     expect(olderDetail.latestAttempt).toBeUndefined();
 
+    harness.store.setReviewStatus(second.id, 'running');
+    const latestDetail = getLocalDetail(harness.store, harness.targetId)!;
+    expect(latestDetail.review?.id).toBe(second.id);
+    expect(latestDetail.findings).not.toEqual(detail.findings);
+    expect(latestDetail.history.map((entry) => entry.id)).toContain(first.id);
+    harness.store.setReviewStatus(second.id, 'failed', 'Provider failed');
+    expect(getLocalDetail(harness.store, harness.targetId)?.review?.id).toBe(second.id);
     harness.store.setReviewStatus(second.id, 'running');
     const runningDetail = getLocalDetail(harness.store, harness.targetId, first.id)!;
     expect(runningDetail.review?.id).toBe(first.id);

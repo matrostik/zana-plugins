@@ -383,20 +383,21 @@ describe('codenod server', () => {
     await expect(host.callRpc('post', { reviewId: detail.review!.id, findingIds: [], event: 'APPROVE', approvalToken: 'x' })).rejects.toThrow(/unavailable/);
   });
 
-  it('keeps completed findings while a rerun is queued and after cancellation', async () => {
+  it('shows the new review while queued and recovers completed findings after cancellation', async () => {
     const { host, state } = await setup();
     const first = await reviewToCompletion(host);
     state.headSha = 'sha2';
     const next = await host.callRpc('startReview', { prId: PR_ID }) as { id: string };
     const during = await host.callRpc('detail', { prId: PR_ID }) as PrDetail;
-    expect(during.review?.id).toBe(first.review!.id);
-    expect(during.review?.stale).toBe(true);
-    expect(during.findings).toEqual(first.findings);
-    expect(during.latestAttempt?.id).toBe(next.id);
+    expect(during.review?.id).toBe(next.id);
+    expect(during.review?.stale).toBe(false);
+    expect(during.findings).toEqual([]);
     await host.callRpc('cancelReview', { reviewId: next.id });
-    const after = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.latestAttempt?.status === 'cancelled');
-    expect(after.review?.id).toBe(first.review!.id);
+    const after = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.review?.id === first.review!.id);
+    expect(after.review?.stale).toBe(true);
+    expect(after.latestAttempt).toMatchObject({ id: next.id, status: 'cancelled' });
     expect(after.findings).toEqual(first.findings);
+    expect(first.findings.length).toBeGreaterThan(0);
   });
 
   it('detects commits pushed while a review is running without another manual sync', async () => {
@@ -486,7 +487,6 @@ describe('codenod server', () => {
     await host.callRpc('refresh');
     const next = await waitFor(() => host.callRpc('detail', { prId: PR_ID }) as Promise<PrDetail>, (value) => value.review?.headSha === 'sha2');
     expect(next.review?.stale).toBe(false);
-    expect(next.latestAttempt).toBeUndefined();
   });
 
   it('offers no models from providers that cannot run with full access', async () => {
@@ -502,6 +502,9 @@ describe('codenod server', () => {
 
     expect(providers.find((provider) => provider.providerId === 'claude-code')).toMatchObject({ error: null, models: [{ id: 'opus' }] });
     expect(providers.find((provider) => provider.providerId === 'restricted')).toMatchObject({ error: expect.stringMatching(/full-access/), models: [] });
+    const fixProviders = await host.callRpc('availableFixModels') as Array<{ providerId: string }>;
+    expect(fixProviders.find((provider) => provider.providerId === 'restricted')).toMatchObject({ permissionModes: ['accept-edits'], models: [{ id: 'opus' }] });
+    await expect(host.callRpc('localFix', { reviewId: 'any', agent: { providerId: 'restricted', model: 'opus', permissionMode: 'auto' } })).rejects.toThrow(/Choose Edit or Full/);
   });
 
   it('exposes CLI commands and read-only agent tools', async () => {

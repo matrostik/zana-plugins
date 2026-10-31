@@ -54,7 +54,9 @@ Prerequisites: the folder is a Zana project (or a `git worktree` of one), and at
 **Expected result**: the latest review for the checkout, with **Rerun**, **Deep Review in thread**, **Fix with agent**, and **Delete review**. Earlier reviews are under **History**; click **View** to open one.
 
 - If you edit files after the review, an amber **Working tree changed since this review** banner appears. Click **Review outdated — Rerun**.
-- **Fix with agent** opens a visible thread that edits your checkout with your usual permission prompts. It never commits. If files changed since the review, CodeNod asks before starting. Click **Re-review** when the agent finishes.
+- **Fix with agent** opens a picker for **Provider**, **Model**, and **Mode** (**Edit** or **Full**, as supported by the provider). It offers compatible providers independently of your review model list. Your last launch choices are remembered on this device; the initial choice is the first review model with Edit mode. Full must be chosen explicitly if Edit is unavailable. Launch failures stay in the picker so you can retry or choose another model. The agent edits your checkout and never commits. If files changed since the review, CodeNod asks before starting and preserves your chosen agent through that confirmation. Click **Re-review** when the agent finishes.
+
+Starting a new PR or local review clears the previous scores, summary, findings, and model results from the current view once the server accepts the review, then shows the new progress. If a PR rerun fails or is cancelled, the view returns to the last completed review when available and displays the unsuccessful rerun's status and error alongside those results; terminal output reports it too. Local reviews keep showing the latest attempt, with earlier reviews available through **History**.
 
 ### From the terminal
 
@@ -116,6 +118,8 @@ Create named review prompts and choose a default in CodeNod settings. For a sing
 ## Settings
 
 CodeNod review settings live in the CodeNod panel (**Settings** in the toolbar). The plugin settings page only contains the optional GitHub token fallback, used when `gh auth token` and `git credential fill` are unavailable.
+
+The **Profile** tab presents the prompt library as a compact prompt selector with aligned name and instructions fields. **AI Model** shows actionable warnings for unavailable providers selected in the review configuration; unused provider failures stay under collapsed **Provider diagnostics**.
 
 | Tab | Setting | Default | Purpose |
 | --- | --- | --- | --- |

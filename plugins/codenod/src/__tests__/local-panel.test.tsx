@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodenodPanel } from '../app/CodenodPanel.tsx';
 import { LocalDetail } from '../app/LocalDetail.tsx';
@@ -201,6 +202,67 @@ describe('Pull requests | Local changes switch', () => {
 });
 
 describe('LocalDetail', () => {
+  it('keeps the fix picker open when clicked as soon as review results are committed', async () => {
+    answer({
+      localDetail: localDetail(), localStatus: fresh(), localDiff: [],
+      availableFixModels: [{ providerId: 'cursor', displayName: 'Cursor', models: [{ id: 'a', label: 'A', reasoningLevels: [] }], permissionModes: ['edit'], error: null }]
+    });
+    let clicked = false;
+    render(
+      <Profiler id="local-detail" onRender={() => {
+        const button = screen.queryByRole('button', { name: 'Fix with agent' }) as HTMLButtonElement | null;
+        if (clicked || !button || button.disabled) return;
+        clicked = true;
+        // Exercise the first interactive commit, before passive review-reset effects run.
+        button.click();
+      }}>
+        <LocalDetail rpc={sdk.rpc} location={location()} defaultModels={[{ providerId: 'cursor', model: 'a' }]} hasModels onOpenSettings={() => {}} />
+      </Profiler>
+    );
+    const picker = await screen.findByRole('dialog', { name: 'Fix with agent' });
+    expect(clicked).toBe(true);
+    expect(await within(picker).findByLabelText('Mode')).toBeTruthy();
+    expect(calls('localFix')).toHaveLength(0);
+  });
+
+  it.each(['queued', 'running'] as const)('selects findings when the same %s review completes and preserves later manual selection', async (status) => {
+    const completed = localDetail();
+    let current = localDetail({ review: { ...completed.review!, status }, findings: [], runs: [] });
+    answer({ localDetail: () => current, localStatus: fresh(), localDiff: [] });
+    const view = renderDetail();
+    await screen.findByRole('button', { name: 'Cancel review' });
+    current = completed;
+    const refresh = (reloadToken: number) => view.rerender(<LocalDetail rpc={sdk.rpc} location={location()} defaultModels={[{ providerId: 'cursor', model: 'a' }]} hasModels onOpenSettings={() => {}} reloadToken={reloadToken} />);
+    refresh(1);
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select finding in src/login.ts:12' });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('button', { name: 'Fix with agent' }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(checkbox);
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+    const beforeRefresh = calls('localDetail').length;
+    refresh(2);
+    await waitFor(() => expect(calls('localDetail').length).toBeGreaterThan(beforeRefresh));
+    expect((screen.getByRole('checkbox', { name: 'Select finding in src/login.ts:12' }) as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('starts a new review from history using the latest view instead of restoring the historical result', async () => {
+    let started = false;
+    const previous = localDetail();
+    const running = { ...localDetail().review!, id: 'rev-3', status: 'running' as const, summary: null };
+    answer({
+      localDetail: (args: Record<string, unknown>) => started && !args.reviewId ? localDetail({ review: running, findings: [], runs: [] }) : previous,
+      localStatus: fresh(), localDiff: [],
+      startLocalReview: () => { started = true; return running; }
+    });
+    renderDetail();
+    const history = (await screen.findByText('History (2)')).closest('details')!;
+    fireEvent.click(within(history).getByRole('button', { name: 'View' }));
+    await waitFor(() => expect(calls('localDetail').at(-1)?.reviewId).toBe('rev-1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Rerun' }));
+    await screen.findByRole('button', { name: 'Cancel review' });
+    expect(screen.queryByText('Null token crashes login')).toBeNull();
+    expect(calls('localDetail').at(-1)?.reviewId).toBeUndefined();
+  });
   it('starts a review for the chosen scope, base, and intent', async () => {
     answer({ localDetail: localDetail({ review: null, snapshot: null, runs: [], findings: [], history: [] }), startLocalReview: { id: 'rev-3' } });
     renderDetail();
@@ -347,6 +409,7 @@ describe('LocalDetail', () => {
       localDetail: localDetail(),
       localStatus: fresh(true),
       localDiff: [],
+      availableFixModels: [{ providerId: 'cursor', displayName: 'Cursor', models: [{ id: 'a', label: 'A', reasoningLevels: [] }], permissionModes: ['edit', 'full'], error: null }],
       localFix: (args: Record<string, unknown>) =>
         args.force ? { needsConfirmation: false, threadId: 'fix-1', priority: 1, model: { providerId: 'cursor', model: 'a' }, usedFallback: false } : { needsConfirmation: true, reason: 'Files changed since this review.' },
       startLocalReview: { id: 'rev-3' }
@@ -354,17 +417,72 @@ describe('LocalDetail', () => {
     renderDetail();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Fix with agent' }));
+    const picker = await screen.findByRole('dialog', { name: 'Fix with agent' });
+    expect(calls('localFix')).toHaveLength(0);
+    fireEvent.change(within(picker).getByLabelText('Mode'), { target: { value: 'full' } });
+    fireEvent.click(within(picker).getByRole('button', { name: 'Start fix' }));
     const confirm = await screen.findByRole('group', { name: 'Confirm fix' });
     fireEvent.click(within(confirm).getByRole('button', { name: 'Fix anyway' }));
 
     expect(await screen.findByText(/A fix agent is editing this checkout/)).toBeTruthy();
     expect(calls('localFix')).toEqual([
-      { reviewId: 'rev-2', findingIds: [], force: false },
-      { reviewId: 'rev-2', findingIds: [], force: true }
+      { reviewId: 'rev-2', findingIds: [], force: false, agent: { providerId: 'cursor', model: 'a', permissionMode: 'full' } },
+      { reviewId: 'rev-2', findingIds: [], force: true, agent: { providerId: 'cursor', model: 'a', permissionMode: 'full' } }
     ]);
     expect(toThread).toHaveBeenCalledWith('fix-1');
     fireEvent.click(screen.getByRole('button', { name: 'Re-review' }));
     await waitFor(() => expect(calls('startLocalReview')).toHaveLength(1));
+  });
+
+  it('keeps launch errors in the picker and releases busy state for a retry', async () => {
+    let fail = true;
+    answer({
+      localDetail: localDetail(), localStatus: fresh(), localDiff: [],
+      availableFixModels: [{ providerId: 'cursor', displayName: 'Cursor', models: [{ id: 'a', label: 'A', reasoningLevels: [] }], permissionModes: ['edit'], error: null }],
+      localFix: () => {
+        if (fail) throw new Error('Agent unavailable');
+        return { needsConfirmation: false, threadId: 'fix-1' };
+      }
+    });
+    renderDetail();
+    fireEvent.click(await screen.findByRole('button', { name: 'Fix with agent' }));
+    const picker = await screen.findByRole('dialog', { name: 'Fix with agent' });
+    await within(picker).findByLabelText('Mode');
+    fireEvent.click(within(picker).getByRole('button', { name: 'Start fix' }));
+    expect(await within(picker).findByRole('alert')).toHaveProperty('textContent', 'Agent unavailable');
+    expect((screen.getByRole('button', { name: 'Rerun' }) as HTMLButtonElement).disabled).toBe(false);
+    fail = false;
+    fireEvent.click(within(picker).getByRole('button', { name: 'Start fix' }));
+    expect(await screen.findByText(/A fix agent is editing this checkout/)).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Fix with agent' })).toBeNull();
+  });
+
+  it('reports confirmation errors and clears them while retrying a fix', async () => {
+    const retry = deferred<{ needsConfirmation: false; threadId: string }>();
+    let attempts = 0;
+    answer({
+      localDetail: localDetail(), localStatus: fresh(), localDiff: [],
+      availableFixModels: [{ providerId: 'cursor', displayName: 'Cursor', models: [{ id: 'a', label: 'A', reasoningLevels: [] }], permissionModes: ['edit'], error: null }],
+      localFix: (args: Record<string, unknown>) => {
+        if (!args.force) return { needsConfirmation: true, reason: 'Files changed.' };
+        if (++attempts === 1) throw new Error('Agent unavailable');
+        return retry.promise;
+      }
+    });
+    renderDetail();
+    fireEvent.click(await screen.findByRole('button', { name: 'Fix with agent' }));
+    const picker = await screen.findByRole('dialog', { name: 'Fix with agent' });
+    await within(picker).findByLabelText('Mode');
+    fireEvent.click(within(picker).getByRole('button', { name: 'Start fix' }));
+    const confirm = await screen.findByRole('group', { name: 'Confirm fix' });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Fix anyway' }));
+    expect(await screen.findByText('Agent unavailable')).toBeTruthy();
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Fix anyway' }));
+    expect(screen.queryByText('Agent unavailable')).toBeNull();
+    expect((within(confirm).getByRole('button', { name: 'Fix anyway' }) as HTMLButtonElement).disabled).toBe(true);
+    retry.resolve({ needsConfirmation: false, threadId: 'fix-1' });
+    expect(await screen.findByText(/A fix agent is editing this checkout/)).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Confirm fix' })).toBeNull();
   });
 
   it('starts Deep Review for the selected findings and deletes a review after confirming', async () => {

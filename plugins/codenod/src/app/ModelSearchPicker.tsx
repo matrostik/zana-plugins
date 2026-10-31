@@ -37,6 +37,8 @@ export function ModelPriorityPicker(props: {
   const { value, providers, onChange } = props;
   const providerById = useMemo(() => new Map(providers.map((provider) => [provider.providerId, provider])), [providers]);
   const selectableProviders = providers.filter((provider) => provider.models.length > 0);
+  const failedProviders = providers.filter((provider) => provider.models.length === 0 && provider.error);
+  const selectedFailures = failedProviders.filter((provider) => value.some((choice) => choice.providerId === provider.providerId));
   const [addingModel, setAddingModel] = useState(value.length === 0);
   const unusedModels = (provider: AvailableProvider, exceptIndex = -1) => provider.models.filter((model) =>
     !value.some((choice, index) => index !== exceptIndex && choice.providerId === provider.providerId && choice.model === model.id)
@@ -48,27 +50,32 @@ export function ModelPriorityPicker(props: {
     <section className="cn-model-priority" aria-labelledby="cn-model-priority-heading">
       <h4 id="cn-model-priority-heading">Review model priority</h4>
       <p className="cn-muted cn-small">Models run together for consensus. Priority 1 is tried first for coordinator and Deep Review threads.</p>
-      {providers.some((provider) => provider.models.length === 0 && provider.error) ? (
-        <div className="cn-model-omitted-notice">
-          <svg className="cn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <div>
-            <p>Some providers couldn’t be loaded, so their models aren’t available right now.</p>
-            <ul>
-              {providers.filter((provider) => provider.models.length === 0 && provider.error).map((provider) => (
-                <li key={provider.providerId}>
-                  <strong>{provider.displayName}</strong> — {providerAvailabilityMessage(provider.error!)}{' '}
-                  <details>
-                    <summary>Technical details</summary>
-                    <code>{provider.error}</code>
-                  </details>
-                </li>
-              ))}
-            </ul>
-          </div>
+      {failedProviders.length > 0 ? (
+        <div>
+          {selectedFailures.length > 0 ? <p className="cn-banner cn-banner-warn" role="status">Selected providers unavailable: {selectedFailures.map((provider) => provider.displayName).join(', ')}. Check their configuration or choose another model.</p> : null}
+          <details className="cn-prompt">
+            <summary>Provider diagnostics ({failedProviders.length})</summary>
+            <div className="cn-model-omitted-notice">
+              <svg className="cn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div>
+                <ul>
+                  {failedProviders.map((provider) => (
+                    <li key={provider.providerId}>
+                      <strong>{provider.displayName}</strong> — {providerAvailabilityMessage(provider.error!)}{' '}
+                      <details>
+                        <summary>Technical details</summary>
+                        <code>{provider.error}</code>
+                      </details>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </details>
         </div>
       ) : null}
       {value.length > 0 ? (

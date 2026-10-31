@@ -15,7 +15,7 @@ import { fetchPullRequestHead } from './src/server/review/workspace.ts';
 import { CHANGED_EVENT, createReviewService, parsePromptSelection, resolveRerunSnapshot, type ReviewConfig } from './src/server/review/service.ts';
 import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
 import { createSyncService } from './src/server/sync.ts';
-import type { ModelChoice, PrBucket, ReviewEvent, ReviewRow } from './src/server/types.ts';
+import { FIX_PERMISSION_MODES, type FixProvider, type ModelChoice, type PrBucket, type ReviewEvent, type ReviewRow } from './src/server/types.ts';
 import { mergeCatalogModels } from './src/server/models-catalog.ts';
 import { asRecord, asString, asStringArray, errorMessage, sleep } from './src/server/util.ts';
 import { getLocalDetail, getPrDetail, listPullRequests } from './src/server/views.ts';
@@ -145,6 +145,7 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
     listProjects: () => zcc.sdk.projects.list(),
     config: reviewConfig,
     reviews: () => reviews,
+    fixProviders: availableFixModels,
     threads,
     waiter,
     specGlobForProject: async (projectId) => {
@@ -552,7 +553,13 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
 
   zcc.rpc.method('localFix', (args) => {
     const record = asRecord(args);
-    return local.fix(asString(record, 'reviewId'), asStringArray(record, 'findingIds'), record.force === true);
+    const agent = asRecord(record.agent);
+    const permissionMode = asString(agent, 'permissionMode');
+    if (!FIX_PERMISSION_MODES.some((mode) => mode === permissionMode)) throw new Error('Choose Edit or Full mode before starting a fix.');
+    return local.fix(asString(record, 'reviewId'), asStringArray(record, 'findingIds'), record.force === true, {
+      providerId: asString(agent, 'providerId'), model: asString(agent, 'model'), permissionMode,
+      ...(typeof agent.reasoningLevel === 'string' && agent.reasoningLevel ? { reasoningLevel: agent.reasoningLevel } : {})
+    });
   });
 
   zcc.rpc.method('deleteLocalReview', async (args) => {
@@ -581,6 +588,23 @@ export default async function createCodenodPlugin(zcc: ZccPluginApi, deps: Coden
   });
 
   zcc.rpc.method('availableModels', availableModels);
+  zcc.rpc.method('availableFixModels', () => availableFixModels());
+
+  async function availableFixModels(providerId?: string): Promise<FixProvider[]> {
+    const providers = (await zcc.sdk.providers.list()).filter((provider) => provider.available && (!providerId || provider.id === providerId));
+    return Promise.all(providers.map(async (provider) => {
+      const permissionModes = (provider.capabilities?.permissionModes ?? []).filter((mode) => FIX_PERMISSION_MODES.some((allowed) => allowed === mode));
+      if (!permissionModes.length) return { providerId: provider.id, displayName: provider.displayName ?? provider.id, permissionModes, models: [], error: 'No supported fix mode.' };
+      const catalog = await zcc.sdk.providers.models({ providerId: provider.id }).catch((error) => {
+        zcc.log.warn(`codenod: fix models for ${provider.id} failed: ${errorMessage(error)}`);
+        return { models: [], modelLoadError: { detail: errorMessage(error), code: 'error' } };
+      });
+      return {
+        providerId: provider.id, displayName: provider.displayName ?? provider.id, permissionModes,
+        models: mergeCatalogModels(catalog), error: catalog.modelLoadError?.detail ?? catalog.modelLoadError?.code ?? null
+      };
+    }));
+  }
 
   async function availableModels(): Promise<AvailableProvider[]> {
     const providers = (await zcc.sdk.providers.list()).filter((provider) => provider.available);

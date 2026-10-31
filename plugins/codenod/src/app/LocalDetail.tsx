@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { LocalLocationSummary, LocalReviewStatus } from '../server/local/service.ts';
-import type { ChangedFile, LocalScope, ModelChoice, ReviewRunRow } from '../server/types.ts';
+import type { ChangedFile, FixAgentChoice, LocalScope, ModelChoice, ReviewRow, ReviewRunRow } from '../server/types.ts';
+import { FixAgentPicker } from './FixAgentPicker.tsx';
 import type { LocalDetail as LocalDetailData, LocalHistoryItem, LocalSnapshotView } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatLocalFindingsPrompt, relativeTime, scoreTone, skipReasonText } from './format.ts';
 import { FindingsView, type FindingFilters } from './FindingsView.tsx';
@@ -12,7 +13,7 @@ import type { Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'files';
 type SpawnResult = { threadId: string; priority: number; model: ModelChoice; usedFallback: boolean };
-type FixResult = { needsConfirmation: true; reason: string } | ({ needsConfirmation: false } & SpawnResult);
+type FixResult = { needsConfirmation: true; reason: string } | { needsConfirmation: false; threadId: string };
 
 const STATUS_CHECK_THROTTLE_MS = 60_000;
 const SAVED_PILL_MS = 3_000;
@@ -193,7 +194,8 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const [notice, setNotice] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [snapshotTaken, setSnapshotTaken] = useState(false);
-  const [confirmFix, setConfirmFix] = useState<{ findingIds: string[]; reason: string } | null>(null);
+  const [fixSelection, setFixSelection] = useState<string[] | null>(null);
+  const [confirmFix, setConfirmFix] = useState<{ findingIds: string[]; reason: string; agent: FixAgentChoice } | null>(null);
   const [fixThreadId, setFixThreadId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
@@ -201,10 +203,10 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const navigate: ReturnType<typeof useZccNavigate> | undefined = useZccNavigate() ?? undefined;
 
   const requestSeq = useRef(0);
-  const load = useCallback(() => {
+  const load = useCallback((requestedReviewId: string | null = viewingId) => {
     const requestId = ++requestSeq.current;
     rpc
-      .call('localDetail', { targetId: location.targetId, ...(viewingId ? { reviewId: viewingId } : {}) })
+      .call('localDetail', { targetId: location.targetId, ...(requestedReviewId ? { reviewId: requestedReviewId } : {}) })
       .then((value) => {
         if (requestSeq.current !== requestId) return;
         const next = value as LocalDetailData;
@@ -213,6 +215,9 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
         if (nextReviewId && initializedReviewId.current !== nextReviewId) {
           initializedReviewId.current = nextReviewId;
           setSelectedIds(new Set(next.findings.filter((finding) => !finding.dismissed).map((finding) => finding.id)));
+        } else if (!nextReviewId) {
+          initializedReviewId.current = null;
+          setSelectedIds(new Set());
         }
       })
       .catch((cause) => {
@@ -275,10 +280,12 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     checkStatus(true);
   }, [reloadToken, load, checkStatus]);
 
-  useEffect(() => {
+  // Reset review-scoped actions before the new results can receive user input.
+  useLayoutEffect(() => {
     setFilters({ severity: 'all', category: 'all' });
     setEditingFinding(false);
     setConfirmFix(null);
+    setFixSelection(null);
     setConfirmDelete(false);
   }, [reviewId]);
 
@@ -293,21 +300,22 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const reviewing = isActive(attempt?.status);
   const now = useNow(reviewing || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
-  const act = async (label: string, fn: () => Promise<void>) => {
+  const act = async (label: string, fn: () => Promise<void>, options: { rethrow?: boolean } = {}) => {
     setBusy(label);
     setNotice(null);
     try {
       await fn();
     } catch (cause) {
+      if (options.rethrow) throw cause;
       setNotice({ kind: 'error', text: errorText(cause) });
     } finally {
       setBusy(null);
     }
   };
 
-  const spawnedNotice = (result: SpawnResult, what: string) => {
+  const spawnedNotice = (result: SpawnResult | { threadId: string }, what: string) => {
     if (navigate?.toThread) navigate.toThread(result.threadId);
-    if (result.usedFallback) {
+    if ('usedFallback' in result && result.usedFallback) {
       const failed = result.priority === 2 ? 'Priority 1 could not start' : `Priorities 1–${result.priority - 1} could not start`;
       setNotice({ kind: 'info', text: `${failed}. ${what} is using priority ${result.priority} (${result.model.providerId}/${result.model.model}).` });
     } else if (!navigate?.toThread) {
@@ -319,7 +327,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     act('review', async () => {
       setPickerOpen(false);
       setFixThreadId(null);
-      await rpc.call('startLocalReview', {
+      const accepted = await rpc.call('startLocalReview', {
         projectId: location.projectId,
         worktreePath: location.worktreePath,
         scope: override?.scope ?? scope,
@@ -327,10 +335,15 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
         intent: override ? override.intent : intent.trim() || null,
         ...(override && detail?.review?.promptSnapshot ? { rerunReviewId: detail.review.id } : promptId !== undefined ? { promptId } : {}),
         ...(models ? { models } : {})
-      });
+      }) as ReviewRow;
+      ++requestSeq.current;
+      setDetail((current) => current && accepted?.id ? { ...current, review: accepted, snapshot: null, runs: [], findings: [], latestAttempt: undefined, latestRuns: undefined } : current);
+      setSelectedIds(new Set());
+      initializedReviewId.current = null;
+      setTab('findings');
       setViewingId(null);
       setSnapshotTaken(true);
-      load();
+      load(null);
     });
 
   const snapshot = detail?.snapshot ?? null;
@@ -362,18 +375,18 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
       spawnedNotice((await rpc.call('localDeepReview', { reviewId: review.id, findingIds: targetedIds })) as SpawnResult, 'Deep Review');
     });
 
-  const fix = (findingIds: string[], force: boolean) =>
-    act('fix', async () => {
-      if (!review) return;
-      const result = (await rpc.call('localFix', { reviewId: review.id, findingIds, force })) as FixResult;
-      if (result.needsConfirmation) {
-        setConfirmFix({ findingIds, reason: result.reason });
-        return;
-      }
-      setConfirmFix(null);
-      setFixThreadId(result.threadId);
-      spawnedNotice(result, 'Fix');
-    });
+  const fix = async (findingIds: string[], force: boolean, agent: FixAgentChoice) => {
+    if (!review) throw new Error('No review is available to fix. Run a review first.');
+    const result = (await rpc.call('localFix', { reviewId: review.id, findingIds, force, agent })) as FixResult;
+    setFixSelection(null);
+    if (result.needsConfirmation) {
+      setConfirmFix({ findingIds, reason: result.reason, agent });
+      return;
+    }
+    setConfirmFix(null);
+    setFixThreadId(result.threadId);
+    spawnedNotice(result, 'Fix');
+  };
 
   const remove = () =>
     act('delete', async () => {
@@ -483,6 +496,8 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
           {pickerOpen ? <ModelPicker rpc={rpc} defaults={props.defaultModels} onRun={(models) => void startReview(models)} onClose={() => setPickerOpen(false)} /> : null}
         </section>
 
+        {fixSelection ? <FixAgentPicker rpc={rpc} defaults={props.defaultModels} onRun={(agent) => act('fix', () => fix(fixSelection, false, agent), { rethrow: true })} onClose={() => setFixSelection(null)} /> : null}
+
         {!review ? (
           <p className="cn-empty">Not reviewed yet.</p>
         ) : (
@@ -521,13 +536,13 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                 Review failed after {attemptElapsed}: {attempt.error}
               </p>
             ) : null}
-            {!viewingOlder && detail.latestAttempt?.status === 'cancelled' ? <p className="cn-banner">Rerun cancelled. Showing the previous completed review.</p> : null}
+            {review.status === 'cancelled' ? <p className="cn-banner">Review cancelled.</p> : null}
             {confirmFix ? (
               <div className="cn-banner cn-banner-warn" role="group" aria-label="Confirm fix">
                 <strong>{confirmFix.reason}</strong>
                 <p>The fix agent will work on your current files, which differ from what was reviewed. Fix anyway?</p>
                 <div className="cn-inline">
-                  <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null} onClick={() => void fix(confirmFix.findingIds, true)}>
+                  <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null} onClick={() => void act('fix', () => fix(confirmFix.findingIds, true, confirmFix.agent))}>
                     Fix anyway
                   </button>
                   <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => setConfirmFix(null)}>
@@ -636,8 +651,8 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
             <button
               type="button"
               className="cn-btn"
-              disabled={busy !== null || editingFinding || activeFindings.length === 0 || nothingSelected || status?.missing === true}
-              onClick={() => void fix(targetedIds, false)}
+              disabled={busy !== null || fixSelection !== null || reviewing || editingFinding || activeFindings.length === 0 || nothingSelected || status?.missing === true}
+              onClick={() => { setNotice(null); setConfirmFix(null); setFixSelection(targetedIds); }}
             >
               {targetedIds.length > 0 ? `Fix ${targetedIds.length} with agent` : 'Fix with agent'}
             </button>

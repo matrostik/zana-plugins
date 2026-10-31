@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { experimental_requestApproval, useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
-import type { ChangedFile, ModelChoice, ReviewEvent } from '../server/types.ts';
+import type { ChangedFile, ModelChoice, ReviewEvent, ReviewRow } from '../server/types.ts';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatFindingsPrompt, relativeTime, scoreTone } from './format.ts';
 import { FindingsView, matchesFinding, type FindingFilters } from './FindingsView.tsx';
@@ -201,7 +201,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const postableFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed && matchesFinding(finding, filters)) ?? [];
   const selectedFindings = detail?.findings.filter((finding) => selectedFindingIds.has(finding.id) && !finding.dismissed) ?? [];
 
-  const now = useNow(isActive(detail?.latestAttempt?.status) || isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
+  const now = useNow(isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
   const act = async (label: string, fn: () => Promise<void>) => {
     setBusy(label);
@@ -218,10 +218,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   if (!detail) return <div className="cn-detail">{notice ? <p className="cn-banner cn-banner-error">{notice.text}</p> : <p className="cn-empty">Loading…</p>}</div>;
 
   const { pr, review, runs, findings } = detail;
-  const attempt = detail.latestAttempt ?? review;
-  const attemptRuns = detail.latestRuns ?? runs;
-  const reviewing = isActive(attempt?.status);
-  const attemptElapsed = attempt ? formatDuration(attempt.createdAt, attempt.completedAt ?? now) : '';
+  const reviewing = isActive(review?.status);
   const reviewElapsed = review ? formatDuration(review.createdAt, review.completedAt ?? now) : '';
   const canPost = review?.status === 'completed' && (postableFindings.length > 0 || message.trim().length > 0 || event === 'APPROVE');
 
@@ -238,7 +235,13 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const startReview = (models?: ModelChoice[], rerun = false) =>
     act('review', async () => {
       setPickerOpen(false);
-      await rpc.call('startReview', { prId: pr.id, ...(models ? { models } : {}), ...(rerun && review?.promptSnapshot ? { rerunReviewId: review.id } : promptId !== undefined ? { promptId } : {}) });
+      const accepted = await rpc.call('startReview', { prId: pr.id, ...(models ? { models } : {}), ...(rerun && review?.promptSnapshot ? { rerunReviewId: review.id } : promptId !== undefined ? { promptId } : {}) }) as ReviewRow;
+      ++requestSeq.current;
+      setDetail((current) => current && accepted?.id ? { ...current, review: { ...accepted, stale: accepted.headSha !== current.pr.headSha }, runs: [], findings: [], posted: [], latestAttempt: undefined } : current);
+      setSelectedFindingIds(new Set());
+      initializedReviewId.current = null;
+      prevFindingsPosted.current = new Map();
+      setTab('findings');
       load();
     });
 
@@ -341,15 +344,22 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             {reviewing ? (
               <p className="cn-banner cn-inline" role="status" aria-busy="true">
                 <span className="cn-spinner" aria-hidden="true" />
-                Review {attempt!.status} · {attemptRuns.filter((run) => run.status === 'completed').length}/{attemptRuns.length} model(s) done · {attemptElapsed}
+                Review {review!.status} · {runs.filter((run) => run.status === 'completed').length}/{runs.length} model(s) done · {reviewElapsed}
               </p>
             ) : null}
-            {attempt?.status === 'failed' ? (
+            {detail.latestAttempt ? (
+              <p className={`cn-banner${detail.latestAttempt.status === 'failed' ? ' cn-banner-error' : ''}`} role="status">
+                {detail.latestAttempt.status === 'failed'
+                  ? `Latest rerun failed after ${formatDuration(detail.latestAttempt.createdAt, detail.latestAttempt.completedAt ?? now)}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}. Showing the previous completed review.`
+                  : 'Latest rerun cancelled. Showing the previous completed review.'}
+              </p>
+            ) : null}
+            {review?.status === 'failed' ? (
               <p className="cn-banner cn-banner-error">
-                Review failed after {attemptElapsed}: {attempt.error}
+                Review failed after {reviewElapsed}: {review.error}
               </p>
             ) : null}
-            {detail.latestAttempt?.status === 'cancelled' ? <p className="cn-banner">Rerun cancelled. Showing the previous completed review.</p> : null}
+            {review.status === 'cancelled' ? <p className="cn-banner">Review cancelled.</p> : null}
             {review.status === 'completed' ? (
               <>
                 <div className="cn-scores">
@@ -372,7 +382,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
             <div className="cn-tabs" role="tablist" aria-label="Review details">
               {(['findings', 'models', 'diff'] as DetailTab[]).map((id) => (
                 <button key={id} type="button" role="tab" className="cn-tab" aria-selected={tab === id} onClick={() => setTab(id)}>
-                  {id === 'findings' ? `Findings (${findings.filter((finding) => !finding.dismissed).length})` : id === 'models' ? `Models (${attemptRuns.length})` : 'Diff'}
+                  {id === 'findings' ? `Findings (${findings.filter((finding) => !finding.dismissed).length})` : id === 'models' ? `Models (${runs.length})` : 'Diff'}
                 </button>
               ))}
             </div>
@@ -402,7 +412,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
                     </tr>
                   </thead>
                   <tbody>
-                    {attemptRuns.map((run) => (
+                    {runs.map((run) => (
                       <tr key={run.id}>
                         <td className="cn-mono">
                           {run.providerId}/{run.model}
@@ -444,7 +454,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
       <div className="cn-actions">
         {reviewing ? (
-          <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void act('cancel', async () => void (await rpc.call('cancelReview', { reviewId: attempt!.id })))}>
+          <button type="button" className="cn-btn" disabled={busy !== null} onClick={() => void act('cancel', async () => void (await rpc.call('cancelReview', { reviewId: review!.id })))}>
             Cancel review
           </button>
         ) : (
