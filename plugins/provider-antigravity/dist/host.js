@@ -33107,7 +33107,7 @@ var __toESM2 = (mod, isNodeMode, target2) => (target2 = mod != null ? __create2(
   mod
 ));
 var require_windows2 = __commonJS2({
-  "node_modules/isexe/windows.js"(exports, module) {
+  "../../../node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require2("fs");
@@ -33145,7 +33145,7 @@ var require_windows2 = __commonJS2({
   }
 });
 var require_mode2 = __commonJS2({
-  "node_modules/isexe/mode.js"(exports, module) {
+  "../../../node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require2("fs");
@@ -33176,7 +33176,7 @@ var require_mode2 = __commonJS2({
   }
 });
 var require_isexe2 = __commonJS2({
-  "node_modules/isexe/index.js"(exports, module) {
+  "../../../node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require2("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
@@ -33229,7 +33229,7 @@ var require_isexe2 = __commonJS2({
   }
 });
 var require_which2 = __commonJS2({
-  "node_modules/which/which.js"(exports, module) {
+  "../../../node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
     var path22 = __require2("path");
     var COLON = isWindows ? ";" : ":";
@@ -33323,7 +33323,7 @@ var require_which2 = __commonJS2({
   }
 });
 var require_path_key2 = __commonJS2({
-  "node_modules/path-key/index.js"(exports, module) {
+  "../../../node_modules/path-key/index.js"(exports, module) {
     "use strict";
     var pathKey = (options = {}) => {
       const environment = options.env || process.env;
@@ -33338,7 +33338,7 @@ var require_path_key2 = __commonJS2({
   }
 });
 var require_resolveCommand2 = __commonJS2({
-  "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+  "../../../node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
     var path22 = __require2("path");
     var which = require_which2();
@@ -33378,7 +33378,7 @@ var require_resolveCommand2 = __commonJS2({
   }
 });
 var require_escape2 = __commonJS2({
-  "node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+  "../../../node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
     var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
     function escapeCommand(arg) {
@@ -33401,13 +33401,13 @@ var require_escape2 = __commonJS2({
   }
 });
 var require_shebang_regex2 = __commonJS2({
-  "node_modules/shebang-regex/index.js"(exports, module) {
+  "../../../node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
 var require_shebang_command2 = __commonJS2({
-  "node_modules/shebang-command/index.js"(exports, module) {
+  "../../../node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
     var shebangRegex = require_shebang_regex2();
     module.exports = (string4 = "") => {
@@ -33425,7 +33425,7 @@ var require_shebang_command2 = __commonJS2({
   }
 });
 var require_readShebang2 = __commonJS2({
-  "node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+  "../../../node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
     var fs3 = __require2("fs");
     var shebangCommand = require_shebang_command2();
@@ -33445,7 +33445,7 @@ var require_readShebang2 = __commonJS2({
   }
 });
 var require_parse2 = __commonJS2({
-  "node_modules/cross-spawn/lib/parse.js"(exports, module) {
+  "../../../node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
     var path22 = __require2("path");
     var resolveCommand = require_resolveCommand2();
@@ -33505,7 +33505,7 @@ var require_parse2 = __commonJS2({
   }
 });
 var require_enoent2 = __commonJS2({
-  "node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+  "../../../node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
     var isWin = process.platform === "win32";
     function notFoundError(original, syscall) {
@@ -33553,7 +33553,7 @@ var require_enoent2 = __commonJS2({
   }
 });
 var require_cross_spawn2 = __commonJS2({
-  "node_modules/cross-spawn/index.js"(exports, module) {
+  "../../../node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
     var cp = __require2("child_process");
     var parse3 = require_parse2();
@@ -42913,7 +42913,7 @@ function healthFromReadiness(runtime, readiness) {
   const installedVersion = readiness.agentVersion ?? runtime.version ?? PINNED_NATIVE_ACP_VERSION;
   const planLabel = readiness.tierName ?? null;
   if (readiness.state === "session_ready") return { status: "ready", statusMessage: null, planLabel, installedVersion };
-  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? 'Sign in required. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".' : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.');
+  const statusMessage = readiness.error || (readiness.state === "sign_in_required" ? 'Sign in required. Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".' : readiness.state === "authenticated" ? 'Local credentials present, but Native ACP session is not verified. Open the thread side panel \u2192 Antigravity account and click "Check again".' : 'Native ACP runtime launched, but session readiness is not verified. Open the thread side panel \u2192 Antigravity account and click "Check again".');
   return { status: readiness.state === "sign_in_required" ? "unauthenticated" : "unknown", statusMessage, planLabel, installedVersion };
 }
 function formatEffortDescription(level) {
@@ -42943,7 +42943,7 @@ function modelListFromReadiness(readiness) {
     return { error: { code: -32e3, message, data: { recovery: { kind: "authRequired", message, retryable: false } } } };
   }
   if (readiness.models.length === 0) {
-    return { error: { code: -32e3, message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings \u2192 Antigravity Provider.' } };
+    return { error: { code: -32e3, message: readiness.error || 'No models discovered from Google Antigravity Native ACP session. Open the thread side panel \u2192 Antigravity account and click "Check again".' } };
   }
   return { result: {
     models: mapDiscoveredModels(readiness.models, readiness.catalogStale),

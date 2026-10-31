@@ -71,16 +71,33 @@ describe('antigravity provider app slots', () => {
     slot.lifecycle.unmount();
   });
 
-  it('shows silent recovery errors in the thread panel without starting interactive sign-in', async () => {
+  it('shows silent recovery errors in the thread panel without starting interactive sign-in and keeps reconnect enabled', async () => {
     const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
     expect(app.threadPanelActions).toHaveLength(1);
-    const login = vi.fn();
+    const login = vi.fn(() => makeDoctorStatus({ ready: true, models: [{ id: 'reconnected', name: 'Reconnected' }] }));
     const slot = renderSlot(app.threadPanelActions[0]!, { pluginId: 'provider-antigravity', threadId: 'thread-1', params: null }, { rpc: {
       'auth:recover': () => { throw new Error('Host unavailable'); },
       'auth:login': login
     } });
     await slot.findByText('Host unavailable');
     expect(login).not.toHaveBeenCalled();
+    const reconnectBtn = (await slot.findByText('Reconnect Antigravity')) as HTMLButtonElement;
+    expect(reconnectBtn.disabled).toBe(false);
+    reconnectBtn.click();
+    await slot.findByText('Connected');
+    expect(login).toHaveBeenCalledTimes(1);
+    slot.lifecycle.unmount();
+  });
+
+  it('disables reconnect button in thread panel when runtime is confirmed uninstalled', async () => {
+    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+    expect(app.threadPanelActions).toHaveLength(1);
+    const slot = renderSlot(app.threadPanelActions[0]!, { pluginId: 'provider-antigravity', threadId: 'thread-1', params: null }, { rpc: {
+      'auth:recover': () => makeUninstalledStatus()
+    } });
+    await slot.findByText('Antigravity could not connect.');
+    const reconnectBtn = (await slot.findByText('Reconnect Antigravity')) as HTMLButtonElement;
+    expect(reconnectBtn.disabled).toBe(true);
     slot.lifecycle.unmount();
   });
 

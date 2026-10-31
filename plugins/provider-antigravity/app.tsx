@@ -438,7 +438,7 @@ export function AntigravityAccountPanel() {
     {(error || status?.error) && <p className="agy-desc agy-desc-error" role="alert">{error || status?.error}</p>}
     <div className="agy-actions">
       <button className="agy-btn" disabled={recovering || busy !== null} onClick={() => void recover(true)}>Check again</button>
-      <button className="agy-btn" disabled={recovering || busy !== null || !status?.installed} onClick={handleSignIn}>Reconnect Antigravity</button>
+      <button className="agy-btn" disabled={recovering || busy !== null || status?.installed === false} onClick={handleSignIn}>Reconnect Antigravity</button>
     </div>
     {status?.pendingAuthUrl && <a href={status.pendingAuthUrl} target="_blank" rel="noreferrer">Open Google sign-in</a>}
     <DiscoveredModelsList status={status} />

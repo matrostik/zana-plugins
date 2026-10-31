@@ -114,8 +114,8 @@ export function healthFromReadiness(runtime: ResolvedNativeRuntime, readiness?: 
     || (readiness.state === 'sign_in_required'
       ? 'Sign in required. Open the thread side panel → Antigravity account and click "Reconnect Antigravity".'
       : readiness.state === 'authenticated'
-      ? 'Local credentials present, but Native ACP session is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.'
-      : 'Native ACP runtime launched, but session readiness is not verified. Run "Verify Session & Models" in Settings → Antigravity Provider.');
+      ? 'Local credentials present, but Native ACP session is not verified. Open the thread side panel → Antigravity account and click "Check again".'
+      : 'Native ACP runtime launched, but session readiness is not verified. Open the thread side panel → Antigravity account and click "Check again".');
   return { status: readiness.state === 'sign_in_required' ? 'unauthenticated' : 'unknown', statusMessage, planLabel, installedVersion };
 }
 
@@ -158,7 +158,7 @@ export function modelListFromReadiness(readiness: NativeReadinessResult): JsonRp
   }
   if (readiness.models.length === 0) {
     return { error: { code: -32000, message: readiness.error
-      || 'No models discovered from Google Antigravity Native ACP session. Run "Verify Session & Models" in Settings → Antigravity Provider.' } };
+      || 'No models discovered from Google Antigravity Native ACP session. Open the thread side panel → Antigravity account and click "Check again".' } };
   }
   return { result: {
     models: mapDiscoveredModels(readiness.models, readiness.catalogStale),

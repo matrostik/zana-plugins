@@ -24,8 +24,11 @@ import {
   resolveRuntime,
   type DoctorStatusResult
 } from './src/provider-config.js';
+import type { NativeReadinessResult } from './src/readiness-store.js';
 
 export type { DoctorStatusResult } from './src/provider-config.js';
+
+export type ReadinessMode = 'fast' | 'probe' | 'catalog';
 
 const ICON = './icons/antigravity.svg';
 
@@ -77,7 +80,7 @@ function getProviderRegistrationConfig(initialLaunchSpec: ReturnType<typeof buil
 
 async function buildDoctorStatus(
   settings: any,
-  options?: { probeNative?: boolean; catalog?: boolean; forceRefresh?: boolean },
+  options?: { mode?: ReadinessMode; forceRefresh?: boolean },
   pendingAuthUrl: string | null = null
 ): Promise<DoctorStatusResult> {
   const { authMethod, customExecutable } = readProviderSettings(await settings.get());
@@ -88,9 +91,17 @@ async function buildDoctorStatus(
   }
 
   const target = { command: runtime.executable, args: runtime.args, authMethod };
-  const readiness = options?.catalog ? await getNativeCatalog({ ...target, forceRefresh: options.forceRefresh }) : options?.probeNative
-    ? await probeNativeAcpReadiness({ ...target, forceRefresh: options?.forceRefresh })
-    : getFastNativeReadiness(target);
+  const mode: ReadinessMode = options?.mode ?? 'fast';
+
+  let readiness: NativeReadinessResult;
+  if (mode === 'catalog') {
+    readiness = await getNativeCatalog({ ...target, forceRefresh: options?.forceRefresh });
+  } else if (mode === 'probe') {
+    readiness = await probeNativeAcpReadiness({ ...target, forceRefresh: options?.forceRefresh });
+  } else {
+    readiness = getFastNativeReadiness(target);
+  }
+
   return doctorStatus(runtime, { authMethod, pendingAuthUrl, readiness, credentialId: getNativeCredentialId(authMethod) });
 }
 
@@ -130,29 +141,118 @@ async function handleAuthLogin(
     credentialId: getNativeCredentialId(authMethod) });
 }
 
+function createRecoveryScheduler(settings: any) {
+  let inFlightRecovery: { promise: Promise<DoctorStatusResult>; forced: boolean } | null = null;
+  let nextForcedRecovery: Promise<DoctorStatusResult> | null = null;
+
+  const startRecovery = (forced: boolean): Promise<DoctorStatusResult> => {
+    const promise = buildDoctorStatus(settings, { mode: 'catalog', forceRefresh: forced })
+      .finally(() => {
+        if (inFlightRecovery?.promise === promise) {
+          inFlightRecovery = null;
+        }
+      });
+    inFlightRecovery = { promise, forced };
+    return promise;
+  };
+
+  return function recover(args: unknown): Promise<DoctorStatusResult> {
+    const forceRefresh = !!args && typeof args === 'object' && (args as Record<string, unknown>).forceRefresh === true;
+
+    if (!forceRefresh) {
+      if (nextForcedRecovery) return nextForcedRecovery;
+      if (inFlightRecovery) return inFlightRecovery.promise;
+      return startRecovery(false);
+    }
+
+    if (nextForcedRecovery) return nextForcedRecovery;
+    if (inFlightRecovery?.forced) return inFlightRecovery.promise;
+    if (inFlightRecovery) {
+      const chained = inFlightRecovery.promise
+        .catch(() => {})
+        .then(() => startRecovery(true))
+        .finally(() => {
+          if (nextForcedRecovery === chained) {
+            nextForcedRecovery = null;
+          }
+        });
+      nextForcedRecovery = chained;
+      return chained;
+    }
+    return startRecovery(true);
+  };
+}
+
+function createLoginManager(
+  settings: any,
+  state: { getPendingAuthUrl: () => string | null; setPendingAuthUrl: (url: string | null) => void }
+) {
+  let inFlightLogin: {
+    promise: Promise<DoctorStatusResult>;
+    authMethodPromise: Promise<string>;
+  } | null = null;
+
+  return function login(args: unknown): Promise<DoctorStatusResult> {
+    const reqObj = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+    const requestedAuthMethodPromise = (async () => {
+      if (reqObj.authMethod != null) return normalizeAuthMethod(reqObj.authMethod);
+      const current = await settings.get();
+      return normalizeAuthMethod(current?.authMethod);
+    })();
+
+    if (inFlightLogin) {
+      const activeLogin = inFlightLogin;
+      return (async () => {
+        const [activeMethod, requestedMethod] = await Promise.all([
+          activeLogin.authMethodPromise,
+          requestedAuthMethodPromise
+        ]);
+        if (activeMethod !== requestedMethod) {
+          throw new Error(
+            `Cannot start sign-in for "${requestedMethod}" while sign-in for "${activeMethod}" is in progress.`
+          );
+        }
+        return activeLogin.promise;
+      })();
+    }
+
+    const currentRecord = {
+      authMethodPromise: requestedAuthMethodPromise,
+      promise: (async () => {
+        const authMethod = await requestedAuthMethodPromise;
+        return handleAuthLogin(settings, { ...reqObj, authMethod }, state);
+      })().finally(() => {
+        if (inFlightLogin === currentRecord) {
+          inFlightLogin = null;
+        }
+      })
+    };
+    inFlightLogin = currentRecord;
+    return currentRecord.promise;
+  };
+}
+
 function registerRpcMethods(
   zcc: ZccPluginApi,
   settings: any,
   state: { getPendingAuthUrl: () => string | null; setPendingAuthUrl: (url: string | null) => void }
 ) {
-  let recovery: Promise<DoctorStatusResult> | null = null;
-  zcc.rpc.method('auth:recover', (args: unknown) => {
-    if (!recovery) {
-      const forceRefresh = !!args && typeof args === 'object' && (args as Record<string, unknown>).forceRefresh === true;
-      recovery = buildDoctorStatus(settings, { catalog: true, forceRefresh })
-        .finally(() => { recovery = null; });
-    }
-    return recovery;
-  });
+  const recover = createRecoveryScheduler(settings);
+  const login = createLoginManager(settings, state);
+
+  zcc.rpc.method('auth:recover', (args: unknown) => recover(args));
+  zcc.rpc.method('auth:login', (args: unknown) => login(args));
+
   zcc.rpc.method('usage:status', async () => {
     const { authMethod, customExecutable } = readProviderSettings(await settings.get());
     const runtime = resolveRuntime(customExecutable);
     return queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod });
   });
+
   zcc.rpc.method('doctor:status', async (args: unknown): Promise<DoctorStatusResult> => {
     const opts = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
     return buildDoctorStatus(settings, {
-      probeNative: Boolean(opts.probeNative),
+      mode: opts.probeNative ? 'probe' : 'fast',
       forceRefresh: Boolean(opts.forceRefresh)
     }, state.getPendingAuthUrl());
   });
@@ -161,25 +261,19 @@ function registerRpcMethods(
     zcc.log.info(`Installing Google Native ACP runtime v${PINNED_NATIVE_ACP_VERSION}...`);
     await installNativeAcpRuntime();
     clearCachedNativeReadiness();
-    return buildDoctorStatus(settings, { probeNative: false, forceRefresh: true });
+    return buildDoctorStatus(settings, { mode: 'fast', forceRefresh: true });
   });
 
   zcc.rpc.method('runtime:rollback', async (): Promise<DoctorStatusResult> => {
     zcc.log.info('Rolling back Google Native ACP runtime to previous version...');
     rollbackNativeAcpRuntime();
     clearCachedNativeReadiness();
-    return buildDoctorStatus(settings, { probeNative: false, forceRefresh: true });
-  });
-
-  let login: Promise<DoctorStatusResult> | null = null;
-  zcc.rpc.method('auth:login', (args: unknown) => {
-    if (!login) login = handleAuthLogin(settings, args, state).finally(() => { login = null; });
-    return login;
+    return buildDoctorStatus(settings, { mode: 'fast', forceRefresh: true });
   });
 
   zcc.rpc.method('auth:logout', async (): Promise<DoctorStatusResult> => {
     writeNativeAcpAuthType(null);
-    return buildDoctorStatus(settings, { probeNative: false, forceRefresh: true });
+    return buildDoctorStatus(settings, { mode: 'fast', forceRefresh: true });
   });
 }
 
