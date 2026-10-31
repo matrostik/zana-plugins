@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodenodPanel } from '../app/CodenodPanel.tsx';
 import { LocalDetail } from '../app/LocalDetail.tsx';
@@ -201,6 +202,29 @@ describe('Pull requests | Local changes switch', () => {
 });
 
 describe('LocalDetail', () => {
+  it('keeps the fix picker open when clicked as soon as review results are committed', async () => {
+    answer({
+      localDetail: localDetail(), localStatus: fresh(), localDiff: [],
+      availableFixModels: [{ providerId: 'cursor', displayName: 'Cursor', models: [{ id: 'a', label: 'A', reasoningLevels: [] }], permissionModes: ['edit'], error: null }]
+    });
+    let clicked = false;
+    render(
+      <Profiler id="local-detail" onRender={() => {
+        const button = screen.queryByRole('button', { name: 'Fix with agent' }) as HTMLButtonElement | null;
+        if (clicked || !button || button.disabled) return;
+        clicked = true;
+        // Exercise the first interactive commit, before passive review-reset effects run.
+        button.click();
+      }}>
+        <LocalDetail rpc={sdk.rpc} location={location()} defaultModels={[{ providerId: 'cursor', model: 'a' }]} hasModels onOpenSettings={() => {}} />
+      </Profiler>
+    );
+    const picker = await screen.findByRole('dialog', { name: 'Fix with agent' });
+    expect(clicked).toBe(true);
+    expect(await within(picker).findByLabelText('Mode')).toBeTruthy();
+    expect(calls('localFix')).toHaveLength(0);
+  });
+
   it.each(['queued', 'running'] as const)('selects findings when the same %s review completes and preserves later manual selection', async (status) => {
     const completed = localDetail();
     let current = localDetail({ review: { ...completed.review!, status }, findings: [], runs: [] });

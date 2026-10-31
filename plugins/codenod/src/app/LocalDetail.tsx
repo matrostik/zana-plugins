@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { LocalLocationSummary, LocalReviewStatus } from '../server/local/service.ts';
 import type { ChangedFile, FixAgentChoice, LocalScope, ModelChoice, ReviewRow, ReviewRunRow } from '../server/types.ts';
@@ -280,7 +280,8 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     checkStatus(true);
   }, [reloadToken, load, checkStatus]);
 
-  useEffect(() => {
+  // Reset review-scoped actions before the new results can receive user input.
+  useLayoutEffect(() => {
     setFilters({ severity: 'all', category: 'all' });
     setEditingFinding(false);
     setConfirmFix(null);
