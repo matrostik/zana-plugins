@@ -14,6 +14,8 @@ import { FULL_ACCESS_PERMISSION_MODE, spawnVisibleWithPriorityFallback, type Spa
 import { resolvePrompt, resolveRerunSnapshot, samePromptSnapshot, type ReviewConfig, type ReviewService, type ReviewTarget } from '../review/service.ts';
 import type {
   ChangedFile,
+  FixAgentChoice,
+  FixProvider,
   LocalReviewSource,
   LocalScope,
   LocalSnapshotRow,
@@ -77,6 +79,7 @@ export interface LocalReviewDeps {
   reviews: () => Pick<ReviewService, 'resolveModels' | 'enqueueReview' | 'isActive'>;
   threads: ThreadsApi;
   waiter: ThreadWaiter;
+  fixProviders: (providerId: string) => Promise<FixProvider[]>;
   /** Spec file pattern of the watched repository that a project checks out, if any. */
   specGlobForProject?: (projectId: string) => Promise<string | null>;
   publish: (event: string, payload: unknown) => void;
@@ -430,21 +433,25 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   }
 
   /**
-   * Starts a visible thread that edits the reviewed checkout to fix findings, with the provider's normal permission prompts.
+   * Starts a visible fix thread in the reviewed checkout with the user's chosen provider, model, and supported mode.
    * Returns `needsConfirmation` instead when files changed since the review and `force` is not set.
    */
-  async function fix(reviewId: string, findingIds: string[], force = false) {
+  async function fix(reviewId: string, findingIds: string[], force: boolean, agent: FixAgentChoice) {
     const { snapshot, target } = snapshotFor(reviewId);
     const findings = selectedFindings(reviewId, findingIds);
     if (findings.length === 0) throw new Error('This review has no active findings to fix');
     const current = await status(reviewId);
     if (current.missing) throw new Error(`${target.worktreePath} no longer exists`);
     if (current.stale && !force) return { needsConfirmation: true as const, reason: 'Files changed since this review.' };
-    const config = await deps.config();
-    if (config.models.length === 0) throw new Error('Choose a priority 1 review model in CodeNod Settings → Models before fixing findings.');
+    const provider = (await deps.fixProviders(agent.providerId)).find((item) => item.providerId === agent.providerId);
+    if (!provider || !provider.models.some((model) => model.id === agent.model)) throw new Error('The selected fix model is unavailable. Choose another provider or model.');
+    if (!provider.permissionModes.includes(agent.permissionMode)) throw new Error('The selected mode is unavailable for this provider. Choose a supported mode.');
+    const model = provider.models.find((item) => item.id === agent.model)!;
+    if (agent.reasoningLevel && !model.reasoningLevels.includes(agent.reasoningLevel)) throw new Error('The selected reasoning level is unavailable for this model.');
     const project = await projectFor(target);
     const separateWorktree = !isWithin(await canonicalPath(project.path), await canonicalPath(target.worktreePath));
-    const spawned = await spawnVisibleWithPriorityFallback(deps.threads, deps.waiter, config.models, {
+    // A single explicit choice prevents priority fallback from changing permissions or providers.
+    const spawned = await spawnVisibleWithPriorityFallback(deps.threads, deps.waiter, [agent], {
       projectId: project.id,
       title: `Fix: ${localLabel(target)} (${findings.length} issue${findings.length === 1 ? '' : 's'})`,
       prompt: getLocalFixPrompt({
@@ -456,9 +463,10 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         findings
       }),
       visibility: 'visible',
+      permissionMode: agent.permissionMode,
       environment: { kind: 'unmanaged' }
     });
-    return { needsConfirmation: false as const, threadId: spawned.id, projectId: project.id, priority: spawned.priority, model: spawned.model, usedFallback: spawned.usedFallback };
+    return { needsConfirmation: false as const, threadId: spawned.id, projectId: project.id };
   }
 
   return {

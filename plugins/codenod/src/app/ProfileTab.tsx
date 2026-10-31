@@ -118,51 +118,55 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
       <h3 id="cn-instructions-heading">Custom review instructions</h3>
       <p className="cn-muted cn-small">Manage the instructions available for reviews and choose a default.</p>
       {action.error ? <p className="cn-banner cn-banner-error">{action.error}</p> : null}
-      <div className="cn-inline">
-        <label>Prompt <select aria-label="Prompt" value={creating ? '' : selectedId ?? ''} disabled={isDirty && !creating} onChange={(event) => { setCreating(false); showPrompt(event.target.value || null); }}>
-          <option value="" disabled>Select a prompt</option>
+      <div className="cn-prompt-library">
+        <div className="cn-prompt-library-toolbar">
+          <label className="cn-field"><span>Prompt</span><select className="cn-select" aria-label="Prompt" value={creating ? '' : selectedId ?? ''} disabled={isDirty && !creating} onChange={(event) => { setCreating(false); showPrompt(event.target.value || null); }}>
+            <option value="" disabled>Select a prompt</option>
+            {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
+          </select></label>
+          <button type="button" className="cn-btn" disabled={isDirty} onClick={startCreating}>New prompt</button>
+          {creating ? <button type="button" className="cn-btn" onClick={cancelCreating}>Cancel</button> : null}
+          {!creating && isDirty ? <button type="button" className="cn-btn" onClick={() => { setDraft(saved); setName(selected?.name ?? ''); }}>Discard changes</button> : null}
+        </div>
+        <label className="cn-field"><span>Default prompt</span><select className="cn-select" aria-label="Default prompt" value={defaultId ?? ''} onChange={(event) => void action.run(() => rpc.call('setSettings', { defaultPromptId: event.target.value || null }))}>
+          <option value="">Built-in prompt only</option>
           {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
         </select></label>
-        <button type="button" className="cn-btn" disabled={isDirty} onClick={startCreating}>New prompt</button>
-        {creating ? <button type="button" className="cn-btn" onClick={cancelCreating}>Cancel</button> : null}
-        {!creating && isDirty ? <button type="button" className="cn-btn" onClick={() => { setDraft(saved); setName(selected?.name ?? ''); }}>Discard changes</button> : null}
-      </div>
-      <label>Default prompt <select aria-label="Default prompt" value={defaultId ?? ''} onChange={(event) => void action.run(() => rpc.call('setSettings', { defaultPromptId: event.target.value || null }))}>
-        <option value="">Built-in prompt only</option>
-        {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
-      </select></label>
-      <label>Prompt name <input aria-label="Prompt name" value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <textarea
-        className="cn-textarea cn-instructions"
-        aria-label="Custom review instructions"
-        aria-describedby="cn-instructions-count"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      <div className="cn-inline">
-        <button
-          type="button"
-          className="cn-btn cn-btn-primary"
-          disabled={!isDirty || isTooLong || !name.trim()}
-          onClick={savePrompt}
-        >
-          Save instructions
-        </button>
-        {!creating && selected ? <button type="button" className="cn-btn" disabled={selected.id === defaultId} title={selected.id === defaultId ? 'Choose another default before deleting' : undefined} onClick={deleteSelected}>Delete prompt</button> : null}
-        <button type="button" className="cn-btn" disabled={draft === config.defaultInstructions} onClick={() => setDraft(config.defaultInstructions)}>
-          Reset to default
-        </button>
-        <span id="cn-instructions-count" className={isTooLong ? 'cn-small cn-badge-danger' : 'cn-muted cn-small'}>
-          {draft.length} / {maxChars}
-        </span>
-        {action.saved ? (
-          <span className="cn-status-saved" role="status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Saved
+        <label className="cn-field cn-prompt-library-wide"><span>Prompt name</span><input className="cn-input" aria-label="Prompt name" value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <label className="cn-field cn-prompt-library-wide"><span>Instructions</span>
+        <textarea
+          className="cn-textarea cn-instructions"
+          aria-label="Custom review instructions"
+          aria-describedby="cn-instructions-count"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        </label>
+        <div className="cn-inline cn-prompt-library-wide">
+          <button
+            type="button"
+            className="cn-btn cn-btn-primary"
+            disabled={!isDirty || isTooLong || !name.trim()}
+            onClick={savePrompt}
+          >
+            Save instructions
+          </button>
+          {!creating && selected ? <button type="button" className="cn-btn" disabled={selected.id === defaultId} title={selected.id === defaultId ? 'Choose another default before deleting' : undefined} onClick={deleteSelected}>Delete prompt</button> : null}
+          <button type="button" className="cn-btn" disabled={draft === config.defaultInstructions} onClick={() => setDraft(config.defaultInstructions)}>
+            Reset to default
+          </button>
+          <span id="cn-instructions-count" className={isTooLong ? 'cn-small cn-badge-danger' : 'cn-muted cn-small'}>
+            {draft.length} / {maxChars}
           </span>
-        ) : null}
+          {action.saved ? (
+            <span className="cn-status-saved" role="status">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Saved
+            </span>
+          ) : null}
+        </div>
       </div>
       <details className="cn-prompt">
         <summary>View built-in prompt</summary>

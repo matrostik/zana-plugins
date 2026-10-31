@@ -237,11 +237,20 @@ export const CODENOD_STYLES = `
 .cn-checkbox-group { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 
 .cn-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 12px; }
+.cn-prompt-library { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin: 16px 0; }
+.cn-prompt-library-toolbar { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.cn-prompt-library-toolbar .cn-field { flex: 1; min-width: 120px; }
+.cn-prompt-library-wide { grid-column: 1 / -1; }
+.cn-prompt-library .cn-select, .cn-prompt-library .cn-input { width: 100%; max-width: none; }
+.cn-fix-picker .cn-select { max-width: none; }
+@media (max-width: 600px) { .cn-prompt-library { grid-template-columns: minmax(0, 1fr); } }
 .cn-field { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
 .cn-field > label, .cn-field > span:first-child {
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--cn-muted);
 }
 .cn-field .cn-select { max-width: 420px; width: 100%; }
+.cn-review-prompt { margin: 12px 0; }
+.cn-review-prompt option { background: var(--cn-card); color: var(--cn-text); }
 
 .cn-number-wrap { display: inline-flex; align-items: center; gap: 8px; }
 .cn-number { width: 90px; }

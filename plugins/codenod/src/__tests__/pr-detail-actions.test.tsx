@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrDetail } from '../app/PrDetail.tsx';
 import type { PrDetail as PrDetailData } from '../server/views.ts';
@@ -107,13 +107,46 @@ describe('PrDetail loading and setup', () => {
 });
 
 describe('PrDetail review actions', () => {
+  it('clears accepted review results immediately and ignores an older refresh response', async () => {
+    const old = Object.assign(completedWithFindings(), { latestAttempt: { ...detail('failed').review!, id: 'failed-rerun' } });
+    const next = detail('running');
+    next.review!.id = 'next';
+    next.findings = [];
+    let releaseOld!: (value: PrDetailData) => void;
+    let releaseNext!: (value: PrDetailData) => void;
+    const delayedOld = new Promise<PrDetailData>((resolve) => { releaseOld = resolve; });
+    const delayedNext = new Promise<PrDetailData>((resolve) => { releaseNext = resolve; });
+    let loads = 0;
+    const call = vi.fn(async (method: string) => {
+      if (method === 'listPrompts') return { prompts: [], defaultPromptId: null };
+      if (method === 'refreshPullRequest') return null;
+      if (method === 'startReview') return next.review;
+      if (method === 'detail') { loads++; return loads === 1 ? old : loads === 2 ? delayedOld : delayedNext; }
+      throw new Error(`Unexpected ${method}`);
+    });
+    renderDetail(call);
+    await screen.findByText('Null token crashes login');
+    expect(screen.getByText(/Latest rerun failed/)).toBeTruthy();
+    await waitFor(() => expect(loads).toBe(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Re-review' }));
+    await screen.findByRole('button', { name: 'Cancel review' });
+    expect(screen.queryByText(/Latest rerun failed/)).toBeNull();
+    expect(screen.queryByText('Null token crashes login')).toBeNull();
+    expect(screen.queryByText('Looks fine')).toBeNull();
+    await act(async () => { releaseOld(old); });
+    expect(screen.queryByText('Null token crashes login')).toBeNull();
+    await act(async () => { releaseNext(next); });
+    expect(screen.getByText(/Review running/)).toBeTruthy();
+  });
   it('replaces the model results with the latest runs when starting a re-review', async () => {
     const data = completedWithFindings();
     data.runs[0].summary = 'Previous model result';
     const call = makeRpc(data, {
       startReview: () => {
-        data.latestAttempt = { ...detail('running').review!, id: 'rerun' };
-        data.latestRuns = detail('running').runs.slice(1).map((run) => ({ ...run, id: `rerun-${run.id}`, reviewId: 'rerun' }));
+        data.review = { ...detail('running').review!, id: 'rerun' };
+        data.runs = detail('running').runs.slice(1).map((run) => ({ ...run, id: `rerun-${run.id}`, reviewId: 'rerun' }));
+        data.findings = [];
+        return data.review;
       }
     });
     renderDetail(call);
@@ -122,13 +155,14 @@ describe('PrDetail review actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Re-review' }));
     await screen.findByRole('button', { name: 'Cancel review' });
     expect(screen.getByRole('tab', { name: 'Models (2)' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Models (2)' }));
     const table = screen.getByRole('table');
     expect(within(table).getByText('running')).toBeTruthy();
     expect(within(table).getByText('queued')).toBeTruthy();
     expect(within(table).queryByText('completed')).toBeNull();
     expect(within(table).queryByText('Previous model result')).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: /Findings/ }));
-    expect(screen.getByText('Null token crashes login')).toBeTruthy();
+    expect(screen.queryByText('Null token crashes login')).toBeNull();
   });
 
   it('checks the selected PR for new commits once on opening', async () => {
@@ -139,23 +173,33 @@ describe('PrDetail review actions', () => {
     expect(call.mock.calls.filter(([method]) => method === 'refreshPullRequest')).toHaveLength(1);
   });
 
-  it('shows one cancellation notice while retaining the completed findings', async () => {
-    const data = completedWithFindings();
-    data.latestAttempt = { ...detail('cancelled').review!, id: 'rerun' };
+  it('shows one cancellation notice without previous completed findings', async () => {
+    const data = detail('cancelled');
+    data.findings = [];
     renderDetail(makeRpc(data));
-    await screen.findByText('Null token crashes login');
-    expect(screen.getAllByText('Rerun cancelled. Showing the previous completed review.')).toHaveLength(1);
+    expect(await screen.findByText('Review cancelled.')).toBeTruthy();
+    expect(screen.queryByText('Null token crashes login')).toBeNull();
   });
 
-  it('shows previous findings and cancels the active rerun instead of the completed review', async () => {
-    const data = completedWithFindings();
-    data.review!.stale = true;
-    data.latestAttempt = { ...detail('running').review!, id: 'rerun', headSha: 'sha2' };
-    data.latestRuns = detail('running').runs;
+  it.each(['failed', 'cancelled'] as const)('shows a %s rerun notice with completed findings on the same commit', async (status) => {
+    const data = Object.assign(completedWithFindings(), {
+      latestAttempt: { ...detail(status, { createdAt: NOW - 20_000, completedAt: NOW }).review!, id: 'rerun' }
+    });
+    renderDetail(makeRpc(data));
+    const message = status === 'failed' ? 'Latest rerun failed after 20s: boom. Showing the previous completed review.' : 'Latest rerun cancelled. Showing the previous completed review.';
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByText('Looks fine')).toBeTruthy();
+    expect(screen.getByText('Null token crashes login')).toBeTruthy();
+    expect(screen.queryByRole('status', { name: 'Review outdated' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Post 1 finding to GitHub' })).toBeTruthy();
+  });
+
+  it('cancels the active rerun', async () => {
+    const data = detail('running');
+    data.review!.id = 'rerun';
     const call = makeRpc(data, { cancelReview: () => null });
     renderDetail(call);
-    expect(await screen.findByText('Null token crashes login')).toBeTruthy();
-    expect(screen.getByText(/Review running/)).toBeTruthy();
+    expect(await screen.findByText(/Review running/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel review' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('cancelReview', { reviewId: 'rerun' }));
   });

@@ -9,9 +9,8 @@ export interface PrListItem extends PullRequestRow {
 export interface PrDetail {
   pr: PullRequestRow;
   review: (ReviewRow & { stale: boolean }) | null;
-  /** A newer attempt is separate from the completed results displayed above. */
+  /** An unsuccessful rerun while the previous completed results are displayed. */
   latestAttempt?: ReviewRow;
-  latestRuns?: ReviewRunRow[];
   runs: ReviewRunRow[];
   findings: FindingRow[];
   posted: Array<{ event: string; url: string | null; commentCount: number; postedAt: number }>;
@@ -63,11 +62,13 @@ export function getPrDetail(store: Store, prId: string): PrDetail | null {
   const pr = store.getPullRequest(prId);
   if (!pr) return null;
   const latest = store.latestReview(pr.id);
-  const completed = latest && latest.status !== 'completed' ? store.latestCompletedReview(pr.id) : null;
-  const review = completed ?? latest;
+  // PRs have no History view; keep completed findings reachable after an unsuccessful rerun.
+  const review = latest && (latest.status === 'failed' || latest.status === 'cancelled')
+    ? store.latestCompletedReview(pr.id) ?? latest
+    : latest;
   return {
     pr,
-    ...(completed && latest ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
+    ...(latest && review && latest.id !== review.id ? { latestAttempt: latest } : {}),
     review: review ? { ...review, stale: review.headSha !== pr.headSha } : null,
     runs: review ? store.listRuns(review.id) : [],
     findings: review ? sortFindings(store.listFindings(review.id)) : [],
@@ -102,7 +103,7 @@ export interface LocalDetail {
   target: LocalTargetRow;
   review: ReviewRow | null;
   snapshot: LocalSnapshotView | null;
-  /** A newer attempt is separate from the completed results displayed above. */
+  /** A newer active attempt while a historical review is selected. */
   latestAttempt?: ReviewRow;
   latestRuns?: ReviewRunRow[];
   runs: ReviewRunRow[];
@@ -110,7 +111,7 @@ export interface LocalDetail {
   history: LocalHistoryItem[];
 }
 
-/** The latest completed local review of a target (or the one requested), with newer attempts and history. */
+/** The latest local review (or an explicitly requested historical review). */
 export function getLocalDetail(store: Store, targetId: string, reviewId?: string): LocalDetail | null {
   const target = store.getLocalTarget(targetId);
   if (!target) return null;
@@ -118,14 +119,11 @@ export function getLocalDetail(store: Store, targetId: string, reviewId?: string
   const latest = entries[0]?.review ?? null;
   const requested = reviewId ? entries.find((entry) => entry.review.id === reviewId)?.review ?? null : null;
   if (reviewId && !requested) return null;
-  const completed = !requested && latest && latest.status !== 'completed' ? entries.find((entry) => entry.review.status === 'completed')?.review ?? null : null;
-  const review = requested ?? completed ?? latest;
+  const review = requested ?? latest;
   const snapshot = review ? store.getLocalSnapshot(review.id) : null;
   const counts = store.countUndismissedFindings(entries.filter((entry) => entry.review.status === 'completed').map((entry) => entry.review.id));
   const hasAttempt = Boolean(
-    latest &&
-      latest.id !== review?.id &&
-      (!requested ? latest.status !== 'completed' : latest.status === 'queued' || latest.status === 'running')
+    requested && latest && latest.id !== requested.id && (latest.status === 'queued' || latest.status === 'running')
   );
   return {
     target,
@@ -185,7 +183,7 @@ export function formatLocalDetail(detail: LocalDetail, options: { stale?: boolea
     '',
     `Review ${review.status}${options.stale ? ' (stale: files changed since this review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`
   );
-  if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing previous completed results.`);
+  if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing selected review.`);
   if (review.promptSnapshot) lines.push(`Review prompt: ${review.promptSnapshot.name}`);
   if (review.error) lines.push(`Error: ${review.error}`);
   if (snapshot.skipped.length > 0) {
@@ -229,8 +227,8 @@ export function formatPrDetail(detail: PrDetail): string {
     return lines.join('\n');
   }
   lines.push(`Review ${review.status}${review.stale ? ' (stale: new commits since review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`);
-  if (review.promptSnapshot) lines.push(`Review prompt: ${review.promptSnapshot.name}`);
   if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status} at ${detail.latestAttempt.headSha}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing previous completed results.`);
+  if (review.promptSnapshot) lines.push(`Review prompt: ${review.promptSnapshot.name}`);
   if (review.error) lines.push(`Error: ${review.error}`);
   if (review.status === 'completed') {
     lines.push(

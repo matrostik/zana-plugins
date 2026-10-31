@@ -26,7 +26,7 @@ export function useReviewPrompts(rpc: Rpc) {
 }
 
 export function PromptSelector(props: { prompts: ReviewPrompt[]; error?: string | null; value: string | null | undefined; onChange(value: string | null | undefined): void }) {
-  return <label>Review prompt <select aria-label="Review prompt" value={props.value === undefined ? '__default' : props.value === null ? '__builtin' : props.value} onChange={(event) => props.onChange(event.target.value === '__default' ? undefined : event.target.value === '__builtin' ? null : event.target.value)}>
+  return <label className="cn-field cn-review-prompt"><span>Review prompt</span><select className="cn-select" aria-label="Review prompt" value={props.value === undefined ? '__default' : props.value === null ? '__builtin' : props.value} onChange={(event) => props.onChange(event.target.value === '__default' ? undefined : event.target.value === '__builtin' ? null : event.target.value)}>
     <option value="__default">Default prompt</option>
     <option value="__builtin">Built-in prompt only</option>
     {props.prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}

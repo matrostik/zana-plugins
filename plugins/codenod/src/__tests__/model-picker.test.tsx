@@ -58,7 +58,11 @@ describe('model choice helpers', () => {
 });
 
 describe('ModelPriorityPicker', () => {
-  it('explains unavailable providers in plain language and tucks the raw error into details', () => {
+  it('keeps a warning visible for a selected provider that failed to load', () => {
+    render(<ModelPriorityPicker value={[{ providerId: 'grok', model: 'a' }]} providers={[{ providerId: 'grok', displayName: 'Grok', error: 'not configured', models: [] }]} onChange={() => {}} />);
+    expect(screen.getByRole('status').textContent).toContain('Selected providers unavailable: Grok');
+  });
+  it('keeps unused provider failures in collapsed diagnostics without a warning', () => {
     const unavailable: AvailableProvider = {
       providerId: 'grok-build',
       displayName: 'Grok Build',
@@ -68,7 +72,8 @@ describe('ModelPriorityPicker', () => {
 
     render(<ModelPriorityPicker value={[]} providers={[unavailable]} onChange={() => {}} />);
 
-    expect(screen.getByText('Some providers couldn’t be loaded, so their models aren’t available right now.')).toBeTruthy();
+    expect(screen.queryByText('Some providers couldn’t be loaded, so their models aren’t available right now.')).toBeNull();
+    expect(screen.getByText('Provider diagnostics (1)').closest('details')?.open).toBe(false);
     expect(screen.getByText('Grok Build')).toBeTruthy();
     expect(screen.getByText(/its command-line tool couldn’t be found\. Check that it’s installed and available to Zana\./)).toBeTruthy();
     expect(screen.getByText('Technical details')).toBeTruthy();

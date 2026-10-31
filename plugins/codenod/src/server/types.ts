@@ -34,6 +34,20 @@ export interface ModelChoice {
   reasoningLevel?: string;
 }
 
+export interface FixAgentChoice extends ModelChoice {
+  permissionMode: string;
+}
+
+export const FIX_PERMISSION_MODES = ['edit', 'accept-edits', 'full'] as const;
+
+export interface FixProvider {
+  providerId: string;
+  displayName: string;
+  error: string | null;
+  permissionModes: string[];
+  models: Array<{ id: string; label: string; reasoningLevels: string[] }>;
+}
+
 export interface PullRequestRow {
   id: string;
   host: string;
