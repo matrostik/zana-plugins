@@ -53,8 +53,8 @@
       }
     },
     {
-      "id": "codenod",
-      "displayName": "CodeNod",
+      "id": "codewink",
+      "displayName": "CodeWink",
       "description": "AI pull request reviews for GitHub and GitHub Enterprise on Zana's providers: review inbox, multi-model consensus, risk and quality scores, Deep Review threads, and posting findings.",
       "icon": {
         "lucide": "GitPullRequest"
@@ -70,7 +70,7 @@
       "source": {
         "git": {
           "url": "https://github.com/matrostik/zana-plugins",
-          "subdir": "plugins/codenod",
+          "subdir": "plugins/codewink",
           "ref": "master"
         }
       }
