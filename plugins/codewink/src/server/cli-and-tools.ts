@@ -1,0 +1,560 @@
+import { parsePrRef, parseRepoRef, repoId } from './github/refs.ts';
+import { isLocalScope, type LocalReviewStatus, type StartLocalReviewInput } from './local/service.ts';
+import { parsePromptSelection } from './review/service.ts';
+import type { HostStatus, SyncResult } from './sync.ts';
+import type { FindingRow, ModelChoice, PrBucket, PrRef, RepoRow, ReviewEvent, ReviewRow, Severity } from './types.ts';
+import { errorMessage } from './util.ts';
+import { formatLocalDetail, formatPrDetail, formatPrLine, type LocalDetail, type PrDetail, type PrListItem } from './views.ts';
+
+export interface LocalLocationRef {
+  targetId: string;
+  projectId: string;
+  worktreePath: string;
+}
+
+export interface LocalApp {
+  locationForPath(path: string, projectId?: string): Promise<LocalLocationRef>;
+  resolveLocation(projectId: string, worktreePath: string): Promise<LocalLocationRef>;
+  start(input: StartLocalReviewInput): Promise<ReviewRow>;
+  detail(targetId: string, reviewId?: string): LocalDetail | null;
+  status(reviewId: string): Promise<LocalReviewStatus>;
+  /** Checkout path of an agent thread's environment, falling back to its project path. */
+  threadWorkspacePath(threadId: string): Promise<string | null>;
+}
+
+export interface CodewinkApp {
+  defaultHost(): Promise<string>;
+  listPullRequests(bucket?: PrBucket): PrListItem[];
+  detail(ref: PrRef): Promise<PrDetail>;
+  startReview(ref: PrRef, options: { models?: ModelChoice[]; trigger?: 'manual' | 'auto'; promptId?: string | null }): Promise<ReviewRow>;
+  waitForReview(reviewId: string, timeoutMs: number): Promise<ReviewRow>;
+  post(input: { reviewId: string; findingIds: string[]; event: ReviewEvent; body?: string }): Promise<{ url: string | null; commentCount: number; publishedCount: number }>;
+  syncAll(): Promise<SyncResult>;
+  hostStatuses(): Promise<HostStatus[]>;
+  configuredModels(): Promise<ModelChoice[]>;
+  listPrompts(): Promise<{ prompts: Array<{ id: string; name: string }>; defaultPromptId: string | null }>;
+  availableModels(): Promise<AvailableProvider[]>;
+  listRepos(): RepoRow[];
+  addRepo(input: { host: string; owner: string; name: string; autoReview?: boolean; specGlob?: string | null }): RepoRow;
+  removeRepo(id: string): boolean;
+  local?: LocalApp;
+}
+
+const SEVERITY_RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
+function isSeverity(value: string): value is Severity {
+  return value in SEVERITY_RANK;
+}
+
+/** Active findings at or above `threshold`. */
+export function findingsAtOrAbove(findings: FindingRow[], threshold: Severity): FindingRow[] {
+  return findings.filter((finding) => !finding.dismissed && SEVERITY_RANK[finding.severity] <= SEVERITY_RANK[threshold]);
+}
+
+function blockingSummary(findings: FindingRow[]) {
+  const blocking = findingsAtOrAbove(findings, 'high');
+  return {
+    blockingCount: blocking.length,
+    blockingFindings: blocking.map((f) => ({
+      id: f.id,
+      severity: f.severity,
+      category: f.category,
+      file: f.file,
+      line: f.line,
+      description: f.description,
+      suggestion: f.suggestion,
+      agreedBy: f.agreedBy
+    }))
+  };
+}
+
+function requireLocal(app: CodewinkApp): LocalApp {
+  if (!app.local) throw new Error('Local reviews are not available');
+  return app.local;
+}
+
+export interface AvailableProvider {
+  providerId: string;
+  displayName: string;
+  error: string | null;
+  models: Array<{ id: string; label: string; reasoningLevels: string[] }>;
+}
+
+interface ToolRegistrar {
+  registerTool(registration: {
+    name: string;
+    description: string;
+    parameters?: unknown;
+    execute(input: unknown, ctx: { threadId: string; projectId: string; signal: AbortSignal }): unknown | Promise<unknown>;
+  }): void;
+}
+
+interface CliRegistrar {
+  register(registration: {
+    name: string;
+    summary: string;
+    commands?: Array<{ name: string; summary: string; usage: string }>;
+    run(argv: string[], ctx: { cwd?: string }): Promise<{ exitCode: number; stdout?: string; stderr?: string }>;
+  }): void;
+}
+
+const BUCKETS: PrBucket[] = ['needs-review', 'mine', 'watched'];
+const CLI_WAIT_TIMEOUT_MS = 25 * 60_000;
+
+/** `provider:model[@reasoning]`, comma-separated. */
+export function parseModelList(raw: string): ModelChoice[] {
+  return raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [main, reasoningLevel] = entry.split('@');
+      const separator = main.indexOf(':');
+      if (separator <= 0 || separator === main.length - 1) throw new Error(`Invalid model "${entry}". Use provider:model, e.g. claude-code:opus.`);
+      return { providerId: main.slice(0, separator), model: main.slice(separator + 1), ...(reasoningLevel ? { reasoningLevel } : {}) };
+    });
+}
+
+interface ParsedArgs {
+  positional: string[];
+  flags: Map<string, string | true>;
+}
+
+const BOOLEAN_FLAGS = new Set(['json', 'wait', 'yes', 'auto']);
+
+export function parseArgs(argv: string[]): ParsedArgs {
+  const positional: string[] = [];
+  const flags = new Map<string, string | true>();
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
+    if (!arg.startsWith('--')) {
+      positional.push(arg);
+      continue;
+    }
+    const body = arg.slice(2);
+    const separator = body.indexOf('=');
+    const key = separator === -1 ? body : body.slice(0, separator);
+    if (separator !== -1) flags.set(key, body.slice(separator + 1));
+    else if (!BOOLEAN_FLAGS.has(key) && argv[index + 1] && !argv[index + 1].startsWith('--')) flags.set(key, argv[++index]);
+    else flags.set(key, true);
+  }
+  return { positional, flags };
+}
+
+function flagString(args: ParsedArgs, key: string): string | undefined {
+  const value = args.flags.get(key);
+  return typeof value === 'string' ? value : undefined;
+}
+
+const USAGE = `Usage:
+  zcc codewink list [--tab needs-review|mine|watched] [--json]
+  zcc codewink sync
+  zcc codewink review <pr-url|owner/repo#123> [--models provider:model,...] [--wait] [--json]
+  zcc codewink show <pr-url|owner/repo#123> [--json]
+  zcc codewink post <pr-url|owner/repo#123> --yes [--findings all|id,id] [--message "..."]
+  zcc codewink review-local [--path dir] [--scope uncommitted|staged|branch] [--base origin/main] [--intent "..."] [--models provider:model,...] [--wait] [--fail-on critical|high|medium|low] [--json]
+  zcc codewink show-local [--path dir] [--json]
+  zcc codewink repos [list | add <owner/repo|host/owner/repo> [--auto] [--spec "docs/**/*.md"] | remove <host/owner/repo>]
+  zcc codewink models [--json]
+  zcc codewink auth`;
+
+function json(value: unknown) {
+  return { exitCode: 0, stdout: JSON.stringify(value, null, 2) };
+}
+
+type CliResult = { exitCode: number; stdout?: string; stderr?: string };
+
+/** The checkout a local command targets: `--path`, else the terminal's working directory. */
+async function cliLocalLocation(app: CodewinkApp, args: ParsedArgs, ctx: { cwd?: string } | undefined) {
+  const local = requireLocal(app);
+  const path = flagString(args, 'path') ?? ctx?.cwd;
+  if (!path) throw new Error('Run this inside a project checkout or pass --path');
+  return { local, path, location: await local.locationForPath(path) };
+}
+
+async function handleReviewLocal(app: CodewinkApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const prompt = promptFlag(args);
+  const asJson = args.flags.has('json');
+  const scope = flagString(args, 'scope') ?? 'uncommitted';
+  if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch');
+  const failOn = flagString(args, 'fail-on');
+  if (failOn !== undefined && !isSeverity(failOn)) throw new Error('--fail-on must be one of critical, high, medium, low');
+  const wait = args.flags.has('wait');
+  if (failOn && !wait) throw new Error('--fail-on needs --wait');
+  const { local, path, location } = await cliLocalLocation(app, args, ctx);
+  const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
+  let review = await local.start({
+    projectId: location.projectId,
+    worktreePath: location.worktreePath,
+    scope,
+    base: flagString(args, 'base') ?? null,
+    intent: flagString(args, 'intent') ?? null,
+    models,
+    ...(prompt !== undefined ? { promptId: prompt === 'builtin' ? null : prompt } : {}),
+    source: 'cli'
+  });
+  if (!wait) {
+    if (asJson) return json(review);
+    return { exitCode: 0, stdout: `Local review ${review.id} ${review.status}. Check it with: zcc codewink show-local${flagString(args, 'path') ? ` --path ${path}` : ''}` };
+  }
+  review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+  const detail = local.detail(location.targetId, review.id);
+  if (!detail) throw new Error(`Local review ${review.id} not found`);
+  const completed = review.status === 'completed';
+  const stale = completed ? (await local.status(review.id)).stale : false;
+  const blocking = completed && failOn ? findingsAtOrAbove(detail.findings, failOn) : [];
+  // A gate must not pass on findings for files that changed while the review ran.
+  const exitCode = !completed || blocking.length > 0 || (failOn !== undefined && stale) ? 1 : 0;
+  if (asJson) return { ...json({ ...detail, stale, ...(failOn ? { blockingCount: blocking.length } : {}) }), exitCode };
+  // A review that did not complete has no gate to report; show why it ended instead of claiming the gate passed.
+  if (!completed) {
+    const reason = review.error ?? `Review ${review.status}.`;
+    return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}\n\nReview did not complete (${review.status}): ${reason}` };
+  }
+  const staleGate = failOn && stale ? ' Files changed while the review ran, so the result is stale; re-run the review.' : '';
+  const gate = failOn ? `\n\n${blocking.length} active finding(s) at or above ${failOn}.${staleGate}` : '';
+  return { exitCode, stdout: `${formatLocalDetail(detail, { stale })}${gate}` };
+}
+
+function promptFlag(args: ParsedArgs): string | undefined {
+  const value = flagString(args, 'prompt');
+  if (args.flags.has('prompt') && !value?.trim()) throw new Error('--prompt needs an id or builtin');
+  return value;
+}
+
+async function handleShowLocal(app: CodewinkApp, args: ParsedArgs, ctx: { cwd?: string } | undefined): Promise<CliResult> {
+  const { local, location } = await cliLocalLocation(app, args, ctx);
+  const detail = local.detail(location.targetId);
+  if (!detail) throw new Error(`No local reviews for ${location.worktreePath}`);
+  const stale = detail.review?.status === 'completed' ? (await local.status(detail.review.id)).stale : false;
+  return args.flags.has('json') ? json({ ...detail, stale }) : { exitCode: 0, stdout: formatLocalDetail(detail, { stale }) };
+}
+
+/** Well-formed `models` tool input; entries without a non-empty provider and model string are dropped. */
+function toolModels(raw: unknown): ModelChoice[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
+  return raw.flatMap((entry) => {
+    const model = (entry ?? {}) as { providerId?: unknown; model?: unknown; reasoningLevel?: unknown };
+    if (!nonEmpty(model.providerId) || !nonEmpty(model.model)) return [];
+    return [{ providerId: model.providerId, model: model.model, ...(nonEmpty(model.reasoningLevel) ? { reasoningLevel: model.reasoningLevel } : {}) }];
+  });
+}
+
+export function registerCli(cli: CliRegistrar, app: CodewinkApp): void {
+  cli.register({
+    name: 'codewink',
+    summary: 'AI pull request reviews on Zana providers',
+    commands: [
+      { name: 'list', summary: 'List pull requests in the CodeWink inbox', usage: 'zcc codewink list [--tab needs-review|mine|watched] [--json]' },
+      { name: 'sync', summary: 'Sync pull requests from GitHub now', usage: 'zcc codewink sync' },
+      { name: 'review', summary: 'Start an AI review of a pull request', usage: 'zcc codewink review <pr> [--models provider:model,...] [--prompt id|builtin] [--wait] [--json]' },
+      { name: 'show', summary: 'Show the latest review of a pull request', usage: 'zcc codewink show <pr> [--json]' },
+      { name: 'post', summary: 'Post review findings to GitHub as comments', usage: 'zcc codewink post <pr> --yes [--findings all|id,id] [--message "..."]' },
+      {
+        name: 'review-local',
+        summary: 'AI-review local changes (uncommitted, staged, or branch) without a pull request',
+        usage: 'zcc codewink review-local [--path dir] [--scope uncommitted|staged|branch] [--base ref] [--intent "..."] [--models ...] [--prompt id|builtin] [--wait] [--fail-on high] [--json]'
+      },
+      { name: 'show-local', summary: 'Show the latest local review of a checkout', usage: 'zcc codewink show-local [--path dir] [--json]' },
+      { name: 'repos', summary: 'List, add, or remove watched repositories', usage: 'zcc codewink repos [list|add|remove]' },
+      { name: 'models', summary: 'Show configured review models and available provider:model ids', usage: 'zcc codewink models [--json]' },
+      { name: 'prompts', summary: 'List review prompt IDs', usage: 'zcc codewink prompts [--json]' },
+      { name: 'auth', summary: 'Show GitHub sign-in status per host', usage: 'zcc codewink auth' }
+    ],
+    async run(argv, ctx) {
+      const [command, ...rest] = argv;
+      const args = parseArgs(rest);
+      const asJson = args.flags.has('json');
+      try {
+        const prArg = async () => {
+          const raw = args.positional[0];
+          if (!raw) throw new Error('A pull request URL or owner/repo#123 is required');
+          return parsePrRef(raw, await app.defaultHost());
+        };
+        switch (command) {
+          case 'prompts': {
+            const library = await app.listPrompts();
+            return asJson ? json(library) : { exitCode: 0, stdout: ['builtin — Built-in prompt only', ...library.prompts.map((prompt) => `${prompt.id} — ${prompt.name}${prompt.id === library.defaultPromptId ? ' [default]' : ''}`)].join('\n') };
+          }
+          case 'list': {
+            const tab = flagString(args, 'tab') as PrBucket | undefined;
+            if (tab && !BUCKETS.includes(tab)) throw new Error(`--tab must be one of ${BUCKETS.join(', ')}`);
+            const items = app.listPullRequests(tab);
+            if (asJson) return json(items);
+            return { exitCode: 0, stdout: items.length === 0 ? 'No open pull requests. Run "zcc codewink sync" to refresh.' : items.map(formatPrLine).join('\n') };
+          }
+          case 'sync': {
+            const result = await app.syncAll();
+            const lines = result.hosts.map((host) => `${host.host}: ${host.error ?? `${host.pullRequestCount} open PR(s) as @${host.login}`}`);
+            return { exitCode: result.hosts.some((host) => host.error) ? 1 : 0, stdout: lines.join('\n') };
+          }
+          case 'review': {
+            const ref = await prArg();
+            const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
+            const prompt = promptFlag(args);
+            let review = await app.startReview(ref, { models, ...(prompt !== undefined ? { promptId: prompt === 'builtin' ? null : prompt } : {}) });
+            if (args.flags.has('wait')) review = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+            if (asJson && !args.flags.has('wait')) return json(review);
+            if (asJson) return { ...json(await app.detail(ref)), exitCode: review.status === 'completed' ? 0 : 1 };
+            if (!args.flags.has('wait')) return { exitCode: 0, stdout: `Review ${review.id} ${review.status}. Check it with: zcc codewink show ${repoId(ref)}#${ref.number}` };
+            return { exitCode: review.status === 'completed' ? 0 : 1, stdout: formatPrDetail(await app.detail(ref)) };
+          }
+          case 'show': {
+            const detail = await app.detail(await prArg());
+            return asJson ? json(detail) : { exitCode: 0, stdout: formatPrDetail(detail) };
+          }
+          case 'post': {
+            if (!args.flags.has('yes')) throw new Error('Posting writes to GitHub. Re-run with --yes to confirm. Approving is only available in the CodeWink panel.');
+            const detail = await app.detail(await prArg());
+            if (!detail.review || detail.review.status !== 'completed') throw new Error('This pull request has no completed review to post');
+            const selection = flagString(args, 'findings') ?? 'all';
+            const unposted = detail.findings.filter((finding) => !finding.dismissed && !finding.postedAt);
+            const findingIds = selection === 'all'
+              ? unposted.map((finding) => finding.id)
+              : selection.split(',').map((prefix) => {
+                  const match = detail.findings.find((finding) => finding.id.startsWith(prefix.trim()));
+                  if (!match) throw new Error(`No finding matches "${prefix}"`);
+                  return match.id;
+                });
+            const result = await app.post({ reviewId: detail.review.id, findingIds, event: 'COMMENT', body: flagString(args, 'message') });
+            const skipped = findingIds.length - result.publishedCount;
+            return { exitCode: 0, stdout: `Posted ${result.publishedCount} finding(s), ${result.commentCount} inline.${skipped > 0 ? ` ${skipped} selected finding(s) were left unposted (GitHub review body size limit).` : ''}${result.url ? `\n${result.url}` : ''}` };
+          }
+          case 'review-local':
+            return await handleReviewLocal(app, args, ctx);
+          case 'show-local':
+            return await handleShowLocal(app, args, ctx);
+          case 'repos': {
+            const [sub = 'list', target] = args.positional;
+            if (sub === 'list') {
+              const repos = app.listRepos();
+              if (asJson) return json(repos);
+              return {
+                exitCode: 0,
+                stdout: repos.length === 0 ? 'No watched repositories.' : repos.map((repo) => `${repo.id}${repo.autoReview ? '  [auto-review]' : ''}${repo.specGlob ? `  spec: ${repo.specGlob}` : ''}`).join('\n')
+              };
+            }
+            if (!target) throw new Error(`zcc codewink repos ${sub} needs a repository`);
+            const ref = parseRepoRef(target, await app.defaultHost());
+            if (sub === 'add') {
+              const repo = app.addRepo({ ...ref, autoReview: args.flags.has('auto'), specGlob: flagString(args, 'spec') ?? null });
+              return { exitCode: 0, stdout: `Watching ${repo.id}${repo.autoReview ? ' with auto-review' : ''}` };
+            }
+            if (sub === 'remove') return app.removeRepo(repoId(ref)) ? { exitCode: 0, stdout: `Stopped watching ${repoId(ref)}` } : { exitCode: 1, stderr: `${repoId(ref)} is not watched` };
+            return { exitCode: 1, stderr: USAGE };
+          }
+          case 'models': {
+            const [configured, available] = await Promise.all([app.configuredModels(), app.availableModels()]);
+            if (asJson) return json({ configured, available });
+            const lines = [
+              `Configured: ${configured.length === 0 ? 'none (pick models in CodeWink settings or pass --models)' : configured.map((model) => `${model.providerId}:${model.model}${model.reasoningLevel ? `@${model.reasoningLevel}` : ''}`).join(', ')}`,
+              ...available.flatMap((provider) => [
+                `${provider.displayName}${provider.error ? ` — ${provider.error}` : ''}`,
+                ...provider.models.map((model) => `  ${provider.providerId}:${model.id}${model.reasoningLevels.length > 0 ? `  (@${model.reasoningLevels.join('|')})` : ''}`)
+              ])
+            ];
+            return { exitCode: 0, stdout: lines.join('\n') };
+          }
+          case 'auth': {
+            const statuses = await app.hostStatuses();
+            if (asJson) return json(statuses);
+            return {
+              exitCode: 0,
+              stdout: statuses
+                .map((status) => `${status.host}: ${status.authSource ? `signed in via ${status.authSource}${status.login ? ` as @${status.login}` : ''}` : 'not signed in'}${status.error ? ` — ${status.error}` : ''}`)
+                .join('\n')
+            };
+          }
+          default:
+            return { exitCode: command ? 1 : 0, ...(command ? { stderr: USAGE } : { stdout: USAGE }) };
+        }
+      } catch (error) {
+        return { exitCode: 1, stderr: errorMessage(error) };
+      }
+    }
+  });
+}
+
+export function remediationGateStaleReason(input: {
+  currentHeadSha: string;
+  currentReview: { id: string; headSha: string; stale: boolean } | null;
+  finishedReview: { id: string; headSha: string };
+}): string | null {
+  if (input.currentHeadSha !== input.finishedReview.headSha) {
+    return 'Review is stale: head commit changed during review';
+  }
+  if (!input.currentReview) {
+    return 'Review is stale: no current review is available';
+  }
+  if (input.currentReview.headSha !== input.currentHeadSha || input.currentReview.stale) {
+    return 'Review is stale: head commit changed during review';
+  }
+  if (input.currentReview.id !== input.finishedReview.id) {
+    return 'Review is stale: a newer review superseded this result';
+  }
+  return null;
+}
+
+export function registerTools(agents: ToolRegistrar, app: CodewinkApp): void {
+  agents.registerTool({
+    name: 'codewink_list_prompts',
+    description: 'List available review prompt IDs and the configured default.',
+    parameters: { type: 'object', properties: {} },
+    execute: async () => await app.listPrompts()
+  });
+  const prParameter = { type: 'string', description: 'Pull request URL, host/owner/repo#123, or owner/repo#123' };
+
+  agents.registerTool({
+    name: 'codewink_list_prs',
+    description: 'List open pull requests in the CodeWink inbox with CI state and latest AI review status.',
+    parameters: {
+      type: 'object',
+      properties: { tab: { type: 'string', enum: BUCKETS, description: 'needs-review (review requested from me), mine (I authored), or watched' } }
+    },
+    execute: (input) => {
+      const tab = (input as { tab?: PrBucket })?.tab;
+      return app.listPullRequests(tab && BUCKETS.includes(tab) ? tab : undefined).map((item) => ({
+        pr: `${item.host}/${item.owner}/${item.repo}#${item.number}`,
+        title: item.title,
+        author: item.author,
+        url: item.url,
+        draft: item.isDraft,
+        ci: item.ciState,
+        buckets: item.buckets,
+        review: item.review
+      }));
+    }
+  });
+
+  agents.registerTool({
+    name: 'codewink_get_review',
+    description: 'Get the latest CodeWink AI review of a pull request: scores (risk, coverage, requirements, simplicity, stability), summary, per-model runs, and findings.',
+    parameters: { type: 'object', properties: { pr: prParameter }, required: ['pr'] },
+    execute: async (input) => {
+      const raw = String((input as { pr?: unknown })?.pr ?? '');
+      return app.detail(parsePrRef(raw, await app.defaultHost()));
+    }
+  });
+
+  agents.registerTool({
+    name: 'codewink_review_pr',
+    description:
+      'Start a CodeWink AI review of a pull request using the configured (or given) Zana models. This tool never posts to GitHub. Returns the review id and status; use codewink_get_review to read results.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pr: prParameter,
+        promptId: { type: ['string', 'null'], description: 'Prompt ID from CodeWink settings; null selects built-in prompt only' },
+        models: {
+          type: 'array',
+          description: 'Optional models to use instead of the configured defaults',
+          items: {
+            type: 'object',
+            properties: { providerId: { type: 'string' }, model: { type: 'string' }, reasoningLevel: { type: 'string' } },
+            required: ['providerId', 'model']
+          }
+        },
+        wait: { type: 'boolean', description: 'Wait for the review to finish (can take several minutes)' },
+        remediationGate: { type: 'boolean', description: 'Include structured blockingCount and blockingFindings in the response' }
+      },
+      required: ['pr']
+    },
+    execute: async (input, ctx) => {
+      const record = (input ?? {}) as { pr?: unknown; models?: unknown; promptId?: unknown; wait?: unknown; remediationGate?: unknown };
+      const ref = parsePrRef(String(record.pr ?? ''), await app.defaultHost());
+      const models = toolModels(record.models);
+      const review = await app.startReview(ref, { models, promptId: parsePromptSelection(record.promptId) });
+      if (record.wait !== true || ctx.signal.aborted) {
+        return { reviewId: review.id, status: review.status, ...(review.coordinatorThreadId ? { coordinatorThreadId: review.coordinatorThreadId } : {}) };
+      }
+      const finished = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+      if (finished.status !== 'completed') {
+        return { reviewId: finished.id, status: finished.status, error: finished.error, ...(finished.coordinatorThreadId ? { coordinatorThreadId: finished.coordinatorThreadId } : {}) };
+      }
+      const detail = await app.detail(ref);
+      if (record.remediationGate === true) {
+        const staleReason = remediationGateStaleReason({
+          currentHeadSha: detail.pr.headSha,
+          currentReview: detail.review,
+          finishedReview: finished
+        });
+        if (staleReason) {
+          return {
+            reviewId: finished.id,
+            status: 'stale',
+            error: staleReason,
+            ...(finished.coordinatorThreadId ? { coordinatorThreadId: finished.coordinatorThreadId } : {})
+          };
+        }
+        return {
+          ...detail,
+          ...blockingSummary(detail.findings),
+          coordinatorThreadId: detail.review?.coordinatorThreadId ?? null
+        };
+      }
+      return detail;
+    }
+  });
+
+  agents.registerTool({
+    name: 'codewink_review_local',
+    description:
+      "Review local changes that are not a pull request yet with CodeWink's multi-model AI review. By default reviews this thread's own checkout. Never posts to GitHub and never modifies files. With wait and remediationGate, returns blocking (critical/high) findings to fix before opening a pull request; returns status \"stale\" if files changed during the review.",
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['uncommitted', 'staged', 'branch'], description: 'uncommitted (default): working tree vs HEAD incl. new files; staged: index vs HEAD; branch: everything since the base branch' },
+        base: { type: 'string', description: 'Base branch for scope "branch" (defaults to the remote default branch)' },
+        intent: { type: 'string', description: 'What the change is meant to do; used to score requirements' },
+        promptId: { type: ['string', 'null'], description: 'Prompt ID from CodeWink settings; null selects built-in prompt only' },
+        worktreePath: { type: 'string', description: "Another checked-out location of this thread's project to review instead of this thread's checkout" },
+        models: {
+          type: 'array',
+          description: 'Optional models to use instead of the configured defaults',
+          items: {
+            type: 'object',
+            properties: { providerId: { type: 'string' }, model: { type: 'string' }, reasoningLevel: { type: 'string' } },
+            required: ['providerId', 'model']
+          }
+        },
+        wait: { type: 'boolean', description: 'Wait for the review to finish (can take several minutes)' },
+        remediationGate: { type: 'boolean', description: 'Include structured blockingCount and blockingFindings in the response' }
+      }
+    },
+    execute: async (input, ctx) => {
+      const local = requireLocal(app);
+      const record = (input ?? {}) as { scope?: unknown; base?: unknown; intent?: unknown; worktreePath?: unknown; promptId?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
+      const scope = record.scope === undefined ? 'uncommitted' : String(record.scope);
+      if (!isLocalScope(scope)) throw new Error('scope must be one of uncommitted, staged, branch');
+      let location: LocalLocationRef;
+      if (typeof record.worktreePath === 'string' && record.worktreePath.trim()) {
+        location = await local.resolveLocation(ctx.projectId, record.worktreePath.trim());
+      } else {
+        const path = await local.threadWorkspacePath(ctx.threadId);
+        if (!path) throw new Error("Could not find this thread's checkout. Pass worktreePath.");
+        location = await local.locationForPath(path, ctx.projectId);
+      }
+      const models = toolModels(record.models);
+      const review = await local.start({
+        projectId: location.projectId,
+        worktreePath: location.worktreePath,
+        scope,
+        base: typeof record.base === 'string' ? record.base : null,
+        intent: typeof record.intent === 'string' ? record.intent : null,
+        models,
+        promptId: parsePromptSelection(record.promptId),
+        source: 'agent'
+      });
+      if (record.wait !== true || ctx.signal.aborted) return { reviewId: review.id, status: review.status };
+      const finished = await app.waitForReview(review.id, CLI_WAIT_TIMEOUT_MS);
+      if (finished.status !== 'completed') return { reviewId: finished.id, status: finished.status, error: finished.error };
+      if ((await local.status(finished.id)).stale) {
+        return { reviewId: finished.id, status: 'stale', error: 'Files changed during the review. Run codewink_review_local again on the current files.' };
+      }
+      const detail = local.detail(location.targetId, finished.id);
+      if (!detail) throw new Error(`Local review ${finished.id} not found`);
+      return record.remediationGate === true ? { ...detail, ...blockingSummary(detail.findings) } : detail;
+    }
+  });
+}
