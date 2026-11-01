@@ -21,6 +21,10 @@ Triage and AI-review GitHub pull requests in Zana Command Center using the AI pr
 
 CodeWink uses, in order: `gh auth token --hostname <host>`, your Git credential helper, then tokens pasted into the **GitHub tokens** setting (`host=token`, one per line). Tokens are never stored in the plugin database or sent to the UI.
 
+## Credits
+
+CodeWink is a port of the original **CodeNod 2.5.1** application: https://git.soma.salesforce.com/cc-oms/pr-reviewer
+
 ## Build artifacts
 
 Like Git Tree, this plugin installs from pre-built artifacts committed alongside the source: `server.mjs` (referenced by `zcc.server`) and `app.js` (referenced by `zcc.app`). The TypeScript sources under `src/` plus `server.ts`/`app.tsx` are the source of truth; rebuild with `zcc plugin build` and re-commit the artifacts. Run the tests with `npm test`.

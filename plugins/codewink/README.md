@@ -143,7 +143,7 @@ The **Profile** tab presents the prompt library as a compact prompt selector wit
 
 ### Source
 
-The original application is **CodeNod 2.5.1**, a standalone Next.js web app with an Electron macOS desktop shell, a Postgres/Supabase database, and its own AI client layer. It covered review, analytics, team management, and several integrations.
+The original application is **CodeNod 2.5.1** ([source](https://git.soma.salesforce.com/cc-oms/pr-reviewer)), a standalone Next.js web app with an Electron macOS desktop shell, a Postgres/Supabase database, and its own AI client layer. It covered review, analytics, team management, and several integrations.
 
 ### What was carried over
 
