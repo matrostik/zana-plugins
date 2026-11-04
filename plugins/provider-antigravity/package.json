@@ -1,6 +1,6 @@
 {
   "name": "@zcc-ext/provider-antigravity",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Run Zana threads with your Google Antigravity subscription via Google's official Native ACP server (agy_acp_server).",
   "engines": {
