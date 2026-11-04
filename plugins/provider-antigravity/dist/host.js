@@ -41545,28 +41545,28 @@ var NATIVE_ACP_DISTRIBUTIONS = {
     cmd: "agy_acp_server.par",
     args: [],
     sha256: "c57db0a9b8b712daa9c3c17cdb990a61842ea569f279e8bd79d7aa85a303b20b",
-    companionFiles: []
+    companionFiles: ["localharness_external"]
   },
   "darwin-x86_64": {
     archive: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.3-darwin-x86_64.zip",
     cmd: "agy_acp_server.par",
     args: [],
     sha256: "9392dbbdad7f0663dbfb5a0bf641297b0cf80d2ee9cd2d49a616bbbc7378731d",
-    companionFiles: []
+    companionFiles: ["localharness_external"]
   },
   "linux-x86_64": {
     archive: "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.3-linux-x86_64.zip",
     cmd: "agy_acp_server.par",
     args: ["--uid="],
     sha256: "0634ce5306ba92c932945455e7a83fda78e2d99c33fa8aa6ee0566206a382714",
-    companionFiles: []
+    companionFiles: ["localharness_external"]
   },
   "linux-aarch64": {
     archive: "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.3-linux-arm64.zip",
     cmd: "agy_acp_server.par",
     args: ["--uid="],
     sha256: "05c153443b0b1175151c760eeddea538950bc9843e317d54786a1f03670182bc",
-    companionFiles: []
+    companionFiles: ["localharness_external"]
   }
 };
 function resolvePlatformKey(platform = process.platform, arch = process.arch) {
@@ -41692,6 +41692,13 @@ function killProcessTree(child) {
 }
 
 // src/acp-session.ts
+function describeAcpError(error62) {
+  const [message, dataMessage, details] = [error62.message, error62.data?.message, error62.data?.details].map((value) => typeof value === "string" ? value.trim() : "");
+  if (!message || message.toLowerCase() === "internal error") {
+    return details || dataMessage || message || `ACP error ${error62.code}`;
+  }
+  return dataMessage || message;
+}
 var CATALOG_UPDATE_WAIT_MS = 1e3;
 var CATALOG_UPDATE_MAX_SESSIONS = 16;
 var SIGN_IN_PROMPTS = [
@@ -41966,7 +41973,7 @@ var NativeAcpSession = class _NativeAcpSession {
     clearTimeout(entry.timer);
     this.pending.delete(Number(message.id));
     if (message.error) {
-      const error62 = new Error(message.error?.data?.message || message.error?.message || `ACP error ${message.error?.code}`);
+      const error62 = new Error(describeAcpError(message.error));
       error62.code = message.error?.code;
       error62.data = message.error?.data;
       entry.reject(error62);

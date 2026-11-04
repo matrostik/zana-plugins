@@ -3,6 +3,20 @@ import { StringDecoder } from 'node:string_decoder';
 import { killProcessTree } from './native-runtime.js';
 import type { DiscoveredNativeModel } from './readiness-store.js';
 
+function describeAcpError(error: {
+  message?: unknown;
+  code?: unknown;
+  data?: { message?: unknown; details?: unknown } | null;
+}): string {
+  const [message, dataMessage, details] = [error.message, error.data?.message, error.data?.details]
+    .map(value => typeof value === 'string' ? value.trim() : '');
+  // Native session failures put actionable text in data.details behind a generic RPC message.
+  if (!message || message.toLowerCase() === 'internal error') {
+    return details || dataMessage || message || `ACP error ${error.code}`;
+  }
+  return dataMessage || message;
+}
+
 export interface NativeSessionOptions {
   command: string;
   args: string[];
@@ -359,7 +373,7 @@ export class NativeAcpSession {
     clearTimeout(entry.timer);
     this.pending.delete(Number(message.id));
     if (message.error) {
-      const error: any = new Error(message.error?.data?.message || message.error?.message || `ACP error ${message.error?.code}`);
+      const error: any = new Error(describeAcpError(message.error));
       error.code = message.error?.code;
       error.data = message.error?.data;
       entry.reject(error);
