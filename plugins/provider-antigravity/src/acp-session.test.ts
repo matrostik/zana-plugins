@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NativeAcpSession, type NativeSessionOptions } from './acp-session.js';
-import { FakeAcpServer, NO_REPLY, type FakeScript } from './fake-acp-server.js';
+import { FakeAcpServer, fail, NO_REPLY, type FakeScript } from './fake-acp-server.js';
 
 function open(script: FakeScript = {}, options: Partial<NativeSessionOptions> = {}) {
   const server = new FakeAcpServer(script);
@@ -10,6 +10,27 @@ function open(script: FakeScript = {}, options: Partial<NativeSessionOptions> = 
 }
 
 describe('NativeAcpSession', () => {
+  it.each([
+    ['Internal error', { details: 'Could not find default localharness binary.' }, 'Could not find default localharness binary.'],
+    ['', { details: 'Missing harness' }, 'Missing harness'],
+    ['  ', { details: 'Missing harness' }, 'Missing harness'],
+    ['Internal error', { message: 'Session could not start' }, 'Session could not start'],
+    ['Internal error', { details: 'Missing harness', message: 'Session could not start' }, 'Missing harness'],
+    ['Authentication required', { details: 'Extra context' }, 'Authentication required'],
+    ['Authentication required', { message: 'Sign in first' }, 'Sign in first'],
+    ['Internal error', { details: {}, message: 'Session could not start' }, 'Session could not start'],
+    ['Internal error', { details: ' ', message: '' }, 'Internal error'],
+    ['', null, 'ACP error -32603'],
+    ['Internal error', null, 'Internal error']
+  ])('describes session errors with message %j and data %j', async (message, data, expected) => {
+    const { session } = open({ 'session/new': () => fail(message, -32603, data) });
+    try {
+      await expect(session.newSession()).rejects.toMatchObject({ message: expected, code: -32603, data: data ?? undefined });
+    } finally {
+      session.close();
+    }
+  });
+
   it('reports initialize metadata and an empty method list when none is advertised', async () => {
     const { session } = open({ initialize: () => ({ protocolVersion: 1, agentInfo: { version: '1.4.3' }, authMethods: [{ id: 'oauth-personal' }, {}] }) });
     expect(await session.initialize()).toEqual({ protocolVersion: 1, agentVersion: '1.4.3', advertisedAuthMethods: ['oauth-personal'] });

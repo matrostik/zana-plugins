@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import './test-environment.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,6 +19,12 @@ import {
 } from './native-runtime.js';
 
 const tempDirs: string[] = [];
+const posixPlatforms = [
+  ['darwin', 'arm64', 'darwin-aarch64'],
+  ['darwin', 'x64', 'darwin-x86_64'],
+  ['linux', 'x64', 'linux-x86_64'],
+  ['linux', 'arm64', 'linux-aarch64']
+] as const;
 function makeTempDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
@@ -36,6 +42,64 @@ afterEach(() => {
 });
 
 describe('native-runtime.ts unit tests', () => {
+  it.each(posixPlatforms)('requires the harness for existing %s/%s installs', (platform, arch, key) => {
+    const baseDir = makeTempDir('missing-harness-');
+    const versionDir = join(getManagedRuntimesRoot(baseDir), PINNED_NATIVE_ACP_VERSION);
+    mkdirSync(versionDir, { recursive: true });
+    const executable = join(versionDir, 'agy_acp_server.par');
+    writeFileSync(executable, 'server');
+    expect(checkCompanionFiles(executable, key)).toEqual({ ok: false, missing: ['localharness_external'] });
+    expect(resolveNativeAcpRuntime({ baseDir, platform, arch }).installed).toBe(false);
+    expect(resolveNativeAcpRuntime({ baseDir, platform, arch, customExecutable: executable }).installed).toBe(false);
+  });
+
+  it.each(posixPlatforms)('retains the harness on install and reinstall for %s/%s', async (platform, arch, key) => {
+    const baseDir = makeTempDir('install-harness-');
+    const dist = NATIVE_ACP_DISTRIBUTIONS[key]!;
+    const bytes = new Uint8Array([1, 2, 3]);
+    vi.spyOn(dist, 'sha256', 'get').mockReturnValue(computeSha256Hex(bytes));
+    const options = {
+      baseDir, platform, arch,
+      fetchImpl: (async () => new Response(bytes)) as typeof fetch,
+      extractImpl: async (_zip: string, destination: string) => {
+        mkdirSync(destination, { recursive: true });
+        writeFileSync(join(destination, 'agy_acp_server.par'), 'server');
+        writeFileSync(join(destination, 'localharness_external'), 'harness');
+      }
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const runtime = await installNativeAcpRuntime(options);
+      expect(runtime.installed).toBe(true);
+      const harness = join(getManagedRuntimesRoot(baseDir), PINNED_NATIVE_ACP_VERSION, 'localharness_external');
+      expect(readFileSync(harness, 'utf8')).toBe('harness');
+      if (process.platform !== 'win32') expect(statSync(harness).mode & 0o777).toBe(0o755);
+    }
+  });
+
+  it.each(posixPlatforms)('preserves an existing install when %s/%s extraction lacks the harness', async (platform, arch, key) => {
+    const baseDir = makeTempDir('reject-missing-harness-');
+    const root = getManagedRuntimesRoot(baseDir);
+    const versionDir = join(root, PINNED_NATIVE_ACP_VERSION);
+    mkdirSync(versionDir, { recursive: true });
+    writeFileSync(join(versionDir, 'agy_acp_server.par'), 'old-server');
+    writeFileSync(join(versionDir, 'localharness_external'), 'old-harness');
+    const pointer = JSON.stringify({ version: PINNED_NATIVE_ACP_VERSION, platformKey: key });
+    writeFileSync(join(root, 'current.json'), pointer);
+    const bytes = new Uint8Array([1, 2, 3]);
+    vi.spyOn(NATIVE_ACP_DISTRIBUTIONS[key]!, 'sha256', 'get').mockReturnValue(computeSha256Hex(bytes));
+    await expect(installNativeAcpRuntime({
+      baseDir, platform, arch,
+      fetchImpl: (async () => new Response(bytes)) as typeof fetch,
+      extractImpl: async (_zip, destination) => {
+        mkdirSync(destination, { recursive: true });
+        writeFileSync(join(destination, 'agy_acp_server.par'), 'new-server');
+      }
+    })).rejects.toThrow(/missing required companion files: localharness_external/);
+    expect(readFileSync(join(versionDir, 'agy_acp_server.par'), 'utf8')).toBe('old-server');
+    expect(readFileSync(join(versionDir, 'localharness_external'), 'utf8')).toBe('old-harness');
+    expect(readFileSync(join(root, 'current.json'), 'utf8')).toBe(pointer);
+  });
+
   it('resolvePlatformKey handles all supported and unsupported architectures', () => {
     expect(resolvePlatformKey('win32', 'x64')).toBe('windows-x86_64');
     expect(resolvePlatformKey('win32', 'arm64')).toBe('windows-aarch64');
@@ -72,7 +136,6 @@ describe('native-runtime.ts unit tests', () => {
   });
 
   it('checkCompanionFiles returns ok for platforms without companion requirements', () => {
-    expect(checkCompanionFiles('/dummy/path', 'darwin-aarch64')).toEqual({ ok: true, missing: [] });
     expect(checkCompanionFiles('/dummy/path', null)).toEqual({ ok: true, missing: [] });
   });
 
@@ -106,6 +169,7 @@ describe('native-runtime.ts unit tests', () => {
     const customDir = makeTempDir('custom-exe-dir-');
     const customExe = join(customDir, 'agy_acp_server.par');
     writeFileSync(customExe, 'dummy-binary');
+    writeFileSync(join(customDir, 'localharness_external'), 'dummy-harness');
     const existentCustom = resolveNativeAcpRuntime({
       baseDir,
       customExecutable: customExe,
@@ -119,6 +183,7 @@ describe('native-runtime.ts unit tests', () => {
     const versionDir = join(root, PINNED_NATIVE_ACP_VERSION);
     mkdirSync(versionDir, { recursive: true });
     writeFileSync(join(versionDir, 'agy_acp_server.par'), 'dummy-managed');
+    writeFileSync(join(versionDir, 'localharness_external'), 'dummy-harness');
 
     const existentManaged = resolveNativeAcpRuntime({ baseDir, platform: 'linux', arch: 'x64' });
     expect(existentManaged.installed).toBe(true);
@@ -209,6 +274,7 @@ describe('native-runtime.ts unit tests', () => {
           extractImpl: async (_zip, destDir) => {
             mkdirSync(destDir, { recursive: true });
             writeFileSync(join(destDir, dist.cmd), content);
+            writeFileSync(join(destDir, 'localharness_external'), 'harness');
           }
         });
 
@@ -252,6 +318,7 @@ describe('native-runtime.ts unit tests', () => {
     const prevDir = join(root, '1.4.0');
     mkdirSync(prevDir, { recursive: true });
     writeFileSync(join(prevDir, 'agy_acp_server.par'), 'prev-binary');
+    writeFileSync(join(prevDir, 'localharness_external'), 'prev-harness');
     writeFileSync(
       join(root, 'current.json'),
       JSON.stringify({ version: '1.4.3', previousVersion: '1.4.0', platformKey: 'linux-x86_64' })
