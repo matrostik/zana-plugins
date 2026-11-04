@@ -17,12 +17,14 @@ function makeTempDir(prefix: string): string {
   return dir;
 }
 
-/** A custom runtime executable with its Windows companion file, so it resolves as installed. */
+/** A custom runtime executable with platform companion files, so it resolves as installed on all platforms. */
 function fakeRuntime(): string {
   const dir = makeTempDir('fake-agy-');
-  const executable = join(dir, 'agy_acp_server.exe');
+  const isWin = process.platform === 'win32';
+  const executable = join(dir, isWin ? 'agy_acp_server.exe' : 'agy_acp_server.par');
   writeFileSync(executable, 'exe');
   writeFileSync(join(dir, 'localharness_external.exe'), 'harness');
+  writeFileSync(join(dir, 'localharness_external'), 'harness');
   return executable;
 }
 
