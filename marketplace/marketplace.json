@@ -74,6 +74,31 @@
           "ref": "master"
         }
       }
+    },
+    {
+      "id": "prompt-voice",
+      "displayName": "Prompt Voice",
+      "description": "Dictate into any composer using Zana host speech-to-text and optional Zana assistant cleanup, with no API key needed. OpenAI, Gemini, and Anthropic can be used instead with your own key. Text is added to your draft for review; nothing is sent automatically.",
+      "icon": {
+        "lucide": "Mic"
+      },
+      "tags": [
+        "community",
+        "voice",
+        "productivity"
+      ],
+      "author": {
+        "name": "Ros Haitovich",
+        "github": "matrostik",
+        "url": "https://github.com/matrostik"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/matrostik/zana-plugins",
+          "subdir": "plugins/prompt-voice",
+          "ref": "master"
+        }
+      }
     }
   ]
 }
