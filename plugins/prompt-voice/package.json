@@ -1,0 +1,38 @@
+{
+  "name": "@zcc-ext/prompt-voice",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Voice dictation for Zana composers: record with the mic button, transcribe with Zana host speech-to-text, optionally clean up with the Zana assistant, and append the text to your draft for review.",
+  "engines": {
+    "zcc": ">=1.0.0",
+    "zccPluginSdk": ">=0.1.0"
+  },
+  "zcc": {
+    "name": "Prompt Voice",
+    "description": "Dictate into any composer using Zana host speech-to-text and optional Zana assistant cleanup, with no API key needed. OpenAI, Gemini, and Anthropic can be used instead with your own key. Text is added to your draft for review; nothing is sent automatically.",
+    "branding": {
+      "icon": "Mic"
+    },
+    "server": "./server.mjs",
+    "app": "./app.js"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "types": "zcc plugin types ."
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^4.1.12",
+    "esbuild": "^0.25.12",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.10"
+  }
+}
