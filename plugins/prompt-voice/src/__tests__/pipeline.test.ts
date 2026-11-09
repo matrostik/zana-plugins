@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AudioInput } from '../server/audio.ts';
-import { runDictation, type PipelineLogger } from '../server/pipeline.ts';
+import { runDictation, runRephrase, type PipelineLogger } from '../server/pipeline.ts';
 import { normalizeSettings, type PromptVoiceSettings } from '../server/settings.ts';
 import { PromptVoiceError } from '../server/errors.ts';
 import {
@@ -496,5 +496,58 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Special terms to always spell correctly:');
     expect(prompt).toContain('- Zana');
     expect(prompt).toContain('- TypeScript');
+  });
+});
+
+describe('runRephrase', () => {
+  it('returns unchanged text when llmProvider is none', async () => {
+    const result = await runRephrase(
+      { text: '   raw draft text   ' },
+      settings({ llmProvider: 'none' }),
+      { fetch: vi.fn(), log: logger() }
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        rawText: 'raw draft text',
+        text: 'raw draft text',
+        llmProvider: 'none',
+        llmModel: null
+      })
+    );
+  });
+
+  it('returns failure on empty input text', async () => {
+    const result = await runRephrase(
+      { text: '    ' },
+      settings({ llmProvider: 'none' }),
+      { fetch: vi.fn(), log: logger() }
+    );
+    expect(result).toEqual({
+      ok: false,
+      code: 'AUDIO_EMPTY',
+      message: 'No text provided to refine.'
+    });
+  });
+
+  it('rephrases text via assistant provider', async () => {
+    const assistant = {
+      complete: vi.fn(async () => ({ text: 'Refined assistant prompt.' }))
+    };
+    const result = await runRephrase(
+      { text: 'generate tests for react' },
+      settings({ llmProvider: 'assistant' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: true,
+        rawText: 'generate tests for react',
+        text: 'Refined assistant prompt.',
+        llmProvider: 'assistant',
+        llmModel: 'assistant'
+      })
+    );
+    expect(assistant.complete).toHaveBeenCalled();
   });
 });

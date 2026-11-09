@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prompt Studio // Design Alternatives</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #090D16; color: #F8FAFC; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { background: #0D111D; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; z-index: 100; flex-shrink: 0; }
+  .logo { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; color: #A5B4FC; }
+  .tabs { display: flex; background: #161B2E; padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); gap: 4px; }
+  .tab { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: #94A3B8; transition: all 0.15s ease; text-decoration: none; }
+  .tab:hover { color: #FFFFFF; background: rgba(255,255,255,0.04); }
+  .tab.active { background: #6366F1; color: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.3); font-weight: 600; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(99,102,241,0.15); color: #A5B4FC; border: 1px solid rgba(99,102,241,0.3); }
+  iframe { flex: 1; width: 100%; border: none; background: #090D16; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <span>✨</span>
+      <span>Prompt Studio Designs</span>
+      <span class="badge">4 Options</span>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="load('prompt-studio-clean.html', this)">Option 1: Clean Dual-Pane</button>
+      <button class="tab" onclick="load('prompt-studio-raycast.html', this)">Option 2: Floating Command Card (Wispr/Raycast)</button>
+      <button class="tab" onclick="load('prompt-studio-inline.html', this)">Option 3: Inline Document (Cursor / Notion)</button>
+      <button class="tab" onclick="load('prompt-studio-waveform.html', this)">Option 4: Voice Waveform First</button>
+    </div>
+    <div></div>
+  </header>
+  <iframe id="viewer" src="prompt-studio-clean.html"></iframe>
+  <script>
+    function load(url, btn) {
+      document.getElementById('viewer').src = url;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

@@ -6,6 +6,7 @@
 /** RPC method names. Shared so the composer and the server agree without importing each other. */
 export const TRANSCRIBE_METHOD = 'promptVoice.transcribe';
 export const STATUS_METHOD = 'promptVoice.status';
+export const REPHRASE_METHOD = 'promptVoice.rephrase';
 
 export const STT_PROVIDER_IDS = ['system', 'openai', 'google-gemini'] as const;
 export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
@@ -76,3 +77,28 @@ export interface StatusResponse {
   llmKeyConfigured: boolean;
   availableProviders?: string[];
 }
+
+export interface RephraseRequest {
+  text: string;
+  tone?: ToneId | string;
+  customPrompt?: string;
+  llmProvider?: LlmProviderId;
+  llmModel?: string;
+}
+
+export interface RephraseSuccess {
+  ok: true;
+  rawText: string;
+  text: string;
+  llmProvider: LlmProviderId;
+  llmModel: string | null;
+  durationMs: number;
+}
+
+export interface RephraseFailure {
+  ok: false;
+  code: PromptVoiceErrorCode;
+  message: string;
+}
+
+export type RephraseResponse = RephraseSuccess | RephraseFailure;

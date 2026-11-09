@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+
+<html class="dark h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zana IDE // Prompt Studio</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..900&display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-lowest": "#0a0e1a",
+            "surface-bright": "#353946",
+            "on-surface-variant": "#c7c4d7",
+            "on-primary": "#1000a9",
+            "on-tertiary": "#003824",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "surface-container-low": "#171b28",
+            "secondary": "#d0bcff",
+            "background": "#0f131f",
+            "on-secondary-fixed": "#23005c",
+            "surface-container": "#1b1f2c",
+            "surface": "#0f131f",
+            "inverse-on-surface": "#2c303d",
+            "primary-fixed": "#e1e0ff",
+            "error": "#ffb4ab",
+            "on-tertiary-fixed": "#002113",
+            "surface-variant": "#313442",
+            "on-primary-container": "#0d0096",
+            "surface-dim": "#0f131f",
+            "primary-container": "#8083ff",
+            "inverse-primary": "#494bd6",
+            "outline": "#908fa0",
+            "surface-container-high": "#262a37",
+            "on-tertiary-container": "#000703",
+            "on-primary-fixed": "#07006c",
+            "error-container": "#93000a",
+            "on-error-container": "#ffdad6",
+            "primary": "#c0c1ff",
+            "secondary-container": "#571bc1",
+            "on-error": "#690005",
+            "tertiary-fixed-dim": "#4edea3",
+            "inverse-surface": "#dfe2f3",
+            "tertiary-fixed": "#6ffbbe",
+            "on-secondary": "#3c0091",
+            "on-secondary-container": "#c4abff",
+            "primary-fixed-dim": "#c0c1ff",
+            "secondary-fixed": "#e9ddff",
+            "tertiary": "#4edea3",
+            "on-background": "#dfe2f3",
+            "outline-variant": "#464554",
+            "on-secondary-fixed-variant": "#5516be",
+            "secondary-fixed-dim": "#d0bcff",
+            "surface-tint": "#c0c1ff",
+            "surface-container-highest": "#313442",
+            "on-surface": "#dfe2f3",
+            "tertiary-container": "#00885d",
+            "on-tertiary-fixed-variant": "#005236"
+          },
+          borderRadius: {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          spacing: {
+            "space-md": "0.5rem",
+            "space-sm": "0.375rem",
+            "gutter": "0.5rem",
+            "space-xs": "0.25rem",
+            "margin": "0.75rem",
+            "gutter-desktop": "0.75rem",
+            "space-xl": "1rem",
+            "space-lg": "0.75rem",
+            "margin-desktop": "1rem"
+          },
+          fontFamily: {
+            "body-md": ["Inter"],
+            "shortcut": ["JetBrains Mono"],
+            "display": ["Geist"],
+            "code-block": ["JetBrains Mono"],
+            "headline-md": ["Geist"],
+            "body-sm": ["Inter"],
+            "code-inline": ["JetBrains Mono"],
+            "label-mono": ["JetBrains Mono"],
+            "label-default": ["Inter"],
+            "headline-lg": ["Geist"],
+            "body-lg": ["Inter"]
+          },
+          fontSize: {
+            "body-md": ["0.8125rem", { lineHeight: "1.25rem", letterSpacing: "0em", fontWeight: "400" }],
+            "shortcut": ["0.625rem", { lineHeight: "0.75rem", letterSpacing: "0.06em", fontWeight: "600" }],
+            "display": ["2rem", { lineHeight: "2.5rem", letterSpacing: "-0.025em", fontWeight: "600" }],
+            "code-block": ["0.8125rem", { lineHeight: "1.375rem", letterSpacing: "0em", fontWeight: "400" }],
+            "headline-md": ["1.25rem", { lineHeight: "1.75rem", letterSpacing: "-0.015em", fontWeight: "500" }],
+            "body-sm": ["0.75rem", { lineHeight: "1.125rem", letterSpacing: "0.005em", fontWeight: "400" }],
+            "code-inline": ["0.8125rem", { lineHeight: "1.25rem", letterSpacing: "-0.01em", fontWeight: "400" }],
+            "label-mono": ["0.6875rem", { lineHeight: "0.875rem", letterSpacing: "0.04em", fontWeight: "500" }],
+            "label-default": ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.01em", fontWeight: "500" }],
+            "headline-lg": ["1.5rem", { lineHeight: "2rem", letterSpacing: "-0.02em", fontWeight: "600" }],
+            "body-lg": ["0.9375rem", { lineHeight: "1.5rem", letterSpacing: "-0.005em", fontWeight: "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface h-full flex flex-col font-body-md antialiased overflow-hidden select-none">
+<!-- Top Global Bar (Shared Component: TopNavBar with breadcrumbs & active studio switch) -->
+<header class="flex justify-between items-center w-full px-margin-desktop py-space-xs border-b border-outline-variant/30 bg-surface-container-low shrink-0 z-30">
+<!-- Left: Brand / Breadcrumb -->
+<div class="flex items-center gap-space-sm">
+<span class="text-headline-md font-headline-md font-bold tracking-tight text-on-surface flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-lg bg-surface-container-highest border border-outline-variant/40 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[13px]" data-icon="terminal">terminal</span>
+</span>
+        Zana IDE
+      </span>
+<span class="text-outline text-body-sm">/</span>
+<span class="text-on-surface-variant font-body-sm text-body-sm">workspaces</span>
+<span class="text-outline text-body-sm">/</span>
+<div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-lg bg-surface-container border border-outline-variant/30">
+<span class="material-symbols-outlined text-[13px] text-tertiary" data-icon="spark" style="font-variation-settings: 'FILL' 1;">spark</span>
+<span class="text-primary font-headline-md text-body-sm font-medium tracking-tight">Prompt Studio</span>
+</div>
+</div>
+<!-- Center: Segmented Switch Pill -->
+<div class="flex items-center p-0.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30">
+<button class="relative flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container text-primary text-label-default font-label-default font-medium shadow-sm transition-all duration-150">
+<span class="w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-primary/20"></span>
+        Studio
+      </button>
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all duration-150">
+        History
+        <span class="px-1.5 py-0.2 rounded-full bg-surface-container-high text-on-surface-variant text-label-mono font-label-mono text-[10px]">14</span>
+</button>
+</div>
+<!-- Right: Runtime Status & Engine Selector -->
+<div class="flex items-center gap-space-sm">
+<!-- Local Engine Status Pill -->
+<div class="flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container border border-outline-variant/30 text-on-surface-variant text-label-mono font-label-mono">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+</span>
+<span class="text-on-surface text-label-mono">Whisper Local</span>
+</div>
+<!-- Model Dropdown -->
+<div class="relative">
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-high/60 hover:bg-surface-container-high border border-outline-variant/40 text-on-surface text-label-default font-label-default transition-colors">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Claude 3.5 Sonnet</span>
+<span class="material-symbols-outlined text-[13px] text-on-surface-variant" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+<!-- Icon Actions -->
+<div class="flex items-center gap-0.5 border-l border-outline-variant/30 pl-space-sm">
+<button class="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="Settings">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<button class="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors" title="Toggle Fullscreen">
+<span class="material-symbols-outlined" data-icon="fullscreen">fullscreen</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Workspace Subheader: Preset Template Pills Bar -->
+<div class="flex items-center justify-between px-margin-desktop py-space-xs border-b border-outline-variant/20 bg-surface-container-lowest shrink-0">
+<div class="flex items-center gap-space-xs overflow-x-auto custom-scroll py-0.5">
+<!-- Active Pill -->
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container border border-primary/40 text-primary shadow-[0_0_12px_rgba(99,102,241,0.15)] text-label-default font-label-default font-medium transition-all">
+<span class="material-symbols-outlined text-[13px] text-primary" data-icon="auto_awesome">auto_awesome</span>
+        Clarity Polish
+      </button>
+<!-- Inactive Pills -->
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-low/60 hover:bg-surface-container border border-outline-variant/25 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[13px]" data-icon="bolt">bolt</span>
+        Executive Brief
+      </button>
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-low/60 hover:bg-surface-container border border-outline-variant/25 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[13px]" data-icon="chat_bubble">chat_bubble</span>
+        Friendly Chat
+      </button>
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-low/60 hover:bg-surface-container border border-outline-variant/25 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[13px]" data-icon="square_foot">square_foot</span>
+        Technical Spec
+      </button>
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-low/60 hover:bg-surface-container border border-outline-variant/25 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[13px]" data-icon="translate">translate</span>
+        Translation
+      </button>
+<button class="flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-low/60 hover:bg-surface-container border border-outline-variant/25 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[13px]" data-icon="tune">tune</span>
+        Custom Prompt
+      </button>
+</div>
+<!-- Right Model Tone / Options Indicator -->
+<div class="flex items-center gap-space-md shrink-0">
+<button class="flex items-center gap-space-xs text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-colors">
+<span class="text-outline">Tone:</span>
+<span class="font-medium text-on-surface">Professional & Concise</span>
+<span class="material-symbols-outlined text-[13px]" data-icon="unfold_more">unfold_more</span>
+</button>
+<div class="h-3 w-px bg-outline-variant/30"></div>
+<label class="flex items-center gap-space-xs cursor-pointer text-label-default font-label-default text-on-surface-variant">
+<input checked="" class="rounded-DEFAULT bg-surface-container-highest border-outline-variant text-primary focus:ring-0 focus:ring-offset-0 h-3 w-3" type="checkbox"/>
+<span>Auto-refine</span>
+</label>
+</div>
+</div>
+<!-- Primary Workspace: 50/50 Multi-Pane Viewport -->
+<main class="flex-1 flex overflow-hidden p-space-sm gap-space-sm bg-surface-container-lowest">
+<!-- Left Pane: Source Input -->
+<section class="flex-1 flex flex-col rounded-xl bg-surface-container-low border border-outline-variant/20 overflow-hidden shadow-sm">
+<!-- Pane Header -->
+<div class="flex items-center justify-between px-margin-desktop py-space-sm border-b border-outline-variant/20 bg-surface-container-low/90 shrink-0">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline text-[15px]" data-icon="edit_note">edit_note</span>
+<h2 class="text-label-default font-label-default font-medium text-on-surface">Source Prompt / Speech</h2>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="text-label-mono font-label-mono text-outline text-[11px] bg-surface-container px-2 py-0.5 rounded-lg border border-outline-variant/20">42 words · 210 chars</span>
+<button class="w-6 h-6 rounded flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors" title="Clear Buffer">
+<span class="material-symbols-outlined text-[14px]" data-icon="backspace">backspace</span>
+</button>
+</div>
+</div>
+<!-- Editor Content Area -->
+<div class="flex-1 p-margin-desktop overflow-y-auto custom-scroll flex flex-col">
+<textarea class="w-full flex-1 bg-transparent text-on-surface font-body-md text-body-md leading-relaxed resize-none focus:outline-none placeholder-outline/40 border-0 p-0 focus:ring-0" placeholder="Speak or type raw intent, instructions, or rough draft here..." spellcheck="false">Refactor the authentication middleware in the API gateway. When token verification fails, return a 401 Unauthorized status with detailed error payload instead of an uncaught 500 internal crash. Also add tenant rate limiting to the /v1/prompts/stream endpoint with Redis.</textarea>
+</div>
+<!-- Pane Footer / Audio & Dictation Control -->
+<div class="px-margin-desktop py-space-sm border-t border-outline-variant/20 bg-surface-container-lowest flex items-center justify-between shrink-0">
+<div class="flex items-center gap-space-md">
+<!-- Tactile Dictation Button -->
+<button class="relative group flex items-center gap-space-sm px-space-md py-1.5 rounded-lg bg-surface-container border border-outline-variant/40 hover:border-primary/50 text-on-surface transition-all active:scale-[0.98]">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-60"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-error"></span>
+</span>
+<span class="material-symbols-outlined text-[15px] text-error" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+<span class="text-label-default font-label-default font-medium">Dictate</span>
+<span class="text-shortcut font-shortcut text-outline bg-surface-container-highest px-1.5 py-0.5 rounded border border-outline-variant/30">Hold Space</span>
+</button>
+<!-- Mini Audio Wave Meter (Live Input Sensitivity) -->
+<div class="flex items-center gap-0.5 h-4 px-2 py-1 bg-surface-container rounded-lg border border-outline-variant/20">
+<span class="w-0.5 h-1.5 bg-outline rounded-full animate-pulse"></span>
+<span class="w-0.5 h-3 bg-tertiary rounded-full"></span>
+<span class="w-0.5 h-2 bg-tertiary rounded-full animate-pulse"></span>
+<span class="w-0.5 h-4 bg-tertiary rounded-full"></span>
+<span class="w-0.5 h-1.5 bg-outline rounded-full"></span>
+<span class="w-0.5 h-2.5 bg-tertiary rounded-full animate-pulse"></span>
+<span class="w-0.5 h-1 bg-outline rounded-full"></span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs text-outline text-label-mono font-label-mono text-[11px]">
+<span class="material-symbols-outlined text-[13px]" data-icon="keyboard">keyboard</span>
+<span>Auto-punctuation enabled</span>
+</div>
+</div>
+</section>
+<!-- Right Pane: Refined Result -->
+<section class="flex-1 flex flex-col rounded-xl bg-surface-container-low border border-outline-variant/20 overflow-hidden shadow-sm">
+<!-- Pane Header -->
+<div class="flex items-center justify-between px-margin-desktop py-space-sm border-b border-outline-variant/20 bg-surface-container-low/90 shrink-0">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[15px]" data-icon="task_alt">task_alt</span>
+<h2 class="text-label-default font-label-default font-medium text-on-surface">Refined Output</h2>
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+</div>
+<!-- Mode Toggle & Telemetry -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center p-0.5 rounded-lg bg-surface-container border border-outline-variant/30">
+<button class="px-2 py-0.5 text-label-mono font-label-mono text-[11px] rounded text-outline hover:text-on-surface transition-colors">
+              Inline Diff
+            </button>
+<button class="px-2 py-0.5 text-label-mono font-label-mono text-[11px] rounded bg-surface-container-highest text-primary font-medium shadow-xs">
+              Clean Preview
+            </button>
+</div>
+<span class="text-label-mono font-label-mono text-outline text-[11px]">320ms · 184 tokens</span>
+</div>
+</div>
+<!-- Structured Markdown Result View -->
+<div class="flex-1 p-margin-desktop overflow-y-auto custom-scroll text-on-surface font-body-md text-body-md space-y-space-md">
+<!-- Objective Section -->
+<div class="space-y-space-xs">
+<div class="flex items-center gap-space-xs text-label-mono font-label-mono text-primary font-semibold">
+<span class="text-outline">###</span>
+<span>Objective</span>
+</div>
+<p class="text-on-surface-variant font-body-md leading-relaxed pl-space-md border-l border-outline-variant/30">
+            Harden API gateway auth handling by safely intercepting expired or malformed JWTs and enforce tenant-level rate limiting on streaming endpoints.
+          </p>
+</div>
+<!-- Implementation Steps -->
+<div class="space-y-space-xs">
+<div class="flex items-center gap-space-xs text-label-mono font-label-mono text-primary font-semibold">
+<span class="text-outline">###</span>
+<span>Implementation Steps</span>
+</div>
+<ul class="space-y-1.5 pl-space-md text-on-surface-variant">
+<li class="flex items-start gap-space-xs">
+<span class="text-tertiary mt-1 text-[11px]">▪</span>
+<span><strong>Auth Middleware Isolation:</strong> Wrap token decoding logic in a structured try-catch block. Intercept <code class="px-1 py-0.2 rounded bg-surface-container-high text-primary font-code-inline text-code-inline">JsonWebTokenError</code> and <code class="px-1 py-0.2 rounded bg-surface-container-high text-primary font-code-inline text-code-inline">TokenExpiredError</code> directly.</span>
+</li>
+<li class="flex items-start gap-space-xs">
+<span class="text-tertiary mt-1 text-[11px]">▪</span>
+<span><strong>Standardized 401 Payload:</strong> Prevent 500 unhandled bubble-ups by returning unified response entity with error reason and tracking ID.</span>
+</li>
+<li class="flex items-start gap-space-xs">
+<span class="text-tertiary mt-1 text-[11px]">▪</span>
+<span><strong>Redis Rate Limiter:</strong> Apply sliding-window token bucket on <code class="px-1 py-0.2 rounded bg-surface-container-high text-secondary font-code-inline text-code-inline">/v1/prompts/stream</code> keyed by <code class="px-1 py-0.2 rounded bg-surface-container-high text-primary font-code-inline text-code-inline">tenant_id</code> (Limit: 120 req/min).</span>
+</li>
+</ul>
+</div>
+<!-- Structured Code / Response Model Schema -->
+<div class="space-y-space-xs pt-space-xs">
+<div class="flex items-center justify-between text-label-mono font-label-mono text-[11px] text-outline">
+<span>JSON SPEC // 401 Unauthorized Response</span>
+<span>schema.v1.json</span>
+</div>
+<div class="rounded-lg bg-surface-container-lowest border border-outline-variant/30 p-space-md font-code-block text-code-block text-on-surface overflow-x-auto">
+<pre class="leading-snug"><span class="text-outline">{</span>
+  <span class="text-primary">"status"</span><span class="text-outline">:</span> <span class="text-tertiary">401</span><span class="text-outline">,</span>
+  <span class="text-primary">"code"</span><span class="text-outline">:</span> <span class="text-secondary">"ERR_AUTH_UNAUTHORIZED"</span><span class="text-outline">,</span>
+  <span class="text-primary">"message"</span><span class="text-outline">:</span> <span class="text-secondary">"JWT token verification failed or expired."</span><span class="text-outline">,</span>
+  <span class="text-primary">"details"</span><span class="text-outline">:</span> <span class="text-outline">{</span>
+    <span class="text-primary">"retry_allowed"</span><span class="text-outline">:</span> <span class="text-tertiary">false</span><span class="text-outline">,</span>
+    <span class="text-primary">"token_state"</span><span class="text-outline">:</span> <span class="text-secondary">"signature_invalid"</span>
+  <span class="text-outline">}</span>
+<span class="text-outline">}</span></pre>
+</div>
+</div>
+</div>
+<!-- Pane Footer / Clean Actions -->
+<div class="px-margin-desktop py-space-sm border-t border-outline-variant/20 bg-surface-container-lowest flex items-center justify-between shrink-0">
+<!-- Left Secondary Actions -->
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-space-xs px-space-md py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="content_copy">content_copy</span>
+            Copy
+          </button>
+<button class="flex items-center gap-space-xs px-space-md py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface-variant hover:text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="swap_horiz">swap_horiz</span>
+            Swap with Source
+          </button>
+</div>
+<!-- Right Primary High-Emphasis Action -->
+<button class="flex items-center gap-space-sm px-space-lg py-1.5 rounded-lg bg-primary-container text-on-primary-container font-label-default font-medium border border-white/20 shadow-[0_0_16px_rgba(99,102,241,0.25)] hover:brightness-110 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[15px]" data-icon="send">send</span>
+<span>Insert into Composer</span>
+<span class="text-shortcut font-shortcut bg-on-primary-container/20 text-on-primary-container px-1.5 py-0.5 rounded">⌘↵</span>
+</button>
+</div>
+</section>
+</main>
+</body></html>

@@ -1,11 +1,11 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import { describeUnexpectedFailure } from './src/server/errors.ts';
 import { SETTING_DESCRIPTORS } from './src/server/settings.ts';
-import { statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
+import { rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
 import type { FetchLike } from './src/server/http.ts';
 import type { AssistantApi } from './src/server/llm/providers.ts';
 import { resolveServerUrl } from './src/server/stt/providers.ts';
-import { STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
+import { REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
 
 export interface PromptVoiceDeps {
   /** Injected in tests. Defaults to the runtime's global fetch. */
@@ -34,6 +34,16 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
 
   zcc.rpc.method(TRANSCRIBE_METHOD, (request) =>
     transcribeHandler(request, {
+      readSettings,
+      fetch: fetchImpl,
+      log: zcc.log,
+      serverUrl,
+      assistant
+    })
+  );
+
+  zcc.rpc.method(REPHRASE_METHOD, (request) =>
+    rephraseHandler(request, {
       readSettings,
       fetch: fetchImpl,
       log: zcc.log,

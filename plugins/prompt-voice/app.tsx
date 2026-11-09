@@ -1,23 +1,36 @@
 import { definePluginApp } from '@zana-ai/zcc-plugin-sdk/app';
-import { MicButton } from './src/app/MicButton.tsx';
-import styles from './styles.css';
+import { MicButton, ensureStylesInjected } from './src/app/MicButton.tsx';
+import { PromptStudio } from './src/app/PromptStudio.tsx';
 
-const STYLE_ELEMENT_ID = 'zcc-ext-prompt-voice-styles';
+export const PROMPT_STUDIO_PANEL_PATH = 'prompt-studio';
 
-function ensureStylesInjected(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ELEMENT_ID)) return;
-  const styleEl = document.createElement('style');
-  styleEl.id = STYLE_ELEMENT_ID;
-  styleEl.textContent = styles;
-  document.head.appendChild(styleEl);
-}
-
-/** Registers the dictation button as a composer action in every thread composer. */
+/**
+ * Registers Prompt Voice's composer mic button and Prompt Studio screen.
+ */
 export default definePluginApp((app) => {
   ensureStylesInjected();
+
+  // Thread Composer mic action
   app.composer.customize({
     id: 'prompt-voice-mic',
     actions: [{ id: 'prompt-voice-mic', component: MicButton }]
+  });
+
+  // Dedicated Prompt Studio global navigation screen
+  app.slots.navPanel?.({
+    id: 'prompt-studio',
+    title: 'Prompt Studio',
+    icon: 'Sparkles',
+    path: PROMPT_STUDIO_PANEL_PATH,
+    component: PromptStudio
+  });
+
+  // Command palette quick open
+  app.slots.commandPaletteAction?.({
+    id: 'open-prompt-studio',
+    title: 'Prompt Studio: Open Canvas',
+    run: (ctx: { navigate?: (path: string) => void }) => {
+      ctx.navigate?.(`/${PROMPT_STUDIO_PANEL_PATH}`);
+    }
   });
 });
