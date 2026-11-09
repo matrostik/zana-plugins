@@ -9,7 +9,7 @@
   },
   "zcc": {
     "name": "Prompt Voice",
-    "description": "Dictate into any composer using Zana host speech-to-text and optional Zana assistant cleanup, with no API key needed. OpenAI, Gemini, and Anthropic can be used instead with your own key. Text is added to your draft for review; nothing is sent automatically.",
+    "description": "Dictate into any composer using Zana speech-to-text and optional assistant cleanup, with no API key needed. OpenAI, Gemini, and Anthropic can be used instead with your own key. Text is added to your draft for review; nothing is sent automatically.",
     "branding": {
       "icon": "Mic"
     },
