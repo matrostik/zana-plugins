@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zana IDE // Prompt Studio — Inline Refinement Canvas</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Fonts: Geist, Inter, JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "outline": "#908fa0",
+            "on-secondary": "#3c0091",
+            "secondary": "#d0bcff",
+            "on-tertiary-container": "#000703",
+            "tertiary-fixed-dim": "#4edea3",
+            "on-tertiary": "#003824",
+            "error": "#ffb4ab",
+            "secondary-container": "#571bc1",
+            "inverse-surface": "#dfe2f3",
+            "surface-container-low": "#171b28",
+            "outline-variant": "#464554",
+            "on-surface": "#dfe2f3",
+            "error-container": "#93000a",
+            "on-primary-fixed": "#07006c",
+            "primary": "#c0c1ff",
+            "on-surface-variant": "#c7c4d7",
+            "surface-container-high": "#262a37",
+            "on-secondary-fixed-variant": "#5516be",
+            "surface-dim": "#0f131f",
+            "on-tertiary-fixed": "#002113",
+            "tertiary-fixed": "#6ffbbe",
+            "primary-fixed-dim": "#c0c1ff",
+            "on-primary-container": "#0d0096",
+            "tertiary": "#4edea3",
+            "surface": "#0f131f",
+            "surface-container-highest": "#313442",
+            "secondary-fixed-dim": "#d0bcff",
+            "primary-fixed": "#e1e0ff",
+            "background": "#0f131f",
+            "secondary-fixed": "#e9ddff",
+            "surface-bright": "#353946",
+            "on-primary": "#1000a9",
+            "on-secondary-container": "#c4abff",
+            "tertiary-container": "#00885d",
+            "surface-tint": "#c0c1ff",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "surface-container-lowest": "#0a0e1a",
+            "surface-container": "#1b1f2c",
+            "on-secondary-fixed": "#23005c",
+            "on-background": "#dfe2f3",
+            "inverse-on-surface": "#2c303d",
+            "inverse-primary": "#494bd6",
+            "on-tertiary-fixed-variant": "#005236",
+            "on-error": "#690005",
+            "on-error-container": "#ffdad6",
+            "surface-variant": "#313442",
+            "primary-container": "#8083ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "space-md": "0.5rem",
+            "space-sm": "0.375rem",
+            "gutter-desktop": "0.75rem",
+            "space-xl": "1rem",
+            "space-lg": "0.75rem",
+            "margin": "0.75rem",
+            "gutter": "0.5rem",
+            "margin-desktop": "1rem"
+          },
+          "fontFamily": {
+            "label-default": ["Inter"],
+            "body-md": ["Inter"],
+            "code-block": ["JetBrains Mono"],
+            "label-mono": ["JetBrains Mono"],
+            "display": ["Geist"],
+            "body-sm": ["Inter"],
+            "headline-lg": ["Geist"],
+            "headline-md": ["Geist"],
+            "code-inline": ["JetBrains Mono"],
+            "shortcut": ["JetBrains Mono"],
+            "body-lg": ["Inter"]
+          },
+          "fontSize": {
+            "label-default": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "body-md": ["0.8125rem", { "lineHeight": "1.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "code-block": ["0.8125rem", { "lineHeight": "1.375rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "label-mono": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "display": ["2rem", { "lineHeight": "2.5rem", "letterSpacing": "-0.025em", "fontWeight": "600" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1.125rem", "letterSpacing": "0.005em", "fontWeight": "400" }],
+            "headline-lg": ["1.5rem", { "lineHeight": "2rem", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "headline-md": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.015em", "fontWeight": "500" }],
+            "code-inline": ["0.8125rem", { "lineHeight": "1.25rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "shortcut": ["0.625rem", { "lineHeight": "0.75rem", "letterSpacing": "0.06em", "fontWeight": "600" }],
+            "body-lg": ["0.9375rem", { "lineHeight": "1.5rem", "letterSpacing": "-0.005em", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    /* Custom IDE Atmosphere & Precision Cursors */
+    body {
+      background-color: #090D16;
+      color: #dfe2f3;
+      font-family: 'Inter', sans-serif;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .diff-deleted {
+      background-color: rgba(239, 68, 68, 0.12);
+      color: #FCA5A5;
+      text-decoration: line-through;
+      text-decoration-color: rgba(239, 68, 68, 0.6);
+      padding: 0 4px;
+      border-radius: 2px;
+    }
+
+    .diff-added {
+      background-color: rgba(16, 185, 129, 0.14);
+      color: #6EE7B7;
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-weight: 500;
+    }
+
+    .cursor-active-border {
+      box-shadow: 0 0 0 1px #6366F1, 0 0 20px -2px rgba(99, 102, 241, 0.35);
+    }
+
+    .floating-command-panel {
+      box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.75), 0 0 24px -2px rgba(99, 102, 241, 0.22);
+    }
+
+    /* Ambient pulse for microphone */
+    @keyframes mic-pulse {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(1.35); }
+    }
+    .animate-mic-wave {
+      animation: mic-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-surface-container-lowest text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+<!-- ========================================================================= -->
+<!-- TOP APPLICATION BAR (Derived from Shared Component TopNavBar)            -->
+<!-- ========================================================================= -->
+<header class="flex justify-between items-center w-full px-margin-desktop py-space-xs border-b border-outline-variant/30 bg-surface-container-low/95 backdrop-blur-md sticky top-0 z-50">
+<!-- Left Navigation / Breadcrumbs & Identity -->
+<div class="flex items-center gap-space-lg">
+<div class="text-headline-md font-headline-md font-bold tracking-tight text-on-surface flex items-center gap-space-xs select-none">
+<span class="w-6 h-6 rounded bg-gradient-to-tr from-inverse-primary to-primary-container flex items-center justify-center text-surface-container-lowest font-headline-lg font-bold">Z</span>
+<span class="text-body-md font-body-md text-on-surface-variant font-medium">Zana IDE //</span>
+<span class="text-body-md font-body-md text-primary font-semibold">Prompt Studio</span>
+</div>
+<div class="h-4 w-px bg-outline-variant/40"></div>
+<!-- Deep Breadcrumb -->
+<nav aria-label="Breadcrumb" class="hidden xl:flex items-center gap-1.5 text-body-sm font-body-sm text-on-surface-variant">
+<span>workspaces</span>
+<span class="text-outline">/</span>
+<span>default-project</span>
+<span class="text-outline">/</span>
+<span>documents</span>
+<span class="text-outline">/</span>
+<span class="text-on-surface font-medium truncate max-w-[200px]">API Gateway Rate Limiter RFC</span>
+</nav>
+</div>
+<!-- Center System Navigation Links (Anchored in JSON) -->
+<div class="hidden lg:flex items-center gap-space-xl">
+<a class="text-primary font-medium border-b-2 border-primary pb-space-xs flex items-center gap-1.5 text-body-sm font-body-sm" href="#">
+<span class="material-symbols-outlined text-[16px]">draw</span>
+<span>Studio</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors pb-space-xs text-body-sm font-body-sm" href="#">Templates</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors pb-space-xs text-body-sm font-body-sm" href="#">Evaluations</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors pb-space-xs text-body-sm font-body-sm" href="#">Logs</a>
+</div>
+<!-- Trailing Action Cluster & Model Pills -->
+<div class="flex items-center gap-space-sm">
+<!-- Dictation Voice Indicator -->
+<div class="flex items-center gap-2 px-space-md py-1 rounded bg-surface-container border border-outline-variant/40 text-on-surface text-label-default font-label-default">
+<div class="relative flex items-center justify-center w-2.5 h-2.5">
+<span class="absolute w-full h-full rounded-full bg-error animate-mic-wave"></span>
+<span class="relative w-1.5 h-1.5 rounded-full bg-error"></span>
+</div>
+<span class="material-symbols-outlined text-[15px] text-on-surface-variant">mic</span>
+<span class="font-medium text-body-sm">Mic Ready</span>
+<span class="px-1 py-0.5 rounded bg-surface-container-highest text-outline text-[10px] font-shortcut tracking-wider">SPACE</span>
+</div>
+<!-- Engine Selector Pill -->
+<div class="flex items-center gap-1.5 px-space-md py-1 rounded bg-surface-container hover:bg-surface-container-high transition-colors border border-outline-variant/40 text-on-surface text-label-default font-label-default cursor-pointer">
+<span class="material-symbols-outlined text-[15px] text-tertiary">bolt</span>
+<span class="font-medium text-body-sm font-body-sm">Claude 3.5 Sonnet</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">expand_more</span>
+</div>
+<div class="h-4 w-px bg-outline-variant/40 mx-space-xs"></div>
+<!-- Secondary Icon Actions -->
+<button class="p-1.5 rounded hover:bg-surface-container-highest/60 text-on-surface-variant hover:text-on-surface transition-colors active:scale-[0.98]" title="Refresh Context">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+</button>
+<button class="p-1.5 rounded hover:bg-surface-container-highest/60 text-on-surface-variant hover:text-on-surface transition-colors active:scale-[0.98]" title="Zen Mode / Fullscreen">
+<span class="material-symbols-outlined text-[18px]">fullscreen</span>
+</button>
+<button class="p-1.5 rounded hover:bg-surface-container-highest/60 text-on-surface-variant hover:text-on-surface transition-colors active:scale-[0.98]" title="Studio Settings">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+</button>
+<!-- Deploy Primary CTA (JSON Mandate) -->
+<button class="ml-space-xs px-space-lg py-1.5 rounded bg-primary-container text-on-primary-container font-label-default text-label-default font-medium hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]">rocket_launch</span>
+<span>Deploy Prompt</span>
+</button>
+<!-- Lead Prompt Architect User Avatar -->
+<img class="w-7 h-7 rounded-full border border-outline-variant/40 ml-1.5 object-cover" data-alt="Close-up portrait of a senior tech lead and prompt architect illuminated by cool indigo and emerald terminal screen reflections in a sleek dark mode workspace studio." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQmuzT3rnZxFlajgX9gIG-HG01wWHFHRJeqZZ45IYXtcEtA0qd6LCxgQnAJdd1QaJkrX6-dCveWSgmuC2uh-M8-eUqqhUmgo8uqTCXxzg0R6aT7ZuHRUZZykQ7gjSw6k-DQOwjZTA8buWyTIY9x7voEXJrJJIA1kZ7bwuZuMA0njv4NvKNz5qnn6BI7pO4eA-fE1zxmwrHP8FulHVAPLkx9q3KV1kc6hltIPfsIOi0UIVvT3TyJvns_DMlr80L_eqHcf-f4DE6afx5"/>
+</div>
+</header>
+<!-- ========================================================================= -->
+<!-- MAIN WORKSPACE: SINGLE-COLUMN EDITORIAL CANVAS                            -->
+<!-- ========================================================================= -->
+<main class="flex-1 w-full flex flex-col items-center justify-start overflow-y-auto pb-32 pt-8 px-margin-desktop">
+<!-- Central Document Article Container (Cursor/Notion Style max-w-4xl) -->
+<article class="w-full max-w-4xl bg-surface-container-lowest/60 border border-outline-variant/20 rounded-xl p-8 md:p-12 shadow-2xl relative">
+<!-- Document Breadcrumbs & Inline Title Metadata -->
+<header class="mb-8 border-b border-outline-variant/20 pb-6">
+<div class="flex flex-wrap items-center justify-between gap-4 mb-3">
+<div class="flex items-center gap-2 text-label-mono font-label-mono text-outline">
+<span class="material-symbols-outlined text-[14px]">edit_document</span>
+<span>DOC-ID: RFC-104-PROMPT-V2</span>
+<span>•</span>
+<span class="text-tertiary">UTF-8 Clean</span>
+<span>•</span>
+<span>Last edited just now by Lead Prompt Architect</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-body-sm font-body-sm text-on-surface-variant hover:text-on-surface flex items-center gap-1 px-2 py-1 rounded bg-surface-container/60 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[15px]">share</span>
+<span>Share</span>
+</button>
+<button class="text-body-sm font-body-sm text-on-surface-variant hover:text-on-surface flex items-center gap-1 px-2 py-1 rounded bg-surface-container/60 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[15px]">format_list_bulleted</span>
+<span>Outline</span>
+</button>
+</div>
+</div>
+<!-- Editable Large Crisp Title -->
+<h1 class="text-headline-lg md:text-display font-headline-lg md:font-display text-on-surface font-bold tracking-tight mb-4 flex items-center gap-3">
+<span>RFC-104: Distributed Redis Rate Limiting Middleware</span>
+<span class="text-outline text-headline-md font-normal hover:text-primary cursor-pointer select-none">#</span>
+</h1>
+<!-- Metadata Pills -->
+<div class="flex flex-wrap items-center gap-2">
+<span class="px-2 py-0.5 rounded bg-primary-container/20 text-primary border border-primary/30 text-label-default font-label-default font-medium flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            Status: Draft Review
+          </span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant border border-outline-variant/30 text-label-default font-label-default">
+            Author: Prompt Architect
+          </span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant border border-outline-variant/30 text-label-mono font-label-mono flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-outline">dns</span>
+            Target: /api/v1/auth/ratelimit
+          </span>
+<span class="text-body-sm font-body-sm text-outline ml-auto">
+            382 words • ~2 min read
+          </span>
+</div>
+</header>
+<!-- Section 1: Background & Context Prose -->
+<section class="mb-8 space-y-4">
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight flex items-center gap-2">
+<span class="text-outline text-body-md font-label-mono">01.</span>
+<span>Background &amp; Operational Context</span>
+</h2>
+<p class="text-body-lg font-body-lg text-on-surface-variant leading-relaxed">
+          The existing tier-1 edge proxy cluster relies on sticky in-process leaky buckets. During high-concurrency burst workloads (e.g., promotional drops and synchronous auth verification spikes), inter-node token synchronization desyncs by upwards of 420ms, yielding erratic HTTP 429 cascades and degraded downstream service availability.
+        </p>
+<p class="text-body-lg font-body-lg text-on-surface-variant leading-relaxed">
+          This document formalizes the production prompt spec and technical design contract for implementing atomic Redis-backed sliding window evaluation, standardizing HTTP header schemas, and deploying immediate circuit fallback policies.
+        </p>
+</section>
+<!-- ===================================================================== -->
+<!-- SECTION 2: ACTIVE FOCUSED BLOCK & INLINE AI REFINEMENT (THE HERO)      -->
+<!-- ===================================================================== -->
+<section class="my-10 relative">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">
+<span class="text-outline text-body-md font-label-mono">02.</span>
+<span>Architectural Invariant Specifications</span>
+</h2>
+<span class="px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/25 text-[11px] font-label-mono font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">auto_fix_high</span>
+              INLINE REFINING ACTIVE
+            </span>
+</div>
+<span class="text-label-mono font-label-mono text-outline">Cursor Engine v4.19</span>
+</div>
+<!-- The Active Refinement Canvas Box with Outer Glow -->
+<div class="relative rounded-lg bg-surface-container-low border border-primary/40 cursor-active-border p-6 transition-all">
+<!-- Subtle Top Label Tag on Editor Frame -->
+<div class="absolute -top-3 left-6 px-2 py-0.5 rounded bg-surface-container-high border border-primary/40 text-primary font-label-mono text-[11px] flex items-center gap-1.5 shadow-md">
+<span class="material-symbols-outlined text-[13px]">record_voice_over</span>
+<span>Raw Prompt Voice Transcription → RFC Semantic Filter</span>
+</div>
+<!-- Document Diff Text Stream -->
+<div class="space-y-4 text-body-lg font-body-lg text-on-surface leading-relaxed">
+<p>
+              When a client emits requests over the defined tenant threshold, the system should 
+              <span class="diff-deleted">so basically uh just check if they exceed it and you know</span>
+<span class="diff-added">+ execute an atomic token-bucket replenishment routine using Redis EVALSHA</span>. 
+              Under burst saturation conditions, the handler must not 
+              <span class="diff-deleted">throw an uncaught 500 error or hang until NGINX crashes</span>
+<span class="diff-added">+ degrade catastrophically; instead, trigger a graceful fallback: local memory token bucket with 500ms circuit breaker</span>.
+            </p>
+<p>
+              Additionally, upon token exhaustion, the edge layer must 
+              <span class="diff-deleted">tell the user to wait a bit</span>
+<span class="diff-added">+ emit Datadog metric `ratelimit.breach.v1` alongside canonical RFC-6585 response headers</span>:
+            </p>
+</div>
+<!-- Embedded Code Snippet with Diff Highlighting -->
+<div class="mt-4 rounded bg-surface-container-lowest border border-outline-variant/30 overflow-hidden font-code-block text-code-block">
+<div class="flex items-center justify-between px-3 py-1.5 bg-surface-container border-b border-outline-variant/20 text-label-mono font-label-mono text-outline">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-outline-variant/60"></span>
+<span>ratelimit_eval.lua (Diff Preview)</span>
+</div>
+<span class="text-tertiary">Streaming Lua AST (+12 -4)</span>
+</div>
+<div class="p-3 text-body-sm leading-relaxed overflow-x-auto space-y-1">
+<div class="text-outline-variant select-none">// Atomic Sliding Window Evaluator</div>
+<div class="diff-deleted block px-2 py-0.5">- local current_hits = redis.call('get', KEYS[1]) or 0</div>
+<div class="diff-added block px-2 py-0.5">+ local tokens = redis.call('HMGET', KEYS[1], 'remaining', 'last_leak')</div>
+<div class="diff-added block px-2 py-0.5">+ if not tokens[1] then redis.call('HMSET', KEYS[1], 'remaining', capacity, 'last_leak', now) end</div>
+<div class="text-on-surface-variant px-2">  local delta = math.max(0, now - tokens[2]) * leak_rate</div>
+<div class="diff-deleted block px-2 py-0.5">- if current_hits &gt; limit then return 0 end</div>
+<div class="diff-added block px-2 py-0.5">+ if computed_remaining &lt; cost then redis.call('PUBLISH', 'telemetry:breach', KEYS[1]); return -1 end</div>
+</div>
+</div>
+<!-- ================================================================= -->
+<!-- FLOATING COMMAND PILL BAR (Cursor Cmd+K / Notion AI Model)       -->
+<!-- ================================================================= -->
+<div class="mt-6 pt-4 border-t border-outline-variant/20">
+<div class="w-full bg-surface-container-high/95 backdrop-blur-xl border border-primary/40 rounded-xl p-2.5 floating-command-panel flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+<!-- Left: Preset Dropdown & Style Chips -->
+<div class="flex flex-wrap items-center gap-2">
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container border border-primary/30 text-on-surface text-label-default font-label-default">
+<span class="material-symbols-outlined text-[16px] text-primary">auto_awesome</span>
+<span class="font-medium">Preset: Tech Spec RFC</span>
+<span class="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+</div>
+<!-- Quick Presets -->
+<div class="hidden sm:flex items-center gap-1 text-label-default font-label-default">
+<button class="px-2 py-1 rounded bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-tertiary">arrow_back_ios_new</span>
+<span>Clarity Polish</span>
+</button>
+<button class="px-2 py-1 rounded bg-surface-container/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">bolt</span>
+<span>Executive Brief</span>
+</button>
+<button class="px-2 py-1 rounded bg-primary-container/20 border border-primary text-primary font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">architecture</span>
+<span>Tech Spec RFC</span>
+</button>
+</div>
+</div>
+<!-- Right: Explicit Decision Actions -->
+<div class="flex items-center gap-1.5 justify-end">
+<button class="px-2.5 py-1.5 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all text-label-default font-label-default flex items-center gap-1 active:scale-[0.98]">
+<span>Discard</span>
+<span class="text-[10px] font-shortcut text-outline">ESC</span>
+</button>
+<button class="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-highest border border-outline-variant/30 text-on-surface transition-all text-label-default font-label-default flex items-center gap-1 active:scale-[0.98]">
+<span class="material-symbols-outlined text-[15px] text-outline">sync</span>
+<span>Try Again</span>
+<span class="text-[10px] font-shortcut text-outline">^R</span>
+</button>
+<button class="px-4 py-1.5 rounded bg-gradient-to-r from-inverse-primary to-primary-container text-surface-container-lowest font-semibold shadow-md hover:brightness-110 active:scale-[0.98] transition-all text-label-default font-label-default flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]">done_all</span>
+<span>Accept</span>
+<span class="text-[10px] font-shortcut bg-surface-container-lowest/30 px-1 py-0.2 rounded text-surface-container-lowest">↵</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Downstream Implementation Specification & Criteria -->
+<section class="space-y-6 pt-4 border-t border-outline-variant/20">
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight flex items-center gap-2">
+<span class="text-outline text-body-md font-label-mono">03.</span>
+<span>Contractual Headers &amp; Acceptance Criteria</span>
+</h2>
+<!-- Spec Requirements List with Modern Checkboxes -->
+<div class="space-y-3">
+<div class="flex items-start gap-3 p-3 rounded-lg bg-surface-container/30 border border-outline-variant/15 hover:border-outline-variant/40 transition-colors">
+<span class="material-symbols-outlined text-tertiary text-[18px] mt-0.5">check_circle</span>
+<div class="text-body-md font-body-md">
+<strong class="text-on-surface font-semibold">Deterministic Header Emission:</strong>
+<span class="text-on-surface-variant">
+                Every tier-1 endpoint response must populate <code class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-code-inline text-code-inline">X-RateLimit-Limit</code>, <code class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-code-inline text-code-inline">X-RateLimit-Remaining</code>, and <code class="px-1.5 py-0.5 rounded bg-surface-container text-primary font-code-inline text-code-inline">X-RateLimit-Reset</code> in epoch seconds.
+              </span>
+</div>
+</div>
+<div class="flex items-start gap-3 p-3 rounded-lg bg-surface-container/30 border border-outline-variant/15 hover:border-outline-variant/40 transition-colors">
+<span class="material-symbols-outlined text-tertiary text-[18px] mt-0.5">check_circle</span>
+<div class="text-body-md font-body-md">
+<strong class="text-on-surface font-semibold">Redis Cluster Availability Guarantee:</strong>
+<span class="text-on-surface-variant">
+                If round-trip latency to Redis cluster exceeds 12ms over a rolling 100-request window, the circuit breaker switches to degraded local in-memory token mode and triggers telemetry alert <code class="px-1.5 py-0.5 rounded bg-surface-container text-tertiary font-code-inline text-code-inline">ratelimit.degraded.circuit_open</code>.
+              </span>
+</div>
+</div>
+<div class="flex items-start gap-3 p-3 rounded-lg bg-surface-container/30 border border-outline-variant/15 hover:border-outline-variant/40 transition-colors">
+<span class="material-symbols-outlined text-outline text-[18px] mt-0.5">radio_button_unchecked</span>
+<div class="text-body-md font-body-md">
+<strong class="text-on-surface font-semibold">Automated Canary Verification:</strong>
+<span class="text-on-surface-variant">
+                Synthesize 5,000 requests/sec through the mock gateway container to confirm maximum burst overfill does not exceed 0.05% across distributed edge regions.
+              </span>
+</div>
+</div>
+</div>
+<!-- Telemetry Summary Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+<div class="p-4 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col justify-between">
+<span class="text-label-mono font-label-mono text-outline">P99 EVAL LATENCY</span>
+<div class="text-headline-md font-headline-md font-bold text-tertiary mt-2">1.84ms</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant mt-1">Measured via local Redis replica</span>
+</div>
+<div class="p-4 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col justify-between">
+<span class="text-label-mono font-label-mono text-outline">REMOVED VERBOSITY</span>
+<div class="text-headline-md font-headline-md font-bold text-primary mt-2">42 tokens</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant mt-1">Voice fluff pruned in real-time</span>
+</div>
+<div class="p-4 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col justify-between">
+<span class="text-label-mono font-label-mono text-outline">CONFIDENCE SCORE</span>
+<div class="text-headline-md font-headline-md font-bold text-secondary mt-2">99.4%</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant mt-1">Aligned with RFC-6585 syntax</span>
+</div>
+</div>
+</section>
+</article>
+</main>
+<!-- ========================================================================= -->
+<!-- BOTTOM FLOATING STATUS BAR & INJECTION DOCK                              -->
+<!-- ========================================================================= -->
+<footer class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-11/12 max-w-4xl bg-surface-container-high/90 backdrop-blur-2xl border border-outline-variant/30 rounded-xl px-4 py-2.5 shadow-2xl flex flex-wrap items-center justify-between gap-3">
+<!-- Left Real-time Metrics & Status Indicator -->
+<div class="flex items-center gap-3 text-label-mono font-label-mono">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+<span class="text-on-surface font-semibold text-body-sm">382 words</span>
+</div>
+<span class="text-outline">/</span>
+<span class="text-on-surface-variant">42 filler words eliminated</span>
+<span class="text-outline">/</span>
+<span class="text-primary font-medium">Model Latency: 240ms</span>
+</div>
+<!-- Right Primary CTA: Insert Directly into Composer / Cursor -->
+<div class="flex items-center gap-3 ml-auto">
+<!-- Quick Keyboard Helper Badges -->
+<div class="hidden lg:flex items-center gap-2 text-label-default font-label-default text-outline">
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/40 text-[10px] font-shortcut text-on-surface">SPACE</kbd> Dictate
+        </span>
+<span>•</span>
+<span class="flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/40 text-[10px] font-shortcut text-on-surface">⌘K</kbd> Refine
+        </span>
+</div>
+<!-- Action Button -->
+<button class="px-4 py-2 rounded-lg bg-gradient-to-r from-primary-container to-secondary-container text-on-surface font-headline-md text-label-default font-medium hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-2 shadow-lg cursor-pointer">
+<span class="material-symbols-outlined text-[17px]">send_spark</span>
+<span>Insert into Composer / Cursor</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-lowest/50 text-[11px] font-shortcut tracking-tight">⌘↵</span>
+</button>
+</div>
+</footer>
+</body></html>

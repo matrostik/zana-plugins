@@ -7,8 +7,11 @@ import {
   type ApiKeyName,
   type PromptVoiceSettings
 } from './settings.ts';
-import { runDictation, type PipelineDeps, type PipelineLogger } from './pipeline.ts';
+import { runDictation, runRephrase, type PipelineDeps, type PipelineLogger } from './pipeline.ts';
 import type {
+  RephraseFailure,
+  RephraseRequest,
+  RephraseResponse,
   StatusResponse,
   TranscribeFailure,
   TranscribeRequest,
@@ -62,6 +65,23 @@ export async function transcribeHandler(request: unknown, deps: HandlerDeps): Pr
     });
   } catch (err) {
     return failureResponse(err, deps.log);
+  }
+}
+
+/** RPC `promptVoice.rephrase`. Directly rephrases or transforms text using LLMs. */
+export async function rephraseHandler(request: unknown, deps: HandlerDeps): Promise<RephraseResponse> {
+  const req = (request && typeof request === 'object' ? request : {}) as RephraseRequest;
+  try {
+    const settings = normalizeSettings(await deps.readSettings());
+    return await runRephrase(req, settings, {
+      fetch: deps.fetch,
+      log: deps.log,
+      serverUrl: deps.serverUrl,
+      assistant: deps.assistant
+    });
+  } catch (err) {
+    const failure = failureResponse(err, deps.log);
+    return { ok: false, code: failure.code, message: failure.message };
   }
 }
 

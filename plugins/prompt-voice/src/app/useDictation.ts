@@ -1,5 +1,5 @@
 import { useComposer, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { TRANSCRIBE_METHOD, type TranscribeResponse } from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
 import { dictationReducer, initialDictationState, type DictationEvent } from './dictationMachine.ts';
@@ -7,6 +7,7 @@ import { defaultStartSession, type RecordedAudio, type RecordingSession } from '
 
 export const UNEXPECTED_RESPONSE_MESSAGE = 'Prompt Voice returned an unexpected response. Try again.';
 export const GENERIC_FAILURE_MESSAGE = 'Dictation failed. Try again.';
+export const NOTICE_DISMISS_DELAY_MS = 4000;
 
 function isTranscribeResponse(value: unknown): value is TranscribeResponse {
   return typeof value === 'object' && value !== null && typeof (value as { ok?: unknown }).ok === 'boolean';
@@ -42,7 +43,7 @@ export function applyDictationResult(
   composer.focus();
   const notice = response.refineNotice
     ? `Inserted the raw transcript. ${response.refineNotice.message}`
-    : null;
+    : 'Added to draft.';
   dispatch({ type: 'SUCCESS', notice });
 }
 
@@ -70,6 +71,8 @@ function wireSessionCallbacks(
 export interface UseDictationOptions {
   /** Starts a recording. Defaults to the browser microphone; tests inject a fake. */
   startSession?: () => Promise<RecordingSession>;
+  /** Duration in milliseconds before completion notice automatically disappears. Defaults to 4000ms. */
+  noticeDurationMs?: number;
 }
 
 /**
@@ -144,20 +147,57 @@ function useRecordingLifecycle(
     const isCurrent = () => mountedRef.current && startIdRef.current === startId;
     const pending = settleSessionStart(startSession(), sessionRef, isCurrent, onAutoStop, dispatch);
     pendingStartRef.current = pending;
-    await pending;
+    const session = await pending;
+    if (session && isCurrent()) dispatch({ type: 'STARTED' });
     if (pendingStartRef.current === pending) pendingStartRef.current = null;
   }, [dispatch, startSession]);
 
   const isMounted = useCallback(() => mountedRef.current, []);
 
-  return { start, takeSession, cancel, isMounted };
+  const getAudioLevel = useCallback(() => sessionRef.current?.getAudioLevel?.() ?? null, []);
+  return { start, takeSession, cancel, isMounted, getAudioLevel };
 }
 
-export function useDictation({ startSession = defaultStartSession }: UseDictationOptions = {}) {
+export function useDictation({
+  startSession = defaultStartSession,
+  noticeDurationMs = NOTICE_DISMISS_DELAY_MS
+}: UseDictationOptions = {}) {
   const composer = useComposer();
   const rpc = useRpc();
   const [state, dispatch] = useReducer(dictationReducer, initialDictationState);
-  const { start, takeSession, cancel, isMounted } = useRecordingLifecycle(startSession, dispatch);
+  const { start, takeSession, cancel, isMounted, getAudioLevel } = useRecordingLifecycle(startSession, dispatch);
+  const [level, setLevel] = useState<number | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  const [autoStopped, setAutoStopped] = useState(false);
+
+  useEffect(() => {
+    if (state.phase !== 'recording') {
+      setLevel(null);
+      setSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const update = () => {
+      setLevel(getAudioLevel());
+      setSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    };
+    update();
+    const timer = setInterval(update, 100);
+    return () => clearInterval(timer);
+  }, [getAudioLevel, state.phase]);
+
+  // Automatically dismiss notice after noticeDurationMs
+  useEffect(() => {
+    if (!state.notice) return;
+    const timer = setTimeout(() => {
+      dispatch({ type: 'CLEAR_NOTICE' });
+    }, noticeDurationMs);
+    return () => clearTimeout(timer);
+  }, [noticeDurationMs, state.notice]);
+
+  const clearNotice = useCallback(() => {
+    dispatch({ type: 'CLEAR_NOTICE' });
+  }, []);
 
   const finishDictation = useCallback(async () => {
     dispatch({ type: 'STOP' });
@@ -179,12 +219,16 @@ export function useDictation({ startSession = defaultStartSession }: UseDictatio
   }, [composer, isMounted, rpc, takeSession]);
 
   const beginDictation = useCallback(async () => {
+    setAutoStopped(false);
     dispatch({ type: 'START' });
-    await start(() => void finishDictation());
+    await start(() => {
+      setAutoStopped(true);
+      void finishDictation();
+    });
   }, [finishDictation, start]);
 
   const onClick = useCallback(() => {
-    if (state.phase === 'recording') void finishDictation();
+    if (state.phase === 'recording' || state.phase === 'starting') void finishDictation();
     else if (state.phase !== 'processing') void beginDictation();
   }, [beginDictation, finishDictation, state.phase]);
 
@@ -192,8 +236,12 @@ export function useDictation({ startSession = defaultStartSession }: UseDictatio
     phase: state.phase,
     error: state.error,
     notice: state.notice,
+    level,
+    seconds,
+    autoStopped,
     onClick,
     cancel,
+    clearNotice,
     beginDictation,
     finishDictation
   };

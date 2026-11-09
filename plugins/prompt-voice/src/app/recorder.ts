@@ -27,6 +27,8 @@ export interface RecordingSession {
   stop(): Promise<RecordedAudio>;
   /** Stops recording and discards audio. Safe to call more than once. */
   cancel(): void;
+  /** Returns the current normalized input level, or null if metering is unavailable. */
+  getAudioLevel?(): number | null;
   /** Optional callback invoked if an error occurs during active recording. */
   onError?: (error: RecordingError) => void;
   /** Optional callback invoked if recording reaches the duration or byte limit and stops automatically. */
@@ -319,12 +321,29 @@ export async function startRecording(
   options: StartRecordingOptions = {}
 ): Promise<RecordingSession> {
   const stream = await requestMicrophone(deps);
-  const releaseMicrophone = () => stream.getTracks().forEach((track) => track.stop());
+  const meter = createAudioMeter(stream);
+  const tracks = stream.getTracks();
+  let onTrackEnded: (() => void) | undefined;
+  const releaseMicrophone = () => {
+    for (const track of tracks) {
+      if (onTrackEnded) track.removeEventListener?.('ended', onTrackEnded);
+    }
+    meter?.close();
+    tracks.forEach((track) => track.stop());
+  };
 
   try {
     const mimeType = pickRecorderMimeType(deps.isTypeSupported) ?? FALLBACK_MIME_TYPE;
     const recorder = deps.createRecorder(stream, mimeType);
-    return createRecordingSession(recorder, releaseMicrophone, mimeType, options);
+    const session = createRecordingSession(recorder, releaseMicrophone, mimeType, options);
+    session.getAudioLevel = () => meter?.level() ?? null;
+    onTrackEnded = () => {
+      const notify = session.onError;
+      session.cancel();
+      notify?.(new RecordingError('MIC_UNAVAILABLE', 'Microphone disconnected. Check your device and try again.'));
+    };
+    tracks.forEach((track) => track.addEventListener?.('ended', onTrackEnded!));
+    return session;
   } catch (err) {
     releaseMicrophone();
     if (err instanceof RecordingError) throw err;
@@ -332,5 +351,38 @@ export async function startRecording(
       'RECORDING_FAILED',
       err instanceof Error ? err.message : 'The recording could not be started.'
     );
+  }
+}
+
+/** Metering is optional: a failed Web Audio setup must not prevent recording. */
+function createAudioMeter(stream: MediaStream): { level(): number | null; close(): void } | null {
+  let context: AudioContext | undefined;
+  try {
+    context = new AudioContext();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    const samples = new Uint8Array(analyser.fftSize);
+    const audioContext = context;
+    let closed = false;
+    return {
+      level() {
+        if (audioContext.state && audioContext.state !== 'running') return null;
+        analyser.getByteTimeDomainData(samples);
+        const meanSquare = samples.reduce((sum, sample) => sum + ((sample - 128) / 128) ** 2, 0) / samples.length;
+        return Math.min(1, Math.sqrt(meanSquare) * 5);
+      },
+      close() {
+        if (closed) return;
+        closed = true;
+        source.disconnect();
+        void audioContext.close().catch((error: unknown) => console.error('Prompt Voice audio meter cleanup failed', error));
+      }
+    };
+  } catch (error) {
+    if (context) void context.close().catch((closeError: unknown) => console.error('Prompt Voice audio meter cleanup failed', closeError));
+    console.warn('Prompt Voice audio meter unavailable', error);
+    return null;
   }
 }

@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zana IDE // Prompt Studio - Live Dictation &amp; Active Voice Waveform Mode</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Fonts: Geist and JetBrains Mono & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "background": "#0f131f",
+            "tertiary-fixed": "#6ffbbe",
+            "on-surface-variant": "#c7c4d7",
+            "surface-container-low": "#171b28",
+            "on-secondary-fixed-variant": "#5516be",
+            "on-secondary-fixed": "#23005c",
+            "on-secondary": "#3c0091",
+            "surface-container-high": "#262a37",
+            "inverse-primary": "#494bd6",
+            "on-primary-fixed": "#07006c",
+            "on-background": "#dfe2f3",
+            "surface-bright": "#353946",
+            "secondary": "#d0bcff",
+            "on-error-container": "#ffdad6",
+            "secondary-fixed": "#e9ddff",
+            "on-tertiary": "#003824",
+            "error": "#ffb4ab",
+            "on-secondary-container": "#c4abff",
+            "on-tertiary-container": "#000703",
+            "inverse-on-surface": "#2c303d",
+            "tertiary": "#4edea3",
+            "tertiary-container": "#00885d",
+            "on-tertiary-fixed-variant": "#005236",
+            "surface-container-highest": "#313442",
+            "surface-tint": "#c0c1ff",
+            "on-primary-container": "#0d0096",
+            "surface-variant": "#313442",
+            "surface-container": "#1b1f2c",
+            "outline-variant": "#464554",
+            "on-tertiary-fixed": "#002113",
+            "secondary-container": "#571bc1",
+            "on-error": "#690005",
+            "primary-container": "#8083ff",
+            "primary": "#c0c1ff",
+            "inverse-surface": "#dfe2f3",
+            "on-surface": "#dfe2f3",
+            "on-primary": "#1000a9",
+            "tertiary-fixed-dim": "#4edea3",
+            "outline": "#908fa0",
+            "error-container": "#93000a",
+            "surface-container-lowest": "#0a0e1a",
+            "primary-fixed": "#e1e0ff",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "surface-dim": "#0f131f",
+            "surface": "#0f131f",
+            "primary-fixed-dim": "#c0c1ff",
+            "secondary-fixed-dim": "#d0bcff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "gutter": "0.5rem",
+            "margin": "0.75rem",
+            "space-xs": "0.25rem",
+            "space-lg": "0.75rem",
+            "margin-desktop": "1rem",
+            "space-xl": "1rem",
+            "gutter-desktop": "0.75rem",
+            "space-md": "0.5rem",
+            "space-sm": "0.375rem"
+          },
+          "fontFamily": {
+            "shortcut": ["JetBrains Mono"],
+            "headline-lg": ["Geist"],
+            "code-block": ["JetBrains Mono"],
+            "label-default": ["Inter"],
+            "label-mono": ["JetBrains Mono"],
+            "body-md": ["Inter"],
+            "body-lg": ["Inter"],
+            "body-sm": ["Inter"],
+            "headline-md": ["Geist"],
+            "code-inline": ["JetBrains Mono"],
+            "display": ["Geist"]
+          },
+          "fontSize": {
+            "shortcut": ["0.625rem", { "lineHeight": "0.75rem", "letterSpacing": "0.06em", "fontWeight": "600" }],
+            "headline-lg": ["1.5rem", { "lineHeight": "2rem", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "code-block": ["0.8125rem", { "lineHeight": "1.375rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "label-default": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "label-mono": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "body-md": ["0.8125rem", { "lineHeight": "1.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "body-lg": ["0.9375rem", { "lineHeight": "1.5rem", "letterSpacing": "-0.005em", "fontWeight": "400" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1.125rem", "letterSpacing": "0.005em", "fontWeight": "400" }],
+            "headline-md": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.015em", "fontWeight": "500" }],
+            "code-inline": ["0.8125rem", { "lineHeight": "1.25rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "display": ["2rem", { "lineHeight": "2.5rem", "letterSpacing": "-0.025em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+      display: inline-block;
+      vertical-align: middle;
+      font-size: 1.125rem;
+      line-height: 1;
+    }
+    /* Spectrum visualizer animations */
+    @keyframes eqWave {
+      0%, 100% { height: 16%; opacity: 0.55; }
+      50% { height: 95%; opacity: 1; }
+    }
+    .eq-bar {
+      animation: eqWave 1.2s ease-in-out infinite alternate;
+      transform-origin: bottom;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.9; transform: scale(1); filter: drop-shadow(0 0 6px rgba(244,63,94,0.6)); }
+      50% { opacity: 0.45; transform: scale(0.92); filter: drop-shadow(0 0 2px rgba(244,63,94,0.2)); }
+    }
+    .recording-beacon {
+      animation: pulseGlow 1.6s ease-in-out infinite;
+    }
+    @keyframes cursorPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.1; }
+    }
+    .blinking-cursor {
+      animation: cursorPulse 0.9s infinite;
+    }
+    /* Subtle scanline and grid background */
+    .bg-obsidian-grid {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0a0e1a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #313442;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #464554;
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface antialiased font-body-md min-h-screen overflow-hidden flex flex-col select-none">
+<!-- TOPNAVBAR (Shared Component Implementation) -->
+<header class="flex justify-between items-center w-full px-margin-desktop py-space-xs border-b border-outline-variant/30 bg-surface-container-low dark:bg-surface-container-low text-primary dark:text-primary z-40 shrink-0">
+<!-- Left: Brand + Breadcrumbs -->
+<div class="flex items-center gap-space-lg">
+<div class="text-headline-md font-headline-md font-bold tracking-tight text-on-surface dark:text-on-surface flex items-center gap-space-xs">
+<span class="w-6 h-6 rounded bg-gradient-to-tr from-inverse-primary to-primary-container flex items-center justify-center text-on-primary shadow-sm shadow-primary/20">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</span>
+<span>Zana IDE // Prompt Studio</span>
+</div>
+<div class="hidden lg:flex items-center gap-space-xs text-label-mono font-label-mono text-outline">
+<span>/</span>
+<span class="hover:text-on-surface cursor-pointer transition-colors">workspaces</span>
+<span>/</span>
+<span class="hover:text-on-surface cursor-pointer transition-colors">default-project</span>
+<span>/</span>
+<span class="text-on-surface font-medium flex items-center gap-1 bg-surface-container px-space-sm py-0.5 rounded border border-outline-variant/30">
+<span class="material-symbols-outlined text-[13px] text-tertiary">graphic_eq</span>
+          dictate://auth-rfc-stream
+        </span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high border border-outline-variant/40 text-[10px] text-primary">feat/voice-v3</span>
+</div>
+</div>
+<!-- Center: Primary Nav Links -->
+<nav class="hidden md:flex items-center gap-space-xl">
+<a class="text-primary dark:text-primary font-medium border-b-2 border-primary dark:border-primary pb-space-xs text-body-sm font-body-sm flex items-center gap-1" href="#">
+        Studio
+        <span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
+</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface transition-colors pb-space-xs text-body-sm font-body-sm" href="#">Templates</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface transition-colors pb-space-xs text-body-sm font-body-sm" href="#">Evaluations</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface transition-colors pb-space-xs text-body-sm font-body-sm" href="#">Logs</a>
+</nav>
+<!-- Right: Secondary & Primary Action Controls -->
+<div class="flex items-center gap-space-md">
+<!-- Dictation Mode Active Pill -->
+<div class="flex items-center gap-space-xs px-space-sm py-1 rounded bg-secondary-container/40 border border-secondary/30 text-secondary text-label-mono font-label-mono">
+<span class="w-2 h-2 rounded-full bg-error recording-beacon"></span>
+<span class="tracking-wider uppercase text-[10px]">Mic Streaming</span>
+</div>
+<!-- Icon Actions from JSON -->
+<div class="flex items-center gap-0.5 border-r border-outline-variant/30 pr-space-md">
+<button class="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container-highest/60 transition-colors" title="Sync Session">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+</button>
+<button class="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container-highest/60 transition-colors" title="Toggle Fullscreen">
+<span class="material-symbols-outlined text-[18px]">fullscreen</span>
+</button>
+<button class="p-1.5 rounded text-outline hover:text-on-surface hover:bg-surface-container-highest/60 transition-colors" title="Audio Device &amp; Model Settings">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+</button>
+</div>
+<!-- Refine and Deploy Buttons -->
+<button class="h-7 px-space-md flex items-center gap-space-xs rounded bg-surface-container border border-outline-variant/40 hover:bg-surface-container-high text-on-surface text-label-default font-label-default transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-[15px] text-primary">auto_fix_high</span>
+<span>Refine (⌘↵)</span>
+</button>
+<button class="h-7 px-space-md flex items-center gap-space-xs rounded bg-gradient-to-r from-inverse-primary to-primary-container text-white text-label-default font-label-default font-medium shadow-sm shadow-primary/30 hover:brightness-110 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-[15px]">send</span>
+<span>Deploy Prompt</span>
+</button>
+<!-- Avatar with alt label -->
+<div class="w-7 h-7 rounded-full border border-primary/40 overflow-hidden ring-1 ring-primary/20 shrink-0 ml-1">
+<img class="w-full h-full object-cover" data-alt="Lead Prompt Architect User Avatar, futuristic technical portrait in a dark ambient neon studio setting, cinematic blue and indigo lighting accents, high resolution render" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMg_nKHYGU6H5ARBmDlVtLCLso-XDa1Cp5p_f43w6jkrqPegHVwvzMKJRs7gfAkwsGuAFUi40-uNJUtXO2NxglImq8iNID1v2F4skbCpptzjSRkV0Nt-fZI59gBzNJSvUemjr2rvBa6QQAcAmCS1bOa4IYICa062EbL7mUNCXfWz8C_3th6ZAzMfDyvPs6lc9PO5bTYyI1CQhmepmOHDjZKtLoc7eKlcy3ZsKXNvGVJh3YShF20-uTBIf7GfxVWVyoKKsy7xPYJia5"/>
+</div>
+</div>
+</header>
+<!-- MAIN WORKSPACE SPLIT (SideNavBar + Studio Dictation Canvas) -->
+<div class="flex flex-1 overflow-hidden">
+<!-- SIDENAVBAR (Shared Component Implementation) -->
+<aside class="h-[calc(100vh-45px)] w-64 flex flex-col justify-between p-space-sm border-r border-outline-variant/30 shrink-0 bg-surface-container-lowest dark:bg-surface-container-lowest">
+<!-- Top Section: Header & Tabs -->
+<div class="space-y-space-md">
+<!-- Workspace Header -->
+<div class="px-space-md pt-space-xs pb-space-sm flex items-center justify-between border-b border-outline-variant/20">
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded bg-surface-container flex items-center justify-center border border-outline-variant/40">
+<span class="material-symbols-outlined text-primary text-[15px]" style="font-variation-settings: 'FILL' 1;">neurology</span>
+</div>
+<div>
+<div class="text-headline-md font-headline-md font-semibold text-on-surface dark:text-on-surface text-xs leading-none">Prompt Studio</div>
+<div class="text-label-mono font-label-mono text-[10px] text-outline">v2.4.0-stable</div>
+</div>
+</div>
+<span class="w-2 h-2 rounded-full bg-tertiary shadow-sm shadow-tertiary/40"></span>
+</div>
+<!-- Primary SideNav Action Button -->
+<button class="w-full h-7 px-space-md flex items-center justify-center gap-space-xs rounded bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-label-default font-label-default transition-colors">
+<span class="material-symbols-outlined text-[15px] text-tertiary">add</span>
+<span>New Experiment</span>
+</button>
+<!-- Navigation Tabs: EXACT match to JSON -->
+<div class="space-y-0.5 pt-space-xs">
+<!-- Active Tab: Prompt Buffer (Currently in Voice Dictation Submode) -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg bg-surface-container dark:bg-surface-container text-primary dark:text-primary font-medium border-l-2 border-primary text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">code_blocks</span>
+<span class="flex-1">Prompt Buffer</span>
+<span class="px-1.5 py-0.2 rounded bg-primary/20 text-primary text-shortcut font-shortcut">LIVE</span>
+</a>
+<!-- Inactive Tab 2 -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 transition-colors text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">dataset</span>
+<span>Test Matrix</span>
+</a>
+<!-- Inactive Tab 3 -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 transition-colors text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">psychology</span>
+<span>Engine Models</span>
+</a>
+<!-- Inactive Tab 4 -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 transition-colors text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">difference</span>
+<span>Diff Inspector</span>
+</a>
+<!-- Inactive Tab 5 -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 transition-colors text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">history</span>
+<span>Version History</span>
+</a>
+</div>
+<!-- Voice Sessions Mini Drawer in Sidebar -->
+<div class="pt-space-md border-t border-outline-variant/20 px-space-xs">
+<div class="text-shortcut font-shortcut uppercase tracking-widest text-outline mb-space-xs px-space-sm flex items-center justify-between">
+<span>Voice Channels</span>
+<span class="text-tertiary">ONLINE</span>
+</div>
+<div class="space-y-1">
+<div class="px-space-sm py-1.5 rounded bg-surface-container-low border border-primary/20 flex items-center justify-between text-body-sm font-body-sm">
+<span class="flex items-center gap-1.5 text-on-surface truncate">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-ping"></span>
+<span>Session #402 (Active)</span>
+</span>
+<span class="text-label-mono font-label-mono text-[10px] text-primary">00:14</span>
+</div>
+<div class="px-space-sm py-1.5 rounded hover:bg-surface-container/30 flex items-center justify-between text-body-sm font-body-sm text-outline hover:text-on-surface transition-colors cursor-pointer">
+<span class="truncate">#401 Tokenizer RFC</span>
+<span class="text-label-mono font-label-mono text-[10px]">1:42m</span>
+</div>
+<div class="px-space-sm py-1.5 rounded hover:bg-surface-container/30 flex items-center justify-between text-body-sm font-body-sm text-outline hover:text-on-surface transition-colors cursor-pointer">
+<span class="truncate">#400 System Prompt Spec</span>
+<span class="text-label-mono font-label-mono text-[10px]">0:58s</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Section: Footer Tabs from JSON -->
+<div class="space-y-0.5 pt-space-sm border-t border-outline-variant/20">
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 transition-colors text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">tune</span>
+<span>API Config</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 transition-colors text-label-default font-label-default" href="#">
+<span class="material-symbols-outlined text-[17px]">terminal</span>
+<span>Documentation</span>
+</a>
+</div>
+</aside>
+<!-- CENTRAL CONTENT CANVAS: LIVE DICTATION & WAVEFORM STUDIO -->
+<main class="flex-1 flex flex-col bg-surface-container-lowest bg-obsidian-grid overflow-hidden relative">
+<!-- 1. ACTIVE RECORDING MODE HEADER & TELEMETRY STATUS BAR -->
+<section class="border-b border-outline-variant/30 bg-surface-container-low/90 backdrop-blur-md px-margin-desktop py-space-xs shrink-0 flex flex-wrap items-center justify-between gap-y-2">
+<!-- Live Recording Indicator + Elapsed Time -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs bg-error-container/40 border border-error/40 px-2.5 py-1 rounded text-error">
+<span class="w-2.5 h-2.5 rounded-full bg-error recording-beacon"></span>
+<span class="font-shortcut text-shortcut tracking-wider">● LISTENING...</span>
+<span class="font-label-mono text-label-mono font-bold text-on-error-container ml-1" id="timer-display">00:14.82</span>
+</div>
+<!-- VU / dB Audio Meter -->
+<div class="flex items-center gap-space-xs bg-surface-container-lowest px-2.5 py-1 rounded border border-outline-variant/30">
+<span class="text-shortcut font-shortcut text-outline">MIC -18 dB</span>
+<div class="w-24 h-2 bg-surface-container-high rounded overflow-hidden flex gap-0.5 p-0.5">
+<span class="w-2 h-full bg-tertiary rounded-sm"></span>
+<span class="w-2 h-full bg-tertiary rounded-sm"></span>
+<span class="w-2 h-full bg-tertiary rounded-sm"></span>
+<span class="w-2 h-full bg-tertiary rounded-sm"></span>
+<span class="w-2 h-full bg-tertiary rounded-sm"></span>
+<span class="w-2 h-full bg-tertiary rounded-sm"></span>
+<span class="w-2 h-full bg-secondary-container rounded-sm"></span>
+<span class="w-2 h-full bg-outline-variant/40 rounded-sm"></span>
+<span class="w-2 h-full bg-outline-variant/20 rounded-sm"></span>
+</div>
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary shadow-sm shadow-tertiary/50"></span>
+</div>
+<!-- ANC & Local Whisper Engine Status -->
+<div class="hidden xl:flex items-center gap-space-xs text-label-mono font-label-mono text-[11px] text-on-surface-variant">
+<span class="px-1.5 py-0.5 rounded bg-surface-container border border-outline-variant/30 text-tertiary flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">noise_aware</span>
+              ANC: Active
+            </span>
+<span class="text-outline">•</span>
+<span class="text-outline">48kHz PCM via</span>
+<span class="text-primary font-medium">Local Whisper v3 Large</span>
+</div>
+</div>
+<!-- Mic Selector & Shortcuts Bar -->
+<div class="flex items-center gap-space-md">
+<!-- Audio Input Selector Dropdown -->
+<div class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded border border-outline-variant/30 text-label-default font-label-default text-on-surface cursor-pointer hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-primary text-[15px]">mic</span>
+<span class="text-xs">MacBook Pro Mic (Studio)</span>
+<span class="material-symbols-outlined text-[13px] text-outline">expand_more</span>
+</div>
+<!-- Shortcuts Bar -->
+<div class="hidden 2xl:flex items-center gap-space-sm text-shortcut font-shortcut text-outline">
+<span class="flex items-center gap-1 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">
+<kbd class="text-on-surface">Space</kbd> Complete
+            </span>
+<span class="flex items-center gap-1 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">
+<kbd class="text-on-surface">Esc</kbd> Cancel
+            </span>
+<span class="flex items-center gap-1 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">
+<kbd class="text-on-surface">Tab</kbd> Tone
+            </span>
+<span class="flex items-center gap-1 bg-surface-container-high px-1.5 py-0.5 rounded border border-outline-variant/30">
+<kbd class="text-primary">⌘+↵</kbd> Force Refine
+            </span>
+</div>
+</div>
+</section>
+<!-- 2. GLOWING CENTRAL AUDIO VISUALIZER & DYNAMIC WAVEFORM CARD -->
+<section class="mx-margin-desktop mt-space-sm mb-space-xs p-space-sm rounded-xl bg-surface-container/60 border border-primary/20 backdrop-blur-xl relative overflow-hidden shadow-lg shadow-black/50 shrink-0">
+<!-- Ambient Indigo Background Glow -->
+<div class="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-20 bg-primary-container/20 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex flex-col gap-space-xs relative z-10">
+<!-- Top Row of Visualizer Card: Waveform timeline meta -->
+<div class="flex items-center justify-between px-space-xs">
+<div class="flex items-center gap-space-md">
+<span class="text-label-mono font-label-mono text-xs text-primary flex items-center gap-1 font-semibold">
+<span class="material-symbols-outlined text-[14px]">graphic_eq</span>
+                Spectrogram Spectrum Analysis [Local 24-Band FFT]
+              </span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary/10 border border-tertiary/30 text-tertiary text-shortcut font-shortcut flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+                99.4% SPEECH CLARITY VAD
+              </span>
+</div>
+<div class="flex items-center gap-space-md text-label-mono font-label-mono text-[11px] text-outline">
+<span>RMS: <strong class="text-on-surface">-18.4 dBFS</strong></span>
+<span>•</span>
+<span>Sample Rate: <strong class="text-on-surface">48,000 Hz</strong></span>
+<span>•</span>
+<span>Buffer Latency: <strong class="text-tertiary">22ms</strong></span>
+</div>
+</div>
+<!-- Dynamic Waveform & EQ Bars Container -->
+<div class="h-20 w-full bg-surface-container-lowest/90 rounded-lg border border-outline-variant/20 p-2 flex items-center justify-between relative overflow-hidden">
+<!-- Timeline Scrub Head (Indicator Marker) -->
+<div class="absolute top-0 bottom-0 left-[68%] w-0.5 bg-error z-20 shadow-[0_0_8px_#ffb4ab]">
+<div class="absolute -top-1 -left-1.5 w-3.5 h-3 bg-error rounded-sm flex items-center justify-center text-[7px] font-bold text-on-error">
+                LIVE
+              </div>
+</div>
+<!-- Waveform Bar Array (48 EQ spectrum columns with staggered CSS animations) -->
+<div class="w-full h-full flex items-end justify-between gap-1 px-1">
+<!-- Visualizer Bars -->
+<span class="eq-bar w-1.5 rounded-t bg-primary/40" style="height: 25%; animation-duration: 0.9s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary/50" style="height: 40%; animation-duration: 1.4s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary/60" style="height: 30%; animation-duration: 1.1s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 65%; animation-duration: 0.8s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 85%; animation-duration: 1.2s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 70%; animation-duration: 0.7s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 50%; animation-duration: 1.5s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 90%; animation-duration: 0.9s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 45%; animation-duration: 1.3s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 35%; animation-duration: 1.0s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 60%; animation-duration: 0.85s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary-container" style="height: 95%; animation-duration: 1.1s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary-container" style="height: 80%; animation-duration: 0.75s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 55%; animation-duration: 1.3s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 88%; animation-duration: 1.0s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 65%; animation-duration: 1.4s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 40%; animation-duration: 0.95s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 75%; animation-duration: 1.15s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 92%; animation-duration: 0.8s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 60%; animation-duration: 1.25s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 78%; animation-duration: 0.7s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 35%; animation-duration: 1.1s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 50%; animation-duration: 0.9s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary-container" style="height: 85%; animation-duration: 1.35s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 100%; animation-duration: 0.8s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 70%; animation-duration: 1.0s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 90%; animation-duration: 1.2s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 65%; animation-duration: 0.85s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 45%; animation-duration: 1.1s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 80%; animation-duration: 0.9s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary-container" style="height: 55%; animation-duration: 1.3s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 75%; animation-duration: 0.75s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 94%; animation-duration: 1.05s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 60%; animation-duration: 1.4s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 35%; animation-duration: 0.9s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 70%; animation-duration: 1.2s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 85%; animation-duration: 0.8s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 50%; animation-duration: 1.15s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-tertiary" style="height: 75%; animation-duration: 0.95s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary" style="height: 30%; animation-duration: 1.3s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 45%; animation-duration: 0.85s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-primary-container" style="height: 65%; animation-duration: 1.1s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-secondary" style="height: 50%; animation-duration: 1.0s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-outline-variant/50" style="height: 20%; animation-duration: 1.5s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-outline-variant/40" style="height: 15%; animation-duration: 1.2s;"></span>
+<span class="eq-bar w-1.5 rounded-t bg-outline-variant/30" style="height: 10%; animation-duration: 1.4s;"></span>
+</div>
+<!-- Waveform baseline timestamp indicators -->
+<div class="absolute bottom-1 left-2 right-2 flex justify-between text-[9px] font-label-mono text-outline/50 pointer-events-none">
+<span>00:00.00</span>
+<span>00:04.00</span>
+<span>00:08.00</span>
+<span>00:12.00</span>
+<span class="text-error font-semibold">00:14.82 (NOW)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. TONE & REFINEMENT PRESETS BAR -->
+<section class="mx-margin-desktop mb-space-xs flex items-center justify-between gap-space-md shrink-0">
+<!-- Tone Preset Chips -->
+<div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
+<span class="text-shortcut font-shortcut uppercase text-outline pr-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">tune</span> Tone:
+          </span>
+<!-- Active Preset Pill -->
+<button class="px-2.5 py-1 rounded bg-secondary-container text-white border border-secondary shadow-[0_0_12px_rgba(99,102,241,0.3)] text-label-default font-label-default text-xs font-medium flex items-center gap-1.5 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+            Professional &amp; Concise
+          </button>
+<!-- Inactive Presets -->
+<button class="px-2.5 py-1 rounded bg-surface-container border border-outline-variant/30 hover:border-outline hover:text-on-surface text-on-surface-variant text-label-default font-label-default text-xs transition-colors shrink-0">
+            Technical Spec RFC
+          </button>
+<button class="px-2.5 py-1 rounded bg-surface-container border border-outline-variant/30 hover:border-outline hover:text-on-surface text-on-surface-variant text-label-default font-label-default text-xs transition-colors shrink-0">
+            Executive Brief
+          </button>
+<button class="px-2.5 py-1 rounded bg-surface-container border border-outline-variant/30 hover:border-outline hover:text-on-surface text-on-surface-variant text-label-default font-label-default text-xs transition-colors shrink-0">
+            Casual &amp; Friendly
+          </button>
+<button class="px-2.5 py-1 rounded bg-surface-container border border-outline-variant/30 hover:border-outline hover:text-on-surface text-on-surface-variant text-label-default font-label-default text-xs transition-colors shrink-0">
+            Bullet Points
+          </button>
+<button class="px-2.5 py-1 rounded bg-surface-container border border-outline-variant/30 hover:border-outline hover:text-on-surface text-on-surface-variant text-label-default font-label-default text-xs transition-colors shrink-0">
+            Code Prompt / PR Description
+          </button>
+</div>
+<!-- Target Engine & Filter Toggles -->
+<div class="flex items-center gap-space-sm shrink-0">
+<!-- Auto-strip filler words toggle button -->
+<button class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container border border-outline-variant/40 text-on-surface text-label-mono font-label-mono text-[11px] hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-[14px] text-tertiary">check_circle</span>
+<span>Auto-strip filler words: <strong class="text-tertiary">ON</strong></span>
+</button>
+<!-- Target Engine Pill -->
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container border border-outline-variant/40 text-label-mono font-label-mono text-[11px] text-primary">
+<span class="material-symbols-outlined text-[13px]">bolt</span>
+<span>Claude 3.5 Sonnet Dual Synthesis</span>
+</div>
+<!-- Latency Badge -->
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high border border-outline-variant/30 text-shortcut font-shortcut text-outline">
+            32ms Local VAD
+          </span>
+</div>
+</section>
+<!-- 4. REAL-TIME DUAL REFINEMENT PANE (Left: Raw Speech vs Right: Instant Spec Synthesizer) -->
+<section class="flex-1 mx-margin-desktop grid grid-cols-1 lg:grid-cols-2 gap-space-md min-h-0 mb-space-sm">
+<!-- LEFT PANE: LIVE RAW SPEECH STREAM -->
+<div class="flex flex-col bg-surface-container-low/70 border border-outline-variant/30 rounded-xl overflow-hidden shadow-inner">
+<!-- Pane Top Bar -->
+<div class="px-space-md py-space-xs bg-surface-container flex items-center justify-between border-b border-outline-variant/20">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-error text-[16px]">record_voice_over</span>
+<span class="text-label-default font-label-default font-semibold text-on-surface text-xs uppercase tracking-wider">Live Raw Speech Stream</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container-highest text-on-surface-variant font-label-mono text-[10px]">84 words</span>
+</div>
+<div class="flex items-center gap-space-xs text-shortcut font-shortcut text-outline">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span>CONTINUOUS AUDIO CAPTURE</span>
+</div>
+</div>
+<!-- Live Transcribed Buffer Canvas -->
+<div class="flex-1 p-space-md overflow-y-auto space-y-space-md font-body-lg text-body-lg leading-relaxed text-on-surface-variant select-text">
+<p>
+              "We need to completely refactor the 
+              <span class="text-on-surface font-medium">authentication middleware</span> in the API gateway. 
+              <span class="line-through text-outline/60 bg-surface-container-highest/40 px-1 rounded text-xs mx-0.5">uh</span>
+              Right now, when token verification fails, it's throwing an uncaught 
+              <code class="px-1.5 py-0.5 rounded bg-surface-container-highest text-secondary text-code-inline font-code-inline text-xs">500 Internal Error</code> 
+              instead of cleanly handling a 
+              <code class="px-1.5 py-0.5 rounded bg-surface-container-highest text-secondary text-code-inline font-code-inline text-xs">401 Unauthorized</code> response. 
+              <span class="line-through text-outline/60 bg-surface-container-highest/40 px-1 rounded text-xs mx-0.5">you know</span>
+              Ensure that expired JWT tokens trigger an automatic token refresh flow using the Redis refresh pool 
+              <span class="line-through text-outline/60 bg-surface-container-highest/40 px-1 rounded text-xs mx-0.5">like</span> 
+              before rejecting the request outright."
+            </p>
+<p>
+              "Also, add distributed rate limiting on the 
+              <span class="text-on-surface font-medium">/v1/prompts/stream</span> endpoint. It should cap tenants to 
+              <span class="text-tertiary font-medium">120 requests per minute</span> with a token bucket burst allowance of 
+              <span class="text-tertiary font-medium">30 tokens</span>. 
+              If the rate limit is exceeded, return headers with 
+              <code class="px-1.5 py-0.5 rounded bg-surface-container-highest text-secondary text-code-inline font-code-inline text-xs">Retry-After</code> 
+              and emit an anomaly telemetry event to Datadog."
+            </p>
+<!-- Real-time Active Transcription Streaming Segment with Glowing Cursor -->
+<div class="p-2.5 rounded-lg bg-surface-container-highest/30 border border-primary/25 text-on-surface">
+<span class="text-shortcut font-shortcut uppercase tracking-wider text-primary block mb-1">Transcribing In-Flight Chunk:</span>
+<span class="text-on-surface font-medium">"Make sure the Redis cluster timeout is set to 250 milliseconds with fallbacks..."</span>
+<span class="inline-block w-2 h-4 bg-primary align-middle ml-1 blinking-cursor"></span>
+</div>
+</div>
+<!-- Bottom Pane Stats -->
+<div class="px-space-md py-space-xs bg-surface-container/60 border-t border-outline-variant/20 flex items-center justify-between text-label-mono font-label-mono text-[11px] text-outline">
+<div class="flex items-center gap-space-md">
+<span>Confidence: <strong class="text-tertiary">98.8%</strong></span>
+<span>Filler words stripped: <strong class="text-on-surface">3</strong></span>
+</div>
+<button class="hover:text-primary transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">content_copy</span>
+<span>Copy Raw Speech</span>
+</button>
+</div>
+</div>
+<!-- RIGHT PANE: INSTANT TARGET OUTPUT PREVIEW (Live Speech-to-Spec Synthesizer) -->
+<div class="flex flex-col bg-surface-container-low/70 border border-primary/30 rounded-xl overflow-hidden shadow-xl shadow-black/40">
+<!-- Pane Top Bar -->
+<div class="px-space-md py-space-xs bg-surface-container flex items-center justify-between border-b border-outline-variant/20">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-tertiary text-[16px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="text-label-default font-label-default font-semibold text-on-surface text-xs uppercase tracking-wider">Instant Target Output Preview (Refining in Real-Time)</span>
+</div>
+<!-- View Switcher Tabs -->
+<div class="flex items-center bg-surface-container-lowest rounded p-0.5 border border-outline-variant/30 text-label-default font-label-default text-xs">
+<button class="px-2 py-0.5 rounded bg-surface-container-high text-primary font-medium">Split View</button>
+<button class="px-2 py-0.5 rounded text-outline hover:text-on-surface transition-colors">Inline Diff</button>
+<button class="px-2 py-0.5 rounded text-outline hover:text-on-surface transition-colors">Clean Preview</button>
+</div>
+</div>
+<!-- Synthesized Specification & Code Output with Live Diff Highlights -->
+<div class="flex-1 p-space-md overflow-y-auto space-y-space-md font-code-block text-code-block text-on-surface select-text bg-surface-container-lowest/80">
+<!-- Document Header -->
+<div class="border-b border-outline-variant/20 pb-space-sm">
+<div class="text-shortcut font-shortcut text-primary uppercase tracking-wider mb-1">Generated System Prompt &amp; Architectural RFC</div>
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface">RFC: Gateway Auth Middleware &amp; Distributed Rate Limiter</h2>
+<div class="flex items-center gap-2 mt-1 text-[11px] text-outline font-label-mono">
+<span>Scope: <code class="text-tertiary">api/gateway/middleware.py</code></span>
+<span>•</span>
+<span>Format: <span class="text-secondary">Production RFC</span></span>
+</div>
+</div>
+<!-- Markdown Section 1: Objective & Auth Failures -->
+<div class="space-y-1">
+<h3 class="text-xs font-semibold text-primary font-label-default uppercase tracking-wider flex items-center gap-1">
+<span>1. Problem Statement &amp; Middleware Refactor</span>
+</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant">
+                Replace unhandled exceptions during token validation with deterministic HTTP status codes and integrate transparent Redis session replenishment.
+              </p>
+</div>
+<!-- Diff Highlights Block: Code Segment (Token verification & Redis refresh) -->
+<div class="rounded-lg border border-outline-variant/30 overflow-hidden bg-surface-container-lowest text-xs">
+<div class="px-space-sm py-1 bg-surface-container flex items-center justify-between text-outline text-[11px] font-label-mono border-b border-outline-variant/20">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-primary">data_object</span>
+<span>gateway/auth/validator.py</span>
+</span>
+<span class="text-tertiary">+14 lines added</span>
+</div>
+<div class="p-2.5 font-code-inline text-code-inline leading-relaxed space-y-0.5">
+<div class="text-outline/70"> def validate_auth_token(request: Request) -&gt; UserIdentity:</div>
+<div class="bg-error/10 border-l-2 border-error text-error -mx-2.5 px-2.5 line-through">
+                  -     if not token or is_expired(token): raise InternalServerCrash("JWT expired")
+                </div>
+<div class="bg-tertiary/10 border-l-2 border-tertiary text-tertiary-fixed -mx-2.5 px-2.5 font-medium">
+                  +     if not token:
+                </div>
+<div class="bg-tertiary/10 border-l-2 border-tertiary text-tertiary-fixed -mx-2.5 px-2.5 font-medium">
+                  +         raise HTTPException(status_code=401, detail="Missing Bearer Token")
+                </div>
+<div class="bg-tertiary/10 border-l-2 border-tertiary text-tertiary-fixed -mx-2.5 px-2.5 font-medium">
+                  +     if is_expired(token):
+                </div>
+<div class="bg-tertiary/10 border-l-2 border-tertiary text-tertiary-fixed -mx-2.5 px-2.5 font-medium">
+                  +         refreshed = redis_session_pool.attempt_refresh(token.session_id)
+                </div>
+<div class="bg-tertiary/10 border-l-2 border-tertiary text-tertiary-fixed -mx-2.5 px-2.5 font-medium">
+                  +         if not refreshed: raise HTTPException(status_code=401, detail="Session Expired")
+                </div>
+</div>
+</div>
+<!-- Markdown Section 2: Rate Limiting Matrix -->
+<div class="space-y-1.5 pt-space-xs">
+<h3 class="text-xs font-semibold text-primary font-label-default uppercase tracking-wider flex items-center gap-1">
+<span>2. Endpoint Telemetry &amp; Bucket Bounds</span>
+</h3>
+<ul class="text-body-sm font-body-sm text-on-surface-variant space-y-1 list-disc list-inside">
+<li><strong class="text-on-surface">Target Endpoint:</strong> <code class="text-secondary bg-surface-container px-1 py-0.5 rounded">POST /v1/prompts/stream</code></li>
+<li><strong class="text-on-surface">Standard Allowance:</strong> 120 RPM per Tenant UUID</li>
+<li><strong class="text-on-surface">Burst Capacity:</strong> Token bucket depth of 30 requests</li>
+<li><strong class="text-on-surface">Header Contract:</strong> Populate <code class="text-primary bg-surface-container px-1 py-0.5 rounded">Retry-After: {seconds}</code> on 429 response</li>
+<li><strong class="text-on-surface">Observability:</strong> Emit anomaly pulse payload directly to Datadog event loop</li>
+</ul>
+</div>
+<!-- In-progress prompt synthesis indicator -->
+<div class="flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 text-xs font-label-default text-primary">
+<span class="material-symbols-outlined text-[15px] animate-spin">sync</span>
+<span>Streaming synthesis continuously listening to voice buffer... (updated 120ms ago)</span>
+</div>
+</div>
+<!-- Bottom Action Floating Dock -->
+<div class="p-space-sm bg-surface-container border-t border-outline-variant/30 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-space-xs">
+<button class="h-8 px-space-md flex items-center gap-1 rounded bg-surface-container-high border border-outline-variant/40 hover:bg-surface-bright text-error text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+<span>Discard</span>
+</button>
+<button class="h-8 px-space-md flex items-center gap-1 rounded bg-surface-container-high border border-outline-variant/40 hover:bg-surface-bright text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[16px] text-tertiary">pause</span>
+<span>Pause Dictation</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="h-8 px-space-md flex items-center gap-1.5 rounded bg-surface-container-high border border-outline-variant/40 hover:bg-surface-bright text-on-surface text-label-default font-label-default transition-all">
+<span class="material-symbols-outlined text-[16px] text-primary">edit_note</span>
+<span>Manual Edit</span>
+</button>
+<button class="h-8 px-space-lg flex items-center gap-space-xs rounded bg-gradient-to-r from-inverse-primary to-primary-container text-white text-label-default font-label-default font-semibold shadow-md shadow-primary/30 hover:brightness-110 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">input</span>
+<span>Finish &amp; Inject into Active Composer (Space)</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. BOTTOM RECENT RECORDING SESSIONS TRAY -->
+<footer class="h-10 border-t border-outline-variant/30 bg-surface-container-lowest px-margin-desktop flex items-center justify-between text-label-mono font-label-mono text-xs text-outline shrink-0">
+<div class="flex items-center gap-space-lg overflow-x-auto">
+<span class="text-shortcut font-shortcut uppercase tracking-wider text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">history</span> Cached Dictations:
+          </span>
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container border border-outline-variant/30 text-on-surface cursor-pointer hover:border-primary/40 transition-colors">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span class="truncate max-w-[140px]">RFC-auth-gateway</span>
+<span class="text-outline text-[10px]">00:14 (Active)</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container/60 border border-outline-variant/20 hover:text-on-surface cursor-pointer transition-colors">
+<span class="truncate max-w-[130px]">eval-prompt-v2</span>
+<span class="text-outline text-[10px]">1:42</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container/60 border border-outline-variant/20 hover:text-on-surface cursor-pointer transition-colors">
+<span class="truncate max-w-[130px]">system-persona-spec</span>
+<span class="text-outline text-[10px]">0:58</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-tertiary">speed</span>
+<span>48.2 tok/s synthesis</span>
+</span>
+<span>•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-primary">memory</span>
+<span>Metal GPU Accelerated (M3 Max)</span>
+</span>
+</div>
+</footer>
+</main>
+</div>
+<!-- Interactive timer simulation micro-script -->
+<script>
+    let seconds = 14;
+    let hundredths = 82;
+    const timerElem = document.getElementById('timer-display');
+    if (timerElem) {
+      setInterval(() => {
+        hundredths += 4;
+        if (hundredths >= 100) {
+          hundredths = 0;
+          seconds++;
+        }
+        const sStr = seconds < 10 ? '0' + seconds : seconds;
+        const hStr = hundredths < 10 ? '0' + hundredths : hundredths;
+        timerElem.textContent = `00:${sStr}.${hStr}`;
+      }, 40);
+    }
+  </script>
+</body></html>

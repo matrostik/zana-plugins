@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Zana IDE // Prompt Studio Command Palette</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-container": "#c4abff",
+            "on-error": "#690005",
+            "background": "#0f131f",
+            "primary-fixed": "#e1e0ff",
+            "surface-container-lowest": "#0a0e1a",
+            "surface-container-high": "#262a37",
+            "on-secondary": "#3c0091",
+            "on-primary-container": "#0d0096",
+            "on-background": "#dfe2f3",
+            "tertiary-fixed-dim": "#4edea3",
+            "surface-container": "#1b1f2c",
+            "surface-bright": "#353946",
+            "inverse-primary": "#494bd6",
+            "on-primary-fixed": "#07006c",
+            "on-tertiary-container": "#000703",
+            "surface": "#0f131f",
+            "surface-dim": "#0f131f",
+            "on-tertiary": "#003824",
+            "tertiary-fixed": "#6ffbbe",
+            "secondary-fixed": "#e9ddff",
+            "on-secondary-fixed-variant": "#5516be",
+            "inverse-surface": "#dfe2f3",
+            "outline-variant": "#464554",
+            "on-surface": "#dfe2f3",
+            "error-container": "#93000a",
+            "surface-variant": "#313442",
+            "secondary": "#d0bcff",
+            "tertiary-container": "#00885d",
+            "surface-container-low": "#171b28",
+            "on-tertiary-fixed-variant": "#005236",
+            "error": "#ffb4ab",
+            "surface-container-highest": "#313442",
+            "on-surface-variant": "#c7c4d7",
+            "on-primary-fixed-variant": "#2f2ebe",
+            "primary-container": "#8083ff",
+            "on-secondary-fixed": "#23005c",
+            "outline": "#908fa0",
+            "inverse-on-surface": "#2c303d",
+            "tertiary": "#4edea3",
+            "on-primary": "#1000a9",
+            "primary-fixed-dim": "#c0c1ff",
+            "on-tertiary-fixed": "#002113",
+            "secondary-container": "#571bc1",
+            "on-error-container": "#ffdad6",
+            "primary": "#c0c1ff",
+            "surface-tint": "#c0c1ff",
+            "secondary-fixed-dim": "#d0bcff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-sm": "0.375rem",
+            "margin": "0.75rem",
+            "space-md": "0.5rem",
+            "space-xs": "0.25rem",
+            "gutter-desktop": "0.75rem",
+            "gutter": "0.5rem",
+            "space-lg": "0.75rem",
+            "space-xl": "1rem",
+            "margin-desktop": "1rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Geist", "sans-serif"],
+            "code-block": ["JetBrains Mono", "monospace"],
+            "body-sm": ["Inter", "sans-serif"],
+            "shortcut": ["JetBrains Mono", "monospace"],
+            "label-mono": ["JetBrains Mono", "monospace"],
+            "code-inline": ["JetBrains Mono", "monospace"],
+            "body-md": ["Inter", "sans-serif"],
+            "display": ["Geist", "sans-serif"],
+            "body-lg": ["Inter", "sans-serif"],
+            "headline-lg": ["Geist", "sans-serif"],
+            "label-default": ["Inter", "sans-serif"]
+          },
+          "fontSize": {
+            "headline-md": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.015em", "fontWeight": "500" }],
+            "code-block": ["0.8125rem", { "lineHeight": "1.375rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1.125rem", "letterSpacing": "0.005em", "fontWeight": "400" }],
+            "shortcut": ["0.625rem", { "lineHeight": "0.75rem", "letterSpacing": "0.06em", "fontWeight": "600" }],
+            "label-mono": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "code-inline": ["0.8125rem", { "lineHeight": "1.25rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "body-md": ["0.8125rem", { "lineHeight": "1.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "display": ["2rem", { "lineHeight": "2.5rem", "letterSpacing": "-0.025em", "fontWeight": "600" }],
+            "body-lg": ["0.9375rem", { "lineHeight": "1.5rem", "letterSpacing": "-0.005em", "fontWeight": "400" }],
+            "headline-lg": ["1.5rem", { "lineHeight": "2rem", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "label-default": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.01em", "fontWeight": "500" }]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: 1.125rem;
+      line-height: 1;
+    }
+    @keyframes pulse-wave {
+      0%, 100% { height: 4px; }
+      50% { height: 22px; }
+    }
+    .wave-bar {
+      animation: pulse-wave 1.1s ease-in-out infinite;
+    }
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.2s; }
+    .wave-bar:nth-child(6) { animation-delay: 0.35s; }
+    .wave-bar:nth-child(7) { animation-delay: 0.5s; }
+    .wave-bar:nth-child(8) { animation-delay: 0.1s; }
+    .wave-bar:nth-child(9) { animation-delay: 0.25s; }
+    .wave-bar:nth-child(10) { animation-delay: 0.4s; }
+    .wave-bar:nth-child(11) { animation-delay: 0.18s; }
+    .wave-bar:nth-child(12) { animation-delay: 0.32s; }
+
+    /* Custom subtle scrollbars */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+  </style>
+</head>
+<body class="bg-[#090D16] text-on-surface antialiased h-screen w-screen overflow-hidden flex items-center justify-center relative select-none">
+<!-- ==================== BACKGROUND SIMULATED IDE CANVAS ==================== -->
+<div class="absolute inset-0 pointer-events-none opacity-20 filter blur-[8px] flex flex-col z-0">
+<!-- Mock IDE Header -->
+<div class="h-9 border-b border-outline-variant/30 bg-surface-container-lowest px-4 flex items-center justify-between text-on-surface-variant font-label-mono text-label-mono">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-error-container inline-block"></span>
+<span class="w-3 h-3 rounded-full bg-surface-variant inline-block"></span>
+<span class="w-3 h-3 rounded-full bg-tertiary-container inline-block"></span>
+<span class="ml-4 text-on-surface">backend/middleware/rate_limit.ts — Zana Core IDE</span>
+</div>
+<div class="flex items-center gap-4">
+<span>Git: feature/sliding-window-redis*</span>
+<span>UTF-8</span>
+</div>
+</div>
+<!-- Mock IDE Body Code Lines -->
+<div class="p-6 font-code-block text-code-block leading-relaxed text-outline">
+<div class="text-secondary-fixed">import { RedisClient } from '@infrastructure/redis';</div>
+<div class="text-secondary-fixed">import { MetricsService } from '@datadog/telemetry';</div>
+<div> </div>
+<div>export interface LimiterOptions {</div>
+<div class="pl-4">windowMs: number;</div>
+<div class="pl-4">maxAllowed: number;</div>
+<div class="pl-4">keyPrefix: string;</div>
+<div>}</div>
+<div> </div>
+<div class="text-tertiary">// DEPRECATED: Fixed window counter prone to traffic spikes at window boundaries</div>
+<div>export async function rateLimit(req: Request, res: Response, next: NextFunction) {</div>
+<div class="pl-4 text-error">const currentHits = await redis.incr(req.ip);</div>
+<div class="pl-4">if (currentHits &gt; 100) return res.status(429).send('Rate limited');</div>
+<div class="pl-4">next();</div>
+<div>}</div>
+</div>
+</div>
+<!-- Ambient Indigo Backlight Glow behind floating palette -->
+<div class="absolute w-[680px] h-[480px] bg-primary-container/15 rounded-full filter blur-[120px] pointer-events-none z-0"></div>
+<div class="absolute w-[360px] h-[260px] bg-secondary-container/20 rounded-full filter blur-[90px] pointer-events-none z-0"></div>
+<!-- ==================== FLOATING COMMAND PALETTE & VOICE CARD ==================== -->
+<div class="relative z-10 w-[760px] max-w-[94vw] max-h-[942px] flex flex-col bg-surface-container-low/90 backdrop-blur-2xl border border-outline-variant/30 rounded-xl shadow-2xl shadow-black/90 overflow-hidden ring-1 ring-white/10 transition-all duration-200">
+<!-- 1. HEADER BAR -->
+<div class="flex items-center justify-between px-space-md py-space-sm border-b border-outline-variant/20 bg-surface-container-lowest/60 shrink-0">
+<!-- Left: Logo & Studio Title & Shortcut -->
+<div class="flex items-center gap-space-sm">
+<div class="w-6 h-6 rounded-lg bg-primary-container/20 border border-primary/30 flex items-center justify-center text-primary shadow-[0_0_10px_rgba(192,193,255,0.2)]">
+<span class="material-symbols-outlined text-[15px]" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<span class="font-headline-md text-body-md font-semibold text-on-surface tracking-tight">Prompt Studio</span>
+<kbd class="font-shortcut text-shortcut bg-surface-container-highest/80 text-on-surface-variant border border-outline-variant/40 px-1.5 py-0.5 rounded shadow-inner">
+          Ctrl + Alt + Space
+        </kbd>
+</div>
+<!-- Center: Active Voice Mode Badge -->
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container/70 border border-outline-variant/30 text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+<span class="font-label-mono text-label-mono text-on-surface font-medium">Voice-to-Prompt Buffer</span>
+</div>
+<!-- Right: Model Pill, STT latency & Esc Hotkey -->
+<div class="flex items-center gap-space-sm">
+<button class="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container border border-outline-variant/30 hover:border-primary/40 text-on-surface font-label-default text-label-default transition-colors">
+<span class="font-medium text-primary">Claude 3.5 Sonnet</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant" data-icon="expand_more">expand_more</span>
+</button>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface-variant" title="Local streaming inference latency">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span class="font-label-mono text-label-mono text-on-surface-variant">Whisper (12ms)</span>
+</div>
+<button class="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-colors" title="Close (Esc)">
+<kbd class="font-shortcut text-shortcut text-on-surface-variant">ESC</kbd>
+</button>
+</div>
+</div>
+<!-- 2. CENTRAL INPUT CANVAS -->
+<div class="p-space-lg bg-surface-container-lowest/30 flex flex-col gap-space-xs border-b border-outline-variant/20 relative">
+<div class="flex items-center justify-between text-on-surface-variant font-label-mono text-label-mono mb-1">
+<span class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[14px]" data-icon="mic">mic</span>
+          Streaming Transcript
+        </span>
+<div class="flex items-center gap-3">
+<span class="text-tertiary font-medium">99.4% speech clarity</span>
+<span class="text-outline">·</span>
+<span>48 words</span>
+<span class="text-outline">·</span>
+<span class="text-secondary font-medium">~62 tokens</span>
+</div>
+</div>
+<!-- Editable / Streamed Prompt Area -->
+<div class="relative group">
+<textarea class="w-full bg-transparent border-0 p-0 text-on-surface font-headline-md text-body-lg leading-relaxed focus:ring-0 resize-none selection:bg-primary-container selection:text-on-primary-container placeholder:text-outline/40 outline-none" rows="3" spellcheck="false">Refactor our rate-limiter middleware into a sliding-window counter using Redis. Make sure to emit Datadog metrics on 429 drops and handle Redis cluster disconnection without blocking downstream requests.</textarea>
+</div>
+</div>
+<!-- 3. VOICE INTERACTION & WAVEFORM RIBBON -->
+<div class="px-space-lg py-space-sm bg-surface-container-low/50 flex items-center justify-between border-b border-outline-variant/20">
+<!-- Microphone Trigger Pill -->
+<div class="flex items-center gap-space-md">
+<button class="relative flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-primary to-secondary text-on-primary font-label-default text-label-default font-semibold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[15px]" data-icon="mic" data-weight="fill" style="font-variation-settings: 'FILL' 1;">mic</span>
+<span>Hold to Speak</span>
+<kbd class="bg-black/20 text-on-primary border border-white/20 px-1.5 py-0.2 rounded font-shortcut text-shortcut ml-0.5">Space</kbd>
+</button>
+<!-- Dynamic Kinetic Audio Equalizer Waves -->
+<div class="flex items-center gap-[3px] h-6 px-3 py-1 rounded-full bg-surface-container-lowest/80 border border-outline-variant/30">
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-secondary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-secondary-fixed wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-secondary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-primary wave-bar rounded-full"></div>
+<div class="w-[3px] bg-secondary-fixed wave-bar rounded-full"></div>
+</div>
+</div>
+<!-- Telemetry details: Bitrate, Auto-punctuation & Decibels -->
+<div class="flex items-center gap-3 font-label-mono text-label-mono text-on-surface-variant">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+          48kHz PCM
+        </span>
+<span class="text-outline">/</span>
+<span>Auto-punctuate</span>
+<span class="text-outline">/</span>
+<span class="text-tertiary">-18.4 dB</span>
+</div>
+</div>
+<!-- 4. QUICK TONE / TRANSFORMATION PILLS -->
+<div class="px-space-lg py-space-sm bg-surface-container-lowest/50 flex items-center justify-between gap-space-md border-b border-outline-variant/20 overflow-x-auto">
+<div class="flex items-center gap-1.5 shrink-0">
+<!-- Selected Pill -->
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high border border-primary text-primary font-label-default text-label-default font-medium shadow-[0_0_12px_rgba(192,193,255,0.15)]">
+<span class="text-primary">⚡</span>
+<span>Executive Brief</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container/60 hover:bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface font-label-default text-label-default transition-all">
+<span class="text-secondary">✨</span>
+<span>Polish &amp; Fix</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container/60 hover:bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface font-label-default text-label-default transition-all">
+<span class="text-tertiary">📐</span>
+<span>Tech Spec / RFC</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container/60 hover:bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface font-label-default text-label-default transition-all">
+<span class="text-primary-fixed">💬</span>
+<span>Conversational</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container/60 hover:bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface font-label-default text-label-default transition-all">
+<span class="text-secondary-fixed">🔄</span>
+<span>Unit Test Suite</span>
+</button>
+</div>
+<!-- Right Transform Action CTA -->
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary hover:bg-primary-fixed-dim text-on-primary font-label-default text-label-default font-semibold shadow-md transition-all active:scale-[0.98]">
+<span>Transform &amp; Insert</span>
+<kbd class="font-shortcut text-shortcut bg-on-primary/20 text-on-primary px-1 py-0.2 rounded">↵</kbd>
+</button>
+</div>
+<!-- 5. COLLAPSIBLE DIFF PREVIEW DRAWER -->
+<div class="flex flex-col bg-surface-container-lowest/80 overflow-hidden">
+<!-- Drawer Header Bar -->
+<div class="flex items-center justify-between px-space-lg py-1.5 bg-surface-container-low/70 border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[15px] text-primary" data-icon="difference">difference</span>
+<span class="font-headline-md text-label-default font-semibold text-on-surface">Refined Output Preview</span>
+<!-- View switcher tabs -->
+<div class="flex items-center ml-2 p-0.5 rounded-md bg-surface-container-lowest border border-outline-variant/30 font-label-mono text-label-mono">
+<button class="px-2 py-0.5 rounded bg-surface-container-high text-primary font-medium">Split Diff</button>
+<button class="px-2 py-0.5 text-on-surface-variant hover:text-on-surface">Clean Preview</button>
+</div>
+</div>
+<div class="flex items-center gap-3 font-label-mono text-label-mono text-on-surface-variant">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+            280ms latency
+          </span>
+<span class="text-outline">·</span>
+<span class="text-secondary">142 tokens generated</span>
+</div>
+</div>
+<!-- Diff Canvas -->
+<div class="p-space-md max-h-52 overflow-y-auto font-code-block text-code-block leading-normal space-y-1">
+<!-- Deletion / Spoken raw input diff -->
+<div class="flex items-start gap-2 px-2 py-1 rounded bg-error-container/15 border-l-2 border-error text-error text-[12px]">
+<span class="font-label-mono select-none text-error/80 w-3">-</span>
+<span class="line-through opacity-85">"Refactor our rate-limiter middleware into a sliding-window counter using Redis... handle Redis cluster disconnection..."</span>
+</div>
+<!-- Addition / Structured Production Prompt -->
+<div class="flex items-start gap-2 px-2 py-1.5 rounded bg-tertiary-container/15 border-l-2 border-tertiary text-tertiary text-[12.5px] font-code-block">
+<span class="font-label-mono select-none text-tertiary w-3">+</span>
+<div class="space-y-1 text-on-surface">
+<div class="text-tertiary-fixed font-semibold">### TASK: Redis Sliding-Window Rate Limiter Middleware</div>
+<div class="text-on-surface-variant">Implement a non-blocking sliding-window rate limiter using Redis sorted sets (ZSET):</div>
+<div class="text-primary-fixed-dim pl-2 font-label-mono text-[11.5px]">
+              • Key format: <span class="bg-surface-container px-1 rounded text-primary">rate_limit:{org_id}:{client_ip}</span><br/>
+              • ZADD with microsecond timestamp score &amp; ZREMRANGEBYSCORE for window cleanup<br/>
+              • Metric Hook: emit <span class="text-error bg-surface-container px-1 rounded">metrics.increment('ratelimit.drop_429')</span> with Datadog tags<br/>
+              • Resilience: Fallback to local memory token bucket on Redis timeout without HTTP 500 error
+            </div>
+</div>
+</div>
+</div>
+<!-- Action Footer Drawer -->
+<div class="flex items-center justify-between px-space-lg py-space-sm bg-surface-container border-t border-outline-variant/30">
+<div class="flex items-center gap-space-sm">
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high/80 hover:bg-surface-container-highest border border-outline-variant/30 text-on-surface font-label-default text-label-default transition-colors">
+<span class="material-symbols-outlined text-[14px]" data-icon="content_copy">content_copy</span>
+<span>Copy</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high/80 hover:bg-surface-container-highest border border-outline-variant/30 text-on-surface-variant hover:text-on-surface font-label-default text-label-default transition-colors">
+<span class="material-symbols-outlined text-[14px]" data-icon="tune">tune</span>
+<span>Refine Prompt</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-on-surface-variant font-label-mono text-label-mono">Target: active document</span>
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary to-secondary text-on-primary font-label-default text-label-default font-semibold shadow-md hover:brightness-110 active:scale-[0.98] transition-all">
+<span>Insert into Cursor / Composer</span>
+<kbd class="font-shortcut text-shortcut bg-black/25 text-on-primary px-1.5 py-0.5 rounded ml-0.5">⌘↵</kbd>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Keyboard hints dock at screen bottom -->
+<div class="absolute bottom-4 flex items-center gap-4 text-on-surface-variant font-label-mono text-label-mono bg-surface-container-lowest/80 px-4 py-1.5 rounded-full border border-outline-variant/20 backdrop-blur-md">
+<span class="flex items-center gap-1"><kbd class="bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/40 text-on-surface text-[10px]">Space</kbd> Voice input</span>
+<span class="text-outline">·</span>
+<span class="flex items-center gap-1"><kbd class="bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/40 text-on-surface text-[10px]">Tab</kbd> Cycle modes</span>
+<span class="text-outline">·</span>
+<span class="flex items-center gap-1"><kbd class="bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/40 text-on-surface text-[10px]">⌘ + ↵</kbd> Insert</span>
+<span class="text-outline">·</span>
+<span class="flex items-center gap-1"><kbd class="bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/40 text-on-surface text-[10px]">Esc</kbd> Dismiss</span>
+</div>
+</body></html>

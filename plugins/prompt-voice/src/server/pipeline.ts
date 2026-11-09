@@ -6,7 +6,14 @@ import { buildSystemPrompt, buildUserMessage } from './llm/prompts.ts';
 import type { PromptVoiceSettings } from './settings.ts';
 import { cleanTranscription, isMeaningfulSpeech } from './stt/clean.ts';
 import { createSttProvider, type SttProvider } from './stt/providers.ts';
-import type { RefineNotice, TranscribeNoSpeech, TranscribeSuccess } from '../shared/protocol.ts';
+import type {
+  LlmProviderId,
+  RefineNotice,
+  RephraseRequest,
+  RephraseResponse,
+  TranscribeNoSpeech,
+  TranscribeSuccess
+} from '../shared/protocol.ts';
 
 export interface PipelineLogger {
   warn(message: string): void;
@@ -116,4 +123,77 @@ export async function runDictation(
     llmModel: refined.model,
     ...(refined.notice ? { refineNotice: refined.notice } : {})
   };
+}
+
+/**
+ * Rephrases or refines existing text directly using LLM providers.
+ */
+export async function runRephrase(
+  request: RephraseRequest,
+  settings: PromptVoiceSettings,
+  deps: PipelineDeps
+): Promise<RephraseResponse> {
+  const start = Date.now();
+  const rawText = (request.text ?? '').trim();
+  if (!rawText) {
+    return { ok: false, code: 'AUDIO_EMPTY', message: 'No text provided to refine.' };
+  }
+
+  const effectiveProvider = (request.llmProvider ?? settings.llmProvider) as LlmProviderId;
+  if (effectiveProvider === 'none') {
+    return {
+      ok: true,
+      rawText,
+      text: rawText,
+      llmProvider: 'none',
+      llmModel: null,
+      durationMs: Date.now() - start
+    };
+  }
+
+  const effectiveSettings: PromptVoiceSettings = {
+    ...settings,
+    llmProvider: effectiveProvider,
+    ...(request.llmModel ? { llmModel: request.llmModel } : {}),
+    ...(request.tone ? { tone: request.tone as PromptVoiceSettings['tone'] } : {}),
+    ...(request.customPrompt !== undefined ? { customPrompt: request.customPrompt } : {})
+  };
+
+  const model = resolveLlmModel(effectiveSettings);
+  try {
+    const provider = createLlmProvider(effectiveSettings, deps.fetch, model, { assistant: deps.assistant });
+    if (!provider) {
+      return {
+        ok: true,
+        rawText,
+        text: rawText,
+        llmProvider: effectiveProvider,
+        llmModel: null,
+        durationMs: Date.now() - start
+      };
+    }
+
+    const systemPrompt = buildSystemPrompt({
+      tone: effectiveSettings.tone,
+      customPrompt: effectiveSettings.customPrompt,
+      dictionary: effectiveSettings.dictionary
+    });
+    const text = await provider.refine(systemPrompt, buildUserMessage(rawText));
+    return {
+      ok: true,
+      rawText,
+      text,
+      llmProvider: effectiveProvider,
+      llmModel: provider.model,
+      durationMs: Date.now() - start
+    };
+  } catch (err) {
+    const error = toPromptVoiceError(err, 'LLM_FAILED', LLM_LABELS[effectiveProvider] ?? effectiveProvider, model);
+    deps.log.warn(`Rephrase failed: ${error.detail ?? error.message}`);
+    return {
+      ok: false,
+      code: error.code,
+      message: error.userMessage
+    };
+  }
 }

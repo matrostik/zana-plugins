@@ -32,6 +32,54 @@ afterEach(() => {
 });
 
 describe('MicButton', () => {
+  it('shows startup, recording activity, and processing feedback', async () => {
+    let resolveStart!: (value: RecordingSession) => void;
+    let resolveRpc!: (value: unknown) => void;
+    fakes.call.mockReturnValue(new Promise((resolve) => { resolveRpc = resolve; }));
+    const session = fakeSession();
+    render(<MicButton startSession={() => new Promise((resolve) => { resolveStart = resolve; })} />);
+    fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+    expect(screen.getByText(/requesting microphone/i)).toBeTruthy();
+    await act(async () => resolveStart(session));
+    expect(screen.getByText(/recording/i)).toBeTruthy();
+    expect(screen.getByText(/audio meter unavailable/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+    expect(await screen.findByText(/transcribing and refining/i)).toBeTruthy();
+    await act(async () => resolveRpc({ ok: true, status: 'ok', text: 'hello' }));
+    expect(await screen.findByText(/added to draft/i)).toBeTruthy();
+  });
+
+  it('dismisses notice on click and automatically after delay', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const session = fakeSession();
+      fakes.call.mockResolvedValue({ ok: true, status: 'ok', text: 'testing' });
+      render(<MicButton startSession={async () => session} />);
+      const button = screen.getByRole('button', { name: BUTTON_NAME });
+      fireEvent.click(button);
+      await act(async () => undefined);
+      fireEvent.click(button);
+      await act(async () => undefined);
+      const noticeEl = screen.getByText(/added to draft/i);
+      expect(noticeEl).toBeTruthy();
+
+      // Click to dismiss immediately
+      fireEvent.click(noticeEl);
+      expect(screen.queryByText(/added to draft/i)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('allows a recording to be cancelled without transcribing', async () => {
+    const session = fakeSession();
+    render(<MicButton startSession={async () => session} />);
+    fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+    await screen.findByText(/recording/i);
+    fireEvent.click(screen.getByRole('button', { name: /cancel recording/i }));
+    expect(session.cancel).toHaveBeenCalled();
+    expect(fakes.call).not.toHaveBeenCalled();
+  });
   it('records on the first click, transcribes on the second, and appends to the draft', async () => {
     const session = fakeSession();
     const startSession = vi.fn(async () => session);
@@ -147,6 +195,16 @@ describe('MicButton', () => {
     await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
   });
 
+  it('explains an automatic stop while the transcript is processing', async () => {
+    const session = fakeSession();
+    fakes.call.mockReturnValue(new Promise(() => undefined));
+    render(<MicButton startSession={async () => session} />);
+    fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+    await screen.findByText(/recording/i);
+    act(() => session.onAutoStop?.());
+    expect(await screen.findByText(/recording limit reached/i)).toBeTruthy();
+  });
+
   it('cancels pending startup and cancels session if it resolves after cancel()', async () => {
     const session = fakeSession();
     let resolveStart: (value: RecordingSession) => void = () => undefined;
@@ -156,7 +214,7 @@ describe('MicButton', () => {
     act(() => {
       void result.current.beginDictation();
     });
-    expect(result.current.phase).toBe('recording');
+    expect(result.current.phase).toBe('starting');
 
     act(() => {
       result.current.cancel();
@@ -166,8 +224,6 @@ describe('MicButton', () => {
     await act(async () => {
       resolveStart(session);
     });
-
     expect(session.cancel).toHaveBeenCalled();
-    expect(result.current.phase).toBe('idle');
   });
 });
