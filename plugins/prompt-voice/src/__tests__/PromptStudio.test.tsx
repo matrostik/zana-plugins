@@ -46,6 +46,7 @@ afterEach(() => {
 
 describe('PromptStudio Component', () => {
   it('renders vertical canvas and allows typing raw input', () => {
+    fakes.call.mockResolvedValue({ llmProvider: 'assistant' });
     render(<PromptStudio />);
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     expect(textarea).toBeTruthy();
@@ -54,14 +55,61 @@ describe('PromptStudio Component', () => {
     expect(screen.getAllByText(/4 words/i).length).toBeGreaterThan(0);
   });
 
+  it('allows selecting an LLM refinement model and passes it to the server', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') {
+        return { llmProvider: 'assistant', sttProvider: 'system' };
+      }
+      if (method === 'promptVoice.rephrase') {
+        return {
+          ok: true,
+          rawText: 'Fix bug in auth',
+          text: 'Resolve defect in authentication service using GPT-5.6.',
+          llmProvider: 'openai',
+          llmModel: 'gpt-5.6-luna',
+          durationMs: 140
+        };
+      }
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const select = screen.getByRole('combobox', { name: /refinement model/i });
+    expect(select).toBeTruthy();
+
+    // Change model to OpenAI GPT-5.6 Luna
+    fireEvent.change(select, { target: { value: 'openai-smart' } });
+
+    const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
+    fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
+
+    const refineBtn = screen.getByRole('button', { name: /refine now/i });
+    fireEvent.click(refineBtn);
+
+    expect(await screen.findByText('Resolve defect in authentication service using GPT-5.6.')).toBeTruthy();
+    expect(fakes.call).toHaveBeenCalledWith(
+      'promptVoice.rephrase',
+      expect.objectContaining({
+        llmProvider: 'openai',
+        llmModel: 'gpt-5.6-luna'
+      })
+    );
+  });
+
   it('runs a preset refinement and displays output in bottom pane', async () => {
-    fakes.call.mockResolvedValueOnce({
-      ok: true,
-      rawText: 'Fix bug in auth',
-      text: 'Resolve defect in authentication service.',
-      llmProvider: 'assistant',
-      llmModel: 'assistant',
-      durationMs: 120
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.rephrase') {
+        return {
+          ok: true,
+          rawText: 'Fix bug in auth',
+          text: 'Resolve defect in authentication service.',
+          llmProvider: 'assistant',
+          llmModel: 'assistant',
+          durationMs: 120
+        };
+      }
+      return {};
     });
 
     render(<PromptStudio />);
@@ -77,13 +125,19 @@ describe('PromptStudio Component', () => {
   });
 
   it('allows toggling diff view in output pane', async () => {
-    fakes.call.mockResolvedValueOnce({
-      ok: true,
-      rawText: 'Fix bug in auth',
-      text: 'Resolve defect in authentication service.',
-      llmProvider: 'assistant',
-      llmModel: 'assistant',
-      durationMs: 120
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.rephrase') {
+        return {
+          ok: true,
+          rawText: 'Fix bug in auth',
+          text: 'Resolve defect in authentication service.',
+          llmProvider: 'assistant',
+          llmModel: 'assistant',
+          durationMs: 120
+        };
+      }
+      return {};
     });
 
     render(<PromptStudio />);
@@ -111,11 +165,17 @@ describe('PromptStudio Component', () => {
 
   it('supports voice dictation into the top input', async () => {
     const session = fakeSession();
-    fakes.call.mockResolvedValueOnce({
-      ok: true,
-      status: 'ok',
-      text: 'spoken voice ideas',
-      rawText: 'spoken voice ideas'
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.transcribe') {
+        return {
+          ok: true,
+          status: 'ok',
+          text: 'spoken voice ideas',
+          rawText: 'spoken voice ideas'
+        };
+      }
+      return {};
     });
 
     render(<PromptStudio startSession={async () => session} />);
@@ -137,13 +197,19 @@ describe('PromptStudio Component', () => {
   });
 
   it('replaces input with output when Replace Input is clicked', async () => {
-    fakes.call.mockResolvedValueOnce({
-      ok: true,
-      rawText: 'Raw notes',
-      text: 'Polished spec',
-      llmProvider: 'assistant',
-      llmModel: 'assistant',
-      durationMs: 100
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.rephrase') {
+        return {
+          ok: true,
+          rawText: 'Raw notes',
+          text: 'Polished spec',
+          llmProvider: 'assistant',
+          llmModel: 'assistant',
+          durationMs: 100
+        };
+      }
+      return {};
     });
 
     render(<PromptStudio />);

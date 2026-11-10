@@ -181,6 +181,37 @@ export const PROMPT_STUDIO_STYLES = `
   justify-content: space-between !important;
 }
 
+/* Model Select Dropdown */
+.ps-select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  height: 30px !important;
+  background: var(--ps-bg-base) !important;
+  color: var(--ps-text) !important;
+  border: 1px solid var(--ps-border-strong) !important;
+  border-radius: 4px !important;
+  padding: 4px 28px 4px 8px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  outline: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ps-select:hover:not(:disabled) {
+  border-color: var(--ps-accent) !important;
+}
+
+.ps-select:focus-visible {
+  border-color: var(--ps-accent) !important;
+  box-shadow: 0 0 0 1px var(--ps-accent) !important;
+}
+
 /* Dictation Card */
 .ps-dictation-card {
   background: var(--ps-bg-base) !important;

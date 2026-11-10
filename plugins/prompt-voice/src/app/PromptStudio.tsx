@@ -1,6 +1,14 @@
 import { useComposer, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { REPHRASE_METHOD, TRANSCRIBE_METHOD, type RephraseResponse, type TranscribeResponse } from '../shared/protocol.ts';
+import {
+  STATUS_METHOD,
+  REPHRASE_METHOD,
+  TRANSCRIBE_METHOD,
+  type RephraseResponse,
+  type StatusResponse,
+  type TranscribeResponse,
+  type LlmProviderId
+} from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
 import { defaultStartSession, type RecordedAudio, type RecordingSession } from './recorder.ts';
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
@@ -42,6 +50,52 @@ export const STUDIO_PRESETS: PromptPreset[] = [
   }
 ];
 
+export interface ModelOption {
+  id: string;
+  provider: LlmProviderId;
+  label: string;
+  model: string;
+}
+
+export const REFINEMENT_MODEL_OPTIONS: ModelOption[] = [
+  {
+    id: 'assistant',
+    provider: 'assistant',
+    label: 'Zana Assistant (Local / Active Thread Agent)',
+    model: 'assistant'
+  },
+  {
+    id: 'openai-fast',
+    provider: 'openai',
+    label: 'OpenAI GPT-5.4 Nano (Fast)',
+    model: 'gpt-5.4-nano'
+  },
+  {
+    id: 'openai-smart',
+    provider: 'openai',
+    label: 'OpenAI GPT-5.6 Luna (Smart)',
+    model: 'gpt-5.6-luna'
+  },
+  {
+    id: 'anthropic-haiku',
+    provider: 'anthropic',
+    label: 'Anthropic Claude 4.5 Haiku',
+    model: 'claude-haiku-4-5-20251001'
+  },
+  {
+    id: 'anthropic-sonnet',
+    provider: 'anthropic',
+    label: 'Anthropic Claude 5 Sonnet',
+    model: 'claude-sonnet-5-20260201'
+  },
+  {
+    id: 'google-flash',
+    provider: 'google',
+    label: 'Google Gemini 2.5 Flash',
+    model: 'gemini-2.5-flash'
+  }
+];
+
 export interface PromptStudioProps {
   /** Optional custom session starter for tests */
   startSession?: () => Promise<RecordingSession>;
@@ -57,6 +111,11 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [outputText, setOutputText] = useState('');
   const [isCopiedOutput, setIsCopiedOutput] = useState(false);
   const [insertNotice, setInsertNotice] = useState<string | null>(null);
+
+  // ─── Model & Status State ───────────────────────────────────────────────────
+  const [selectedModelId, setSelectedModelId] = useState<string>('assistant');
+  const [serverLlmProvider, setServerLlmProvider] = useState<string | null>(null);
+  const [lastUsedModel, setLastUsedModel] = useState<string | null>(null);
 
   // ─── Diff & View State ───────────────────────────────────────────────────────
   const [showDiff, setShowDiff] = useState(false);
@@ -85,20 +144,44 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         if (parsed.title) setDocTitle(parsed.title);
         if (parsed.inputText) setInputText(parsed.inputText);
         if (parsed.outputText) setOutputText(parsed.outputText);
+        if (parsed.selectedModelId) setSelectedModelId(parsed.selectedModelId);
       }
     } catch {
       // Ignore storage read errors
     }
   }, []);
 
+  // Fetch server status to know default configured LLM provider
+  useEffect(() => {
+    let isCurrent = true;
+    rpc
+      .call(STATUS_METHOD)
+      .then((res) => {
+        if (!isCurrent) return;
+        const status = res as StatusResponse;
+        if (status && status.llmProvider) {
+          setServerLlmProvider(status.llmProvider);
+        }
+      })
+      .catch(() => {
+        // Fall back gracefully
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [rpc]);
+
   // Auto-save draft on change
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ title: docTitle, inputText, outputText }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ title: docTitle, inputText, outputText, selectedModelId })
+      );
     } catch {
       // Ignore storage write errors
     }
-  }, [docTitle, inputText, outputText]);
+  }, [docTitle, inputText, outputText, selectedModelId]);
 
   // Clean up recording timers on unmount
   useEffect(() => {
@@ -127,6 +210,11 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     if (!outputText || !showDiff) return [];
     return computeWordDiff(inputText, outputText);
   }, [inputText, outputText, showDiff]);
+
+  // Find active model details
+  const activeModelOption = useMemo(() => {
+    return REFINEMENT_MODEL_OPTIONS.find((m) => m.id === selectedModelId) ?? REFINEMENT_MODEL_OPTIONS[0];
+  }, [selectedModelId]);
 
   // ─── Voice Dictation Handler ─────────────────────────────────────────────────
   const handleToggleDictation = async () => {
@@ -203,11 +291,14 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       const response = (await rpc.call(REPHRASE_METHOD, {
         text: raw,
         tone,
-        customPrompt: instruction
+        customPrompt: instruction,
+        llmProvider: activeModelOption.provider,
+        llmModel: activeModelOption.model
       })) as RephraseResponse;
 
       if (response.ok) {
         setOutputText(response.text);
+        setLastUsedModel(response.llmModel || activeModelOption.model);
       } else {
         setStatusNotice(response.message);
       }
@@ -277,7 +368,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         handleRefine();
       }
     },
-    [inputText, selectedPresetId, customPrompt, isRefining]
+    [inputText, selectedPresetId, customPrompt, isRefining, activeModelOption]
   );
 
   return (
@@ -332,6 +423,32 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
 
         {/* ─── Left Sidebar Controls ────────────────────────────────────────── */}
         <aside className="ps-sidebar">
+
+          {/* Model Selection Card */}
+          <section className="ps-section">
+            <div className="ps-section-title">
+              <span>Refinement Model</span>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>LLM Engine</span>
+            </div>
+            <select
+              className="ps-select"
+              aria-label="Refinement model"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              disabled={isRefining}
+            >
+              {REFINEMENT_MODEL_OPTIONS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ps-text-muted)', lineHeight: 1.35 }}>
+              {activeModelOption.provider === 'assistant'
+                ? 'Uses the active Zana assistant agent with no extra API key required.'
+                : `Calls ${activeModelOption.provider.toUpperCase()} directly with your configured plugin key.`}
+            </div>
+          </section>
 
           {/* Voice Dictation Card */}
           <section className="ps-section">
@@ -479,7 +596,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             {/* ─── MIDDLE ACTION BAR: TRANSFORM TRIGGER ─────────────────────── */}
             <div className="ps-mid-action-bar">
               <div className="ps-mid-info">
-                <span>⬇ Transform Input into Prompt Spec</span>
+                <span>⬇ Transform Input using <strong>{activeModelOption.label.split(' (')[0]}</strong></span>
               </div>
               <div className="ps-mid-actions">
                 <button
@@ -601,7 +718,9 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         </div>
         <div className="ps-status-item">
           <span>Model:</span>
-          <span style={{ color: 'var(--ps-text)' }}>Active Thread Agent</span>
+          <span style={{ color: 'var(--ps-text)', fontWeight: 500 }}>
+            {lastUsedModel || activeModelOption.label}
+          </span>
         </div>
         <div className="ps-spacer" />
         <div className="ps-status-item">
