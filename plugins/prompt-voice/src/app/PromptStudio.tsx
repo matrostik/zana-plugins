@@ -6,7 +6,7 @@ import { defaultStartSession, type RecordedAudio, type RecordingSession } from '
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
 import { PROMPT_STUDIO_STYLES } from './promptStudioStyles.ts';
 
-const STORAGE_KEY = 'zcc-prompt-voice:studio-draft';
+const STORAGE_KEY = 'zcc-prompt-voice:studio-vertical-draft';
 
 export interface PromptPreset {
   id: string;
@@ -51,30 +51,30 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const rpc = useRpc();
   const composer = useComposer();
 
-  // ─── Canvas State ────────────────────────────────────────────────────────────
+  // ─── Workspace State ─────────────────────────────────────────────────────────
   const [docTitle, setDocTitle] = useState('Prompt Spec');
-  const [content, setContent] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [outputText, setOutputText] = useState('');
+  const [isCopiedOutput, setIsCopiedOutput] = useState(false);
   const [insertNotice, setInsertNotice] = useState<string | null>(null);
 
-  // ─── Review & Diff State ─────────────────────────────────────────────────────
-  const [isReviewMode, setIsReviewMode] = useState(false);
-  const [originalContent, setOriginalContent] = useState('');
-  const [refinedContent, setRefinedContent] = useState('');
-  const [showDiff, setShowDiff] = useState(true);
+  // ─── Diff & View State ───────────────────────────────────────────────────────
+  const [showDiff, setShowDiff] = useState(false);
 
   // ─── Refinement Controls State ───────────────────────────────────────────────
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isRefining, setIsRefining] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   // ─── Voice Dictation State ───────────────────────────────────────────────────
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [audioLevel, setAudioLevel] = useState<number | null>(null);
   const activeSessionRef = useRef<RecordingSession | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const customPromptInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Load saved draft on mount
   useEffect(() => {
@@ -83,7 +83,8 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.title) setDocTitle(parsed.title);
-        if (parsed.content) setContent(parsed.content);
+        if (parsed.inputText) setInputText(parsed.inputText);
+        if (parsed.outputText) setOutputText(parsed.outputText);
       }
     } catch {
       // Ignore storage read errors
@@ -92,681 +93,522 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
 
   // Auto-save draft on change
   useEffect(() => {
-    if (!isReviewMode) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ title: docTitle, content }));
-      } catch {
-        // Ignore storage write errors
-      }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ title: docTitle, inputText, outputText }));
+    } catch {
+      // Ignore storage write errors
     }
-  }, [docTitle, content, isReviewMode]);
+  }, [docTitle, inputText, outputText]);
 
-  // Clean up recording timer on unmount
+  // Clean up recording timers on unmount
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (meterIntervalRef.current) clearInterval(meterIntervalRef.current);
       if (activeSessionRef.current) activeSessionRef.current.cancel();
     };
   }, []);
 
-  // ─── Word & Character Counts ─────────────────────────────────────────────────
-  const telemetry = useMemo(() => {
-    const textToCount = isReviewMode ? refinedContent : content;
-    const words = textToCount.trim() ? textToCount.trim().split(/\s+/).length : 0;
-    const chars = textToCount.length;
-    return `${words} words · ${chars} chars`;
-  }, [content, refinedContent, isReviewMode]);
+  // Compute telemetry
+  const inputStats = useMemo(() => {
+    const trimmed = inputText.trim();
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    return `${words} words · ${inputText.length} chars`;
+  }, [inputText]);
 
-  // ─── Diff Tokens ─────────────────────────────────────────────────────────────
-  const diffTokens = useMemo<DiffToken[]>(() => {
-    if (!isReviewMode) return [];
-    return computeWordDiff(originalContent, refinedContent);
-  }, [isReviewMode, originalContent, refinedContent]);
+  const outputStats = useMemo(() => {
+    const trimmed = outputText.trim();
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    return `${words} words · ${outputText.length} chars`;
+  }, [outputText]);
+
+  // Compute token-level LCS diff between input and output
+  const diffTokens: DiffToken[] = useMemo(() => {
+    if (!outputText || !showDiff) return [];
+    return computeWordDiff(inputText, outputText);
+  }, [inputText, outputText, showDiff]);
 
   // ─── Voice Dictation Handler ─────────────────────────────────────────────────
   const handleToggleDictation = async () => {
     if (isRecording) {
-      // Stop recording
+      // Stop active recording
       setIsRecording(false);
+      setAudioLevel(null);
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (meterIntervalRef.current) clearInterval(meterIntervalRef.current);
+
       const session = activeSessionRef.current;
       activeSessionRef.current = null;
       if (!session) return;
 
       try {
-        const audio: RecordedAudio = await session.stop();
+        const audio = await session.stop();
         const response = (await rpc.call(TRANSCRIBE_METHOD, {
           audio: audio.base64,
           mimeType: audio.mimeType
         })) as TranscribeResponse;
 
         if (response.ok && response.status === 'ok') {
-          setContent((prev) => appendTranscript(prev, response.text));
+          setInputText((prev) => appendTranscript(prev, response.text));
         } else if (response.ok && response.status === 'no-speech') {
-          setErrorMessage('No speech detected. Try speaking closer to the microphone.');
-          setTimeout(() => setErrorMessage(null), 4000);
+          setStatusNotice('No speech detected. Try speaking closer to the microphone.');
+          setTimeout(() => setStatusNotice(null), 4000);
         } else if (!response.ok) {
-          setErrorMessage(response.message);
+          setStatusNotice(response.message);
         }
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Transcription failed.');
+        setStatusNotice(err instanceof Error ? err.message : 'Transcription failed.');
       }
     } else {
       // Start recording
-      setErrorMessage(null);
+      setStatusNotice(null);
       setRecordingSeconds(0);
       try {
         const session = await startSession();
         activeSessionRef.current = session;
         setIsRecording(true);
+
         timerIntervalRef.current = setInterval(() => {
           setRecordingSeconds((s) => s + 1);
         }, 1000);
+
+        if (session.getAudioLevel) {
+          meterIntervalRef.current = setInterval(() => {
+            const level = session.getAudioLevel?.();
+            if (level !== undefined && level !== null) {
+              setAudioLevel(level);
+            }
+          }, 100);
+        }
       } catch (err) {
         setIsRecording(false);
-        setErrorMessage(err instanceof Error ? err.message : 'Microphone access denied.');
+        setStatusNotice(err instanceof Error ? err.message : 'Microphone access denied.');
       }
     }
   };
 
   // ─── Refinement Handler ──────────────────────────────────────────────────────
-  const handleRunRefine = async (presetId?: string) => {
-    const textToRefine = content.trim();
-    if (!textToRefine || isRefining) return;
+  const handleRefine = async (presetIdOverride?: string) => {
+    const raw = inputText.trim();
+    if (!raw || isRefining) return;
 
-    const preset = STUDIO_PRESETS.find((p) => p.id === (presetId || selectedPresetId));
-    const instruction = customPrompt.trim() || preset?.prompt || 'Polish and format for clarity.';
+    const activePreset = STUDIO_PRESETS.find((p) => p.id === (presetIdOverride || selectedPresetId));
+    const instruction = customPrompt.trim() || activePreset?.prompt || 'Polish and format for clarity.';
+    const tone = activePreset?.tone || 'technical';
 
-    setErrorMessage(null);
+    setStatusNotice(null);
     setIsRefining(true);
 
     try {
       const response = (await rpc.call(REPHRASE_METHOD, {
-        text: textToRefine,
-        tone: preset?.tone || 'technical',
+        text: raw,
+        tone,
         customPrompt: instruction
       })) as RephraseResponse;
 
       if (response.ok) {
-        setOriginalContent(textToRefine);
-        setRefinedContent(response.text);
-        setIsReviewMode(true);
-        setShowDiff(true);
+        setOutputText(response.text);
       } else {
-        setErrorMessage(response.message);
+        setStatusNotice(response.message);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Refinement request failed.');
+      setStatusNotice(err instanceof Error ? err.message : 'Refinement request failed.');
     } finally {
       setIsRefining(false);
     }
   };
 
-  // ─── Review Actions ──────────────────────────────────────────────────────────
-  const handleAcceptDiff = () => {
-    setContent(refinedContent);
-    setIsReviewMode(false);
-    setOriginalContent('');
-    setRefinedContent('');
-  };
-
-  const handleDiscardDiff = () => {
-    setIsReviewMode(false);
-    setOriginalContent('');
-    setRefinedContent('');
-  };
-
-  const handleCopy = async () => {
-    const textToCopy = isReviewMode ? refinedContent : content;
-    if (!textToCopy) return;
+  // ─── Canvas Actions ──────────────────────────────────────────────────────────
+  const handleCopyInput = async () => {
+    if (!inputText) return;
     try {
-      await navigator.clipboard.writeText(textToCopy);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
+      await navigator.clipboard.writeText(inputText);
+      setStatusNotice('Input draft copied to clipboard!');
+      setTimeout(() => setStatusNotice(null), 2500);
     } catch {
       // Fallback
     }
   };
 
+  const handleCopyOutput = async () => {
+    if (!outputText) return;
+    try {
+      await navigator.clipboard.writeText(outputText);
+      setIsCopiedOutput(true);
+      setTimeout(() => setIsCopiedOutput(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleClearAll = () => {
+    if (confirm('Clear both raw input and refined output?')) {
+      setInputText('');
+      setOutputText('');
+      setShowDiff(false);
+    }
+  };
+
+  const handleReplaceInput = () => {
+    if (!outputText) return;
+    setInputText(outputText);
+    setStatusNotice('Replaced top input with refined output for further iteration.');
+    setTimeout(() => setStatusNotice(null), 3000);
+  };
+
   const handleInsertIntoComposer = () => {
-    const textToInsert = isReviewMode ? refinedContent : content;
+    const textToInsert = outputText || inputText;
     if (!textToInsert) return;
 
     composer.updateText((draft) => appendTranscript(draft, textToInsert));
     composer.focus();
-    setInsertNotice('Inserted into thread composer!');
+    setInsertNotice('Inserted output into thread composer!');
     setTimeout(() => setInsertNotice(null), 3000);
   };
 
-  const handleClear = () => {
-    if (isReviewMode) {
-      handleDiscardDiff();
-    } else if (content.trim()) {
-      setContent('');
-    }
-  };
-
-  // Global keyboard shortcuts
+  // Keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        inputRef.current?.focus();
-      }
-      if (isReviewMode) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          e.preventDefault();
-          handleAcceptDiff();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          handleDiscardDiff();
-        }
+        customPromptInputRef.current?.focus();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleRefine();
       }
     },
-    [isReviewMode, refinedContent]
+    [inputText, selectedPresetId, customPrompt, isRefining]
   );
 
   return (
-    <div
-      className="ps-root"
-      onKeyDown={handleKeyDown}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-        height: '100%',
-        minHeight: '100vh',
-        background: '#090D16',
-        color: '#F8FAFC',
-        position: 'relative'
-      }}
-    >
-      {/* Embedded Stylesheet for 100% Guaranteed Layout Isolation */}
+    <div className="ps-root" onKeyDown={handleKeyDown}>
+      {/* Guaranteed Style Injection */}
       <style dangerouslySetInnerHTML={{ __html: PROMPT_STUDIO_STYLES }} />
 
-      {/* ─── Top Header ───────────────────────────────────────────────────────── */}
-      <header
-        className="ps-header"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          height: '52px',
-          padding: '0 24px',
-          background: '#0D111D',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          flexShrink: 0
-        }}
-      >
-        <div className="ps-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            className="ps-logo-badge"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '28px',
-              height: '28px',
-              borderRadius: '7px',
-              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-              color: '#FFFFFF',
-              fontSize: '14px'
-            }}
-          >
-            ✨
-          </div>
-          <span className="ps-title" style={{ fontSize: '15px', fontWeight: 600, color: '#F8FAFC' }}>
-            Prompt Studio
-          </span>
-          <span
-            className="ps-badge"
-            style={{
-              fontSize: '11px',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: '999px',
-              background: 'rgba(99, 102, 241, 0.12)',
-              color: '#A5B4FC',
-              border: '1px solid rgba(99, 102, 241, 0.25)'
-            }}
-          >
-            Inline Canvas
-          </span>
-          <span
-            className="ps-telemetry-tag"
-            style={{
-              fontSize: '12px',
-              color: '#94A3B8',
-              fontFamily: 'ui-monospace, monospace'
-            }}
-          >
-            {telemetry}
-          </span>
+      {/* ─── Top Studio Toolbar ─────────────────────────────────────────────── */}
+      <header className="ps-toolbar">
+        <div className="ps-brand">
+          <span>✨</span>
+          <span>Prompt Studio</span>
+          <span className="ps-brand-badge">Vertical Workflow</span>
         </div>
 
-        <div className="ps-header-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {insertNotice && <span style={{ fontSize: 12, color: '#34d399', fontWeight: 500 }}>{insertNotice}</span>}
+        {insertNotice && (
+          <span style={{ fontSize: 12, color: '#3fb950', fontWeight: 500 }}>
+            ✓ {insertNotice}
+          </span>
+        )}
+        {statusNotice && (
+          <span style={{ fontSize: 12, color: '#fca5a5', fontWeight: 500 }}>
+            {statusNotice}
+          </span>
+        )}
 
-          <button
-            type="button"
-            className="ps-btn-ghost"
-            onClick={handleCopy}
-            disabled={!content && !refinedContent}
-            title="Copy prompt to clipboard"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              color: '#CBD5E1',
-              fontSize: '12px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            {isCopied ? '✓ Copied' : '📋 Copy'}
-          </button>
+        <div className="ps-spacer" />
 
-          <button
-            type="button"
-            className="ps-btn-ghost"
-            onClick={handleClear}
-            disabled={!content && !refinedContent}
-            title="Clear prompt canvas"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              color: '#CBD5E1',
-              fontSize: '12px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            🗑️ Clear
-          </button>
+        <button
+          type="button"
+          className="ps-btn ps-btn-sm"
+          onClick={handleClearAll}
+          disabled={!inputText && !outputText}
+          title="Clear all text"
+        >
+          <span>🗑️</span> Clear All
+        </button>
 
-          <button
-            type="button"
-            className="ps-btn-primary"
-            onClick={handleInsertIntoComposer}
-            disabled={!content && !refinedContent}
-            title="Insert directly into the active chat composer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '6px',
-              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#FFFFFF',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            💬 Insert into Composer
-          </button>
-        </div>
+        <button
+          type="button"
+          className="ps-btn ps-btn-primary"
+          onClick={handleInsertIntoComposer}
+          disabled={!inputText && !outputText}
+          title="Insert refined output into active composer"
+        >
+          <span>💬</span> Insert Output into Composer
+        </button>
       </header>
 
-      {/* ─── Document Canvas ──────────────────────────────────────────────────── */}
-      <main
-        className="ps-canvas-scroll"
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '40px 24px 160px 24px',
-          display: 'flex',
-          justifyContent: 'center',
-          background: '#090D16'
-        }}
-      >
-        <div
-          className="ps-canvas"
-          style={{
-            width: '100%',
-            maxWidth: '800px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px'
-          }}
-        >
-          <input
-            type="text"
-            className="ps-doc-title"
-            value={docTitle}
-            onChange={(e) => setDocTitle(e.target.value)}
-            placeholder="Untitled Prompt Spec..."
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              fontSize: '26px',
-              fontWeight: 700,
-              color: '#F8FAFC',
-              outline: 'none',
-              padding: 0,
-              margin: 0
-            }}
-          />
-          <div
-            className="ps-doc-divider"
-            style={{
-              width: '100%',
-              height: '1px',
-              background: 'rgba(255, 255, 255, 0.08)'
-            }}
-          />
+      {/* ─── Workspace Layout ───────────────────────────────────────────────── */}
+      <div className="ps-workspace">
 
-          {errorMessage && <div className="ps-status-notice">{errorMessage}</div>}
+        {/* ─── Left Sidebar Controls ────────────────────────────────────────── */}
+        <aside className="ps-sidebar">
 
-          {isReviewMode ? (
-            <div className="ps-diff-container">
-              {showDiff ? (
-                diffTokens.map((token, index) => {
-                  if (token.type === 'added') {
-                    return (
-                      <span key={index} className="ps-diff-added">
-                        {token.text}
-                      </span>
-                    );
-                  }
-                  if (token.type === 'removed') {
-                    return (
-                      <span key={index} className="ps-diff-removed">
-                        {token.text}
-                      </span>
-                    );
-                  }
-                  return (
-                    <span key={index} className="ps-diff-unchanged">
-                      {token.text}
-                    </span>
-                  );
-                })
-              ) : (
-                <div style={{ color: '#E2E8F0', whiteSpace: 'pre-wrap', lineHeight: 1.75 }}>{refinedContent}</div>
-              )}
+          {/* Voice Dictation Card */}
+          <section className="ps-section">
+            <div className="ps-section-title">
+              <span>Voice Dictation</span>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>Host STT</span>
             </div>
-          ) : (
-            <textarea
-              className="ps-doc-editor"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Type your raw thoughts or click Dictate in the toolbar below to capture speech..."
-              rows={12}
-              style={{
-                width: '100%',
-                minHeight: '280px',
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: '#E2E8F0',
-                fontSize: '15px',
-                lineHeight: 1.7,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                padding: 0
-              }}
-            />
-          )}
-        </div>
-      </main>
-
-      {/* ─── Floating AI Refinement Bar ───────────────────────────────────────── */}
-      <footer
-        className="ps-floating-bar"
-        style={{
-          position: 'absolute',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 'calc(100% - 48px)',
-          maxWidth: '800px',
-          background: 'rgba(13, 17, 29, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(99, 102, 241, 0.35)',
-          borderRadius: '14px',
-          padding: '12px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          zIndex: 50
-        }}
-      >
-        {isReviewMode ? (
-          <div
-            className="ps-review-banner"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '8px',
-              padding: '8px 12px',
-              width: '100%'
-            }}
-          >
-            <div className="ps-review-info" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#6EE7B7' }}>
-              <span>✨ Refinement Ready</span>
+            <div className="ps-dictation-card">
               <button
                 type="button"
-                className="ps-preset-pill"
-                onClick={() => setShowDiff((v) => !v)}
-                style={{
-                  fontSize: 11,
-                  padding: '2px 8px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#CBD5E1',
-                  borderRadius: '999px',
-                  cursor: 'pointer'
-                }}
-              >
-                {showDiff ? '👁️ View Clean' : '🔍 View Diff'}
-              </button>
-            </div>
-
-            <div className="ps-review-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                className="ps-btn-ghost"
-                onClick={() => handleRunRefine()}
-                disabled={isRefining}
-                style={{
-                  fontSize: 11,
-                  background: 'transparent',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#CBD5E1',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}
-              >
-                🔄 Try Again
-              </button>
-              <button
-                type="button"
-                className="ps-btn-discard"
-                onClick={handleDiscardDiff}
-                title="Discard refinement (Esc)"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  color: '#FCA5A5',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer'
-                }}
-              >
-                ✕ Discard (Esc)
-              </button>
-              <button
-                type="button"
-                className="ps-btn-accept"
-                onClick={handleAcceptDiff}
-                title="Accept refined text (Enter)"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  background: 'linear-gradient(135deg, #10B981, #059669)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: '#FFFFFF',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                ✓ Accept (Enter)
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Presets Row */}
-            <div className="ps-pills-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto' }}>
-              <span
-                className="ps-pills-label"
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: '#64748B',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginRight: '4px',
-                  flexShrink: 0
-                }}
-              >
-                Presets:
-              </span>
-              {STUDIO_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className={`ps-preset-pill${selectedPresetId === preset.id ? ' active' : ''}`}
-                  onClick={() => {
-                    setSelectedPresetId(preset.id);
-                    handleRunRefine(preset.id);
-                  }}
-                  disabled={!content.trim() || isRefining}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    background: selectedPresetId === preset.id ? 'rgba(99, 102, 241, 0.28)' : 'rgba(255, 255, 255, 0.05)',
-                    border: selectedPresetId === preset.id ? '1px solid #6366F1' : '1px solid rgba(255, 255, 255, 0.08)',
-                    color: selectedPresetId === preset.id ? '#A5B4FC' : '#CBD5E1',
-                    fontSize: '12px',
-                    fontWeight: selectedPresetId === preset.id ? 600 : 500,
-                    padding: '4px 11px',
-                    borderRadius: '999px',
-                    cursor: content.trim() && !isRefining ? 'pointer' : 'not-allowed',
-                    whiteSpace: 'nowrap',
-                    opacity: content.trim() && !isRefining ? 1 : 0.4
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Input & Dictation Row */}
-            <div className="ps-action-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-              <button
-                type="button"
-                className={`ps-mic-toggle${isRecording ? ' recording' : ''}`}
+                className={`ps-mic-btn${isRecording ? ' recording' : ''}`}
                 onClick={handleToggleDictation}
-                title={isRecording ? 'Stop dictation' : 'Start dictation'}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: isRecording ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.14)',
-                  border: isRecording ? '1px solid #EF4444' : '1px solid rgba(239, 68, 68, 0.35)',
-                  color: '#FCA5A5',
-                  padding: '8px 14px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
+                title={isRecording ? 'Stop dictation' : 'Start dictation into input'}
               >
-                <span>🎙️</span>
-                <span>{isRecording ? `Listening (${recordingSeconds}s)...` : 'Dictate'}</span>
+                <span>{isRecording ? '⏹️' : '🎙️'}</span>
+                <span>{isRecording ? `Listening (${recordingSeconds}s)...` : 'Dictate into Top Input'}</span>
               </button>
+              <div className="ps-audio-meter">
+                <div
+                  className="ps-audio-bar"
+                  style={{ width: `${isRecording ? Math.min(100, (audioLevel ?? 0.3) * 100) : 0}%` }}
+                />
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--ps-text-muted)' }}>
+                {isRecording ? 'Recording active. Transcribing into Input above...' : 'Speaks into Raw Input above. Transcribed with Zana host voice.'}
+              </span>
+            </div>
+          </section>
 
-              <input
-                ref={inputRef}
-                type="text"
-                className="ps-input-field"
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || !e.shiftKey)) {
-                    e.preventDefault();
-                    handleRunRefine();
-                  }
-                }}
-                placeholder="Ask AI to refine, transform tone, or add requirements (Ctrl+K)..."
-                disabled={isRefining}
-                style={{
-                  flex: 1,
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  color: '#F8FAFC',
-                  fontSize: '13px',
-                  padding: '8px 12px',
-                  outline: 'none'
-                }}
-              />
+          {/* Refinement Presets */}
+          <section className="ps-section">
+            <div className="ps-section-title">
+              <span>Refinement Presets</span>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>Instant apply</span>
+            </div>
+            <div className="ps-presets-list">
+              {STUDIO_PRESETS.map((preset) => {
+                const isActive = selectedPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={`ps-preset-item${isActive ? ' active' : ''}`}
+                    onClick={() => {
+                      setSelectedPresetId(preset.id);
+                      handleRefine(preset.id);
+                    }}
+                    disabled={!inputText.trim() || isRefining}
+                  >
+                    <div className="ps-preset-header">
+                      <span className="ps-preset-name">{preset.label}</span>
+                    </div>
+                    <span className="ps-preset-desc">{preset.prompt}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
+          {/* Custom AI Instructions */}
+          <section className="ps-section" style={{ borderBottom: 'none' }}>
+            <div className="ps-section-title">
+              <span>Custom Instructions</span>
+              <span className="ps-kbd">Ctrl+K</span>
+            </div>
+            <textarea
+              ref={customPromptInputRef}
+              className="ps-instructions-input"
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              placeholder="E.g., Format as markdown with code examples, or restrict response to 150 words..."
+              disabled={isRefining}
+            />
+            <div style={{ marginTop: 10 }}>
               <button
                 type="button"
-                className="ps-btn-primary"
-                onClick={() => handleRunRefine()}
-                disabled={!content.trim() || isRefining}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: '#FFFFFF',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: content.trim() && !isRefining ? 'pointer' : 'not-allowed',
-                  opacity: content.trim() && !isRefining ? 1 : 0.4,
-                  flexShrink: 0
-                }}
+                className="ps-btn ps-btn-primary"
+                style={{ width: '100%', height: 32 }}
+                onClick={() => handleRefine()}
+                disabled={!inputText.trim() || isRefining}
               >
-                {isRefining ? 'Refining…' : 'Refine'}
+                <span>✨</span> {isRefining ? 'Refining…' : 'Refine Prompt (Ctrl+Enter)'}
               </button>
             </div>
-          </>
-        )}
+          </section>
+
+        </aside>
+
+        {/* ─── Center Vertical Stack: TOP INPUT, BOTTOM OUTPUT ─────────────── */}
+        <main className="ps-stack-workspace">
+
+          {/* Spec Title Sub-header */}
+          <div className="ps-stack-header">
+            <input
+              type="text"
+              className="ps-title-field"
+              value={docTitle}
+              onChange={(e) => setDocTitle(e.target.value)}
+              placeholder="Untitled Prompt Spec..."
+            />
+            <span style={{ fontSize: 11, color: 'var(--ps-text-muted)' }}>
+              Input: {inputStats} · Output: {outputStats}
+            </span>
+          </div>
+
+          <div className="ps-vertical-panes">
+
+            {/* ─── TOP PANE: RAW INPUT ───────────────────────────────────────── */}
+            <section className="ps-section-input">
+              <div className="ps-pane-header">
+                <div className="ps-pane-title">
+                  <span className="ps-badge ps-badge-input">Input</span>
+                  <span>Raw Draft / Speech</span>
+                </div>
+                <div className="ps-pane-actions">
+                  <span style={{ fontSize: 11, color: 'var(--ps-text-muted)' }}>{inputStats}</span>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-sm"
+                    onClick={handleCopyInput}
+                    disabled={!inputText}
+                    title="Copy input text"
+                  >
+                    📋 Copy
+                  </button>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-sm"
+                    onClick={() => setInputText('')}
+                    disabled={!inputText}
+                    title="Clear raw input"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <textarea
+                className="ps-input-textarea"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Type your raw thoughts or click Dictate in the toolbar below to capture speech..."
+              />
+            </section>
+
+            {/* ─── MIDDLE ACTION BAR: TRANSFORM TRIGGER ─────────────────────── */}
+            <div className="ps-mid-action-bar">
+              <div className="ps-mid-info">
+                <span>⬇ Transform Input into Prompt Spec</span>
+              </div>
+              <div className="ps-mid-actions">
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-sm ps-btn-primary"
+                  onClick={() => handleRefine()}
+                  disabled={!inputText.trim() || isRefining}
+                  title="Refine raw input (Ctrl+Enter)"
+                >
+                  <span>✨ {isRefining ? 'Refining…' : 'Refine Now (Ctrl+Enter)'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ─── BOTTOM PANE: REFINED OUTPUT ───────────────────────────────── */}
+            <section className="ps-section-output">
+              <div className="ps-pane-header">
+                <div className="ps-pane-title">
+                  <span className="ps-badge ps-badge-output">Output</span>
+                  <span>{outputText ? 'Refined Spec (Ready)' : 'Refined Spec'}</span>
+                </div>
+                <div className="ps-pane-actions">
+                  {outputText && (
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-sm"
+                      onClick={() => setShowDiff((v) => !v)}
+                      title="Toggle difference view"
+                    >
+                      <span>{showDiff ? '👁️' : '🔍'}</span>
+                      <span>{showDiff ? 'View Clean' : 'View Diff'}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-sm"
+                    onClick={handleCopyOutput}
+                    disabled={!outputText}
+                    title="Copy refined output"
+                  >
+                    <span>{isCopiedOutput ? '✓' : '📋'}</span>
+                    <span>{isCopiedOutput ? 'Copied!' : 'Copy Output'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-sm ps-btn-success"
+                    onClick={handleReplaceInput}
+                    disabled={!outputText}
+                    title="Copy refined text back up to input for further iteration"
+                  >
+                    <span>⬆ Replace Input</span>
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+                {outputText ? (
+                  <div className="ps-output-scroll">
+                    {showDiff ? (
+                      diffTokens.map((token, idx) => {
+                        if (token.type === 'added') {
+                          return (
+                            <span key={idx} className="ps-diff-added">
+                              {token.text}
+                            </span>
+                          );
+                        }
+                        if (token.type === 'removed') {
+                          return (
+                            <span key={idx} className="ps-diff-removed">
+                              {token.text}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span key={idx} className="ps-diff-unchanged">
+                            {token.text}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      outputText
+                    )}
+                  </div>
+                ) : (
+                  <div className="ps-output-empty">
+                    <span style={{ fontSize: 26, opacity: 0.5 }}>✨</span>
+                    <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--ps-text)' }}>
+                      No Refined Output Yet
+                    </div>
+                    <div style={{ fontSize: 12, maxWidth: 320, lineHeight: 1.4, color: 'var(--ps-text-muted)' }}>
+                      Type your raw thoughts above or speak, then click <strong>Refine Now</strong> or select a preset on the left.
+                    </div>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-primary"
+                      style={{ marginTop: 4 }}
+                      onClick={() => handleRefine()}
+                      disabled={!inputText.trim() || isRefining}
+                    >
+                      <span>✨</span> Refine Prompt Now
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+
+          </div>
+
+        </main>
+
+      </div>
+
+      {/* ─── Bottom IDE Status Bar ─────────────────────────────────────────── */}
+      <footer className="ps-statusbar">
+        <div className="ps-status-item">
+          <span>●</span>
+          <span>Auto-saved locally</span>
+        </div>
+        <div className="ps-status-item">
+          <span>Model:</span>
+          <span style={{ color: 'var(--ps-text)' }}>Active Thread Agent</span>
+        </div>
+        <div className="ps-spacer" />
+        <div className="ps-status-item">
+          <span>Shortcuts:</span>
+          <span className="ps-kbd">Ctrl+K</span> Focus Prompt
+          <span className="ps-kbd">Ctrl+Enter</span> Refine
+        </div>
       </footer>
     </div>
   );
