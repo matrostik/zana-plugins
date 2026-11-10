@@ -1,350 +1,350 @@
-function nt(){return globalThis.__ZCC_PLUGIN_RUNTIME__??{}}function ot(t){throw new Error(`${t} is not available until the host plugin runtime is installed`)}function rt(t){return{__zccPluginApp:!0,setup:t}}function U(){return nt().useRpc?.()??ot("useRpc")}function V(){return nt().useComposer?.()??ot("useComposer")}var Lt=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"];var C=class extends Error{code;constructor(e,o){super(o),this.name="RecordingError",this.code=e}};function Ot(t){return Lt.find(e=>t(e))??null}var Mt="audio/webm";function zt(){return{getUserMedia:t=>navigator.mediaDevices.getUserMedia(t),createRecorder:(t,e)=>new MediaRecorder(t,e?{mimeType:e}:void 0),isTypeSupported:t=>typeof MediaRecorder<"u"&&MediaRecorder.isTypeSupported(t)}}async function $t(t){try{return await t.getUserMedia({audio:!0})}catch(e){let o=e instanceof Error?e.name:"";throw o==="NotAllowedError"||o==="SecurityError"?new C("MIC_DENIED","Microphone access was denied. Allow it for Zana in system settings, then try again."):new C("MIC_UNAVAILABLE","No microphone is available. Connect one and try again.")}}function Bt(t){return new Promise((e,o)=>{let i=new FileReader;i.onload=()=>{let s=typeof i.result=="string"?i.result:"";e(s.slice(s.indexOf(",")+1))},i.onerror=()=>o(new C("RECORDING_FAILED","The recording could not be read.")),i.readAsDataURL(t)})}async function Ft(t,e){let o=new Blob(t,{type:e});return{base64:await Bt(o),mimeType:o.type||e}}function jt(t,e){if(!(t>0&&Number.isFinite(t)))return()=>{};let o=setTimeout(e,t);return()=>clearTimeout(o)}var Ut="That recording is too large to transcribe. Keep dictation shorter and try again.";function Vt(t,e){let o=Math.max(e,t),i=[],s=0,a=!1;return{chunks:i,get overflowed(){return a},add(l){return l.size===0||a?"ignored":s+l.size>o?(a=!0,"overflow"):(i.push(l),s+=l.size,s>=t?"limit-reached":"accepted")}}}function Ht(t,e){let o=new Promise((i,s)=>{t.onstop=()=>i(),t.onerror=()=>{let a=new C("RECORDING_FAILED","Recording stopped unexpectedly. Try again.");e(a),s(a)}});return o.catch(()=>{}),o}function qt(t,e,o,i){let s=Ht(t,i);return t.ondataavailable=a=>{let l=e.add(a.data);(l==="limit-reached"||l==="overflow")&&o()},t.start(1e3),s}async function Gt(t,e,o,i){try{await t}finally{e()}if(o.overflowed)throw new C("RECORDING_FAILED",Ut);return Ft(o.chunks,i)}function Zt(t){let e=()=>{};return{stopRecorder(){e(),t.state!=="inactive"&&t.stop()},armTimer(o,i){e=jt(o,i)}}}function Kt(t,e){let o=null;return{attach(i){o=i},detach(){o=null},autoStop(){t();let i=o?.onAutoStop;o&&(o.onAutoStop=void 0),i?.()},fail(i){t(),e();let s=o?.onError;o=null,s?.(i)}}}function Yt(t,e,o,i){let s=Vt(i.maxBytes??9437184,i.hardMaxBytes??10485760),{stopRecorder:a,armTimer:l}=Zt(t),r=Kt(a,e);l(i.maxDurationMs??12e4,r.autoStop);let b=qt(t,s,r.autoStop,r.fail),d={onError:i.onError,onAutoStop:i.onAutoStop,async stop(){a();try{return await Gt(b,e,s,t.mimeType||o)}finally{r.detach()}},cancel(){a(),e(),r.detach()}};return r.attach(d),d}var O=()=>Wt();async function Wt(t=zt(),e={}){let o=await $t(t),i=Xt(o),s=o.getTracks(),a,l=()=>{for(let r of s)a&&r.removeEventListener?.("ended",a);i?.close(),s.forEach(r=>r.stop())};try{let r=Ot(t.isTypeSupported)??Mt,b=t.createRecorder(o,r),d=Yt(b,l,r,e);return d.getAudioLevel=()=>i?.level()??null,a=()=>{let f=d.onError;d.cancel(),f?.(new C("MIC_UNAVAILABLE","Microphone disconnected. Check your device and try again."))},s.forEach(f=>f.addEventListener?.("ended",a)),d}catch(r){throw l(),r instanceof C?r:new C("RECORDING_FAILED",r instanceof Error?r.message:"The recording could not be started.")}}function Xt(t){let e;try{e=new AudioContext;let o=e.createMediaStreamSource(t),i=e.createAnalyser();i.fftSize=256,o.connect(i);let s=new Uint8Array(i.fftSize),a=e,l=!1;return{level(){if(a.state&&a.state!=="running")return null;i.getByteTimeDomainData(s);let r=s.reduce((b,d)=>b+((d-128)/128)**2,0)/s.length;return Math.min(1,Math.sqrt(r)*5)},close(){l||(l=!0,o.disconnect(),a.close().catch(r=>console.error("Prompt Voice audio meter cleanup failed",r)))}}}catch(o){return e&&e.close().catch(i=>console.error("Prompt Voice audio meter cleanup failed",i)),console.warn("Prompt Voice audio meter unavailable",o),null}}var u=globalThis.__ZCC_HOST_REACT__;var ue=u.Children,fe=u.Component,be=u.Fragment,ge=u.StrictMode,he=u.Suspense,xe=u.cloneElement,ve=u.createContext,ye=u.createElement,we=u.createRef,Se=u.forwardRef,Re=u.isValidElement,Ee=u.lazy,Te=u.memo,ke=u.startTransition,E=u.useCallback,Ae=u.useContext,Ce=u.useDebugValue,Ne=u.useDeferredValue,L=u.useEffect,Ie=u.useId,_e=u.useImperativeHandle,Pe=u.useInsertionEffect,De=u.useLayoutEffect,H=u.useMemo,it=u.useReducer,N=u.useRef,y=u.useState,Le=u.useSyncExternalStore,Oe=u.useTransition,Me=u.version;var q="promptVoice.transcribe";var at="promptVoice.rephrase";function F(t,e){let o=e.trim();return o?t?/\s$/.test(t)?`${t}${o}`:`${t} ${o}`:o:t}var Jt="No speech detected.",Y={phase:"idle",notice:null,error:null};function st(t,e){switch(e.type){case"START":return t.phase==="idle"||t.phase==="error"?{phase:"starting",notice:null,error:null}:t;case"STARTED":return t.phase==="starting"?{...t,phase:"recording"}:t;case"STOP":return t.phase==="recording"||t.phase==="starting"?{phase:"processing",notice:null,error:null}:t;case"CANCEL":return t.phase==="recording"||t.phase==="starting"?{...Y}:t;case"SUCCESS":case"NO_SPEECH":return t.phase!=="processing"?t:{phase:"idle",notice:e.type==="NO_SPEECH"?Jt:e.notice,error:null};case"CLEAR_NOTICE":return t.notice?{...t,notice:null}:t;case"FAILURE":return{phase:"error",notice:null,error:e.message}}}var Qt="Prompt Voice returned an unexpected response. Try again.",te="Dictation failed. Try again.",ee=4e3;function ne(t){return typeof t=="object"&&t!==null&&typeof t.ok=="boolean"}async function oe(t,e){let o=await t.call(q,{audio:e.base64,mimeType:e.mimeType});if(!ne(o))throw new Error(Qt);return o}function pt(t){return t instanceof Error&&t.message?t.message:te}function re(t,e,o){if(!t.ok){o({type:"FAILURE",message:t.message});return}if(t.status==="no-speech"){o({type:"NO_SPEECH"});return}e.updateText(s=>F(s,t.text)),e.focus();let i=t.refineNotice?`Inserted the raw transcript. ${t.refineNotice.message}`:"Added to draft.";o({type:"SUCCESS",notice:i})}function ie(t,e,o,i){return e()?(t.onError=s=>{e()&&i(s)},t.onAutoStop=()=>{e()&&o()},t):(t.cancel(),null)}function ae(t,e,o,i,s){let a=l=>s({type:"FAILURE",message:pt(l)});return t.then(l=>{let r=ie(l,o,i,b=>{e.current=null,a(b)});return r&&(e.current=r),r},l=>(o()&&a(l),null))}function se(t,e){let o=N(null),i=N(null),s=N(0),a=N(!0),l=E(()=>{s.current++,i.current=null,o.current&&(o.current.cancel(),o.current=null),e({type:"CANCEL"})},[e]);L(()=>(a.current=!0,()=>{a.current=!1,l()}),[l]);let r=E(async()=>{let h=i.current?await i.current:o.current;return o.current=null,h},[]),b=E(async h=>{let g=++s.current,v=()=>a.current&&s.current===g,w=ae(t(),o,v,h,e);i.current=w,await w&&v()&&e({type:"STARTED"}),i.current===w&&(i.current=null)},[e,t]),d=E(()=>a.current,[]),f=E(()=>o.current?.getAudioLevel?.()??null,[]);return{start:b,takeSession:r,cancel:l,isMounted:d,getAudioLevel:f}}function ct({startSession:t=O,noticeDurationMs:e=ee}={}){let o=V(),i=U(),[s,a]=it(st,Y),{start:l,takeSession:r,cancel:b,isMounted:d,getAudioLevel:f}=se(t,a),[h,g]=y(null),[v,w]=y(0),[_,S]=y(!1);L(()=>{if(s.phase!=="recording"){g(null),w(0);return}let I=Date.now(),x=()=>{g(f()),w(Math.floor((Date.now()-I)/1e3))};x();let T=setInterval(x,100);return()=>clearInterval(T)},[f,s.phase]),L(()=>{if(!s.notice)return;let I=setTimeout(()=>{a({type:"CLEAR_NOTICE"})},e);return()=>clearTimeout(I)},[e,s.notice]);let P=E(()=>{a({type:"CLEAR_NOTICE"})},[]),k=E(async()=>{a({type:"STOP"});let I=await r();if(!(!d()||!I))try{let x=await I.stop();if(!d())return;let T=await oe(i,x);if(!d())return;re(T,o,a)}catch(x){if(!d())return;a({type:"FAILURE",message:pt(x)})}},[o,d,i,r]),R=E(async()=>{S(!1),a({type:"START"}),await l(()=>{S(!0),k()})},[k,l]),j=E(()=>{s.phase==="recording"||s.phase==="starting"?k():s.phase!=="processing"&&R()},[R,k,s.phase]);return{phase:s.phase,error:s.error,notice:s.notice,level:h,seconds:v,autoStopped:_,onClick:j,cancel:b,clearNotice:P,beginDictation:R,finishDictation:k}}var W=`/* Base Container */\r
-.pv-mic {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  height: 36px;\r
-  box-sizing: border-box;\r
-  vertical-align: middle;\r
-  background: transparent;\r
-  border: none;\r
-  user-select: none;\r
-  position: relative;\r
-}\r
-\r
-.pv-sr-only {\r
-  position: absolute;\r
-  width: 1px;\r
-  height: 1px;\r
-  padding: 0;\r
-  margin: -1px;\r
-  overflow: hidden;\r
-  clip: rect(0, 0, 0, 0);\r
-  white-space: nowrap;\r
-  border: 0;\r
-}\r
-\r
-/* Base button reset */\r
-.pv-mic-button {\r
-  box-sizing: border-box;\r
-  font: inherit;\r
-}\r
-\r
-.pv-mic-button:focus-visible {\r
-  outline: 2px solid var(--focus-ring, #4a90e2);\r
-  outline-offset: 2px;\r
-}\r
-\r
-.pv-mic-button:disabled {\r
-  opacity: 0.6;\r
-  cursor: progress;\r
-}\r
-\r
-/* Dictation Pill Container: shared morphing capsule across all phases */\r
-.pv-dictation-pill {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  height: 36px;\r
-  border-radius: 9999px;\r
-  background: var(--pv-pill-bg, #181920);\r
-  border: 1px solid var(--pv-pill-border, rgba(239, 68, 68, 0.35));\r
-  transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1),\r
-              border-color 0.25s ease,\r
-              box-shadow 0.25s ease,\r
-              background 0.25s ease,\r
-              padding 0.25s cubic-bezier(0.16, 1, 0.3, 1),\r
-              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);\r
-  box-sizing: border-box;\r
-}\r
-\r
-/* 1. Idle: Oval Capsule Pill with Signature Crimson Border containing only the mic icon */\r
-.pv-mic.pv-phase-idle {\r
-  width: 58px;\r
-  height: 36px;\r
-  border-radius: 9999px;\r
-  background: var(--pv-pill-bg, #181920);\r
-  border: 1px solid rgba(239, 68, 68, 0.35);\r
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.12);\r
-  padding: 0;\r
-  justify-content: center;\r
-  cursor: pointer;\r
-}\r
-\r
-.pv-mic.pv-phase-idle:hover {\r
-  background: #20222c;\r
-  border-color: rgba(239, 68, 68, 0.75);\r
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.28);\r
-  transform: scale(1.04);\r
-}\r
-\r
-.pv-mic.pv-phase-idle:active {\r
-  transform: scale(0.97);\r
-}\r
-\r
-.pv-mic.pv-phase-idle .pv-idle-icon {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  justify-content: center;\r
-  width: 100%;\r
-  height: 100%;\r
-  border-radius: 9999px;\r
-  background: transparent;\r
-  border: none;\r
-  box-shadow: none;\r
-  color: var(--text-secondary, #cbd5e1);\r
-  cursor: pointer;\r
-  padding: 0;\r
-  transition: color 0.15s ease;\r
-}\r
-\r
-.pv-mic.pv-phase-idle:hover .pv-idle-icon {\r
-  color: #ffffff;\r
-}\r
-\r
-/* 2. Starting Oval: extends smoothly */\r
-.pv-mic.pv-phase-starting {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(234, 179, 8, 0.45);\r
-  box-shadow: 0 0 14px rgba(234, 179, 8, 0.15);\r
-  padding: 0 4px 0 10px;\r
-  gap: 10px;\r
-}\r
-\r
-/* 3. Recording / Listening Oval: extends with red glow */\r
-.pv-mic.pv-phase-recording {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(239, 68, 68, 0.45);\r
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.18), 0 4px 16px rgba(0, 0, 0, 0.4);\r
-  padding: 0 4px 0 10px;\r
-  gap: 10px;\r
-}\r
-\r
-/* 4. Processing Oval */\r
-.pv-mic.pv-phase-processing {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(56, 189, 248, 0.4);\r
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);\r
-  padding: 0 6px 0 10px;\r
-  gap: 10px;\r
-}\r
-\r
-/* 5. Notice Oval: same control showing completion */\r
-.pv-mic.pv-has-notice {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(34, 197, 94, 0.45);\r
-  box-shadow: 0 0 16px rgba(34, 197, 94, 0.15);\r
-  padding: 0 14px 0 12px;\r
-  gap: 8px;\r
-  cursor: pointer;\r
-}\r
-\r
-.pv-mic.pv-has-notice:hover {\r
-  border-color: rgba(34, 197, 94, 0.75);\r
-  background: rgba(34, 197, 94, 0.08);\r
-}\r
-\r
-.pv-notice-content {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 8px;\r
-  animation: pv-notice-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);\r
-}\r
-\r
-.pv-notice-check {\r
-  color: #4ade80;\r
-  font-weight: 700;\r
-  font-size: 13px;\r
-}\r
-\r
-@keyframes pv-notice-enter {\r
-  from { opacity: 0; transform: scale(0.96) translateX(-3px); }\r
-  to { opacity: 1; transform: scale(1) translateX(0); }\r
-}\r
-\r
-/* Flex ordering for active pill children */\r
-.pv-mic-active .pv-pill-timer-badge {\r
-  order: 1;\r
-}\r
-\r
-.pv-mic-active .pv-pill-center {\r
-  order: 2;\r
-}\r
-\r
-.pv-mic-active .pv-mic-button.pv-pill-btn-stop {\r
-  order: 3;\r
-}\r
-\r
-.pv-mic-active .pv-pill-btn-cancel {\r
-  order: 4;\r
-}\r
-\r
-/* Timer Badge */\r
-.pv-pill-timer-badge {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 6px;\r
-  background: rgba(255, 255, 255, 0.08);\r
-  border: 1px solid rgba(255, 255, 255, 0.04);\r
-  border-radius: 9999px;\r
-  padding: 2px 8px 2px 6px;\r
-}\r
-\r
-.pv-pill-dot {\r
-  width: 7px;\r
-  height: 7px;\r
-  border-radius: 50%;\r
-  background: var(--danger-color, #ef4444);\r
-  box-shadow: 0 0 8px var(--danger-color, #ef4444);\r
-  animation: pv-pulse-dot 1.4s ease-in-out infinite;\r
-}\r
-\r
-.pv-pill-dot-starting {\r
-  background: #eab308;\r
-  box-shadow: 0 0 8px #eab308;\r
-}\r
-\r
-@keyframes pv-pulse-dot {\r
-  0%, 100% { opacity: 1; transform: scale(1); }\r
-  50% { opacity: 0.4; transform: scale(0.85); }\r
-}\r
-\r
-.pv-pill-timer-text {\r
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\r
-  font-size: 12px;\r
-  font-weight: 600;\r
-  color: #f8fafc;\r
-  letter-spacing: 0.02em;\r
-}\r
-\r
-/* Center area */\r
-.pv-pill-center {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 8px;\r
-}\r
-\r
-.pv-pill-waveform {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 2.5px;\r
-  height: 16px;\r
-}\r
-\r
-.pv-pill-waveform-bar {\r
-  width: 3px;\r
-  background: #38bdf8;\r
-  border-radius: 9999px;\r
-  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);\r
-  transition: height 0.08s ease;\r
-  min-height: 3px;\r
-  height: 5px;\r
-}\r
-\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(1) { animation: pv-wave 0.8s ease-in-out infinite alternate; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(2) { animation: pv-wave 0.6s ease-in-out infinite alternate 0.15s; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(3) { animation: pv-wave 0.7s ease-in-out infinite alternate 0.3s; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(4) { animation: pv-wave 0.5s ease-in-out infinite alternate 0.2s; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(5) { animation: pv-wave 0.9s ease-in-out infinite alternate 0.05s; }\r
-\r
-@keyframes pv-wave {\r
-  0% { height: 4px; }\r
-  100% { height: 14px; }\r
-}\r
-\r
-.pv-pill-status {\r
-  font-size: 13px;\r
-  font-weight: 500;\r
-  color: #e2e8f0;\r
-  white-space: nowrap;\r
-}\r
-\r
-.pv-mic-quiet-warning {\r
-  font-size: 11px;\r
-  color: #fbbf24;\r
-}\r
-\r
-/* Stop button inside active pill */\r
-.pv-mic-button.pv-pill-btn-stop {\r
-  width: 28px;\r
-  height: 28px;\r
-  border-radius: 50%;\r
-  background: rgba(239, 68, 68, 0.22);\r
-  border: 1px solid rgba(239, 68, 68, 0.55);\r
-  display: inline-flex;\r
-  align-items: center;\r
-  justify-content: center;\r
-  cursor: pointer;\r
-  color: #f87171;\r
-  padding: 0;\r
-  transition: all 0.15s ease;\r
-}\r
-\r
-.pv-mic-button.pv-pill-btn-stop:hover {\r
-  background: rgba(239, 68, 68, 0.38);\r
-  border-color: rgba(239, 68, 68, 0.8);\r
-  color: #ffffff;\r
-  transform: scale(1.05);\r
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);\r
-}\r
-\r
-/* Cancel button inside active pill */\r
-.pv-pill-btn-cancel {\r
-  width: 28px;\r
-  height: 28px;\r
-  border-radius: 50%;\r
-  background: rgba(255, 255, 255, 0.08);\r
-  border: 1px solid rgba(255, 255, 255, 0.06);\r
-  display: inline-flex;\r
-  align-items: center;\r
-  justify-content: center;\r
-  cursor: pointer;\r
-  color: #94a3b8;\r
-  padding: 0;\r
-  transition: all 0.15s ease;\r
-}\r
-\r
-.pv-pill-btn-cancel:hover {\r
-  background: rgba(255, 255, 255, 0.16);\r
-  color: #f1f5f9;\r
-  transform: scale(1.05);\r
-}\r
-\r
-/* Spinner */\r
-.pv-mic-spinner {\r
-  display: inline-block;\r
-  width: 12px;\r
-  height: 12px;\r
-  border: 2px solid currentColor;\r
-  border-right-color: transparent;\r
-  border-radius: 50%;\r
-  animation: pv-spin 0.8s linear infinite;\r
-  vertical-align: middle;\r
-}\r
-\r
-@keyframes pv-spin {\r
-  to { transform: rotate(360deg); }\r
-}\r
-\r
-/* Error styles */\r
-.pv-mic.pv-phase-error {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(239, 68, 68, 0.7);\r
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);\r
-  padding: 0 10px;\r
-}\r
-\r
-.pv-mic-error {\r
-  color: var(--danger-color, #ef4444);\r
-}\r
-\r
-@media (prefers-reduced-motion: reduce) {\r
-  .pv-pill-waveform.animated .pv-pill-waveform-bar { animation: none; height: 8px; }\r
-  .pv-pill-waveform-bar { transition: none; }\r
-  .pv-mic-spinner { animation: none; }\r
+function nt(){return globalThis.__ZCC_PLUGIN_RUNTIME__??{}}function ot(t){throw new Error(`${t} is not available until the host plugin runtime is installed`)}function rt(t){return{__zccPluginApp:!0,setup:t}}function U(){return nt().useRpc?.()??ot("useRpc")}function V(){return nt().useComposer?.()??ot("useComposer")}var Lt=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"];var C=class extends Error{code;constructor(e,o){super(o),this.name="RecordingError",this.code=e}};function Ot(t){return Lt.find(e=>t(e))??null}var Mt="audio/webm";function zt(){return{getUserMedia:t=>navigator.mediaDevices.getUserMedia(t),createRecorder:(t,e)=>new MediaRecorder(t,e?{mimeType:e}:void 0),isTypeSupported:t=>typeof MediaRecorder<"u"&&MediaRecorder.isTypeSupported(t)}}async function $t(t){try{return await t.getUserMedia({audio:!0})}catch(e){let o=e instanceof Error?e.name:"";throw o==="NotAllowedError"||o==="SecurityError"?new C("MIC_DENIED","Microphone access was denied. Allow it for Zana in system settings, then try again."):new C("MIC_UNAVAILABLE","No microphone is available. Connect one and try again.")}}function Bt(t){return new Promise((e,o)=>{let i=new FileReader;i.onload=()=>{let s=typeof i.result=="string"?i.result:"";e(s.slice(s.indexOf(",")+1))},i.onerror=()=>o(new C("RECORDING_FAILED","The recording could not be read.")),i.readAsDataURL(t)})}async function Ft(t,e){let o=new Blob(t,{type:e});return{base64:await Bt(o),mimeType:o.type||e}}function jt(t,e){if(!(t>0&&Number.isFinite(t)))return()=>{};let o=setTimeout(e,t);return()=>clearTimeout(o)}var Ut="That recording is too large to transcribe. Keep dictation shorter and try again.";function Vt(t,e){let o=Math.max(e,t),i=[],s=0,a=!1;return{chunks:i,get overflowed(){return a},add(l){return l.size===0||a?"ignored":s+l.size>o?(a=!0,"overflow"):(i.push(l),s+=l.size,s>=t?"limit-reached":"accepted")}}}function Ht(t,e){let o=new Promise((i,s)=>{t.onstop=()=>i(),t.onerror=()=>{let a=new C("RECORDING_FAILED","Recording stopped unexpectedly. Try again.");e(a),s(a)}});return o.catch(()=>{}),o}function qt(t,e,o,i){let s=Ht(t,i);return t.ondataavailable=a=>{let l=e.add(a.data);(l==="limit-reached"||l==="overflow")&&o()},t.start(1e3),s}async function Gt(t,e,o,i){try{await t}finally{e()}if(o.overflowed)throw new C("RECORDING_FAILED",Ut);return Ft(o.chunks,i)}function Zt(t){let e=()=>{};return{stopRecorder(){e(),t.state!=="inactive"&&t.stop()},armTimer(o,i){e=jt(o,i)}}}function Kt(t,e){let o=null;return{attach(i){o=i},detach(){o=null},autoStop(){t();let i=o?.onAutoStop;o&&(o.onAutoStop=void 0),i?.()},fail(i){t(),e();let s=o?.onError;o=null,s?.(i)}}}function Yt(t,e,o,i){let s=Vt(i.maxBytes??9437184,i.hardMaxBytes??10485760),{stopRecorder:a,armTimer:l}=Zt(t),r=Kt(a,e);l(i.maxDurationMs??12e4,r.autoStop);let b=qt(t,s,r.autoStop,r.fail),d={onError:i.onError,onAutoStop:i.onAutoStop,async stop(){a();try{return await Gt(b,e,s,t.mimeType||o)}finally{r.detach()}},cancel(){a(),e(),r.detach()}};return r.attach(d),d}var O=()=>Wt();async function Wt(t=zt(),e={}){let o=await $t(t),i=Xt(o),s=o.getTracks(),a,l=()=>{for(let r of s)a&&r.removeEventListener?.("ended",a);i?.close(),s.forEach(r=>r.stop())};try{let r=Ot(t.isTypeSupported)??Mt,b=t.createRecorder(o,r),d=Yt(b,l,r,e);return d.getAudioLevel=()=>i?.level()??null,a=()=>{let f=d.onError;d.cancel(),f?.(new C("MIC_UNAVAILABLE","Microphone disconnected. Check your device and try again."))},s.forEach(f=>f.addEventListener?.("ended",a)),d}catch(r){throw l(),r instanceof C?r:new C("RECORDING_FAILED",r instanceof Error?r.message:"The recording could not be started.")}}function Xt(t){let e;try{e=new AudioContext;let o=e.createMediaStreamSource(t),i=e.createAnalyser();i.fftSize=256,o.connect(i);let s=new Uint8Array(i.fftSize),a=e,l=!1;return{level(){if(a.state&&a.state!=="running")return null;i.getByteTimeDomainData(s);let r=s.reduce((b,d)=>b+((d-128)/128)**2,0)/s.length;return Math.min(1,Math.sqrt(r)*5)},close(){l||(l=!0,o.disconnect(),a.close().catch(r=>console.error("Prompt Voice audio meter cleanup failed",r)))}}}catch(o){return e&&e.close().catch(i=>console.error("Prompt Voice audio meter cleanup failed",i)),console.warn("Prompt Voice audio meter unavailable",o),null}}var u=globalThis.__ZCC_HOST_REACT__;var ue=u.Children,fe=u.Component,be=u.Fragment,ge=u.StrictMode,he=u.Suspense,xe=u.cloneElement,ve=u.createContext,ye=u.createElement,we=u.createRef,Se=u.forwardRef,Re=u.isValidElement,Ee=u.lazy,Te=u.memo,ke=u.startTransition,E=u.useCallback,Ae=u.useContext,Ce=u.useDebugValue,Ne=u.useDeferredValue,L=u.useEffect,Ie=u.useId,_e=u.useImperativeHandle,Pe=u.useInsertionEffect,De=u.useLayoutEffect,H=u.useMemo,it=u.useReducer,N=u.useRef,y=u.useState,Le=u.useSyncExternalStore,Oe=u.useTransition,Me=u.version;var q="promptVoice.transcribe";var at="promptVoice.rephrase";function F(t,e){let o=e.trim();return o?t?/\s$/.test(t)?`${t}${o}`:`${t} ${o}`:o:t}var Jt="No speech detected.",Y={phase:"idle",notice:null,error:null};function st(t,e){switch(e.type){case"START":return t.phase==="idle"||t.phase==="error"?{phase:"starting",notice:null,error:null}:t;case"STARTED":return t.phase==="starting"?{...t,phase:"recording"}:t;case"STOP":return t.phase==="recording"||t.phase==="starting"?{phase:"processing",notice:null,error:null}:t;case"CANCEL":return t.phase==="recording"||t.phase==="starting"?{...Y}:t;case"SUCCESS":case"NO_SPEECH":return t.phase!=="processing"?t:{phase:"idle",notice:e.type==="NO_SPEECH"?Jt:e.notice,error:null};case"CLEAR_NOTICE":return t.notice?{...t,notice:null}:t;case"FAILURE":return{phase:"error",notice:null,error:e.message}}}var Qt="Prompt Voice returned an unexpected response. Try again.",te="Dictation failed. Try again.",ee=4e3;function ne(t){return typeof t=="object"&&t!==null&&typeof t.ok=="boolean"}async function oe(t,e){let o=await t.call(q,{audio:e.base64,mimeType:e.mimeType});if(!ne(o))throw new Error(Qt);return o}function pt(t){return t instanceof Error&&t.message?t.message:te}function re(t,e,o){if(!t.ok){o({type:"FAILURE",message:t.message});return}if(t.status==="no-speech"){o({type:"NO_SPEECH"});return}e.updateText(s=>F(s,t.text)),e.focus();let i=t.refineNotice?`Inserted the raw transcript. ${t.refineNotice.message}`:"Added to draft.";o({type:"SUCCESS",notice:i})}function ie(t,e,o,i){return e()?(t.onError=s=>{e()&&i(s)},t.onAutoStop=()=>{e()&&o()},t):(t.cancel(),null)}function ae(t,e,o,i,s){let a=l=>s({type:"FAILURE",message:pt(l)});return t.then(l=>{let r=ie(l,o,i,b=>{e.current=null,a(b)});return r&&(e.current=r),r},l=>(o()&&a(l),null))}function se(t,e){let o=N(null),i=N(null),s=N(0),a=N(!0),l=E(()=>{s.current++,i.current=null,o.current&&(o.current.cancel(),o.current=null),e({type:"CANCEL"})},[e]);L(()=>(a.current=!0,()=>{a.current=!1,l()}),[l]);let r=E(async()=>{let h=i.current?await i.current:o.current;return o.current=null,h},[]),b=E(async h=>{let g=++s.current,v=()=>a.current&&s.current===g,w=ae(t(),o,v,h,e);i.current=w,await w&&v()&&e({type:"STARTED"}),i.current===w&&(i.current=null)},[e,t]),d=E(()=>a.current,[]),f=E(()=>o.current?.getAudioLevel?.()??null,[]);return{start:b,takeSession:r,cancel:l,isMounted:d,getAudioLevel:f}}function ct({startSession:t=O,noticeDurationMs:e=ee}={}){let o=V(),i=U(),[s,a]=it(st,Y),{start:l,takeSession:r,cancel:b,isMounted:d,getAudioLevel:f}=se(t,a),[h,g]=y(null),[v,w]=y(0),[_,S]=y(!1);L(()=>{if(s.phase!=="recording"){g(null),w(0);return}let I=Date.now(),x=()=>{g(f()),w(Math.floor((Date.now()-I)/1e3))};x();let T=setInterval(x,100);return()=>clearInterval(T)},[f,s.phase]),L(()=>{if(!s.notice)return;let I=setTimeout(()=>{a({type:"CLEAR_NOTICE"})},e);return()=>clearTimeout(I)},[e,s.notice]);let P=E(()=>{a({type:"CLEAR_NOTICE"})},[]),k=E(async()=>{a({type:"STOP"});let I=await r();if(!(!d()||!I))try{let x=await I.stop();if(!d())return;let T=await oe(i,x);if(!d())return;re(T,o,a)}catch(x){if(!d())return;a({type:"FAILURE",message:pt(x)})}},[o,d,i,r]),R=E(async()=>{S(!1),a({type:"START"}),await l(()=>{S(!0),k()})},[k,l]),j=E(()=>{s.phase==="recording"||s.phase==="starting"?k():s.phase!=="processing"&&R()},[R,k,s.phase]);return{phase:s.phase,error:s.error,notice:s.notice,level:h,seconds:v,autoStopped:_,onClick:j,cancel:b,clearNotice:P,beginDictation:R,finishDictation:k}}var W=`/* Base Container */
+.pv-mic {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  box-sizing: border-box;
+  vertical-align: middle;
+  background: transparent;
+  border: none;
+  user-select: none;
+  position: relative;
+}
+
+.pv-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Base button reset */
+.pv-mic-button {
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.pv-mic-button:focus-visible {
+  outline: 2px solid var(--focus-ring, #4a90e2);
+  outline-offset: 2px;
+}
+
+.pv-mic-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Dictation Pill Container: shared morphing capsule across all phases */
+.pv-dictation-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--pv-pill-bg, #181920);
+  border: 1px solid var(--pv-pill-border, rgba(239, 68, 68, 0.35));
+  transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s ease,
+              box-shadow 0.25s ease,
+              background 0.25s ease,
+              padding 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+/* 1. Idle: Oval Capsule Pill with Signature Crimson Border containing only the mic icon */
+.pv-mic.pv-phase-idle {
+  width: 58px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--pv-pill-bg, #181920);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.12);
+  padding: 0;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pv-mic.pv-phase-idle:hover {
+  background: #20222c;
+  border-color: rgba(239, 68, 68, 0.75);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.28);
+  transform: scale(1.04);
+}
+
+.pv-mic.pv-phase-idle:active {
+  transform: scale(0.97);
+}
+
+.pv-mic.pv-phase-idle .pv-idle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--text-secondary, #cbd5e1);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.pv-mic.pv-phase-idle:hover .pv-idle-icon {
+  color: #ffffff;
+}
+
+/* 2. Starting Oval: extends smoothly */
+.pv-mic.pv-phase-starting {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(234, 179, 8, 0.45);
+  box-shadow: 0 0 14px rgba(234, 179, 8, 0.15);
+  padding: 0 4px 0 10px;
+  gap: 10px;
+}
+
+/* 3. Recording / Listening Oval: extends with red glow */
+.pv-mic.pv-phase-recording {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.18), 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: 0 4px 0 10px;
+  gap: 10px;
+}
+
+/* 4. Processing Oval */
+.pv-mic.pv-phase-processing {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
+  padding: 0 6px 0 10px;
+  gap: 10px;
+}
+
+/* 5. Notice Oval: same control showing completion */
+.pv-mic.pv-has-notice {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.15);
+  padding: 0 14px 0 12px;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.pv-mic.pv-has-notice:hover {
+  border-color: rgba(34, 197, 94, 0.75);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.pv-notice-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: pv-notice-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pv-notice-check {
+  color: #4ade80;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+@keyframes pv-notice-enter {
+  from { opacity: 0; transform: scale(0.96) translateX(-3px); }
+  to { opacity: 1; transform: scale(1) translateX(0); }
+}
+
+/* Flex ordering for active pill children */
+.pv-mic-active .pv-pill-timer-badge {
+  order: 1;
+}
+
+.pv-mic-active .pv-pill-center {
+  order: 2;
+}
+
+.pv-mic-active .pv-mic-button.pv-pill-btn-stop {
+  order: 3;
+}
+
+.pv-mic-active .pv-pill-btn-cancel {
+  order: 4;
+}
+
+/* Timer Badge */
+.pv-pill-timer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 9999px;
+  padding: 2px 8px 2px 6px;
+}
+
+.pv-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger-color, #ef4444);
+  box-shadow: 0 0 8px var(--danger-color, #ef4444);
+  animation: pv-pulse-dot 1.4s ease-in-out infinite;
+}
+
+.pv-pill-dot-starting {
+  background: #eab308;
+  box-shadow: 0 0 8px #eab308;
+}
+
+@keyframes pv-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.pv-pill-timer-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  letter-spacing: 0.02em;
+}
+
+/* Center area */
+.pv-pill-center {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pv-pill-waveform {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 16px;
+}
+
+.pv-pill-waveform-bar {
+  width: 3px;
+  background: #38bdf8;
+  border-radius: 9999px;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+  transition: height 0.08s ease;
+  min-height: 3px;
+  height: 5px;
+}
+
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(1) { animation: pv-wave 0.8s ease-in-out infinite alternate; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(2) { animation: pv-wave 0.6s ease-in-out infinite alternate 0.15s; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(3) { animation: pv-wave 0.7s ease-in-out infinite alternate 0.3s; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(4) { animation: pv-wave 0.5s ease-in-out infinite alternate 0.2s; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(5) { animation: pv-wave 0.9s ease-in-out infinite alternate 0.05s; }
+
+@keyframes pv-wave {
+  0% { height: 4px; }
+  100% { height: 14px; }
+}
+
+.pv-pill-status {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.pv-mic-quiet-warning {
+  font-size: 11px;
+  color: #fbbf24;
+}
+
+/* Stop button inside active pill */
+.pv-mic-button.pv-pill-btn-stop {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #f87171;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.pv-mic-button.pv-pill-btn-stop:hover {
+  background: rgba(239, 68, 68, 0.38);
+  border-color: rgba(239, 68, 68, 0.8);
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Cancel button inside active pill */
+.pv-pill-btn-cancel {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.pv-pill-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f1f5f9;
+  transform: scale(1.05);
+}
+
+/* Spinner */
+.pv-mic-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: pv-spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes pv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error styles */
+.pv-mic.pv-phase-error {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+  padding: 0 10px;
+}
+
+.pv-mic-error {
+  color: var(--danger-color, #ef4444);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-pill-waveform.animated .pv-pill-waveform-bar { animation: none; height: 8px; }
+  .pv-pill-waveform-bar { transition: none; }
+  .pv-mic-spinner { animation: none; }
 }
 
 \`
