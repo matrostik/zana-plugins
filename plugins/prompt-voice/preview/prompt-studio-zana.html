@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Zana // Prompt Studio (Vertical Stack: Input Top, Output Bottom)</title>
+<style>
+  :root {
+    --bg-base: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-header: #202021;
+    --bg-subtle: rgba(255, 255, 255, 0.04);
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --bg-active: rgba(255, 255, 255, 0.1);
+    --bg-selected: color-mix(in srgb, var(--accent) 22%, transparent);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text-primary: #e6edf3;
+    --text-muted: #8a8a8a;
+    --accent: #007acc;
+    --accent-hover: #0098ff;
+    --danger: #e5534b;
+    --warn: #d29922;
+    --success: #3fb950;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ─── Top Demo Mode Switcher Bar ────────────────────────────────────────── */
+  .proposal-bar {
+    background: #181819;
+    border-bottom: 1px solid var(--border-strong);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+  .proposal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+  }
+  .proposal-tag {
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
+    color: #93c5fd;
+    border: 1px solid var(--accent);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .proposal-modes {
+    display: flex;
+    gap: 6px;
+  }
+  .proposal-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .proposal-btn:hover { background: var(--bg-hover); }
+  .proposal-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* ─── Zana Native Buttons ──────────────────────────────────────────────── */
+  .z-btn {
+    appearance: none;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    font-family: inherit;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+  }
+  .z-btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
+  .z-btn:disabled { opacity: 0.45; cursor: default; }
+  .z-btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  .z-btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  .z-btn-success {
+    background: #238636;
+    border-color: rgba(255,255,255,0.2);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  .z-btn-success:hover:not(:disabled) { background: #2ea043; }
+  .z-btn-danger {
+    background: rgba(229, 83, 75, 0.15);
+    border-color: var(--danger);
+    color: #fca5a5;
+  }
+  .z-btn-danger:hover:not(:disabled) { background: rgba(229, 83, 75, 0.25); }
+  .z-btn-sm {
+    height: 24px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  /* ─── Main Top Toolbar ─────────────────────────────────────────────────── */
+  .ps-toolbar {
+    height: 40px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .ps-brand {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-primary);
+  }
+  .ps-brand-badge {
+    font-size: 11px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--text-muted);
+  }
+  .ps-spacer { flex: 1; }
+
+  /* ─── Workspace Layout (Side Controls + Vertical Stack Center) ────────── */
+  .ps-workspace {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Left Sidebar: Audio & Refinement Config */
+  .ps-sidebar {
+    width: 290px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .ps-section {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ps-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Dictation Card */
+  .ps-dictation-card {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ps-mic-btn {
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid var(--danger);
+    background: rgba(229, 83, 75, 0.12);
+    color: #fca5a5;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .ps-mic-btn:hover { background: rgba(229, 83, 75, 0.22); }
+  .ps-mic-btn.recording {
+    background: var(--danger);
+    color: #fff;
+    animation: pulse-border 1.5s infinite;
+  }
+  @keyframes pulse-border {
+    0% { box-shadow: 0 0 0 0 rgba(229, 83, 75, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(229, 83, 75, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(229, 83, 75, 0); }
+  }
+  .ps-audio-meter {
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .ps-audio-bar {
+    height: 100%;
+    width: 0%;
+    background: #3fb950;
+    border-radius: 3px;
+    transition: width 0.1s linear;
+  }
+
+  /* Presets List */
+  .ps-presets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .ps-preset-item {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 9px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ps-preset-item:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+  }
+  .ps-preset-item.active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .ps-preset-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ps-preset-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .ps-preset-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.3;
+  }
+
+  /* Custom Instructions */
+  .ps-instructions-input {
+    width: 100%;
+    background: var(--bg-base);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    color: var(--text-primary);
+    padding: 7px 9px;
+    font-size: 12px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 65px;
+    outline: none;
+    line-height: 1.4;
+  }
+  .ps-instructions-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  /* ─── Vertical Stack: Input (Top) & Output (Bottom) ─────────────────────── */
+  .ps-stack-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--bg-base);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Spec Title Sub-header */
+  .ps-stack-header {
+    padding: 7px 16px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .ps-title-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: inherit;
+    padding: 2px 4px;
+  }
+  .ps-title-field:focus {
+    background: var(--bg-panel);
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--border-strong);
+  }
+
+  /* Panes Container (Vertical Flex Column) */
+  .ps-vertical-panes {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Top Section: Raw Input (approx 42% height) */
+  .ps-section-input {
+    flex: 0 0 42%;
+    display: flex;
+    flex-direction: column;
+    min-height: 140px;
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  /* Mid Action Bar (Divider + Trigger) */
+  .ps-mid-action-bar {
+    height: 36px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    flex-shrink: 0;
+    z-index: 5;
+  }
+  .ps-mid-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .ps-mid-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Bottom Section: Refined Output (approx 58% height) */
+  .ps-section-output {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 180px;
+    background: var(--bg-base);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Pane Headers */
+  .ps-pane-header {
+    height: 32px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .ps-pane-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 600;
+  }
+  .ps-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+  .ps-badge-input {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+  }
+  .ps-badge-output {
+    background: rgba(63, 185, 80, 0.15);
+    color: #7ee787;
+    border: 1px solid rgba(63, 185, 80, 0.3);
+  }
+
+  /* Pane Toolbar Actions */
+  .ps-pane-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Input Editor Area */
+  .ps-input-textarea {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    color: var(--text-primary);
+    border: none;
+    outline: none;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    font-family: var(--font-sans);
+    resize: none;
+    overflow-y: auto;
+  }
+  .ps-input-textarea::placeholder {
+    color: #64748b;
+  }
+
+  /* Output View / Render Area */
+  .ps-output-scroll {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    user-select: text;
+  }
+  .ps-output-empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 24px;
+  }
+
+  /* Diff Highlighting */
+  .diff-add {
+    background: rgba(46, 160, 67, 0.22);
+    color: #7ee787;
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+  .diff-del {
+    background: rgba(229, 83, 75, 0.22);
+    color: #fca5a5;
+    text-decoration: line-through;
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+
+  /* ─── Bottom IDE Status Bar ────────────────────────────────────────────── */
+  .ps-statusbar {
+    height: 26px;
+    background: var(--bg-header);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 11px;
+    color: var(--text-muted);
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .ps-status-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ps-kbd {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-strong);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+
+  <!-- Demo Mode Switcher Bar -->
+  <div class="proposal-bar">
+    <div class="proposal-title">
+      <span>Zana Prompt Studio</span>
+      <span class="proposal-tag">Vertical Stack</span>
+      <span style="color: var(--text-muted);">Top Input ➔ Bottom Refined Output</span>
+    </div>
+    <div class="proposal-modes">
+      <button class="proposal-btn active" onclick="switchState('populated', this)">1. Populated (Input Top + Output Bottom)</button>
+      <button class="proposal-btn" onclick="switchState('empty', this)">2. Initial (Empty Output)</button>
+      <button class="proposal-btn" onclick="switchState('diff', this)">3. Diff View in Output</button>
+      <button class="proposal-btn" onclick="switchState('dictate', this)">4. Voice Dictating to Top</button>
+    </div>
+  </div>
+
+  <!-- Main Top Toolbar -->
+  <header class="ps-toolbar">
+    <div class="ps-brand">
+      <span>✨</span>
+      <span>Prompt Studio</span>
+      <span class="ps-brand-badge">Vertical Workflow</span>
+    </div>
+
+    <div class="ps-spacer"></div>
+
+    <button class="z-btn" onclick="clearCanvas()">
+      <span>🗑️</span> Clear All
+    </button>
+    <button class="z-btn z-btn-primary" onclick="insertComposer()">
+      <span>💬</span> Insert Output into Composer
+    </button>
+  </header>
+
+  <!-- Workspace -->
+  <div class="ps-workspace">
+
+    <!-- Left Controls Sidebar -->
+    <aside class="ps-sidebar">
+
+      <!-- Voice Dictation Card -->
+      <section class="ps-section">
+        <div class="ps-section-title">
+          <span>Voice Dictation</span>
+          <span style="font-size: 10px; color: var(--text-muted);">Host STT</span>
+        </div>
+        <div class="ps-dictation-card">
+          <button class="ps-mic-btn" id="mic-toggle-btn" onclick="toggleMic()">
+            <span id="mic-icon">🎙️</span>
+            <span id="mic-label">Dictate into Top Input</span>
+          </button>
+          <div class="ps-audio-meter">
+            <div class="ps-audio-bar" id="audio-bar"></div>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted);" id="mic-hint">
+            Speaks into Raw Input above. Transcribed with Zana host voice.
+          </span>
+        </div>
+      </section>
+
+      <!-- Presets & Refinement Goals -->
+      <section class="ps-section">
+        <div class="ps-section-title">
+          <span>Refinement Presets</span>
+          <span style="font-size: 10px; color: var(--text-muted);">Instant apply</span>
+        </div>
+        <div class="ps-presets-list">
+          <div class="ps-preset-item active" onclick="selectPreset('clarity', this)">
+            <div class="ps-preset-header">
+              <span class="ps-preset-name">✨ Polish Clarity</span>
+            </div>
+            <span class="ps-preset-desc">Removes filler words, cleans grammar, sharpens intent.</span>
+          </div>
+          <div class="ps-preset-item" onclick="selectPreset('brief', this)">
+            <div class="ps-preset-header">
+              <span class="ps-preset-name">⚡ Executive Brief</span>
+            </div>
+            <span class="ps-preset-desc">3-bullet summary + immediate action checklist.</span>
+          </div>
+          <div class="ps-preset-item" onclick="selectPreset('spec', this)">
+            <div class="ps-preset-header">
+              <span class="ps-preset-name">📐 Tech Spec RFC</span>
+            </div>
+            <span class="ps-preset-desc">Formats into Overview, Architecture, Data Flow & Tradeoffs.</span>
+          </div>
+          <div class="ps-preset-item" onclick="selectPreset('friendly', this)">
+            <div class="ps-preset-header">
+              <span class="ps-preset-name">💬 Friendly Chat</span>
+            </div>
+            <span class="ps-preset-desc">Warm, collaborative tone for PR reviews & Slack.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Custom AI Instructions -->
+      <section class="ps-section" style="border-bottom: none;">
+        <div class="ps-section-title">
+          <span>Custom Instructions</span>
+          <span class="ps-kbd">Ctrl+K</span>
+        </div>
+        <textarea
+          id="custom-instruction"
+          class="ps-instructions-input"
+          placeholder="E.g., Format as markdown with code examples, or restrict response to 150 words..."
+        ></textarea>
+        <div style="margin-top: 10px;">
+          <button class="z-btn z-btn-primary" style="width: 100%; height: 32px;" onclick="runRefine()">
+            <span>✨</span> Refine Prompt (<span style="opacity:0.8;">Ctrl+Enter</span>)
+          </button>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Center Vertical Stack: TOP INPUT, BOTTOM OUTPUT -->
+    <main class="ps-stack-workspace">
+
+      <!-- Spec Title & Summary Sub-header -->
+      <div class="ps-stack-header">
+        <input type="text" class="ps-title-field" value="Auth Middleware Spec" placeholder="Untitled Prompt Spec..." />
+        <span style="font-size: 11px; color: var(--text-muted);" id="stats-summary">Input: 42 words · Output: 88 words</span>
+      </div>
+
+      <!-- Vertical Panes -->
+      <div class="ps-vertical-panes">
+
+        <!-- TOP PANE: RAW INPUT -->
+        <section class="ps-section-input">
+          <div class="ps-pane-header">
+            <div class="ps-pane-title">
+              <span class="ps-badge ps-badge-input">Input</span>
+              <span>Raw Draft / Speech</span>
+            </div>
+            <div class="ps-pane-actions">
+              <span style="font-size: 11px; color: var(--text-muted);" id="input-word-count">42 words · 284 chars</span>
+              <button class="z-btn z-btn-sm" onclick="copyInput()">📋 Copy</button>
+              <button class="z-btn z-btn-sm" onclick="clearInput()">Clear</button>
+            </div>
+          </div>
+          <textarea
+            class="ps-input-textarea"
+            id="raw-input-textarea"
+            placeholder="Type your raw prompt thoughts here, paste notes, or use the Dictate button on the left to speak..."
+          >We need to refactor the authentication middleware. Right now it just checks cookies directly in every route which is messy and duplicates token decoding logic.
+
+We should centralize token validation in a single handler, support both Bearer authorization headers and session cookies, and return typed user claims to the request context.</textarea>
+        </section>
+
+        <!-- MIDDLE ACTION BAR: TRANSFORM TRIGGER & DIVIDER -->
+        <div class="ps-mid-action-bar">
+          <div class="ps-mid-info">
+            <span>⬇ Transform Input into Prompt Spec</span>
+          </div>
+          <div class="ps-mid-actions">
+            <button class="z-btn z-btn-sm z-btn-primary" onclick="runRefine()">
+              <span>✨ Refine Now (Ctrl+Enter)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- BOTTOM PANE: REFINED OUTPUT -->
+        <section class="ps-section-output">
+          <div class="ps-pane-header">
+            <div class="ps-pane-title">
+              <span class="ps-badge ps-badge-output">Output</span>
+              <span id="output-header-title">Refined Spec (Ready)</span>
+            </div>
+            <div class="ps-pane-actions">
+              <button class="z-btn z-btn-sm" id="view-diff-btn" onclick="toggleDiffView()">
+                <span id="diff-toggle-icon">🔍</span> <span id="diff-toggle-label">View Diff</span>
+              </button>
+              <button class="z-btn z-btn-sm" onclick="copyOutput()">
+                <span id="copy-out-icon">📋</span> <span id="copy-out-label">Copy Output</span>
+              </button>
+              <button class="z-btn z-btn-sm z-btn-success" onclick="applyOutputToInput()" title="Copy refined text back up to input for further iteration">
+                <span>⬆ Replace Input</span>
+              </button>
+            </div>
+          </div>
+          <div style="flex: 1; overflow-y: auto; position: relative;" id="output-pane-content">
+            <div class="ps-output-scroll" id="output-scroll-body">## Authentication Middleware Refactor
+
+### Objective
+Centralize authentication and token verification across all API routes to eliminate duplicated decoding logic and establish typed session claims.
+
+### Key Requirements
+1. **Unified Token Handler**: Validate JWT tokens through a single, reusable middleware pipeline.
+2. **Dual Auth Support**: Transparently accept both `Authorization: Bearer <token>` headers and secure session cookies.
+3. **Context Hydration**: Attach strongly-typed `UserClaims` to the active request context for downstream handlers.
+4. **Security & Validation**: Ensure standard error responses (401 Unauthorized, 403 Forbidden) with structured error envelopes.</div>
+          </div>
+        </section>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Bottom Status Bar -->
+  <footer class="ps-statusbar">
+    <div class="ps-status-item">
+      <span>●</span>
+      <span>Auto-saved locally</span>
+    </div>
+    <div class="ps-status-item">
+      <span>Model:</span>
+      <span style="color: var(--text-primary);">Active Thread Agent</span>
+    </div>
+    <div class="ps-spacer"></div>
+    <div class="ps-status-item">
+      <span>Shortcuts:</span>
+      <span class="ps-kbd">Ctrl+K</span> Focus Prompt
+      <span class="ps-kbd">Ctrl+Enter</span> Refine
+      <span class="ps-kbd">Ctrl+Shift+C</span> Copy Output
+    </div>
+  </footer>
+
+  <script>
+    let micRecording = false;
+    let meterInterval = null;
+    let isDiffActive = false;
+
+    const sampleInput = `We need to refactor the authentication middleware. Right now it just checks cookies directly in every route which is messy and duplicates token decoding logic.
+
+We should centralize token validation in a single handler, support both Bearer authorization headers and session cookies, and return typed user claims to the request context.`;
+
+    const sampleOutput = `## Authentication Middleware Refactor
+
+### Objective
+Centralize authentication and token verification across all API routes to eliminate duplicated decoding logic and establish typed session claims.
+
+### Key Requirements
+1. **Unified Token Handler**: Validate JWT tokens through a single, reusable middleware pipeline.
+2. **Dual Auth Support**: Transparently accept both \`Authorization: Bearer <token>\` headers and secure session cookies.
+3. **Context Hydration**: Attach strongly-typed \`UserClaims\` to the active request context for downstream handlers.
+4. **Security & Validation**: Ensure standard error responses (401 Unauthorized, 403 Forbidden) with structured error envelopes.`;
+
+    const diffHtml = `
+      <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; font-weight: 600;">Diff against raw input:</div>
+      <span class="diff-del">We need to refactor the authentication middleware. Right now it just checks cookies directly in every route which is messy and duplicates token decoding logic.</span>
+      <br/><br/>
+      <span class="diff-add">## Authentication Middleware Refactor</span><br/>
+      <span class="diff-add">### Objective</span><br/>
+      <span class="diff-add">Centralize authentication and token verification across all API routes to eliminate duplicated decoding logic and establish typed session claims.</span>
+      <br/><br/>
+      <span class="diff-del">We should centralize token validation in a single handler, support both Bearer authorization headers and session cookies, and return typed user claims to the request context.</span>
+      <br/><br/>
+      <span class="diff-add">### Key Requirements</span><br/>
+      <span class="diff-add">1. **Unified Token Handler**: Validate JWT tokens through a single, reusable middleware pipeline.</span><br/>
+      <span class="diff-add">2. **Dual Auth Support**: Transparently accept both Authorization: Bearer headers and session cookies.</span><br/>
+      <span class="diff-add">3. **Context Hydration**: Attach strongly-typed UserClaims to the active request context.</span>
+    `;
+
+    function switchState(state, btn) {
+      if (btn) {
+        document.querySelectorAll('.proposal-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+
+      const inputArea = document.getElementById('raw-input-textarea');
+      const outputArea = document.getElementById('output-pane-content');
+
+      if (state === 'populated') {
+        stopMic();
+        isDiffActive = false;
+        inputArea.value = sampleInput;
+        outputArea.innerHTML = `<div class="ps-output-scroll">\${sampleOutput}</div>`;
+        document.getElementById('output-header-title').textContent = 'Refined Spec (Ready)';
+        document.getElementById('diff-toggle-label').textContent = 'View Diff';
+        document.getElementById('diff-toggle-icon').textContent = '🔍';
+      } else if (state === 'empty') {
+        stopMic();
+        isDiffActive = false;
+        inputArea.value = sampleInput;
+        outputArea.innerHTML = `
+          <div class="ps-output-empty">
+            <span style="font-size: 26px; opacity: 0.5;">✨</span>
+            <div style="font-weight: 500; font-size: 13px; color: var(--text-primary);">No Refined Output Yet</div>
+            <div style="font-size: 12px; max-width: 320px; line-height: 1.4;">
+              Type your raw thoughts above or speak, then click <strong>Refine Now</strong> or select a preset on the left.
+            </div>
+            <button class="z-btn z-btn-primary" style="margin-top: 4px;" onclick="runRefine()">
+              <span>✨</span> Refine Prompt Now
+            </button>
+          </div>
+        `;
+        document.getElementById('output-header-title').textContent = 'Waiting for Refinement';
+      } else if (state === 'diff') {
+        stopMic();
+        isDiffActive = true;
+        inputArea.value = sampleInput;
+        outputArea.innerHTML = `<div class="ps-output-scroll">\${diffHtml}</div>`;
+        document.getElementById('output-header-title').textContent = 'Diff Inspection View';
+        document.getElementById('diff-toggle-label').textContent = 'View Clean';
+        document.getElementById('diff-toggle-icon').textContent = '👁️';
+      } else if (state === 'dictate') {
+        startMic();
+        inputArea.value = sampleInput + ' ...listening for speech...';
+      }
+    }
+
+    function toggleDiffView() {
+      if (isDiffActive) {
+        switchState('populated');
+      } else {
+        switchState('diff');
+      }
+    }
+
+    function toggleMic() {
+      if (micRecording) {
+        stopMic();
+      } else {
+        startMic();
+      }
+    }
+
+    function startMic() {
+      micRecording = true;
+      const btn = document.getElementById('mic-toggle-btn');
+      btn.classList.add('recording');
+      document.getElementById('mic-label').textContent = 'Listening (0:04)...';
+      document.getElementById('mic-icon').textContent = '⏹️';
+      document.getElementById('mic-hint').textContent = 'Recording speech. Transcribing live into top input pane...';
+
+      const bar = document.getElementById('audio-bar');
+      clearInterval(meterInterval);
+      meterInterval = setInterval(() => {
+        const pct = Math.floor(Math.random() * 70) + 20;
+        bar.style.width = pct + '%';
+      }, 120);
+    }
+
+    function stopMic() {
+      micRecording = false;
+      const btn = document.getElementById('mic-toggle-btn');
+      btn.classList.remove('recording');
+      document.getElementById('mic-label').textContent = 'Dictate into Top Input';
+      document.getElementById('mic-icon').textContent = '🎙️';
+      document.getElementById('mic-hint').textContent = 'Speaks into Raw Input above. Transcribed with Zana host voice.';
+      clearInterval(meterInterval);
+      document.getElementById('audio-bar').style.width = '0%';
+    }
+
+    function selectPreset(id, el) {
+      document.querySelectorAll('.ps-preset-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+      runRefine();
+    }
+
+    function runRefine() {
+      switchState('populated');
+    }
+
+    function copyInput() {
+      const text = document.getElementById('raw-input-textarea').value;
+      navigator.clipboard.writeText(text);
+      alert('Input draft copied to clipboard!');
+    }
+
+    function clearInput() {
+      document.getElementById('raw-input-textarea').value = '';
+    }
+
+    function copyOutput() {
+      navigator.clipboard.writeText(sampleOutput);
+      const icon = document.getElementById('copy-out-icon');
+      const label = document.getElementById('copy-out-label');
+      icon.textContent = '✓';
+      label.textContent = 'Copied!';
+      setTimeout(() => {
+        icon.textContent = '📋';
+        label.textContent = 'Copy Output';
+      }, 2000);
+    }
+
+    function applyOutputToInput() {
+      document.getElementById('raw-input-textarea').value = sampleOutput;
+      alert('Replaced top input draft with bottom refined output for further iteration.');
+    }
+
+    function clearCanvas() {
+      if (confirm('Clear both input and output?')) {
+        document.getElementById('raw-input-textarea').value = '';
+        switchState('empty');
+      }
+    }
+
+    function insertComposer() {
+      alert('Inserted Refined Output directly into active Zana thread composer!');
+    }
+  </script>
+</body>
+</html>
