@@ -69,6 +69,7 @@ export async function transcribeHandler(request: unknown, deps: HandlerDeps): Pr
 
   try {
     const settings = settingsForRequest(await deps.readSettings(), requestRecord);
+    if (requestRecord.transcriptionOnly === true) settings.llmProvider = 'none';
     return await runDictation(audio, settings, {
       fetch: deps.fetch,
       log: deps.log,
