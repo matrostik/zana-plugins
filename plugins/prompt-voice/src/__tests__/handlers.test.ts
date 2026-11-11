@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { statusFromSettings, transcribeHandler } from '../server/handlers.ts';
+import { availableModelsHandler, mergeCatalogModels, statusFromSettings, transcribeHandler } from '../server/handlers.ts';
 import { PromptVoiceError } from '../server/errors.ts';
 
 const VALID_REQUEST = { audio: Buffer.from('audio').toString('base64'), mimeType: 'audio/webm' };
@@ -105,5 +105,49 @@ describe('statusFromSettings', () => {
       openaiApiKey: 'sk-key'
     });
     expect(status).toMatchObject({ sttKeyConfigured: true, llmKeyConfigured: true });
+  });
+});
+
+describe('mergeCatalogModels', () => {
+  it('merges models and selectedOnlyModels into unique list', () => {
+    const models = mergeCatalogModels({
+      models: [{ id: 'm1', model: 'Model One' }],
+      selectedOnlyModels: [{ id: 'm1', model: 'Model One Dup' }, { id: 'm2', model: 'Model Two' }]
+    });
+    expect(models).toEqual([
+      { id: 'm1', label: 'Model One' },
+      { id: 'm2', label: 'Model Two' }
+    ]);
+  });
+
+  it('handles empty or malformed catalog objects gracefully', () => {
+    expect(mergeCatalogModels(null)).toEqual([]);
+    expect(mergeCatalogModels({})).toEqual([]);
+    expect(mergeCatalogModels({ models: [{ id: '' }] })).toEqual([]);
+  });
+});
+
+describe('availableModelsHandler', () => {
+  it('returns assistant and discovered models from host providers', async () => {
+    const res = await availableModelsHandler({
+      readSettings: async () => ({}),
+      providers: {
+        list: async () => [{ id: 'antigravity', displayName: 'Antigravity ACP' }],
+        models: async () => ({
+          models: [{ id: 'gemini-2.5-flash', model: 'Gemini 2.5 Flash' }]
+        })
+      }
+    });
+
+    expect(res).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ providerId: 'assistant' }),
+        expect.objectContaining({
+          providerId: 'antigravity',
+          displayName: 'Antigravity ACP',
+          models: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }]
+        })
+      ])
+    );
   });
 });

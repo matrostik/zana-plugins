@@ -1,11 +1,11 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import { describeUnexpectedFailure } from './src/server/errors.ts';
 import { SETTING_DESCRIPTORS } from './src/server/settings.ts';
-import { rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
+import { availableModelsHandler, rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
 import type { FetchLike } from './src/server/http.ts';
 import type { AssistantApi } from './src/server/llm/providers.ts';
 import { resolveServerUrl } from './src/server/stt/providers.ts';
-import { REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
+import { AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
 
 export interface PromptVoiceDeps {
   /** Injected in tests. Defaults to the runtime's global fetch. */
@@ -13,7 +13,7 @@ export interface PromptVoiceDeps {
   serverUrl?: string;
   assistant?: AssistantApi;
   providers?: {
-    list(args?: unknown): Promise<Array<{ id: string }>>;
+    list(args?: unknown): Promise<Array<{ id: string; available?: boolean; displayName?: string }>>;
     models(args: { providerId: string }): Promise<unknown>;
   };
 }
@@ -69,4 +69,12 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       : [];
     return statusFromSettings(raw, available.map((p) => p.id));
   });
+
+  zcc.rpc.method(AVAILABLE_MODELS_METHOD, () =>
+    availableModelsHandler({
+      readSettings,
+      providers,
+      log: zcc.log
+    })
+  );
 }

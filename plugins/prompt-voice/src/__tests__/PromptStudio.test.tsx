@@ -7,11 +7,13 @@ import type { RecordedAudio, RecordingSession } from '../app/recorder.ts';
 const fakes = vi.hoisted(() => ({
   updateText: vi.fn(),
   focus: vi.fn(),
-  call: vi.fn()
+  call: vi.fn(),
+  composerView: vi.fn(() => ({ providerId: 'assistant', familyId: 'assistant' }))
 }));
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
   useComposer: () => ({ updateText: fakes.updateText, focus: fakes.focus }),
+  useComposerView: () => fakes.composerView(),
   useRpc: () => ({ call: fakes.call }),
   useZccNavigate: () => vi.fn()
 }));
@@ -60,6 +62,9 @@ describe('PromptStudio Component', () => {
       if (method === 'promptVoice.status') {
         return { llmProvider: 'assistant', sttProvider: 'system' };
       }
+      if (method === 'promptVoice.availableModels') {
+        return [];
+      }
       if (method === 'promptVoice.rephrase') {
         return {
           ok: true,
@@ -74,11 +79,13 @@ describe('PromptStudio Component', () => {
     });
 
     render(<PromptStudio />);
-    const select = screen.getByRole('combobox', { name: /refinement model/i });
-    expect(select).toBeTruthy();
+    const providerSelect = screen.getByRole('combobox', { name: /refinement provider/i });
+    expect(providerSelect).toBeTruthy();
+    fireEvent.change(providerSelect, { target: { value: 'openai' } });
 
-    // Change model to OpenAI GPT-5.6 Luna
-    fireEvent.change(select, { target: { value: 'openai-smart' } });
+    const modelSelect = screen.getByRole('combobox', { name: /refinement model/i });
+    expect(modelSelect).toBeTruthy();
+    fireEvent.change(modelSelect, { target: { value: 'openai-smart' } });
 
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
@@ -96,9 +103,62 @@ describe('PromptStudio Component', () => {
     );
   });
 
+  it('dynamically loads host provider models and syncs with composer', async () => {
+    fakes.composerView.mockReturnValue({ providerId: 'antigravity', familyId: 'gemini' });
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.availableModels') {
+        return [
+          {
+            providerId: 'assistant',
+            displayName: 'Zana Assistant',
+            models: [{ id: 'assistant', label: 'Default Assistant' }]
+          },
+          {
+            providerId: 'antigravity',
+            displayName: 'Antigravity ACP',
+            models: [{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }]
+          }
+        ];
+      }
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.rephrase') {
+        return {
+          ok: true,
+          rawText: 'Write a quick spec',
+          text: 'Refined spec by Antigravity',
+          llmProvider: 'antigravity',
+          llmModel: 'gemini-2.5-pro',
+          durationMs: 150
+        };
+      }
+      return {};
+    });
+
+    render(<PromptStudio />);
+    // Should show composer match badge
+    expect(await screen.findByText(/synced to composer/i)).toBeTruthy();
+
+    const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
+    fireEvent.change(textarea, { target: { value: 'Write a quick spec' } });
+
+    const refineBtn = screen.getByRole('button', { name: /refine now/i });
+    fireEvent.click(refineBtn);
+
+    expect(await screen.findByText('Refined spec by Antigravity')).toBeTruthy();
+    expect(fakes.call).toHaveBeenCalledWith(
+      'promptVoice.rephrase',
+      expect.objectContaining({
+        llmProvider: 'antigravity',
+        llmModel: 'gemini-2.5-pro'
+      })
+    );
+  });
+
   it('runs a preset refinement and displays output in bottom pane', async () => {
+    fakes.composerView.mockReturnValue({ providerId: 'assistant', familyId: 'assistant' });
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') return [];
       if (method === 'promptVoice.rephrase') {
         return {
           ok: true,
@@ -121,12 +181,14 @@ describe('PromptStudio Component', () => {
 
     expect(await screen.findByText('Resolve defect in authentication service.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /view diff/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /copy output/i })).toBeTruthy();
+    expect(screen.getByTitle('Copy refined text to clipboard')).toBeTruthy();
   });
 
   it('allows toggling diff view in output pane', async () => {
+    fakes.composerView.mockReturnValue({ providerId: 'assistant', familyId: 'assistant' });
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') return [];
       if (method === 'promptVoice.rephrase') {
         return {
           ok: true,
@@ -152,11 +214,12 @@ describe('PromptStudio Component', () => {
   });
 
   it('inserts into composer when button is clicked', () => {
+    fakes.composerView.mockReturnValue({ providerId: 'assistant', familyId: 'assistant' });
     render(<PromptStudio />);
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Ready prompt' } });
 
-    const insertBtn = screen.getByRole('button', { name: /insert output into composer/i });
+    const insertBtn = screen.getByRole('button', { name: /insert into composer/i });
     fireEvent.click(insertBtn);
 
     expect(fakes.updateText).toHaveBeenCalled();
@@ -165,8 +228,10 @@ describe('PromptStudio Component', () => {
 
   it('supports voice dictation into the top input', async () => {
     const session = fakeSession();
+    fakes.composerView.mockReturnValue({ providerId: 'assistant', familyId: 'assistant' });
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') return [];
       if (method === 'promptVoice.transcribe') {
         return {
           ok: true,
@@ -179,49 +244,149 @@ describe('PromptStudio Component', () => {
     });
 
     render(<PromptStudio startSession={async () => session} />);
-    const micBtn = screen.getByRole('button', { name: /dictate into top input/i });
+    const dictateBtn = screen.getByRole('button', { name: /start dictation/i });
+    fireEvent.click(dictateBtn);
 
-    // Start recording
-    await act(async () => {
-      fireEvent.click(micBtn);
-    });
-    expect(screen.getByRole('button', { name: /listening/i })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /stop dictation/i })).toBeTruthy();
 
-    // Stop recording
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /listening/i }));
-    });
-
-    const textarea = screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement;
-    expect(textarea.value).toBe('spoken voice ideas');
+    fireEvent.click(screen.getByRole('button', { name: /stop dictation/i }));
+    expect(await screen.findByDisplayValue('spoken voice ideas')).toBeTruthy();
   });
 
-  it('replaces input with output when Replace Input is clicked', async () => {
+  it('pastes from clipboard into the input draft', async () => {
+    const mockClipboard = {
+      readText: vi.fn().mockResolvedValue('Pasted instructions from clipboard'),
+      writeText: vi.fn().mockResolvedValue(undefined)
+    };
+    Object.defineProperty(navigator, 'clipboard', {
+      value: mockClipboard,
+      writable: true,
+      configurable: true
+    });
+
+    render(<PromptStudio />);
+    const pasteBtn = screen.getByRole('button', { name: /paste into input draft/i });
+    expect(pasteBtn).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(pasteBtn);
+    });
+
+    expect(mockClipboard.readText).toHaveBeenCalled();
+    const textarea = screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement;
+    expect(textarea.value).toBe('Pasted instructions from clipboard');
+  });
+
+  it('appends clipboard text to existing input draft', async () => {
+    const mockClipboard = {
+      readText: vi.fn().mockResolvedValue('additional points'),
+      writeText: vi.fn().mockResolvedValue(undefined)
+    };
+    Object.defineProperty(navigator, 'clipboard', {
+      value: mockClipboard,
+      writable: true,
+      configurable: true
+    });
+
+    render(<PromptStudio />);
+    const textarea = screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'First draft' } });
+
+    const pasteBtn = screen.getByRole('button', { name: /paste into input draft/i });
+    await act(async () => {
+      fireEvent.click(pasteBtn);
+    });
+
+    expect(textarea.value).toBe('First draft additional points');
+  });
+
+  it('displays processing feedback while transcription is running', async () => {
+    const session = fakeSession();
+    let resolveTranscribe: (val: any) => void;
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
-      if (method === 'promptVoice.rephrase') {
-        return {
-          ok: true,
-          rawText: 'Raw notes',
-          text: 'Polished spec',
-          llmProvider: 'assistant',
-          llmModel: 'assistant',
-          durationMs: 100
-        };
+      if (method === 'promptVoice.availableModels') return [];
+      if (method === 'promptVoice.transcribe') {
+        return new Promise((resolve) => {
+          resolveTranscribe = resolve;
+        });
       }
       return {};
     });
 
+    render(<PromptStudio startSession={async () => session} />);
+    fireEvent.click(screen.getByRole('button', { name: /start dictation/i }));
+    expect(await screen.findByRole('button', { name: /stop dictation/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /stop dictation/i }));
+
+    const transcribingBtn = await screen.findByRole('button', { name: /transcribing audio/i });
+    expect(transcribingBtn).toBeTruthy();
+    expect(transcribingBtn.textContent).toContain('Transcribing...');
+
+    await act(async () => {
+      resolveTranscribe({
+        ok: true,
+        status: 'ok',
+        text: 'transcribed speech result'
+      });
+    });
+
+    expect(await screen.findByDisplayValue('transcribed speech result')).toBeTruthy();
+  });
+
+  it('copies input draft to clipboard with visual feedback', async () => {
+    const mockClipboard = {
+      writeText: vi.fn().mockResolvedValue(undefined),
+      readText: vi.fn().mockResolvedValue('')
+    };
+    Object.defineProperty(navigator, 'clipboard', {
+      value: mockClipboard,
+      writable: true,
+      configurable: true
+    });
+
     render(<PromptStudio />);
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
-    fireEvent.change(textarea, { target: { value: 'Raw notes' } });
+    fireEvent.change(textarea, { target: { value: 'Text to copy' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /polish clarity/i }));
-    await screen.findByText('Polished spec');
+    const copyBtn = screen.getByRole('button', { name: /copy raw input/i });
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
 
-    const replaceBtn = screen.getByRole('button', { name: /replace input/i });
-    fireEvent.click(replaceBtn);
+    expect(mockClipboard.writeText).toHaveBeenCalledWith('Text to copy');
+    expect((await screen.findAllByText(/copied/i)).length).toBeGreaterThanOrEqual(1);
+  });
 
-    expect((textarea as HTMLTextAreaElement).value).toBe('Polished spec');
+  it('falls back to execCommand when navigator.clipboard.writeText fails', async () => {
+    const mockClipboard = {
+      writeText: vi.fn().mockRejectedValue(new Error('Permission denied')),
+      readText: vi.fn().mockResolvedValue('')
+    };
+    Object.defineProperty(navigator, 'clipboard', {
+      value: mockClipboard,
+      writable: true,
+      configurable: true
+    });
+
+    const execCommandSpy = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, 'execCommand', {
+      value: execCommandSpy,
+      writable: true,
+      configurable: true
+    });
+
+    render(<PromptStudio />);
+    const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
+    fireEvent.change(textarea, { target: { value: 'Fallback text' } });
+
+    const copyBtn = screen.getByRole('button', { name: /copy raw input/i });
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+
+    expect(execCommandSpy).toHaveBeenCalledWith('copy');
+    expect((await screen.findAllByText(/copied/i)).length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import createPromptVoicePlugin from '../../server.ts';
-import { REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from '../shared/protocol.ts';
+import { AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from '../shared/protocol.ts';
 
 function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none' }) {
   const methods = new Map<string, (input: unknown) => unknown>();
@@ -17,7 +17,10 @@ function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none'
         complete: vi.fn(async ({ prompt }: { prompt: string }) => ({ text: `refined: ${prompt}` }))
       },
       providers: {
-        list: vi.fn(async () => [{ id: 'antigravity' }, { id: 'claude-code' }])
+        list: vi.fn(async () => [{ id: 'antigravity', displayName: 'Antigravity' }, { id: 'claude-code', displayName: 'Claude Code' }]),
+        models: vi.fn(async ({ providerId }: { providerId: string }) => ({
+          models: [{ id: `${providerId}-m1`, model: `${providerId}-model-1` }]
+        }))
       }
     }
   };
@@ -37,7 +40,9 @@ describe('createPromptVoicePlugin', () => {
         anthropicApiKey: expect.objectContaining({ secret: true })
       })
     );
-    expect([...methods.keys()].sort()).toEqual([REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD].sort());
+    expect([...methods.keys()].sort()).toEqual(
+      [AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD].sort()
+    );
   });
 
   it('serves status reporting available providers without requiring keys', async () => {
@@ -52,6 +57,31 @@ describe('createPromptVoicePlugin', () => {
         llmKeyConfigured: true,
         availableProviders: ['antigravity', 'claude-code']
       })
+    );
+  });
+
+  it('serves availableModels querying dynamic providers and models', async () => {
+    const { zcc, methods } = fakeZcc();
+    await createPromptVoicePlugin(zcc as never);
+    const available = (await methods.get(AVAILABLE_MODELS_METHOD)?.({})) as Array<{
+      providerId: string;
+      displayName: string;
+      models: Array<{ id: string; label: string }>;
+    }>;
+    expect(available).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ providerId: 'assistant' }),
+        expect.objectContaining({
+          providerId: 'antigravity',
+          displayName: 'Antigravity',
+          models: [expect.objectContaining({ id: 'antigravity-m1' })]
+        }),
+        expect.objectContaining({
+          providerId: 'claude-code',
+          displayName: 'Claude Code',
+          models: [expect.objectContaining({ id: 'claude-code-m1' })]
+        })
+      ])
     );
   });
 

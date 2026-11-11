@@ -76,16 +76,22 @@ const ASSISTANT_LABEL = 'Zana Assistant';
  * Bounded text-only call using the host's existing login; requires no API key.
  */
 export class AssistantLlmProvider implements LlmProvider {
-  readonly id = 'assistant' as const;
-  readonly model = ASSISTANT_MODEL_LABEL;
+  readonly id: Exclude<LlmProviderId, 'none'>;
+  readonly model: string;
 
   constructor(
     private readonly assistant: AssistantApi,
-    private readonly timeoutMs = PROVIDER_TIMEOUT_MS
-  ) {}
+    private readonly timeoutMs = PROVIDER_TIMEOUT_MS,
+    model: string = ASSISTANT_MODEL_LABEL,
+    id: Exclude<LlmProviderId, 'none'> = 'assistant'
+  ) {
+    this.model = model;
+    this.id = id;
+  }
 
   async refine(systemPrompt: string, userMessage: string): Promise<string> {
     let response: { text: string };
+    const label = this.id === 'assistant' ? ASSISTANT_LABEL : String(this.id);
     try {
       response = await withDeadline(
         (signal) => this.assistant.complete({ instructions: systemPrompt, prompt: userMessage, signal }),
@@ -93,11 +99,11 @@ export class AssistantLlmProvider implements LlmProvider {
       );
     } catch (err) {
       // Never surface err.message: it may quote credentials, transcript text, or host internals.
-      throw new PromptVoiceError('LLM_FAILED', describeProviderError(err, ASSISTANT_LABEL), {
-        detail: describeUnexpectedFailure(err, ASSISTANT_LABEL)
+      throw new PromptVoiceError('LLM_FAILED', describeProviderError(err, label, this.model), {
+        detail: describeUnexpectedFailure(err, label)
       });
     }
-    return requireText(response?.text, ASSISTANT_LABEL);
+    return requireText(response?.text, label);
   }
 }
 
@@ -282,9 +288,17 @@ export function createLlmProvider(
   if (settings.llmProvider === 'assistant') return createAssistantProvider(deps.assistant);
   const direct = createDirectProvider(settings, resolvedModel ?? resolveLlmModel(settings), fetchImpl);
   if (direct) return direct;
+  if (deps.assistant) {
+    return new AssistantLlmProvider(
+      deps.assistant,
+      PROVIDER_TIMEOUT_MS,
+      resolvedModel ?? settings.llmModel ?? ASSISTANT_MODEL_LABEL,
+      settings.llmProvider as Exclude<LlmProviderId, 'none'>
+    );
+  }
   throw new PromptVoiceError(
     'LLM_FAILED',
-    `Cleanup provider "${settings.llmProvider}" is not supported. Choose another in Prompt Voice settings.`
+    `Cleanup provider \"${settings.llmProvider}\" is not supported. Choose another in Prompt Voice settings.`
   );
 }
 

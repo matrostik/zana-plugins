@@ -7,6 +7,7 @@
 export const TRANSCRIBE_METHOD = 'promptVoice.transcribe';
 export const STATUS_METHOD = 'promptVoice.status';
 export const REPHRASE_METHOD = 'promptVoice.rephrase';
+export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 
 export const STT_PROVIDER_IDS = ['system', 'openai', 'google-gemini'] as const;
 export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
@@ -77,6 +78,20 @@ export interface StatusResponse {
   llmKeyConfigured: boolean;
   availableProviders?: string[];
 }
+
+export interface DiscoveredModel {
+  id: string;
+  label: string;
+}
+
+export interface DiscoveredProvider {
+  providerId: string;
+  displayName: string;
+  models: DiscoveredModel[];
+  error?: string | null;
+}
+
+export type AvailableModelsResponse = DiscoveredProvider[];
 
 export interface RephraseRequest {
   text: string;
