@@ -47,6 +47,35 @@ afterEach(() => {
 });
 
 describe('PromptStudio Component', () => {
+  it('selects a refinement style without running it until requested', async () => {
+    fakes.call.mockImplementation(async (method: string) => method === 'promptVoice.rephrase'
+      ? { ok: true, text: 'A summary' } : []);
+    render(<PromptStudio />);
+    fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'A draft' } });
+    fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
+    expect(fakes.call.mock.calls.filter(([method]) => method === 'promptVoice.rephrase')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: /refine text/i }));
+    expect(await screen.findByDisplayValue('A summary')).toBeTruthy();
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.rephrase', expect.objectContaining({ tone: 'formal' }));
+  });
+
+  it('requires custom instructions and does not apply them to a preset', async () => {
+    fakes.call.mockImplementation(async (method: string) => method === 'promptVoice.rephrase'
+      ? { ok: true, text: 'Done' } : []);
+    render(<PromptStudio />);
+    fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'A draft' } });
+    fireEvent.click(screen.getByRole('radio', { name: /custom instructions/i }));
+    const refine = screen.getByRole('button', { name: /refine text/i }) as HTMLButtonElement;
+    expect(refine.disabled).toBe(true);
+    fireEvent.change(screen.getByRole('textbox', { name: /custom instructions/i }), { target: { value: 'Make a poem' } });
+    fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
+    fireEvent.click(refine);
+    expect(await screen.findByDisplayValue('Done')).toBeTruthy();
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.rephrase', expect.objectContaining({
+      tone: 'formal', customPrompt: expect.not.stringContaining('Make a poem')
+    }));
+  });
+
   it('renders vertical canvas and allows typing raw input', () => {
     fakes.call.mockResolvedValue({ llmProvider: 'assistant' });
     render(<PromptStudio />);
@@ -90,7 +119,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
 
-    const refineBtn = screen.getByRole('button', { name: /refine now/i });
+    const refineBtn = screen.getByRole('button', { name: /refine text/i });
     fireEvent.click(refineBtn);
 
     expect(await screen.findByText('Resolve defect in authentication service using GPT-5.6.')).toBeTruthy();
@@ -141,7 +170,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Write a quick spec' } });
 
-    const refineBtn = screen.getByRole('button', { name: /refine now/i });
+    const refineBtn = screen.getByRole('button', { name: /refine text/i });
     fireEvent.click(refineBtn);
 
     expect(await screen.findByText('Refined spec by Antigravity')).toBeTruthy();
@@ -176,8 +205,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
 
-    const polishPill = screen.getByRole('button', { name: /polish clarity/i });
-    fireEvent.click(polishPill);
+    fireEvent.click(screen.getByRole('button', { name: /refine text/i }));
 
     expect(await screen.findByText('Resolve defect in authentication service.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /view diff/i })).toBeTruthy();
@@ -206,7 +234,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /polish clarity/i }));
+    fireEvent.click(screen.getByRole('button', { name: /refine text/i }));
     const diffBtn = await screen.findByRole('button', { name: /view diff/i });
     fireEvent.click(diffBtn);
 

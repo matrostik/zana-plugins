@@ -468,7 +468,7 @@ export interface PresetDef {
 export const STUDIO_PRESETS: PresetDef[] = [
   {
     id: 'polish',
-    title: 'Polish Clarity',
+    title: 'Clean up writing',
     icon: '✨',
     desc: 'Fix punctuation, grammar, and stuttering.',
     prompt: 'Clean up disfluencies, typos, and improve sentence flow without altering intent.',
@@ -476,7 +476,7 @@ export const STUDIO_PRESETS: PresetDef[] = [
   },
   {
     id: 'executive',
-    title: 'Executive Brief',
+    title: 'Summarize',
     icon: '⚡',
     desc: 'Condense into punchy bullet points.',
     prompt: 'Summarize the core request into crisp, high-level executive bullet points.',
@@ -484,7 +484,7 @@ export const STUDIO_PRESETS: PresetDef[] = [
   },
   {
     id: 'spec',
-    title: 'Tech Spec RFC',
+    title: 'Create a technical spec',
     icon: '📐',
     desc: 'Format with Goals, Context, Steps.',
     prompt: 'Transform into a structured technical spec with ## Goal, ## Architecture, and ## Implementation Steps.',
@@ -492,7 +492,7 @@ export const STUDIO_PRESETS: PresetDef[] = [
   },
   {
     id: 'chat',
-    title: 'Friendly Chat',
+    title: 'Make it conversational',
     icon: '💬',
     desc: 'Natural, conversational tone.',
     prompt: 'Rephrase in a warm, polite, and helpful conversational tone.',
@@ -595,7 +595,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [showDiff, setShowDiff] = useState(false);
 
   // ─── Refinement Controls State ───────────────────────────────────────────────
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('polish');
   const [customPrompt, setCustomPrompt] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
@@ -839,7 +839,8 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         const audio = await session.stop();
         const response = (await rpc.call(TRANSCRIBE_METHOD, {
           audio: audio.base64,
-          mimeType: audio.mimeType
+          mimeType: audio.mimeType,
+          transcriptionOnly: true
         })) as TranscribeResponse;
 
         if (response.ok && response.status === 'ok') {
@@ -881,12 +882,12 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   };
 
   // ─── Refinement Handler ──────────────────────────────────────────────────────
-  const handleRefine = async (presetIdOverride?: string) => {
+  const handleRefine = async () => {
     const raw = inputText.trim();
-    if (!raw || isRefining) return;
+    if (!raw || isRefining || (selectedPresetId === 'custom' && !customPrompt.trim())) return;
 
-    const activePreset = STUDIO_PRESETS.find((p) => p.id === (presetIdOverride || selectedPresetId));
-    const instruction = customPrompt.trim() || activePreset?.prompt || 'Polish and format for clarity.';
+    const activePreset = STUDIO_PRESETS.find((p) => p.id === selectedPresetId);
+    const instruction = selectedPresetId === 'custom' ? customPrompt.trim() : activePreset?.prompt || 'Polish and format for clarity.';
     const tone = activePreset?.tone || 'technical';
 
     const providerToUse = activeProvider?.id ?? 'assistant';
@@ -969,7 +970,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     if (!inputText && !outputText) return;
     setInputText('');
     setOutputText('');
-    setSelectedPresetId(null);
+    setSelectedPresetId('polish');
     setCustomPrompt('');
     setShowDiff(false);
     setStatusNotice('Studio canvas cleared.');
@@ -1003,7 +1004,8 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      customPromptInputRef.current?.focus();
+      setSelectedPresetId('custom');
+      setTimeout(() => customPromptInputRef.current?.focus(), 0);
     }
   }, []);
 
@@ -1156,66 +1158,33 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             </div>
           </section>
 
-          {/* Refinement Presets (Vertical List as in POC) */}
           <section className="ps-section">
-            <div className="ps-section-title">
-              <span>Refinement Presets</span>
-              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>Quick AI</span>
+            <div className="ps-section-title">How should we improve it?</div>
+            <div className="ps-presets-list" role="radiogroup" aria-label="How should we improve it?">
+              {STUDIO_PRESETS.map((p) => (
+                <label key={p.id} className={`ps-preset-btn ${selectedPresetId === p.id ? 'active' : ''}`}>
+                  <span className="preset-title">
+                    <input type="radio" name="refinement-style" value={p.id}
+                      checked={selectedPresetId === p.id} onChange={() => setSelectedPresetId(p.id)} />
+                    {p.title}
+                  </span>
+                  <span className="preset-desc">{p.desc}</span>
+                </label>
+              ))}
+              <label className={`ps-preset-btn ${selectedPresetId === 'custom' ? 'active' : ''}`}>
+                <span className="preset-title">
+                  <input type="radio" name="refinement-style" value="custom"
+                    checked={selectedPresetId === 'custom'} onChange={() => setSelectedPresetId('custom')} />
+                  Custom instructions
+                </span>
+                <span className="preset-desc">Describe your own transformation.</span>
+              </label>
             </div>
-            <div className="ps-presets-list">
-              {STUDIO_PRESETS.map((p) => {
-                const isActive = selectedPresetId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`ps-preset-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      setSelectedPresetId(isActive ? null : p.id);
-                      if (!isActive) handleRefine(p.id);
-                    }}
-                    title={p.prompt}
-                  >
-                    <span className="preset-title">
-                      <span>{p.icon}</span>
-                      <span>{p.title}</span>
-                    </span>
-                    <span className="preset-desc">{p.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Custom Instruction Box */}
-          <section className="ps-section">
-            <div className="ps-section-title">
-              <span>Custom Instruction</span>
-              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>Ctrl+K</span>
-            </div>
-            <textarea
-              ref={customPromptInputRef}
-              className="ps-custom-prompt-input"
-              placeholder="e.g. Turn into user stories with acceptance criteria..."
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                  e.preventDefault();
-                  handleRefine();
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="ps-btn ps-btn-primary"
-              style={{ width: '100%', justifyContent: 'center' }}
-              onClick={() => handleRefine()}
-              disabled={isRefining || !inputText.trim()}
-            >
-              <span>{isRefining ? '⏳' : '✨'}</span>
-              <span>{isRefining ? 'Refining Spec...' : 'Refine Now'}</span>
-            </button>
+            {selectedPresetId === 'custom' && (
+              <textarea ref={customPromptInputRef} className="ps-custom-prompt-input"
+                aria-label="Custom instructions" placeholder="e.g. Turn into user stories with acceptance criteria..."
+                value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
+            )}
           </section>
 
         </aside>
@@ -1278,7 +1247,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               <span className="ps-pill">⬇ Refine pipeline</span>
               <span style={{ color: 'var(--ps-text-muted)' }}>
-                {inputText.trim() ? `${inputText.trim().split(/\s+/).length} words ready` : 'Waiting for draft'}
+                {inputText.trim() ? `${inputText.trim().split(/\s+/).length} words ready` : 'Add text to get started'}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1286,21 +1255,21 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 type="button"
                 className="ps-btn ps-btn-primary"
                 onClick={() => handleRefine()}
-                disabled={isRefining || !inputText.trim()}
+                disabled={isRefining || !inputText.trim() || (selectedPresetId === 'custom' && !customPrompt.trim())}
                 title="Transform raw draft into polished output"
               >
                 <span>{isRefining ? '⏳' : '⚡'}</span>
-                <span>{isRefining ? 'Refining...' : 'Refine Draft'}</span>
+                <span>{isRefining ? 'Refining...' : 'Refine text'}</span>
               </button>
             </div>
           </div>
 
-          {/* Bottom Pane: Refined Spec Output */}
+          {/* Bottom Pane: Result */}
           <section className="ps-pane">
             <div className="ps-pane-header">
               <div className="ps-pane-title">
                 <span>✨</span>
-                <span>Refined Spec Output</span>
+                <span>Result</span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {outputText && (
@@ -1369,7 +1338,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 placeholder="Polished, structured output will appear here after clicking Refine..."
                 value={outputText}
                 onChange={(e) => setOutputText(e.target.value)}
-                aria-label="Refined Output Spec"
+                aria-label="Refined output"
               />
             )}
           </section>

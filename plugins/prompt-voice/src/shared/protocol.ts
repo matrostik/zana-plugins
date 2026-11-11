@@ -39,6 +39,8 @@ export interface TranscribeRequest {
   mimeType: string;
   /** BCP-47 code or `auto`. Defaults to the plugin setting. */
   language?: string;
+  /** Skip automatic cleanup for Studio's editable input draft. */
+  transcriptionOnly?: boolean;
 }
 
 /** Set when transcription succeeded but LLM cleanup did not; the raw text is still returned. */

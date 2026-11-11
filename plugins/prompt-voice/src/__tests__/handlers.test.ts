@@ -17,6 +17,15 @@ function deps(
 }
 
 describe('transcribeHandler', () => {
+  it('skips automatic cleanup when transcription-only is requested', async () => {
+    const assistant = { complete: vi.fn(async () => ({ text: 'rewritten' })) };
+    const result = await transcribeHandler(
+      { ...VALID_REQUEST, transcriptionOnly: true },
+      { ...deps({ llmProvider: 'assistant' }), assistant }
+    );
+    expect(result).toEqual(expect.objectContaining({ ok: true, text: 'hello', llmProvider: 'none' }));
+    expect(assistant.complete).not.toHaveBeenCalled();
+  });
   it('returns a success envelope for a valid request using system STT', async () => {
     const result = await transcribeHandler(VALID_REQUEST, deps({}));
     expect(result).toEqual(expect.objectContaining({ ok: true, status: 'ok', text: 'hello' }));
