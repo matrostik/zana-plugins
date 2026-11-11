@@ -5,8 +5,8 @@
   "pluginId": "provider-antigravity",
   "pluginVersion": "0.3.1",
   "builtWith": {
-    "zccVersion": "2.4.0",
+    "zccVersion": "2.6.0",
     "pluginSdkVersion": "0.1.0"
   },
-  "artifactDigest": "61404c028a7d914ed7925abcd403361f7a58e6f1efe97292d2866821c36f51c7"
+  "artifactDigest": "409197a284ee86bf1590ef8aa010c6cbb86a1c49e8e33c397f69b9b957923b16"
 }
