@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { StudioSettings } from './StudioSettings.tsx';
 import { useComposer, useComposerView, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import {
   AVAILABLE_MODELS_METHOD,
@@ -567,6 +568,7 @@ export interface PromptStudioProps {
 }
 
 export function PromptStudio({ startSession = defaultStartSession }: PromptStudioProps): React.ReactElement {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const rpc = useRpc();
   const composer = useComposer();
   const composerView = useSafeComposerView();
@@ -590,6 +592,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [selectedModelId, setSelectedModelId] = useState<string>('assistant');
   const [serverLlmProvider, setServerLlmProvider] = useState<string | null>(null);
   const [lastUsedModel, setLastUsedModel] = useState<string | null>(null);
+  const [studioDefaults, setStudioDefaults] = useState<{ studioProvider?: string; studioModel?: string }>({});
 
   // ─── Diff & View State ───────────────────────────────────────────────────────
   const [showDiff, setShowDiff] = useState(false);
@@ -629,6 +632,14 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   }, []);
 
   // Fetch server status to know default configured LLM provider
+  useEffect(() => {
+    let active = true;
+    rpc.call('promptVoice.settings.get').then((result) => {
+      if (active && result && typeof result === 'object') setStudioDefaults(result as { studioProvider?: string; studioModel?: string });
+    }).catch(() => { if (active) setStatusNotice('Could not load Studio defaults.'); });
+    return () => { active = false; };
+  }, [settingsOpen]);
+
   useEffect(() => {
     let isCurrent = true;
     rpc
@@ -744,15 +755,18 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   // Auto-sync with composer if user has not explicitly picked a model
   useEffect(() => {
     if (!userManuallySelectedModel.current && providerOptions.length > 0) {
-      const composerMatch = providerOptions.find((p) => p.isComposerMatch);
+      const composerMatch = studioDefaults.studioProvider && studioDefaults.studioProvider !== 'composer'
+        ? providerOptions.find((p) => p.id === studioDefaults.studioProvider)
+        : providerOptions.find((p) => p.isComposerMatch);
       if (composerMatch) {
         setSelectedProviderId(composerMatch.id);
         if (composerMatch.models.length > 0) {
-          setSelectedModelId(composerMatch.models[0].key || composerMatch.models[0].id);
+          const preferred = composerMatch.models.find((model) => model.id === studioDefaults.studioModel || model.key === studioDefaults.studioModel) ?? composerMatch.models[0];
+          setSelectedModelId(preferred.key || preferred.id);
         }
       }
     }
-  }, [providerOptions]);
+  }, [providerOptions, studioDefaults]);
 
   // Auto-save draft on change
   useEffect(() => {
@@ -1051,7 +1065,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       </header>
 
       {/* ─── Workspace Layout ───────────────────────────────────────────────── */}
-      <div className="ps-workspace">
+      {settingsOpen ? <StudioSettings rpc={rpc} onBack={() => setSettingsOpen(false)} /> : <div className="ps-workspace">
 
         {/* ─── Left Sidebar Controls ────────────────────────────────────────── */}
         <aside className="ps-sidebar">
@@ -1064,6 +1078,10 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 {activeProvider?.isComposerMatch ? '★ Composer Active' : 'AI Model'}
               </span>
             </div>
+            <button type="button" className="ps-btn" onClick={() => {
+              userManuallySelectedModel.current = false;
+              setStudioDefaults((current) => ({ ...current }));
+            }}>Reset to default</button>
 
             {/* Provider Selector */}
             <div className="ps-field-group">
@@ -1187,6 +1205,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             )}
           </section>
 
+          <button type="button" className="ps-btn" style={{ marginTop: 'auto' }} onClick={() => setSettingsOpen(true)}>Settings</button>
         </aside>
 
         {/* ─── Main Editor Canvas (Dual Pane Vertical Layout) ────────────────── */}
@@ -1347,6 +1366,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
 
       </div>
 
+      }
       {/* ─── Bottom Status Bar ──────────────────────────────────────────────── */}
       <footer className="ps-status-bar">
         <div style={{ display: 'flex', gap: 12 }}>
