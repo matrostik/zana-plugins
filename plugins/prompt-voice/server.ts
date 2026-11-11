@@ -1,6 +1,7 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import { describeUnexpectedFailure } from './src/server/errors.ts';
 import { SETTING_DESCRIPTORS } from './src/server/settings.ts';
+import { createSettingsStore } from './src/server/settingsStore.ts';
 import { availableModelsHandler, rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
 import type { FetchLike } from './src/server/http.ts';
 import type { AssistantApi } from './src/server/llm/providers.ts';
@@ -27,7 +28,12 @@ const STATUS_UNAVAILABLE_MESSAGE = 'Prompt Voice status is unavailable. See the 
 export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: PromptVoiceDeps = {}): Promise<void> {
   const settings = zcc.settings.define(SETTING_DESCRIPTORS);
   const fetchImpl: FetchLike = deps.fetch ?? fetch;
-  const readSettings = () => settings.get() as Promise<Record<string, unknown>>;
+  const store = zcc.storage?.kv ? createSettingsStore(zcc.storage.kv, () => settings.get()) : null;
+  const readSettings = () => store ? store.readEffective() : settings.get() as Promise<Record<string, unknown>>;
+  if (store) {
+    zcc.rpc.method('promptVoice.settings.get', () => store.readPublic());
+    zcc.rpc.method('promptVoice.settings.update', (patch) => store.update(patch));
+  }
   const serverUrl = deps.serverUrl ?? resolveServerUrl();
   const assistant = deps.assistant ?? zcc.sdk?.assistant;
   const providers = deps.providers ?? zcc.sdk?.providers;

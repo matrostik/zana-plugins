@@ -47,6 +47,19 @@ afterEach(() => {
 });
 
 describe('PromptStudio Component', () => {
+  it('returns from settings without losing the draft', async () => {
+    fakes.call.mockResolvedValue({});
+    render(<PromptStudio />);
+    fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'Keep this draft' } });
+    fireEvent.click(screen.getByRole('button', { name: /^settings$/i }));
+    expect(screen.getByRole('heading', { name: /settings/i })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Voice & transcription' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Prompt Voice' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Prompt Studio' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Connections' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /back to studio/i }));
+    expect(screen.getByDisplayValue('Keep this draft')).toBeTruthy();
+  });
   it('selects a refinement style without running it until requested', async () => {
     fakes.call.mockImplementation(async (method: string) => method === 'promptVoice.rephrase'
       ? { ok: true, text: 'A summary' } : []);
