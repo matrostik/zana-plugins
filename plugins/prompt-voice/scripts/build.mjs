@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -91,6 +91,37 @@ function hostReactPlugin() {
   };
 }
 
+/**
+ * Git checkouts on Windows convert LF -> CRLF, which esbuild preserves as `\r`
+ * inside CSS text imports and multi-line template literals. Canonicalize to LF
+ * so bundles built on Windows match Linux CI byte-for-byte.
+ */
+function normalizeLocalEolPlugin() {
+  const loaders = {
+    '.css': 'text',
+    '.ts': 'ts',
+    '.mts': 'ts',
+    '.tsx': 'tsx',
+    '.js': 'js',
+    '.mjs': 'js',
+    '.jsx': 'jsx'
+  };
+  return {
+    name: 'normalize-local-eol',
+    setup(build) {
+      build.onLoad({ filter: /\.(css|ts|mts|tsx|js|mjs|jsx)$/, namespace: 'file' }, (args) => {
+        if (args.path.includes('node_modules')) return undefined;
+        const loader = loaders[extname(args.path)];
+        if (!loader) return undefined;
+        return {
+          contents: readFileSync(args.path, 'utf8').replace(/\r\n/g, '\n'),
+          loader
+        };
+      });
+    }
+  };
+}
+
 function writeArtifactMetadata(filePath) {
   const meta = {
     sdkMajor: 1,
@@ -129,6 +160,7 @@ async function buildServerArtifact() {
     minify: true,
     sourcemap: true,
     banner: { js: NODE_ESM_REQUIRE_BANNER },
+    plugins: [normalizeLocalEolPlugin()],
     external: ['@zana-ai/zcc-plugin-sdk', '@zana-ai/zcc-plugin-sdk/server']
   });
   normalizeSourceMap(join(pluginRoot, 'server.mjs.map'));
@@ -148,8 +180,7 @@ async function buildAppArtifact() {
     jsx: 'automatic',
     minify: true,
     sourcemap: true,
-    loader: { '.css': 'text' },
-    plugins: [hostReactPlugin()],
+    plugins: [hostReactPlugin(), normalizeLocalEolPlugin()],
     external: ['@zana-ai/zcc-plugin-sdk/server']
   });
   normalizeSourceMap(join(pluginRoot, 'app.js.map'));

@@ -1,932 +1,932 @@
-function Te(){return globalThis.__ZCC_PLUGIN_RUNTIME__??{}}function Ie(e){throw new Error(`${e} is not available until the host plugin runtime is installed`)}function Ze(e){return{__zccPluginApp:!0,setup:e}}function be(){return Te().useRpc?.()??Ie("useRpc")}function he(){return Te().useComposer?.()??Ie("useComposer")}function Ke(){return Te().useComposerView?.()??Ie("useComposerView")}var Ut=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"];var L=class extends Error{code;constructor(t,r){super(r),this.name="RecordingError",this.code=t}};function Bt(e){return Ut.find(t=>e(t))??null}var Wt="audio/webm";function jt(){return{getUserMedia:e=>navigator.mediaDevices.getUserMedia(e),createRecorder:(e,t)=>new MediaRecorder(e,t?{mimeType:t}:void 0),isTypeSupported:e=>typeof MediaRecorder<"u"&&MediaRecorder.isTypeSupported(e)}}async function Ht(e){try{return await e.getUserMedia({audio:!0})}catch(t){let r=t instanceof Error?t.name:"";throw r==="NotAllowedError"||r==="SecurityError"?new L("MIC_DENIED","Microphone access was denied. Allow it for Zana in system settings, then try again."):new L("MIC_UNAVAILABLE","No microphone is available. Connect one and try again.")}}function Pe(e){return new Promise((t,r)=>{let i=new FileReader;i.onload=()=>{let s=typeof i.result=="string"?i.result:"";t(s.slice(s.indexOf(",")+1))},i.onerror=()=>r(new L("RECORDING_FAILED","The recording could not be read.")),i.readAsDataURL(e)})}async function Gt(e,t){let r=new Blob(e,{type:t});return{base64:await Pe(r),mimeType:r.type||t}}function qt(e,t){if(!(e>0&&Number.isFinite(e)))return()=>{};let r=setTimeout(t,e);return()=>clearTimeout(r)}var Zt="That recording is too large to transcribe. Keep dictation shorter and try again.";function Kt(e,t){let r=Math.max(t,e),i=[],s=0,c=!1;return{chunks:i,get overflowed(){return c},add(d){return d.size===0||c?"ignored":s+d.size>r?(c=!0,"overflow"):(i.push(d),s+=d.size,s>=e?"limit-reached":"accepted")}}}function Yt(e,t){let r=new Promise((i,s)=>{e.onstop=()=>i(),e.onerror=()=>{let c=new L("RECORDING_FAILED","Recording stopped unexpectedly. Try again.");t(c),s(c)}});return r.catch(()=>{}),r}function Xt(e,t,r,i){let s=Yt(e,i);return e.ondataavailable=c=>{let d=t.add(c.data);(d==="limit-reached"||d==="overflow")&&r()},e.start(1e3),s}async function Jt(e,t,r,i){try{await e}finally{t()}if(r.overflowed)throw new L("RECORDING_FAILED",Zt);return Gt(r.chunks,i)}function Qt(e){let t=()=>{};return{stopRecorder(){t(),e.state!=="inactive"&&e.stop()},armTimer(r,i){t=qt(r,i)}}}function en(e,t){let r=null;return{attach(i){r=i},detach(){r=null},autoStop(){e();let i=r?.onAutoStop;r&&(r.onAutoStop=void 0),i?.()},fail(i){e(),t();let s=r?.onError;r=null,s?.(i)}}}function tn(e,t,r,i){let s=Kt(i.maxBytes??9437184,i.hardMaxBytes??10485760),{stopRecorder:c,armTimer:d}=Qt(e),p=en(c,t);d(i.maxDurationMs??12e4,p.autoStop);let f=Xt(e,s,p.autoStop,p.fail),l={onError:i.onError,onAutoStop:i.onAutoStop,async stop(){c();try{return await Jt(f,t,s,e.mimeType||r)}finally{p.detach()}},cancel(){c(),t(),p.detach()}};return p.attach(l),l}var ee=()=>nn();async function nn(e=jt(),t={}){let r=await Ht(e),i=on(r),s=r.getTracks(),c,d=()=>{for(let p of s)c&&p.removeEventListener?.("ended",c);i?.close(),s.forEach(p=>p.stop())};try{let p=Bt(e.isTypeSupported)??Wt,f=e.createRecorder(r,p),l=tn(f,d,p,t);return l.getAudioLevel=()=>i?.level()??null,c=()=>{let g=l.onError;l.cancel(),g?.(new L("MIC_UNAVAILABLE","Microphone disconnected. Check your device and try again."))},s.forEach(g=>g.addEventListener?.("ended",c)),l}catch(p){throw d(),p instanceof L?p:new L("RECORDING_FAILED",p instanceof Error?p.message:"The recording could not be started.")}}function on(e){let t;try{t=new AudioContext;let r=t.createMediaStreamSource(e),i=t.createAnalyser();i.fftSize=256,r.connect(i);let s=new Uint8Array(i.fftSize),c=t,d=!1;return{level(){if(c.state&&c.state!=="running")return null;i.getByteTimeDomainData(s);let p=s.reduce((f,l)=>f+((l-128)/128)**2,0)/s.length;return Math.min(1,Math.sqrt(p)*5)},close(){d||(d=!0,r.disconnect(),c.close().catch(p=>console.error("Prompt Voice audio meter cleanup failed",p)))}}}catch(r){return t&&t.close().catch(i=>console.error("Prompt Voice audio meter cleanup failed",i)),console.warn("Prompt Voice audio meter unavailable",r),null}}var y=globalThis.__ZCC_HOST_REACT__,Ye=y,Wn=y.Children,jn=y.Component,Hn=y.Fragment,Gn=y.StrictMode,qn=y.Suspense,Zn=y.cloneElement,Kn=y.createContext,Yn=y.createElement,Xn=y.createRef,Jn=y.forwardRef,Qn=y.isValidElement,eo=y.lazy,to=y.memo,no=y.startTransition,C=y.useCallback,oo=y.useContext,ro=y.useDebugValue,io=y.useDeferredValue,E=y.useEffect,ao=y.useId,so=y.useImperativeHandle,po=y.useInsertionEffect,lo=y.useLayoutEffect,H=y.useMemo,Xe=y.useReducer,T=y.useRef,v=y.useState,co=y.useSyncExternalStore,uo=y.useTransition,mo=y.version;var ve="promptVoice.transcribe",se="promptVoice.status",Je="promptVoice.rephrase",Qe="promptVoice.availableModels",z={state:"promptVoice.localWhisper.state",installRuntime:"promptVoice.localWhisper.installRuntime",cancelRuntimeInstall:"promptVoice.localWhisper.cancelRuntimeInstall",downloadModel:"promptVoice.localWhisper.downloadModel",cancelModelDownload:"promptVoice.localWhisper.cancelModelDownload",removeModel:"promptVoice.localWhisper.removeModel",selectModel:"promptVoice.localWhisper.selectModel",start:"promptVoice.localWhisper.start",stop:"promptVoice.localWhisper.stop"};function te(e,t){let r=t.trim();return r?e?/\s$/.test(e)?`${e}${r}`:`${e} ${r}`:r:e}var rn="No speech detected.",Ne={phase:"idle",notice:null,error:null};function et(e,t){switch(t.type){case"START":return e.phase==="idle"||e.phase==="error"?{phase:"starting",notice:null,error:null}:e;case"STARTED":return e.phase==="starting"?{...e,phase:"recording"}:e;case"STOP":return e.phase==="recording"||e.phase==="starting"?{phase:"processing",notice:null,error:null}:e;case"CANCEL":return e.phase==="recording"||e.phase==="starting"?{...Ne}:e;case"SUCCESS":case"NO_SPEECH":return e.phase!=="processing"?e:{phase:"idle",notice:t.type==="NO_SPEECH"?rn:t.notice,error:null};case"CLEAR_NOTICE":return e.notice?{...e,notice:null}:e;case"FAILURE":return{phase:"error",notice:null,error:t.message}}}var _e=16e3,tt=44,pe=2,an="This recording couldn't be prepared for Local Whisper. Try again.",sn=async(e,t)=>{let i=await new OfflineAudioContext(1,1,t).decodeAudioData(e),s=Array.from({length:i.numberOfChannels},(c,d)=>i.getChannelData(d));return{sampleRate:i.sampleRate,channels:s}};function pn(e){if(e.length===0)return new Float32Array(0);if(e.length===1)return e[0];let t=Math.min(...e.map(i=>i.length)),r=new Float32Array(t);for(let i=0;i<t;i+=1){let s=0;for(let c of e)s+=c[i];r[i]=s/e.length}return r}function ln(e,t){let r=e.length*pe,i=new Uint8Array(tt+r),s=new DataView(i.buffer),c=(d,p)=>{for(let f=0;f<p.length;f+=1)s.setUint8(d+f,p.charCodeAt(f))};c(0,"RIFF"),s.setUint32(4,36+r,!0),c(8,"WAVE"),c(12,"fmt "),s.setUint32(16,16,!0),s.setUint16(20,1,!0),s.setUint16(22,1,!0),s.setUint32(24,t,!0),s.setUint32(28,t*pe,!0),s.setUint16(32,pe,!0),s.setUint16(34,8*pe,!0),c(36,"data"),s.setUint32(40,r,!0);for(let d=0;d<e.length;d+=1){let p=Math.max(-1,Math.min(1,e[d]));s.setInt16(tt+d*pe,p<0?p*32768:p*32767,!0)}return i}function cn(e){let t=atob(e),r=new Uint8Array(t.length);for(let i=0;i<t.length;i+=1)r[i]=t.charCodeAt(i);return r.buffer}async function dn(e,t=sn){let r;try{let i=await t(cn(e.base64),_e);if(i.sampleRate!==_e)throw new Error("decoder ignored the requested sample rate");r=ln(pn(i.channels),_e)}catch{throw new L("RECORDING_FAILED",an)}return{base64:await Pe(new Blob([r],{type:"audio/wav"})),mimeType:"audio/wav"}}async function xe(e,t,r=dn){return(await e.call(se).catch(()=>null))?.audioFormat==="wav"?r(t):t}var un="Prompt Voice returned an unexpected response. Try again.",mn="Dictation failed. Try again.",fn=4e3;function gn(e){return typeof e=="object"&&e!==null&&typeof e.ok=="boolean"}async function bn(e,t){let r=await xe(e,t),i=await e.call(ve,{audio:r.base64,mimeType:r.mimeType});if(!gn(i))throw new Error(un);return i}function nt(e){return e instanceof Error&&e.message?e.message:mn}function hn(e,t,r){if(!e.ok){r({type:"FAILURE",message:e.message});return}if(e.status==="no-speech"){r({type:"NO_SPEECH"});return}t.updateText(s=>te(s,e.text)),t.focus();let i=e.refineNotice?`Inserted the raw transcript. ${e.refineNotice.message}`:"Added to draft.";r({type:"SUCCESS",notice:i})}function vn(e,t,r,i){return t()?(e.onError=s=>{t()&&i(s)},e.onAutoStop=()=>{t()&&r()},e):(e.cancel(),null)}function xn(e,t,r,i,s){let c=d=>s({type:"FAILURE",message:nt(d)});return e.then(d=>{let p=vn(d,r,i,f=>{t.current=null,c(f)});return p&&(t.current=p),p},d=>(r()&&c(d),null))}function yn(e,t){let r=T(null),i=T(null),s=T(0),c=T(!0),d=C(()=>{s.current++,i.current=null,r.current&&(r.current.cancel(),r.current=null),t({type:"CANCEL"})},[t]);E(()=>(c.current=!0,()=>{c.current=!1,d()}),[d]);let p=C(async()=>{let m=i.current?await i.current:r.current;return r.current=null,m},[]),f=C(async m=>{let b=++s.current,h=()=>c.current&&s.current===b,R=xn(e(),r,h,m,t);i.current=R,await R&&h()&&t({type:"STARTED"}),i.current===R&&(i.current=null)},[t,e]),l=C(()=>c.current,[]),g=C(()=>r.current?.getAudioLevel?.()??null,[]);return{start:f,takeSession:p,cancel:d,isMounted:l,getAudioLevel:g}}function ot({startSession:e=ee,noticeDurationMs:t=fn}={}){let r=he(),i=be(),[s,c]=Xe(et,Ne),{start:d,takeSession:p,cancel:f,isMounted:l,getAudioLevel:g}=yn(e,c),[m,b]=v(null),[h,R]=v(0),[Z,N]=v(!1);E(()=>{if(s.phase!=="recording"){b(null),R(0);return}let O=Date.now(),W=()=>{b(g()),R(Math.floor((Date.now()-O)/1e3))};W();let V=setInterval(W,100);return()=>clearInterval(V)},[g,s.phase]),E(()=>{if(!s.notice)return;let O=setTimeout(()=>{c({type:"CLEAR_NOTICE"})},t);return()=>clearTimeout(O)},[t,s.notice]);let _=C(()=>{c({type:"CLEAR_NOTICE"})},[]),D=C(async()=>{c({type:"STOP"});let O=await p();if(!(!l()||!O))try{let W=await O.stop();if(!l())return;let V=await bn(i,W);if(!l())return;hn(V,r,c)}catch(W){if(!l())return;c({type:"FAILURE",message:nt(W)})}},[r,l,i,p]),K=C(async()=>{N(!1),c({type:"START"}),await d(()=>{N(!0),D()})},[D,d]),le=C(()=>{s.phase==="recording"||s.phase==="starting"?D():s.phase!=="processing"&&K()},[K,D,s.phase]);return{phase:s.phase,error:s.error,notice:s.notice,level:m,seconds:h,autoStopped:Z,onClick:le,cancel:f,clearNotice:_,beginDictation:K,finishDictation:D}}var Me=`/* Base Container */\r
-.pv-mic {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  height: 36px;\r
-  box-sizing: border-box;\r
-  vertical-align: middle;\r
-  background: transparent;\r
-  border: none;\r
-  user-select: none;\r
-  position: relative;\r
-}\r
-\r
-.pv-sr-only {\r
-  position: absolute;\r
-  width: 1px;\r
-  height: 1px;\r
-  padding: 0;\r
-  margin: -1px;\r
-  overflow: hidden;\r
-  clip: rect(0, 0, 0, 0);\r
-  white-space: nowrap;\r
-  border: 0;\r
-}\r
-\r
-/* Base button reset */\r
-.pv-mic-button {\r
-  box-sizing: border-box;\r
-  font: inherit;\r
-}\r
-\r
-.pv-mic-button:focus-visible {\r
-  outline: 2px solid var(--focus-ring, #4a90e2);\r
-  outline-offset: 2px;\r
-}\r
-\r
-.pv-mic-button:disabled {\r
-  opacity: 0.6;\r
-  cursor: progress;\r
-}\r
-\r
-/* Dictation Pill Container: shared morphing capsule across all phases */\r
-.pv-dictation-pill {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  height: 36px;\r
-  border-radius: 9999px;\r
-  background: var(--pv-pill-bg, #181920);\r
-  border: 1px solid var(--pv-pill-border, rgba(239, 68, 68, 0.35));\r
-  transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1),\r
-              border-color 0.25s ease,\r
-              box-shadow 0.25s ease,\r
-              background 0.25s ease,\r
-              padding 0.25s cubic-bezier(0.16, 1, 0.3, 1),\r
-              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);\r
-  box-sizing: border-box;\r
-}\r
-\r
-/* 1. Idle: Oval Capsule Pill with Signature Crimson Border containing only the mic icon */\r
-.pv-mic.pv-phase-idle {\r
-  width: 58px;\r
-  height: 36px;\r
-  border-radius: 9999px;\r
-  background: var(--pv-pill-bg, #181920);\r
-  border: 1px solid rgba(239, 68, 68, 0.35);\r
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.12);\r
-  padding: 0;\r
-  justify-content: center;\r
-  cursor: pointer;\r
-}\r
-\r
-.pv-mic.pv-phase-idle:hover {\r
-  background: #20222c;\r
-  border-color: rgba(239, 68, 68, 0.75);\r
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.28);\r
-  transform: scale(1.04);\r
-}\r
-\r
-.pv-mic.pv-phase-idle:active {\r
-  transform: scale(0.97);\r
-}\r
-\r
-.pv-mic.pv-phase-idle .pv-idle-icon {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  justify-content: center;\r
-  width: 100%;\r
-  height: 100%;\r
-  border-radius: 9999px;\r
-  background: transparent;\r
-  border: none;\r
-  box-shadow: none;\r
-  color: var(--text-secondary, #cbd5e1);\r
-  cursor: pointer;\r
-  padding: 0;\r
-  transition: color 0.15s ease;\r
-}\r
-\r
-.pv-mic.pv-phase-idle:hover .pv-idle-icon {\r
-  color: #ffffff;\r
-}\r
-\r
-/* 2. Starting Oval: extends smoothly */\r
-.pv-mic.pv-phase-starting {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(234, 179, 8, 0.45);\r
-  box-shadow: 0 0 14px rgba(234, 179, 8, 0.15);\r
-  padding: 0 4px 0 10px;\r
-  gap: 10px;\r
-}\r
-\r
-/* 3. Recording / Listening Oval: extends with red glow */\r
-.pv-mic.pv-phase-recording {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(239, 68, 68, 0.45);\r
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.18), 0 4px 16px rgba(0, 0, 0, 0.4);\r
-  padding: 0 4px 0 10px;\r
-  gap: 10px;\r
-}\r
-\r
-/* 4. Processing Oval */\r
-.pv-mic.pv-phase-processing {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(56, 189, 248, 0.4);\r
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);\r
-  padding: 0 6px 0 10px;\r
-  gap: 10px;\r
-}\r
-\r
-/* 5. Notice Oval: same control showing completion */\r
-.pv-mic.pv-has-notice {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(34, 197, 94, 0.45);\r
-  box-shadow: 0 0 16px rgba(34, 197, 94, 0.15);\r
-  padding: 0 14px 0 12px;\r
-  gap: 8px;\r
-  cursor: pointer;\r
-}\r
-\r
-.pv-mic.pv-has-notice:hover {\r
-  border-color: rgba(34, 197, 94, 0.75);\r
-  background: rgba(34, 197, 94, 0.08);\r
-}\r
-\r
-.pv-notice-content {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 8px;\r
-  animation: pv-notice-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);\r
-}\r
-\r
-.pv-notice-check {\r
-  color: #4ade80;\r
-  font-weight: 700;\r
-  font-size: 13px;\r
-}\r
-\r
-@keyframes pv-notice-enter {\r
-  from { opacity: 0; transform: scale(0.96) translateX(-3px); }\r
-  to { opacity: 1; transform: scale(1) translateX(0); }\r
-}\r
-\r
-/* Flex ordering for active pill children */\r
-.pv-mic-active .pv-pill-timer-badge {\r
-  order: 1;\r
-}\r
-\r
-.pv-mic-active .pv-pill-center {\r
-  order: 2;\r
-}\r
-\r
-.pv-mic-active .pv-mic-button.pv-pill-btn-stop {\r
-  order: 3;\r
-}\r
-\r
-.pv-mic-active .pv-pill-btn-cancel {\r
-  order: 4;\r
-}\r
-\r
-/* Timer Badge */\r
-.pv-pill-timer-badge {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 6px;\r
-  background: rgba(255, 255, 255, 0.08);\r
-  border: 1px solid rgba(255, 255, 255, 0.04);\r
-  border-radius: 9999px;\r
-  padding: 2px 8px 2px 6px;\r
-}\r
-\r
-.pv-pill-dot {\r
-  width: 7px;\r
-  height: 7px;\r
-  border-radius: 50%;\r
-  background: var(--danger-color, #ef4444);\r
-  box-shadow: 0 0 8px var(--danger-color, #ef4444);\r
-  animation: pv-pulse-dot 1.4s ease-in-out infinite;\r
-}\r
-\r
-.pv-pill-dot-starting {\r
-  background: #eab308;\r
-  box-shadow: 0 0 8px #eab308;\r
-}\r
-\r
-@keyframes pv-pulse-dot {\r
-  0%, 100% { opacity: 1; transform: scale(1); }\r
-  50% { opacity: 0.4; transform: scale(0.85); }\r
-}\r
-\r
-.pv-pill-timer-text {\r
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;\r
-  font-size: 12px;\r
-  font-weight: 600;\r
-  color: #f8fafc;\r
-  letter-spacing: 0.02em;\r
-}\r
-\r
-/* Center area */\r
-.pv-pill-center {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 8px;\r
-}\r
-\r
-.pv-pill-waveform {\r
-  display: inline-flex;\r
-  align-items: center;\r
-  gap: 2.5px;\r
-  height: 16px;\r
-}\r
-\r
-.pv-pill-waveform-bar {\r
-  width: 3px;\r
-  background: #38bdf8;\r
-  border-radius: 9999px;\r
-  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);\r
-  transition: height 0.08s ease;\r
-  min-height: 3px;\r
-  height: 5px;\r
-}\r
-\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(1) { animation: pv-wave 0.8s ease-in-out infinite alternate; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(2) { animation: pv-wave 0.6s ease-in-out infinite alternate 0.15s; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(3) { animation: pv-wave 0.7s ease-in-out infinite alternate 0.3s; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(4) { animation: pv-wave 0.5s ease-in-out infinite alternate 0.2s; }\r
-.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(5) { animation: pv-wave 0.9s ease-in-out infinite alternate 0.05s; }\r
-\r
-@keyframes pv-wave {\r
-  0% { height: 4px; }\r
-  100% { height: 14px; }\r
-}\r
-\r
-.pv-pill-status {\r
-  font-size: 13px;\r
-  font-weight: 500;\r
-  color: #e2e8f0;\r
-  white-space: nowrap;\r
-}\r
-\r
-.pv-mic-quiet-warning {\r
-  font-size: 11px;\r
-  color: #fbbf24;\r
-}\r
-\r
-/* Stop button inside active pill */\r
-.pv-mic-button.pv-pill-btn-stop {\r
-  width: 28px;\r
-  height: 28px;\r
-  border-radius: 50%;\r
-  background: rgba(239, 68, 68, 0.22);\r
-  border: 1px solid rgba(239, 68, 68, 0.55);\r
-  display: inline-flex;\r
-  align-items: center;\r
-  justify-content: center;\r
-  cursor: pointer;\r
-  color: #f87171;\r
-  padding: 0;\r
-  transition: all 0.15s ease;\r
-}\r
-\r
-.pv-mic-button.pv-pill-btn-stop:hover {\r
-  background: rgba(239, 68, 68, 0.38);\r
-  border-color: rgba(239, 68, 68, 0.8);\r
-  color: #ffffff;\r
-  transform: scale(1.05);\r
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);\r
-}\r
-\r
-/* Cancel button inside active pill */\r
-.pv-pill-btn-cancel {\r
-  width: 28px;\r
-  height: 28px;\r
-  border-radius: 50%;\r
-  background: rgba(255, 255, 255, 0.08);\r
-  border: 1px solid rgba(255, 255, 255, 0.06);\r
-  display: inline-flex;\r
-  align-items: center;\r
-  justify-content: center;\r
-  cursor: pointer;\r
-  color: #94a3b8;\r
-  padding: 0;\r
-  transition: all 0.15s ease;\r
-}\r
-\r
-.pv-pill-btn-cancel:hover {\r
-  background: rgba(255, 255, 255, 0.16);\r
-  color: #f1f5f9;\r
-  transform: scale(1.05);\r
-}\r
-\r
-/* Spinner */\r
-.pv-mic-spinner {\r
-  display: inline-block;\r
-  width: 12px;\r
-  height: 12px;\r
-  border: 2px solid currentColor;\r
-  border-right-color: transparent;\r
-  border-radius: 50%;\r
-  animation: pv-spin 0.8s linear infinite;\r
-  vertical-align: middle;\r
-}\r
-\r
-@keyframes pv-spin {\r
-  to { transform: rotate(360deg); }\r
-}\r
-\r
-/* Error styles */\r
-.pv-mic.pv-phase-error {\r
-  width: auto;\r
-  border-radius: 9999px;\r
-  border-color: rgba(239, 68, 68, 0.7);\r
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);\r
-  padding: 0 10px;\r
-}\r
-\r
-.pv-mic-error {\r
-  color: var(--danger-color, #ef4444);\r
-}\r
-\r
-@media (prefers-reduced-motion: reduce) {\r
-  .pv-pill-waveform.animated .pv-pill-waveform-bar { animation: none; height: 8px; }\r
-  .pv-pill-waveform-bar { transition: none; }\r
-  .pv-mic-spinner { animation: none; }\r
-}\r
-\r
-\`\r
-\r
-\`\r
-/* ==========================================================================\\n   Prompt Studio - Zana Native Vertical Stack (Input Top, Output Bottom)\\n   ========================================================================== */\r
-\r
-:root {\r
-  --ps-bg-base: var(--bg-base, #1e1e1e);\r
-  --ps-bg-panel: var(--bg-panel, #252526);\r
-  --ps-bg-header: var(--bg-header, #202021);\r
-  --ps-bg-subtle: rgba(255, 255, 255, 0.04);\r
-  --ps-bg-hover: var(--bg-hover, rgba(255, 255, 255, 0.06));\r
-  --ps-bg-active: rgba(255, 255, 255, 0.1);\r
-  --ps-border: var(--border, rgba(255, 255, 255, 0.08));\r
-  --ps-border-strong: var(--border-strong, rgba(255, 255, 255, 0.16));\r
-  --ps-text: var(--text-primary, #e6edf3);\r
-  --ps-text-muted: var(--text-muted, #8a8a8a);\r
-  --ps-accent: var(--accent, #007acc);\r
-  --ps-accent-hover: #0098ff;\r
-  --ps-danger: var(--danger, #e5534b);\r
-  --ps-warn: #d29922;\r
-  --ps-success: var(--success, #3fb950);\r
-  --ps-font: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);\r
-  --ps-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);\r
-}\r
-\r
-.ps-root {\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  width: 100% !important;\r
-  height: 100% !important;\r
-  min-height: 0 !important;\r
-  background: var(--ps-bg-base) !important;\r
-  color: var(--ps-text) !important;\r
-  font-family: var(--ps-font) !important;\r
-  font-size: 13px !important;\r
-  overflow: hidden !important;\r
-  position: relative !important;\r
-  box-sizing: border-box !important;\r
-}\r
-\r
-.ps-root *, .ps-root *::before, .ps-root *::after {\r
-  box-sizing: border-box !important;\r
-}\r
-\r
-/* \u2500\u2500\u2500 Top Studio Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\r
-.ps-toolbar {\r
-  height: 40px !important;\r
-  background: var(--ps-bg-header) !important;\r
-  border-bottom: 1px solid var(--ps-border) !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  padding: 0 14px !important;\r
-  gap: 12px !important;\r
-  flex-shrink: 0 !important;\r
-  z-index: 10 !important;\r
-}\r
-\r
-.ps-brand {\r
-  font-size: 13px !important;\r
-  font-weight: 600 !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 6px !important;\r
-  color: var(--ps-text) !important;\r
-}\r
-\r
-.ps-brand-badge {\r
-  font-size: 11px !important;\r
-  background: var(--ps-bg-subtle) !important;\r
-  border: 1px solid var(--ps-border) !important;\r
-  padding: 1px 6px !important;\r
-  border-radius: 4px !important;\r
-  color: var(--ps-text-muted) !important;\r
-}\r
-\r
-.ps-spacer {\r
-  flex: 1 !important;\r
-}\r
-\r
-/* \u2500\u2500\u2500 Zana Native Button Styles \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\r
-.ps-btn {\r
-  appearance: none !important;\r
-  border: 1px solid var(--ps-border-strong) !important;\r
-  background: var(--ps-bg-panel) !important;\r
-  color: var(--ps-text) !important;\r
-  border-radius: 4px !important;\r
-  padding: 4px 10px !important;\r
-  font-size: 12px !important;\r
-  font-weight: 500 !important;\r
-  cursor: pointer !important;\r
-  display: inline-flex !important;\r
-  align-items: center !important;\r
-  justify-content: center !important;\r
-  gap: 6px !important;\r
-  height: 28px !important;\r
-  font-family: inherit !important;\r
-  transition: all 0.12s ease !important;\r
-  white-space: nowrap !important;\r
-}\r
-\r
-.ps-btn:hover:not(:disabled) {\r
-  background: var(--ps-bg-hover) !important;\r
-  border-color: var(--ps-text-muted) !important;\r
-}\r
-\r
-.ps-btn:disabled {\r
-  opacity: 0.45 !important;\r
-  cursor: default !important;\r
-}\r
-\r
-.ps-btn-primary {\r
-  background: var(--ps-accent) !important;\r
-  border-color: var(--ps-accent) !important;\r
-  color: #ffffff !important;\r
-  font-weight: 600 !important;\r
-}\r
-\r
-.ps-btn-primary:hover:not(:disabled) {\r
-  background: var(--ps-accent-hover) !important;\r
-  border-color: var(--ps-accent-hover) !important;\r
-}\r
-\r
-.ps-btn-success {\r
-  background: #238636 !important;\r
-  border-color: rgba(255, 255, 255, 0.2) !important;\r
-  color: #ffffff !important;\r
-  font-weight: 600 !important;\r
-}\r
-\r
-.ps-btn-success:hover:not(:disabled) {\r
-  background: #2ea043 !important;\r
-}\r
-\r
-.ps-btn-danger {\r
-  background: rgba(229, 83, 75, 0.15) !important;\r
-  border-color: var(--ps-danger) !important;\r
-  color: #fca5a5 !important;\r
-}\r
-\r
-.ps-btn-danger:hover:not(:disabled) {\r
-  background: rgba(229, 83, 75, 0.25) !important;\r
-}\r
-\r
-.ps-btn-sm {\r
-  height: 24px !important;\r
-  padding: 2px 8px !important;\r
-  font-size: 11px !important;\r
-}\r
-\r
-/* \u2500\u2500\u2500 Main Workspace Layout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\r
-.ps-workspace {\r
-  flex: 1 !important;\r
-  display: flex !important;\r
-  min-height: 0 !important;\r
-  overflow: hidden !important;\r
-}\r
-\r
-/* \u2500\u2500\u2500 Left Sidebar: Audio & Refinement Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\r
-.ps-sidebar {\r
-  width: 290px !important;\r
-  background: var(--ps-bg-panel) !important;\r
-  border-right: 1px solid var(--ps-border) !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  overflow-y: auto !important;\r
-  flex-shrink: 0 !important;\r
-}\r
-\r
-.ps-section {\r
-  padding: 12px 14px !important;\r
-  border-bottom: 1px solid var(--ps-border) !important;\r
-}\r
-\r
-.ps-section-title {\r
-  font-size: 11px !important;\r
-  font-weight: 600 !important;\r
-  text-transform: uppercase !important;\r
-  letter-spacing: 0.05em !important;\r
-  color: var(--ps-text-muted) !important;\r
-  margin-bottom: 8px !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  justify-content: space-between !important;\r
-}\r
-\r
-/* Model Select Dropdown */\r
-.ps-select {\r
-  appearance: none !important;\r
-  -webkit-appearance: none !important;\r
-  width: 100% !important;\r
-  height: 30px !important;\r
-  background: var(--ps-bg-base) !important;\r
-  color: var(--ps-text) !important;\r
-  border: 1px solid var(--ps-border-strong) !important;\r
-  border-radius: 4px !important;\r
-  padding: 4px 28px 4px 8px !important;\r
-  font-size: 12px !important;\r
-  font-family: inherit !important;\r
-  cursor: pointer !important;\r
-  outline: none !important;\r
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;\r
-  background-repeat: no-repeat !important;\r
-  background-position: right 8px center !important;\r
-  text-overflow: ellipsis !important;\r
-  white-space: nowrap !important;\r
-}\r
-\r
-.ps-select:hover:not(:disabled) {\r
-  border-color: var(--ps-accent) !important;\r
-}\r
-\r
-.ps-select:focus-visible {\r
-  border-color: var(--ps-accent) !important;\r
-  box-shadow: 0 0 0 1px var(--ps-accent) !important;\r
-}\r
-\r
-/* Dictation Card */\r
-.ps-dictation-card {\r
-  background: var(--ps-bg-base) !important;\r
-  border: 1px solid var(--ps-border) !important;\r
-  border-radius: 5px !important;\r
-  padding: 10px !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  gap: 8px !important;\r
-}\r
-\r
-.ps-mic-btn {\r
-  height: 32px !important;\r
-  border-radius: 4px !important;\r
-  border: 1px solid var(--ps-danger) !important;\r
-  background: rgba(229, 83, 75, 0.12) !important;\r
-  color: #fca5a5 !important;\r
-  font-size: 12px !important;\r
-  font-weight: 600 !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  justify-content: center !important;\r
-  gap: 7px !important;\r
-  cursor: pointer !important;\r
-  transition: all 0.15s ease !important;\r
-}\r
-\r
-.ps-mic-btn:hover {\r
-  background: rgba(229, 83, 75, 0.22) !important;\r
-}\r
-\r
-.ps-mic-btn.recording {\r
-  background: var(--ps-danger) !important;\r
-  color: #fff !important;\r
-  animation: ps-pulse 1.5s infinite !important;\r
-}\r
-\r
-@keyframes ps-pulse {\r
-  0% { box-shadow: 0 0 0 0 rgba(229, 83, 75, 0.5); }\r
-  70% { box-shadow: 0 0 0 6px rgba(229, 83, 75, 0); }\r
-  100% { box-shadow: 0 0 0 0 rgba(229, 83, 75, 0); }\r
-}\r
-\r
-.ps-audio-meter {\r
-  height: 6px !important;\r
-  background: rgba(255, 255, 255, 0.06) !important;\r
-  border-radius: 3px !important;\r
-  overflow: hidden !important;\r
-}\r
-\r
-.ps-audio-bar {\r
-  height: 100% !important;\r
-  width: 0% !important;\r
-  background: #3fb950 !important;\r
-  border-radius: 3px !important;\r
-  transition: width 0.1s linear !important;\r
-}\r
-\r
-/* Presets List */\r
-.ps-presets-list {\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  gap: 5px !important;\r
-}\r
-\r
-.ps-preset-item {\r
-  background: var(--ps-bg-base) !important;\r
-  border: 1px solid var(--ps-border) !important;\r
-  border-radius: 4px !important;\r
-  padding: 7px 9px !important;\r
-  cursor: pointer !important;\r
-  transition: all 0.12s ease !important;\r
-  text-align: left !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  gap: 2px !important;\r
-}\r
-\r
-.ps-preset-item:hover {\r
-  border-color: var(--ps-border-strong) !important;\r
-  background: var(--ps-bg-hover) !important;\r
-}\r
-\r
-.ps-preset-item.active {\r
-  border-color: var(--ps-accent) !important;\r
-  background: color-mix(in srgb, var(--ps-accent) 14%, transparent) !important;\r
-}\r
-\r
-.ps-preset-header {\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  justify-content: space-between !important;\r
-}\r
-\r
-.ps-preset-name {\r
-  font-size: 12px !important;\r
-  font-weight: 600 !important;\r
-  color: var(--ps-text) !important;\r
-}\r
-\r
-.ps-preset-desc {\r
-  font-size: 11px !important;\r
-  color: var(--ps-text-muted) !important;\r
-  line-height: 1.3 !important;\r
-}\r
-\r
-/* Custom Instructions Input */\r
-.ps-instructions-input {\r
-  width: 100% !important;\r
-  background: var(--ps-bg-base) !important;\r
-  border: 1px solid var(--ps-border-strong) !important;\r
-  border-radius: 4px !important;\r
-  color: var(--ps-text) !important;\r
-  padding: 7px 9px !important;\r
-  font-size: 12px !important;\r
-  font-family: inherit !important;\r
-  resize: vertical !important;\r
-  min-height: 65px !important;\r
-  outline: none !important;\r
-  line-height: 1.4 !important;\r
-}\r
-\r
-.ps-instructions-input:focus {\r
-  border-color: var(--ps-accent) !important;\r
-  box-shadow: 0 0 0 1px var(--ps-accent) !important;\r
-}\r
-\r
-/* \u2500\u2500\u2500 Vertical Stack: Input (Top) & Output (Bottom) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\r
-.ps-stack-workspace {\r
-  flex: 1 !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  min-width: 0 !important;\r
-  background: var(--ps-bg-base) !important;\r
-  min-height: 0 !important;\r
-  overflow: hidden !important;\r
-}\r
-\r
-/* Spec Title Sub-header */\r
-.ps-stack-header {\r
-  padding: 7px 16px !important;\r
-  background: var(--ps-bg-header) !important;\r
-  border-bottom: 1px solid var(--ps-border) !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 12px !important;\r
-  flex-shrink: 0 !important;\r
-}\r
-\r
-.ps-title-field {\r
-  flex: 1 !important;\r
-  background: transparent !important;\r
-  border: none !important;\r
-  outline: none !important;\r
-  font-size: 14px !important;\r
-  font-weight: 600 !important;\r
-  color: var(--ps-text) !important;\r
-  font-family: inherit !important;\r
-  padding: 2px 4px !important;\r
-}\r
-\r
-.ps-title-field:focus {\r
-  background: var(--ps-bg-panel) !important;\r
-  border-radius: 3px !important;\r
-  box-shadow: 0 0 0 1px var(--ps-border-strong) !important;\r
-}\r
-\r
-/* Vertical Panes Container */\r
-.ps-vertical-panes {\r
-  flex: 1 !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  min-height: 0 !important;\r
-  overflow: hidden !important;\r
-}\r
-\r
-/* TOP PANE: Raw Input */\r
-.ps-section-input {\r
-  flex: 0 0 42% !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  min-height: 140px !important;\r
-  background: var(--ps-bg-base) !important;\r
-  border-bottom: 1px solid var(--ps-border) !important;\r
-  position: relative !important;\r
-}\r
-\r
-/* MIDDLE ACTION BAR */\r
-.ps-mid-action-bar {\r
-  height: 36px !important;\r
-  background: var(--ps-bg-header) !important;\r
-  border-bottom: 1px solid var(--ps-border) !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  justify-content: space-between !important;\r
-  padding: 0 14px !important;\r
-  flex-shrink: 0 !important;\r
-  z-index: 5 !important;\r
-}\r
-\r
-.ps-mid-info {\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 8px !important;\r
-  font-size: 11px !important;\r
-  color: var(--ps-text-muted) !important;\r
-}\r
-\r
-.ps-mid-actions {\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 8px !important;\r
-}\r
-\r
-/* BOTTOM PANE: Refined Output */\r
-.ps-section-output {\r
-  flex: 1 !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  min-height: 180px !important;\r
-  background: var(--ps-bg-base) !important;\r
-  position: relative !important;\r
-  overflow: hidden !important;\r
-}\r
-\r
-/* Pane Headers */\r
-.ps-pane-header {\r
-  height: 32px !important;\r
-  background: var(--ps-bg-panel) !important;\r
-  border-bottom: 1px solid var(--ps-border) !important;\r
-  padding: 0 14px !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  justify-content: space-between !important;\r
-  font-size: 12px !important;\r
-  flex-shrink: 0 !important;\r
-}\r
-\r
-.ps-pane-title {\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 7px !important;\r
-  font-weight: 600 !important;\r
-}\r
-\r
-.ps-badge {\r
-  font-size: 10px !important;\r
-  font-weight: 600 !important;\r
-  text-transform: uppercase !important;\r
-  padding: 1px 6px !important;\r
-  border-radius: 3px !important;\r
-  letter-spacing: 0.04em !important;\r
-}\r
-\r
-.ps-badge-input {\r
-  background: rgba(255, 255, 255, 0.08) !important;\r
-  color: var(--ps-text-muted) !important;\r
-}\r
-\r
-.ps-badge-output {\r
-  background: rgba(63, 185, 80, 0.15) !important;\r
-  color: #7ee787 !important;\r
-  border: 1px solid rgba(63, 185, 80, 0.3) !important;\r
-}\r
-\r
-.ps-pane-actions {\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 6px !important;\r
-}\r
-\r
-/* Textarea & Output Body */\r
-.ps-input-textarea {\r
-  width: 100% !important;\r
-  height: 100% !important;\r
-  background: transparent !important;\r
-  color: var(--ps-text) !important;\r
-  border: none !important;\r
-  outline: none !important;\r
-  padding: 12px 16px !important;\r
-  font-size: 13.5px !important;\r
-  line-height: 1.6 !important;\r
-  font-family: var(--ps-font) !important;\r
-  resize: none !important;\r
-  overflow-y: auto !important;\r
-}\r
-\r
-.ps-input-textarea::placeholder {\r
-  color: #64748b !important;\r
-}\r
-\r
-.ps-output-scroll {\r
-  width: 100% !important;\r
-  height: 100% !important;\r
-  overflow-y: auto !important;\r
-  padding: 14px 16px !important;\r
-  font-size: 13.5px !important;\r
-  line-height: 1.6 !important;\r
-  white-space: pre-wrap !important;\r
-  user-select: text !important;\r
-  font-family: var(--ps-font) !important;\r
-}\r
-\r
-.ps-output-empty {\r
-  height: 100% !important;\r
-  display: flex !important;\r
-  flex-direction: column !important;\r
-  align-items: center !important;\r
-  justify-content: center !important;\r
-  gap: 10px !important;\r
-  color: var(--ps-text-muted) !important;\r
-  text-align: center !important;\r
-  padding: 24px !important;\r
-}\r
-\r
-/* Diff Tokens */\r
-.ps-diff-added {\r
-  background: rgba(46, 160, 67, 0.22) !important;\r
-  color: #7ee787 !important;\r
-  padding: 1px 3px !important;\r
-  border-radius: 3px !important;\r
-}\r
-\r
-.ps-diff-removed {\r
-  background: rgba(229, 83, 75, 0.22) !important;\r
-  color: #fca5a5 !important;\r
-  text-decoration: line-through !important;\r
-  padding: 1px 3px !important;\r
-  border-radius: 3px !important;\r
-}\r
-\r
-.ps-diff-unchanged {\r
-  color: var(--ps-text) !important;\r
-}\r
-\r
-/* \u2500\u2500\u2500 Bottom Status Bar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\r
-.ps-statusbar {\r
-  height: 26px !important;\r
-  background: var(--ps-bg-header) !important;\r
-  border-top: 1px solid var(--ps-border) !important;\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  padding: 0 14px !important;\r
-  font-size: 11px !important;\r
-  color: var(--ps-text-muted) !important;\r
-  gap: 16px !important;\r
-  flex-shrink: 0 !important;\r
-}\r
-\r
-.ps-status-item {\r
-  display: flex !important;\r
-  align-items: center !important;\r
-  gap: 5px !important;\r
-}\r
-\r
-.ps-kbd {\r
-  background: var(--ps-bg-panel) !important;\r
-  border: 1px solid var(--ps-border-strong) !important;\r
-  padding: 1px 4px !important;\r
-  border-radius: 3px !important;\r
-  font-size: 10px !important;\r
-  font-family: var(--ps-mono) !important;\r
-}\r
-\`\r
+function Te(){return globalThis.__ZCC_PLUGIN_RUNTIME__??{}}function Ie(e){throw new Error(`${e} is not available until the host plugin runtime is installed`)}function Ze(e){return{__zccPluginApp:!0,setup:e}}function be(){return Te().useRpc?.()??Ie("useRpc")}function he(){return Te().useComposer?.()??Ie("useComposer")}function Ke(){return Te().useComposerView?.()??Ie("useComposerView")}var Ut=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"];var L=class extends Error{code;constructor(t,r){super(r),this.name="RecordingError",this.code=t}};function Bt(e){return Ut.find(t=>e(t))??null}var Wt="audio/webm";function jt(){return{getUserMedia:e=>navigator.mediaDevices.getUserMedia(e),createRecorder:(e,t)=>new MediaRecorder(e,t?{mimeType:t}:void 0),isTypeSupported:e=>typeof MediaRecorder<"u"&&MediaRecorder.isTypeSupported(e)}}async function Ht(e){try{return await e.getUserMedia({audio:!0})}catch(t){let r=t instanceof Error?t.name:"";throw r==="NotAllowedError"||r==="SecurityError"?new L("MIC_DENIED","Microphone access was denied. Allow it for Zana in system settings, then try again."):new L("MIC_UNAVAILABLE","No microphone is available. Connect one and try again.")}}function Pe(e){return new Promise((t,r)=>{let i=new FileReader;i.onload=()=>{let s=typeof i.result=="string"?i.result:"";t(s.slice(s.indexOf(",")+1))},i.onerror=()=>r(new L("RECORDING_FAILED","The recording could not be read.")),i.readAsDataURL(e)})}async function Gt(e,t){let r=new Blob(e,{type:t});return{base64:await Pe(r),mimeType:r.type||t}}function qt(e,t){if(!(e>0&&Number.isFinite(e)))return()=>{};let r=setTimeout(t,e);return()=>clearTimeout(r)}var Zt="That recording is too large to transcribe. Keep dictation shorter and try again.";function Kt(e,t){let r=Math.max(t,e),i=[],s=0,c=!1;return{chunks:i,get overflowed(){return c},add(d){return d.size===0||c?"ignored":s+d.size>r?(c=!0,"overflow"):(i.push(d),s+=d.size,s>=e?"limit-reached":"accepted")}}}function Yt(e,t){let r=new Promise((i,s)=>{e.onstop=()=>i(),e.onerror=()=>{let c=new L("RECORDING_FAILED","Recording stopped unexpectedly. Try again.");t(c),s(c)}});return r.catch(()=>{}),r}function Xt(e,t,r,i){let s=Yt(e,i);return e.ondataavailable=c=>{let d=t.add(c.data);(d==="limit-reached"||d==="overflow")&&r()},e.start(1e3),s}async function Jt(e,t,r,i){try{await e}finally{t()}if(r.overflowed)throw new L("RECORDING_FAILED",Zt);return Gt(r.chunks,i)}function Qt(e){let t=()=>{};return{stopRecorder(){t(),e.state!=="inactive"&&e.stop()},armTimer(r,i){t=qt(r,i)}}}function en(e,t){let r=null;return{attach(i){r=i},detach(){r=null},autoStop(){e();let i=r?.onAutoStop;r&&(r.onAutoStop=void 0),i?.()},fail(i){e(),t();let s=r?.onError;r=null,s?.(i)}}}function tn(e,t,r,i){let s=Kt(i.maxBytes??9437184,i.hardMaxBytes??10485760),{stopRecorder:c,armTimer:d}=Qt(e),p=en(c,t);d(i.maxDurationMs??12e4,p.autoStop);let f=Xt(e,s,p.autoStop,p.fail),l={onError:i.onError,onAutoStop:i.onAutoStop,async stop(){c();try{return await Jt(f,t,s,e.mimeType||r)}finally{p.detach()}},cancel(){c(),t(),p.detach()}};return p.attach(l),l}var ee=()=>nn();async function nn(e=jt(),t={}){let r=await Ht(e),i=on(r),s=r.getTracks(),c,d=()=>{for(let p of s)c&&p.removeEventListener?.("ended",c);i?.close(),s.forEach(p=>p.stop())};try{let p=Bt(e.isTypeSupported)??Wt,f=e.createRecorder(r,p),l=tn(f,d,p,t);return l.getAudioLevel=()=>i?.level()??null,c=()=>{let g=l.onError;l.cancel(),g?.(new L("MIC_UNAVAILABLE","Microphone disconnected. Check your device and try again."))},s.forEach(g=>g.addEventListener?.("ended",c)),l}catch(p){throw d(),p instanceof L?p:new L("RECORDING_FAILED",p instanceof Error?p.message:"The recording could not be started.")}}function on(e){let t;try{t=new AudioContext;let r=t.createMediaStreamSource(e),i=t.createAnalyser();i.fftSize=256,r.connect(i);let s=new Uint8Array(i.fftSize),c=t,d=!1;return{level(){if(c.state&&c.state!=="running")return null;i.getByteTimeDomainData(s);let p=s.reduce((f,l)=>f+((l-128)/128)**2,0)/s.length;return Math.min(1,Math.sqrt(p)*5)},close(){d||(d=!0,r.disconnect(),c.close().catch(p=>console.error("Prompt Voice audio meter cleanup failed",p)))}}}catch(r){return t&&t.close().catch(i=>console.error("Prompt Voice audio meter cleanup failed",i)),console.warn("Prompt Voice audio meter unavailable",r),null}}var y=globalThis.__ZCC_HOST_REACT__,Ye=y,Wn=y.Children,jn=y.Component,Hn=y.Fragment,Gn=y.StrictMode,qn=y.Suspense,Zn=y.cloneElement,Kn=y.createContext,Yn=y.createElement,Xn=y.createRef,Jn=y.forwardRef,Qn=y.isValidElement,eo=y.lazy,to=y.memo,no=y.startTransition,C=y.useCallback,oo=y.useContext,ro=y.useDebugValue,io=y.useDeferredValue,E=y.useEffect,ao=y.useId,so=y.useImperativeHandle,po=y.useInsertionEffect,lo=y.useLayoutEffect,H=y.useMemo,Xe=y.useReducer,T=y.useRef,v=y.useState,co=y.useSyncExternalStore,uo=y.useTransition,mo=y.version;var ve="promptVoice.transcribe",se="promptVoice.status",Je="promptVoice.rephrase",Qe="promptVoice.availableModels",z={state:"promptVoice.localWhisper.state",installRuntime:"promptVoice.localWhisper.installRuntime",cancelRuntimeInstall:"promptVoice.localWhisper.cancelRuntimeInstall",downloadModel:"promptVoice.localWhisper.downloadModel",cancelModelDownload:"promptVoice.localWhisper.cancelModelDownload",removeModel:"promptVoice.localWhisper.removeModel",selectModel:"promptVoice.localWhisper.selectModel",start:"promptVoice.localWhisper.start",stop:"promptVoice.localWhisper.stop"};function te(e,t){let r=t.trim();return r?e?/\s$/.test(e)?`${e}${r}`:`${e} ${r}`:r:e}var rn="No speech detected.",Ne={phase:"idle",notice:null,error:null};function et(e,t){switch(t.type){case"START":return e.phase==="idle"||e.phase==="error"?{phase:"starting",notice:null,error:null}:e;case"STARTED":return e.phase==="starting"?{...e,phase:"recording"}:e;case"STOP":return e.phase==="recording"||e.phase==="starting"?{phase:"processing",notice:null,error:null}:e;case"CANCEL":return e.phase==="recording"||e.phase==="starting"?{...Ne}:e;case"SUCCESS":case"NO_SPEECH":return e.phase!=="processing"?e:{phase:"idle",notice:t.type==="NO_SPEECH"?rn:t.notice,error:null};case"CLEAR_NOTICE":return e.notice?{...e,notice:null}:e;case"FAILURE":return{phase:"error",notice:null,error:t.message}}}var _e=16e3,tt=44,pe=2,an="This recording couldn't be prepared for Local Whisper. Try again.",sn=async(e,t)=>{let i=await new OfflineAudioContext(1,1,t).decodeAudioData(e),s=Array.from({length:i.numberOfChannels},(c,d)=>i.getChannelData(d));return{sampleRate:i.sampleRate,channels:s}};function pn(e){if(e.length===0)return new Float32Array(0);if(e.length===1)return e[0];let t=Math.min(...e.map(i=>i.length)),r=new Float32Array(t);for(let i=0;i<t;i+=1){let s=0;for(let c of e)s+=c[i];r[i]=s/e.length}return r}function ln(e,t){let r=e.length*pe,i=new Uint8Array(tt+r),s=new DataView(i.buffer),c=(d,p)=>{for(let f=0;f<p.length;f+=1)s.setUint8(d+f,p.charCodeAt(f))};c(0,"RIFF"),s.setUint32(4,36+r,!0),c(8,"WAVE"),c(12,"fmt "),s.setUint32(16,16,!0),s.setUint16(20,1,!0),s.setUint16(22,1,!0),s.setUint32(24,t,!0),s.setUint32(28,t*pe,!0),s.setUint16(32,pe,!0),s.setUint16(34,8*pe,!0),c(36,"data"),s.setUint32(40,r,!0);for(let d=0;d<e.length;d+=1){let p=Math.max(-1,Math.min(1,e[d]));s.setInt16(tt+d*pe,p<0?p*32768:p*32767,!0)}return i}function cn(e){let t=atob(e),r=new Uint8Array(t.length);for(let i=0;i<t.length;i+=1)r[i]=t.charCodeAt(i);return r.buffer}async function dn(e,t=sn){let r;try{let i=await t(cn(e.base64),_e);if(i.sampleRate!==_e)throw new Error("decoder ignored the requested sample rate");r=ln(pn(i.channels),_e)}catch{throw new L("RECORDING_FAILED",an)}return{base64:await Pe(new Blob([r],{type:"audio/wav"})),mimeType:"audio/wav"}}async function xe(e,t,r=dn){return(await e.call(se).catch(()=>null))?.audioFormat==="wav"?r(t):t}var un="Prompt Voice returned an unexpected response. Try again.",mn="Dictation failed. Try again.",fn=4e3;function gn(e){return typeof e=="object"&&e!==null&&typeof e.ok=="boolean"}async function bn(e,t){let r=await xe(e,t),i=await e.call(ve,{audio:r.base64,mimeType:r.mimeType});if(!gn(i))throw new Error(un);return i}function nt(e){return e instanceof Error&&e.message?e.message:mn}function hn(e,t,r){if(!e.ok){r({type:"FAILURE",message:e.message});return}if(e.status==="no-speech"){r({type:"NO_SPEECH"});return}t.updateText(s=>te(s,e.text)),t.focus();let i=e.refineNotice?`Inserted the raw transcript. ${e.refineNotice.message}`:"Added to draft.";r({type:"SUCCESS",notice:i})}function vn(e,t,r,i){return t()?(e.onError=s=>{t()&&i(s)},e.onAutoStop=()=>{t()&&r()},e):(e.cancel(),null)}function xn(e,t,r,i,s){let c=d=>s({type:"FAILURE",message:nt(d)});return e.then(d=>{let p=vn(d,r,i,f=>{t.current=null,c(f)});return p&&(t.current=p),p},d=>(r()&&c(d),null))}function yn(e,t){let r=T(null),i=T(null),s=T(0),c=T(!0),d=C(()=>{s.current++,i.current=null,r.current&&(r.current.cancel(),r.current=null),t({type:"CANCEL"})},[t]);E(()=>(c.current=!0,()=>{c.current=!1,d()}),[d]);let p=C(async()=>{let m=i.current?await i.current:r.current;return r.current=null,m},[]),f=C(async m=>{let b=++s.current,h=()=>c.current&&s.current===b,R=xn(e(),r,h,m,t);i.current=R,await R&&h()&&t({type:"STARTED"}),i.current===R&&(i.current=null)},[t,e]),l=C(()=>c.current,[]),g=C(()=>r.current?.getAudioLevel?.()??null,[]);return{start:f,takeSession:p,cancel:d,isMounted:l,getAudioLevel:g}}function ot({startSession:e=ee,noticeDurationMs:t=fn}={}){let r=he(),i=be(),[s,c]=Xe(et,Ne),{start:d,takeSession:p,cancel:f,isMounted:l,getAudioLevel:g}=yn(e,c),[m,b]=v(null),[h,R]=v(0),[Z,N]=v(!1);E(()=>{if(s.phase!=="recording"){b(null),R(0);return}let O=Date.now(),W=()=>{b(g()),R(Math.floor((Date.now()-O)/1e3))};W();let V=setInterval(W,100);return()=>clearInterval(V)},[g,s.phase]),E(()=>{if(!s.notice)return;let O=setTimeout(()=>{c({type:"CLEAR_NOTICE"})},t);return()=>clearTimeout(O)},[t,s.notice]);let _=C(()=>{c({type:"CLEAR_NOTICE"})},[]),D=C(async()=>{c({type:"STOP"});let O=await p();if(!(!l()||!O))try{let W=await O.stop();if(!l())return;let V=await bn(i,W);if(!l())return;hn(V,r,c)}catch(W){if(!l())return;c({type:"FAILURE",message:nt(W)})}},[r,l,i,p]),K=C(async()=>{N(!1),c({type:"START"}),await d(()=>{N(!0),D()})},[D,d]),le=C(()=>{s.phase==="recording"||s.phase==="starting"?D():s.phase!=="processing"&&K()},[K,D,s.phase]);return{phase:s.phase,error:s.error,notice:s.notice,level:m,seconds:h,autoStopped:Z,onClick:le,cancel:f,clearNotice:_,beginDictation:K,finishDictation:D}}var Me=`/* Base Container */
+.pv-mic {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  box-sizing: border-box;
+  vertical-align: middle;
+  background: transparent;
+  border: none;
+  user-select: none;
+  position: relative;
+}
+
+.pv-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Base button reset */
+.pv-mic-button {
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.pv-mic-button:focus-visible {
+  outline: 2px solid var(--focus-ring, #4a90e2);
+  outline-offset: 2px;
+}
+
+.pv-mic-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Dictation Pill Container: shared morphing capsule across all phases */
+.pv-dictation-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--pv-pill-bg, #181920);
+  border: 1px solid var(--pv-pill-border, rgba(239, 68, 68, 0.35));
+  transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s ease,
+              box-shadow 0.25s ease,
+              background 0.25s ease,
+              padding 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+/* 1. Idle: Oval Capsule Pill with Signature Crimson Border containing only the mic icon */
+.pv-mic.pv-phase-idle {
+  width: 58px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--pv-pill-bg, #181920);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.12);
+  padding: 0;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pv-mic.pv-phase-idle:hover {
+  background: #20222c;
+  border-color: rgba(239, 68, 68, 0.75);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.28);
+  transform: scale(1.04);
+}
+
+.pv-mic.pv-phase-idle:active {
+  transform: scale(0.97);
+}
+
+.pv-mic.pv-phase-idle .pv-idle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--text-secondary, #cbd5e1);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.pv-mic.pv-phase-idle:hover .pv-idle-icon {
+  color: #ffffff;
+}
+
+/* 2. Starting Oval: extends smoothly */
+.pv-mic.pv-phase-starting {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(234, 179, 8, 0.45);
+  box-shadow: 0 0 14px rgba(234, 179, 8, 0.15);
+  padding: 0 4px 0 10px;
+  gap: 10px;
+}
+
+/* 3. Recording / Listening Oval: extends with red glow */
+.pv-mic.pv-phase-recording {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.18), 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: 0 4px 0 10px;
+  gap: 10px;
+}
+
+/* 4. Processing Oval */
+.pv-mic.pv-phase-processing {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.15);
+  padding: 0 6px 0 10px;
+  gap: 10px;
+}
+
+/* 5. Notice Oval: same control showing completion */
+.pv-mic.pv-has-notice {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.15);
+  padding: 0 14px 0 12px;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.pv-mic.pv-has-notice:hover {
+  border-color: rgba(34, 197, 94, 0.75);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.pv-notice-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: pv-notice-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pv-notice-check {
+  color: #4ade80;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+@keyframes pv-notice-enter {
+  from { opacity: 0; transform: scale(0.96) translateX(-3px); }
+  to { opacity: 1; transform: scale(1) translateX(0); }
+}
+
+/* Flex ordering for active pill children */
+.pv-mic-active .pv-pill-timer-badge {
+  order: 1;
+}
+
+.pv-mic-active .pv-pill-center {
+  order: 2;
+}
+
+.pv-mic-active .pv-mic-button.pv-pill-btn-stop {
+  order: 3;
+}
+
+.pv-mic-active .pv-pill-btn-cancel {
+  order: 4;
+}
+
+/* Timer Badge */
+.pv-pill-timer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 9999px;
+  padding: 2px 8px 2px 6px;
+}
+
+.pv-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger-color, #ef4444);
+  box-shadow: 0 0 8px var(--danger-color, #ef4444);
+  animation: pv-pulse-dot 1.4s ease-in-out infinite;
+}
+
+.pv-pill-dot-starting {
+  background: #eab308;
+  box-shadow: 0 0 8px #eab308;
+}
+
+@keyframes pv-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.pv-pill-timer-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  letter-spacing: 0.02em;
+}
+
+/* Center area */
+.pv-pill-center {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pv-pill-waveform {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 16px;
+}
+
+.pv-pill-waveform-bar {
+  width: 3px;
+  background: #38bdf8;
+  border-radius: 9999px;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
+  transition: height 0.08s ease;
+  min-height: 3px;
+  height: 5px;
+}
+
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(1) { animation: pv-wave 0.8s ease-in-out infinite alternate; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(2) { animation: pv-wave 0.6s ease-in-out infinite alternate 0.15s; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(3) { animation: pv-wave 0.7s ease-in-out infinite alternate 0.3s; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(4) { animation: pv-wave 0.5s ease-in-out infinite alternate 0.2s; }
+.pv-pill-waveform.animated .pv-pill-waveform-bar:nth-child(5) { animation: pv-wave 0.9s ease-in-out infinite alternate 0.05s; }
+
+@keyframes pv-wave {
+  0% { height: 4px; }
+  100% { height: 14px; }
+}
+
+.pv-pill-status {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.pv-mic-quiet-warning {
+  font-size: 11px;
+  color: #fbbf24;
+}
+
+/* Stop button inside active pill */
+.pv-mic-button.pv-pill-btn-stop {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #f87171;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.pv-mic-button.pv-pill-btn-stop:hover {
+  background: rgba(239, 68, 68, 0.38);
+  border-color: rgba(239, 68, 68, 0.8);
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Cancel button inside active pill */
+.pv-pill-btn-cancel {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.pv-pill-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #f1f5f9;
+  transform: scale(1.05);
+}
+
+/* Spinner */
+.pv-mic-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: pv-spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes pv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error styles */
+.pv-mic.pv-phase-error {
+  width: auto;
+  border-radius: 9999px;
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+  padding: 0 10px;
+}
+
+.pv-mic-error {
+  color: var(--danger-color, #ef4444);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-pill-waveform.animated .pv-pill-waveform-bar { animation: none; height: 8px; }
+  .pv-pill-waveform-bar { transition: none; }
+  .pv-mic-spinner { animation: none; }
+}
+
+\`
+
+\`
+/* ==========================================================================\\n   Prompt Studio - Zana Native Vertical Stack (Input Top, Output Bottom)\\n   ========================================================================== */
+
+:root {
+  --ps-bg-base: var(--bg-base, #1e1e1e);
+  --ps-bg-panel: var(--bg-panel, #252526);
+  --ps-bg-header: var(--bg-header, #202021);
+  --ps-bg-subtle: rgba(255, 255, 255, 0.04);
+  --ps-bg-hover: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  --ps-bg-active: rgba(255, 255, 255, 0.1);
+  --ps-border: var(--border, rgba(255, 255, 255, 0.08));
+  --ps-border-strong: var(--border-strong, rgba(255, 255, 255, 0.16));
+  --ps-text: var(--text-primary, #e6edf3);
+  --ps-text-muted: var(--text-muted, #8a8a8a);
+  --ps-accent: var(--accent, #007acc);
+  --ps-accent-hover: #0098ff;
+  --ps-danger: var(--danger, #e5534b);
+  --ps-warn: #d29922;
+  --ps-success: var(--success, #3fb950);
+  --ps-font: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  --ps-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+}
+
+.ps-root {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  background: var(--ps-bg-base) !important;
+  color: var(--ps-text) !important;
+  font-family: var(--ps-font) !important;
+  font-size: 13px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.ps-root *, .ps-root *::before, .ps-root *::after {
+  box-sizing: border-box !important;
+}
+
+/* \u2500\u2500\u2500 Top Studio Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.ps-toolbar {
+  height: 40px !important;
+  background: var(--ps-bg-header) !important;
+  border-bottom: 1px solid var(--ps-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 14px !important;
+  gap: 12px !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
+}
+
+.ps-brand {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  color: var(--ps-text) !important;
+}
+
+.ps-brand-badge {
+  font-size: 11px !important;
+  background: var(--ps-bg-subtle) !important;
+  border: 1px solid var(--ps-border) !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  color: var(--ps-text-muted) !important;
+}
+
+.ps-spacer {
+  flex: 1 !important;
+}
+
+/* \u2500\u2500\u2500 Zana Native Button Styles \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.ps-btn {
+  appearance: none !important;
+  border: 1px solid var(--ps-border-strong) !important;
+  background: var(--ps-bg-panel) !important;
+  color: var(--ps-text) !important;
+  border-radius: 4px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 28px !important;
+  font-family: inherit !important;
+  transition: all 0.12s ease !important;
+  white-space: nowrap !important;
+}
+
+.ps-btn:hover:not(:disabled) {
+  background: var(--ps-bg-hover) !important;
+  border-color: var(--ps-text-muted) !important;
+}
+
+.ps-btn:disabled {
+  opacity: 0.45 !important;
+  cursor: default !important;
+}
+
+.ps-btn-primary {
+  background: var(--ps-accent) !important;
+  border-color: var(--ps-accent) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.ps-btn-primary:hover:not(:disabled) {
+  background: var(--ps-accent-hover) !important;
+  border-color: var(--ps-accent-hover) !important;
+}
+
+.ps-btn-success {
+  background: #238636 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.ps-btn-success:hover:not(:disabled) {
+  background: #2ea043 !important;
+}
+
+.ps-btn-danger {
+  background: rgba(229, 83, 75, 0.15) !important;
+  border-color: var(--ps-danger) !important;
+  color: #fca5a5 !important;
+}
+
+.ps-btn-danger:hover:not(:disabled) {
+  background: rgba(229, 83, 75, 0.25) !important;
+}
+
+.ps-btn-sm {
+  height: 24px !important;
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+}
+
+/* \u2500\u2500\u2500 Main Workspace Layout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.ps-workspace {
+  flex: 1 !important;
+  display: flex !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* \u2500\u2500\u2500 Left Sidebar: Audio & Refinement Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.ps-sidebar {
+  width: 290px !important;
+  background: var(--ps-bg-panel) !important;
+  border-right: 1px solid var(--ps-border) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.ps-section {
+  padding: 12px 14px !important;
+  border-bottom: 1px solid var(--ps-border) !important;
+}
+
+.ps-section-title {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: var(--ps-text-muted) !important;
+  margin-bottom: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* Model Select Dropdown */
+.ps-select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  height: 30px !important;
+  background: var(--ps-bg-base) !important;
+  color: var(--ps-text) !important;
+  border: 1px solid var(--ps-border-strong) !important;
+  border-radius: 4px !important;
+  padding: 4px 28px 4px 8px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  outline: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ps-select:hover:not(:disabled) {
+  border-color: var(--ps-accent) !important;
+}
+
+.ps-select:focus-visible {
+  border-color: var(--ps-accent) !important;
+  box-shadow: 0 0 0 1px var(--ps-accent) !important;
+}
+
+/* Dictation Card */
+.ps-dictation-card {
+  background: var(--ps-bg-base) !important;
+  border: 1px solid var(--ps-border) !important;
+  border-radius: 5px !important;
+  padding: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.ps-mic-btn {
+  height: 32px !important;
+  border-radius: 4px !important;
+  border: 1px solid var(--ps-danger) !important;
+  background: rgba(229, 83, 75, 0.12) !important;
+  color: #fca5a5 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.ps-mic-btn:hover {
+  background: rgba(229, 83, 75, 0.22) !important;
+}
+
+.ps-mic-btn.recording {
+  background: var(--ps-danger) !important;
+  color: #fff !important;
+  animation: ps-pulse 1.5s infinite !important;
+}
+
+@keyframes ps-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(229, 83, 75, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(229, 83, 75, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(229, 83, 75, 0); }
+}
+
+.ps-audio-meter {
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-radius: 3px !important;
+  overflow: hidden !important;
+}
+
+.ps-audio-bar {
+  height: 100% !important;
+  width: 0% !important;
+  background: #3fb950 !important;
+  border-radius: 3px !important;
+  transition: width 0.1s linear !important;
+}
+
+/* Presets List */
+.ps-presets-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.ps-preset-item {
+  background: var(--ps-bg-base) !important;
+  border: 1px solid var(--ps-border) !important;
+  border-radius: 4px !important;
+  padding: 7px 9px !important;
+  cursor: pointer !important;
+  transition: all 0.12s ease !important;
+  text-align: left !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.ps-preset-item:hover {
+  border-color: var(--ps-border-strong) !important;
+  background: var(--ps-bg-hover) !important;
+}
+
+.ps-preset-item.active {
+  border-color: var(--ps-accent) !important;
+  background: color-mix(in srgb, var(--ps-accent) 14%, transparent) !important;
+}
+
+.ps-preset-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.ps-preset-name {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--ps-text) !important;
+}
+
+.ps-preset-desc {
+  font-size: 11px !important;
+  color: var(--ps-text-muted) !important;
+  line-height: 1.3 !important;
+}
+
+/* Custom Instructions Input */
+.ps-instructions-input {
+  width: 100% !important;
+  background: var(--ps-bg-base) !important;
+  border: 1px solid var(--ps-border-strong) !important;
+  border-radius: 4px !important;
+  color: var(--ps-text) !important;
+  padding: 7px 9px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  resize: vertical !important;
+  min-height: 65px !important;
+  outline: none !important;
+  line-height: 1.4 !important;
+}
+
+.ps-instructions-input:focus {
+  border-color: var(--ps-accent) !important;
+  box-shadow: 0 0 0 1px var(--ps-accent) !important;
+}
+
+/* \u2500\u2500\u2500 Vertical Stack: Input (Top) & Output (Bottom) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.ps-stack-workspace {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  background: var(--ps-bg-base) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Spec Title Sub-header */
+.ps-stack-header {
+  padding: 7px 16px !important;
+  background: var(--ps-bg-header) !important;
+  border-bottom: 1px solid var(--ps-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+.ps-title-field {
+  flex: 1 !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--ps-text) !important;
+  font-family: inherit !important;
+  padding: 2px 4px !important;
+}
+
+.ps-title-field:focus {
+  background: var(--ps-bg-panel) !important;
+  border-radius: 3px !important;
+  box-shadow: 0 0 0 1px var(--ps-border-strong) !important;
+}
+
+/* Vertical Panes Container */
+.ps-vertical-panes {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* TOP PANE: Raw Input */
+.ps-section-input {
+  flex: 0 0 42% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 140px !important;
+  background: var(--ps-bg-base) !important;
+  border-bottom: 1px solid var(--ps-border) !important;
+  position: relative !important;
+}
+
+/* MIDDLE ACTION BAR */
+.ps-mid-action-bar {
+  height: 36px !important;
+  background: var(--ps-bg-header) !important;
+  border-bottom: 1px solid var(--ps-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 14px !important;
+  flex-shrink: 0 !important;
+  z-index: 5 !important;
+}
+
+.ps-mid-info {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 11px !important;
+  color: var(--ps-text-muted) !important;
+}
+
+.ps-mid-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* BOTTOM PANE: Refined Output */
+.ps-section-output {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 180px !important;
+  background: var(--ps-bg-base) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Pane Headers */
+.ps-pane-header {
+  height: 32px !important;
+  background: var(--ps-bg-panel) !important;
+  border-bottom: 1px solid var(--ps-border) !important;
+  padding: 0 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+.ps-pane-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  font-weight: 600 !important;
+}
+
+.ps-badge {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  padding: 1px 6px !important;
+  border-radius: 3px !important;
+  letter-spacing: 0.04em !important;
+}
+
+.ps-badge-input {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--ps-text-muted) !important;
+}
+
+.ps-badge-output {
+  background: rgba(63, 185, 80, 0.15) !important;
+  color: #7ee787 !important;
+  border: 1px solid rgba(63, 185, 80, 0.3) !important;
+}
+
+.ps-pane-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* Textarea & Output Body */
+.ps-input-textarea {
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  color: var(--ps-text) !important;
+  border: none !important;
+  outline: none !important;
+  padding: 12px 16px !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  font-family: var(--ps-font) !important;
+  resize: none !important;
+  overflow-y: auto !important;
+}
+
+.ps-input-textarea::placeholder {
+  color: #64748b !important;
+}
+
+.ps-output-scroll {
+  width: 100% !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  padding: 14px 16px !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  white-space: pre-wrap !important;
+  user-select: text !important;
+  font-family: var(--ps-font) !important;
+}
+
+.ps-output-empty {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  color: var(--ps-text-muted) !important;
+  text-align: center !important;
+  padding: 24px !important;
+}
+
+/* Diff Tokens */
+.ps-diff-added {
+  background: rgba(46, 160, 67, 0.22) !important;
+  color: #7ee787 !important;
+  padding: 1px 3px !important;
+  border-radius: 3px !important;
+}
+
+.ps-diff-removed {
+  background: rgba(229, 83, 75, 0.22) !important;
+  color: #fca5a5 !important;
+  text-decoration: line-through !important;
+  padding: 1px 3px !important;
+  border-radius: 3px !important;
+}
+
+.ps-diff-unchanged {
+  color: var(--ps-text) !important;
+}
+
+/* \u2500\u2500\u2500 Bottom Status Bar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.ps-statusbar {
+  height: 26px !important;
+  background: var(--ps-bg-header) !important;
+  border-top: 1px solid var(--ps-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 14px !important;
+  font-size: 11px !important;
+  color: var(--ps-text-muted) !important;
+  gap: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.ps-status-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.ps-kbd {
+  background: var(--ps-bg-panel) !important;
+  border: 1px solid var(--ps-border-strong) !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+  font-size: 10px !important;
+  font-family: var(--ps-mono) !important;
+}
+\`
 `;var rt=globalThis.__ZCC_HOST_REACT__,F=rt.Fragment;function n(e,t,r){return rt.createElement(e,r===void 0?t:{...t,key:r})}var a=n;var Sn="Dictation",it="zcc-ext-prompt-voice-styles";function Le(){if(typeof document>"u")return;let e=document.getElementById(it);e||(e=document.createElement("style"),e.id=it,document.head.appendChild(e)),e.textContent!==Me&&(e.textContent=Me)}var Rn={idle:"Start dictation",starting:"Stop dictation",recording:"Stop dictation",processing:"Transcribing",error:"Start dictation"},at={position:"absolute",width:1,height:1,padding:0,margin:-1,overflow:"hidden",clip:"rect(0, 0, 0, 0)",whiteSpace:"nowrap",border:0};function st({startSession:e=ee}){Le();let{phase:t,error:r,notice:i,onClick:s,cancel:c,clearNotice:d,level:p,seconds:f,autoStopped:l}=ot({startSession:e}),g=t==="starting"||t==="recording"||t==="processing",m=t==="idle"&&!!i,b=`${Math.floor(f/60)}:${String(f%60).padStart(2,"0")}`;return a("div",{className:`pv-mic pv-dictation-pill pv-phase-${t} ${m?"pv-has-notice":""}`,onClick:m?d:void 0,title:m?"Click to dismiss":void 0,children:[n("button",{type:"button",className:`pv-mic-button pv-mic-${t} ${g?"pv-pill-btn-stop":"pv-idle-icon"}`,"aria-label":Sn,"aria-pressed":t==="recording"||t==="starting",title:Rn[t],disabled:t==="processing",onClick:s,style:m?{display:"none"}:void 0,children:t==="idle"||t==="error"?n("svg",{viewBox:"0 0 24 24",width:"16",height:"16","aria-hidden":"true",focusable:"false",children:n("path",{d:"M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0h-2a5 5 0 0 1-10 0H5Zm6 9h2v-3h-2v3Z",fill:"currentColor"})}):t==="processing"?n("span",{className:"pv-mic-spinner","aria-hidden":"true"}):n("svg",{viewBox:"0 0 24 24",width:"12",height:"12","aria-hidden":"true",focusable:"false",children:n("rect",{x:"6",y:"6",width:"12",height:"12",rx:"2.5",fill:"currentColor"})})}),m?a("span",{role:"status",className:"pv-notice-content",children:[n("span",{className:"pv-notice-check",children:"\u2713"}),n("span",{className:"pv-pill-status",children:i})]}):null,t==="starting"?a(F,{children:[a("div",{className:"pv-pill-timer-badge",children:[n("div",{className:"pv-pill-dot pv-pill-dot-starting"}),n("span",{className:"pv-pill-timer-text",children:"0:00"})]}),a("div",{className:"pv-pill-center",role:"status",children:[n("span",{className:"pv-mic-spinner","aria-hidden":"true"}),n("span",{className:"pv-pill-status",children:"Requesting microphone\u2026"})]})]}):null,t==="recording"?a(F,{children:[a("div",{className:"pv-pill-timer-badge",children:[n("div",{className:"pv-pill-dot"}),a("span",{className:"pv-pill-timer-text",children:[n("span",{className:"pv-sr-only",style:at,children:"Recording "}),b]})]}),a("div",{className:"pv-pill-center",role:"status",children:[p===null?n("span",{className:"pv-sr-only",style:at,children:"Audio meter unavailable"}):null,n("span",{className:`pv-pill-waveform ${p===null?"animated":""}`,"aria-label":"Microphone audio activity",role:"meter","aria-valuemin":0,"aria-valuemax":100,"aria-valuenow":Math.round((p??.3)*100),children:[.4,.7,1,.7,.4].map((h,R)=>n("span",{className:"pv-pill-waveform-bar",style:p!==null?{height:`${Math.max(3,p*h*20)}px`}:void 0},R))}),n("span",{className:"pv-pill-status",children:"Listening..."}),p!==null&&p<.015&&f>=5?n("span",{className:"pv-mic-quiet-warning",children:"No audio detected \u2014 check your microphone."}):null]})]}):null,t==="processing"?a(F,{children:[n("div",{className:"pv-pill-timer-badge",children:n("span",{className:"pv-pill-timer-text",children:b})}),n("div",{className:"pv-pill-center",role:"status",children:a("span",{className:"pv-pill-status",children:[n("span",{className:"pv-mic-spinner","aria-hidden":"true"})," ",l?"Recording limit reached. ":"","Transcribing and refining\u2026"]})})]}):null,t==="starting"||t==="recording"?n("button",{type:"button",className:"pv-mic-cancel pv-pill-btn-cancel",onClick:c,"aria-label":"Cancel recording",title:"Cancel recording",children:n("svg",{viewBox:"0 0 24 24",width:"12",height:"12","aria-hidden":"true",focusable:"false",children:n("path",{d:"M18 6L6 18M6 6l12 12",fill:"none",stroke:"currentColor",strokeWidth:"2.5",strokeLinecap:"round"})})}):null,t==="error"&&r?n("span",{role:"alert",className:"pv-pill-status pv-mic-error",children:r}):null]})}var An=500,kn=5e3;function De(e){return e>=1e3**3?`${(e/1e3**3).toFixed(1)} GB`:`${Math.round(e/1e3**2)} MB`}function Cn(e){return e.runtime.status==="installing"||e.server.state==="starting"||e.models.some(t=>t.status==="downloading")}function En(e){return typeof e=="object"&&e!==null&&typeof e.ok=="boolean"}function Tn(e){let[t,r]=v(null),[i,s]=v(null),[c,d]=v(null),p=T(!0),f=C(b=>{if(p.current){if(!En(b)){s("Local Whisper returned an unexpected response.");return}b.state&&r(b.state),s(b.ok?null:b.message)}},[]),l=C(()=>e.call(z.state).then(f,()=>p.current&&s("Could not load Local Whisper status.")),[e,f]),g=C(async(b,h,R)=>{d(b);try{f(await e.call(h,R))}catch{p.current&&s("Local Whisper request failed. Try again.")}finally{p.current&&d(null)}},[e,f]);E(()=>(p.current=!0,l(),()=>{p.current=!1}),[l]);let m=t?Cn(t):!1;return E(()=>{let b=setInterval(()=>void l(),m?An:kn);return()=>clearInterval(b)},[m,l]),{state:t,error:i,pending:c,run:g}}function Oe({tone:e}){return n("span",{"aria-hidden":"true",style:{width:9,height:9,borderRadius:"50%",marginTop:4,flex:"none",background:{ok:"var(--ps-success)",warn:"var(--ps-warn)",err:"var(--ps-danger)",busy:"var(--ps-accent)",idle:"var(--ps-text-muted)"}[e]}})}function pt({value:e,label:t}){let r=Math.round(e*100);return n("div",{role:"progressbar","aria-label":t,"aria-valuenow":r,"aria-valuemin":0,"aria-valuemax":100,style:{height:5,minWidth:80,background:"var(--ps-bg-hover)",borderRadius:3,overflow:"hidden"},children:n("div",{style:{width:`${r}%`,height:"100%",background:"var(--ps-accent)"}})})}var ye={display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",borderRadius:6,border:"1px solid var(--ps-border)"},G={color:"var(--ps-text-muted)",fontSize:11};function In(e){let{runtime:t,server:r,activeModelId:i}=e;return t.status==="not-installed"?{tone:"idle",title:"Runtime not installed",detail:`whisper.cpp ${t.version} \xB7 requires ${t.requirements.join(", ")||"no extra components"}`,action:{label:"Install runtime",method:z.installRuntime,primary:!0}}:t.status==="installing"?{tone:"busy",title:`Installing runtime\u2026 ${Math.round((t.progress??0)*100)}%`,detail:"Verifying the download as it arrives.",action:{label:"Cancel",method:z.cancelRuntimeInstall}}:r.state==="running"?{tone:"ok",title:"Running",detail:`Model ${r.modelId} \xB7 on this device (127.0.0.1) \xB7 managed by Prompt Voice`,action:{label:"Stop",method:z.stop}}:r.state==="starting"?{tone:"busy",title:"Starting\u2026",detail:`Loading model ${r.modelId}.`}:r.state==="crashed"?{tone:"err",title:"Stopped unexpectedly",detail:`Exit code ${r.exitCode??"unknown"}. Logs contain no audio or transcripts.`,action:{label:"Restart",method:z.start,primary:!0}}:i?{tone:"warn",title:"Stopped",detail:"Starts automatically when you dictate.",action:{label:"Start",method:z.start}}:{tone:"warn",title:"Runtime installed",detail:"Download a model below and choose Use to start."}}function Pn({model:e,state:t,pending:r,onRun:i}){let s=t.activeModelId===e.id,c=t.runtime.status==="installed"&&!s,d=g=>`${g}:${e.id}`,p={modelId:e.id},f=null,l;return e.status==="downloading"?(f=a(F,{children:[n(pt,{value:e.progress??0,label:`Downloading ${e.label}`}),a("span",{style:G,children:[Math.round((e.progress??0)*100),"% of ",De(e.sizeBytes)]})]}),l=n("button",{type:"button",className:"ps-btn",onClick:()=>i(d("cancel"),z.cancelModelDownload,p),children:"Cancel"})):e.status==="available"?l=a("button",{type:"button",className:"ps-btn",disabled:r===d("download"),onClick:()=>i(d("download"),z.downloadModel,p),children:["Download ",De(e.sizeBytes)]}):(f=s?n("span",{className:"ps-tag",children:"Active"}):r===d("use")?n("span",{className:"ps-tag",children:"Loading\u2026"}):n("span",{className:"ps-tag",children:"Installed"}),l=a(F,{children:[c&&n("button",{type:"button",className:"ps-btn",disabled:r!==null,onClick:()=>i(d("use"),z.selectModel,p),children:"Use"}),n("button",{type:"button",className:"ps-btn ps-btn-danger",disabled:s||r!==null,title:s?"Choose another model before removing this one":void 0,"aria-label":`Remove ${e.label}`,onClick:()=>i(d("remove"),z.removeModel,p),children:"Remove"})]})),a("tr",{style:s?{background:"color-mix(in srgb, var(--ps-accent) 10%, transparent)"}:void 0,children:[a("td",{style:{padding:"8px 6px"},children:[n("strong",{children:e.label})," ",e.recommended&&n("span",{className:"ps-tag",children:"Recommended"})]}),a("td",{style:{padding:"8px 6px",...G},children:[De(e.sizeBytes)," disk",e.memoryEstimate?a(F,{children:[n("br",{}),e.memoryEstimate," RAM"]}):null]}),n("td",{style:{padding:"8px 6px"},children:n("div",{style:{display:"flex",flexDirection:"column",gap:4},children:f})}),n("td",{style:{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"},children:n("div",{style:{display:"inline-flex",gap:6},children:l})})]})}function Nn(e,t){let r=e==="local-whisper";return r&&t==="none"?{offline:!0,text:"Audio and text stay on this device."}:r?{offline:!1,text:"Audio stays on this device. Cleanup sends the transcript to your selected cleanup model."}:{offline:!1,text:"Audio leaves this device for transcription."}}function lt({rpc:e,sttProvider:t,llmProvider:r,onApplyPreset:i}){let{state:s,error:c,pending:d,run:p}=Tn(e),f=Nn(t,r),l=s?.runtime.status==="installed"&&s.activeModelId!==null;return a("section",{className:"ps-pane",style:{flex:"none"},"aria-labelledby":"ps-lw-title",children:[a("div",{className:"ps-pane-header",children:[n("h2",{id:"ps-lw-title",className:"ps-pane-title",style:{margin:0},children:"Local Whisper"}),n("span",{className:"ps-tag",children:s?s.platform.supported?l?"Ready":"Not set up":"Unavailable":"Loading\u2026"})]}),a("div",{style:{display:"flex",flexDirection:"column",gap:14,padding:14},children:[n("p",{style:{...G,margin:0},children:"Transcribe on this device. Audio is never sent anywhere when Local Whisper is the speech provider."}),(c||s?.lastError)&&n("div",{role:"alert",style:{...ye,borderColor:"var(--ps-danger)",color:"var(--ps-danger)",fontSize:12},children:c??s?.lastError?.message}),s&&!s.platform.supported&&a("div",{style:ye,children:[n(Oe,{tone:"err"}),a("div",{children:[n("strong",{children:"Not available on this computer"}),n("div",{style:G,children:s.platform.message})]})]}),s?.platform.supported&&n(_n,{state:s,pending:d,onRun:p}),s?.platform.supported&&a("div",{children:[a("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline"},children:[n("span",{className:"ps-field-label",children:"Models \xB7 multilingual"}),n("span",{style:G,children:"Stored in this computer's app data"})]}),a("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12},children:[n("thead",{children:n("tr",{children:["Model","Size","Status",""].map(g=>n("th",{style:{textAlign:"left",...G,fontWeight:600,padding:"4px 6px"},children:g},g))})}),n("tbody",{children:s.models.map(g=>n(Pn,{model:g,state:s,pending:d,onRun:p},g.id))})]})]}),a("div",{style:ye,children:[n(Oe,{tone:f.offline?"ok":"warn"}),a("div",{style:{flex:1},children:[n("strong",{children:f.offline?"Fully offline":"Not fully offline"}),n("div",{style:G,children:f.text})]}),!f.offline&&n("button",{type:"button",className:"ps-btn",onClick:()=>i({sttProvider:"local-whisper",llmProvider:"none"}),children:"Use offline preset"})]})]})]})}function _n({state:e,pending:t,onRun:r}){let i=In(e);return a("div",{style:ye,"aria-live":"polite",children:[n(Oe,{tone:i.tone}),a("div",{style:{flex:1,minWidth:0},children:[n("strong",{children:i.title}),n("div",{style:G,children:i.detail}),e.runtime.status==="installing"&&n("div",{style:{marginTop:6},children:n(pt,{value:e.runtime.progress??0,label:"Installing runtime"})})]}),i.action&&n("button",{type:"button",className:i.action.primary?"ps-btn ps-btn-primary":"ps-btn",disabled:t==="runtime",onClick:()=>r("runtime",i.action.method),children:i.action.label})]})}var Mn={"Voice & transcription":[{key:"sttProvider",label:"Speech-to-text provider",options:["system","google-gemini","openai","local-whisper"]},{key:"inputLanguage",label:"Input language",options:["auto","en","he","de","fr","es","ja"]},{key:"dictionary",label:"Personal dictionary",multiline:!0,help:"Names and terms, one per line."}],"Prompt Voice":[{key:"tone",label:"Cleanup tone",options:["conversational","formal","casual","technical","custom"]},{key:"customPrompt",label:"Custom cleanup instructions",multiline:!0}],Connections:[]},$e={sttProvider:"system",inputLanguage:"auto",tone:"conversational"},Ln={auto:"Detect automatically",system:"Zana voice",none:"Off",assistant:"Zana assistant",openai:"OpenAI",anthropic:"Anthropic",google:"Google AI","google-gemini":"Google Gemini","local-whisper":"Local Whisper (on this device)",en:"English",he:"Hebrew",de:"German",fr:"French",es:"Spanish",ja:"Japanese"};function ct({rpc:e,onBack:t}){let[r,i]=v({}),[s,c]=v("Loading\u2026"),[d,p]=v(null),f=T(0),l=T({});E(()=>{let m=!0;return e.call("promptVoice.settings.get").then(b=>{m&&(l.current=b||{},i(l.current),c("Saved"))}).catch(()=>{m&&c("Could not load settings")}),()=>{m=!1}},[]);let g=m=>{let b=++f.current;l.current={...l.current,...m};let h=l.current;i(h),c("Saving\u2026"),e.call("promptVoice.settings.update",h).then(()=>{b===f.current&&(p(null),c("Saved"))}).catch(()=>{b===f.current&&(p(h),c("Could not save settings."))})};return n("div",{className:"ps-workspace",children:n("main",{className:"ps-editor-canvas",style:{overflowY:"auto"},children:a("div",{style:{width:"100%",maxWidth:760,margin:"0 auto",display:"flex",flexDirection:"column",gap:12},children:[a("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12},children:[a("div",{children:[n("h1",{style:{fontSize:18,margin:"4px 0"},children:"Settings"}),n("span",{style:{color:"var(--ps-text-muted)",fontSize:12},children:"Configure voice and cleanup defaults"})]}),n("button",{className:"ps-btn",onClick:t,children:"\u2190 Back to Studio"})]}),a("div",{style:{color:"var(--ps-text-muted)",fontSize:11},children:[n("span",{role:"status",children:s}),d&&n("button",{className:"ps-btn",onClick:()=>g(d),children:"Retry"})]}),Object.entries(Mn).map(([m,b])=>a(Ye.Fragment,{children:[a("section",{className:"ps-pane",style:{flex:"none"},children:[a("div",{className:"ps-pane-header",children:[n("h2",{className:"ps-pane-title",style:{margin:0},children:m}),m!=="Connections"&&n("button",{className:"ps-btn",onClick:()=>g(Object.fromEntries(b.map(h=>[h.key,$e[h.key]??""]))),children:"Reset"})]}),a("div",{style:{display:"flex",flexDirection:"column",gap:14,padding:14},children:[m==="Connections"&&n("p",{children:"Manage API keys in Zana\u2019s Prompt Voice plugin settings."}),b.filter(h=>!(h.key==="customPrompt"&&r.tone!=="custom")).map(h=>a("label",{className:"ps-field-group",children:[n("span",{className:"ps-field-label",children:h.label}),h.options?n("select",{className:"ps-select",value:r[h.key]??$e[h.key]??"",onChange:R=>g({[h.key]:R.target.value}),children:h.options.map(R=>n("option",{value:R,children:Ln[R]??R},R))}):h.multiline?n("textarea",{className:"ps-custom-prompt-input",value:r[h.key]??"",onChange:R=>g({[h.key]:R.target.value})}):n("input",{type:h.secret?"password":"text",className:"ps-select",value:r[h.key]??"",onChange:R=>g({[h.key]:R.target.value}),placeholder:h.secret?"Enter API key\u2026":void 0}),h.help&&n("small",{style:{color:"var(--ps-text-muted)"},children:h.help})]},h.key))]})]}),m==="Voice & transcription"&&n(lt,{rpc:e,sttProvider:r.sttProvider??$e.sttProvider,llmProvider:r.llmProvider,onApplyPreset:g})]},m))]})})})}function dt(e){return e?e.match(/[\p{L}\p{N}]+|\s+|[^\p{L}\p{N}\s]+/gu)||[]:[]}var ut=1200;function mt(e,t){if(!e&&!t)return[];if(e===t)return[{type:"unchanged",text:e}];if(!e)return[{type:"added",text:t}];if(!t)return[{type:"removed",text:e}];let r=dt(e),i=dt(t),s=r.length,c=i.length;if(s>ut||c>ut)return[{type:"removed",text:e},{type:"added",text:t}];let d=c+1,p=new Uint32Array((s+1)*d);for(let b=1;b<=s;b++){let h=b*d,R=(b-1)*d,Z=r[b-1];for(let N=1;N<=c;N++)if(Z===i[N-1])p[h+N]=p[R+(N-1)]+1;else{let _=p[h+(N-1)],D=p[R+N];p[h+N]=_>D?_:D}}let f=[],l=s,g=c;for(;l>0||g>0;){let b=l*d,h=(l-1)*d;l>0&&g>0&&r[l-1]===i[g-1]?(f.push({type:"unchanged",text:r[l-1]}),l--,g--):g>0&&(l===0||p[b+(g-1)]>=p[h+g])?(f.push({type:"added",text:i[g-1]}),g--):l>0&&(g===0||p[b+(g-1)]<p[h+g])&&(f.push({type:"removed",text:r[l-1]}),l--)}f.reverse();let m=[];for(let b of f)m.length>0&&m[m.length-1].type===b.type?m[m.length-1].text+=b.text:m.push({...b});return m}var Dn=`
   .ps-container {
     display: flex;
