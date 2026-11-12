@@ -21,7 +21,12 @@ export function createSettingsStore(kv: Store, readHost: () => Promise<Values>) 
   let chain: Promise<unknown> = Promise.resolve();
   async function load(): Promise<Values> {
     const saved = await kv.get(KEY);
-    if (saved && typeof saved === 'object') return preferences(saved);
+    if (saved && typeof saved === 'object') {
+      const clean = preferences(saved);
+      // Remove credentials persisted by older versions, not just from the response.
+      if (Object.keys(saved).some((field) => !(field in clean))) await kv.set(KEY, clean);
+      return clean;
+    }
     const initial = preferences(await readHost());
     await kv.set(KEY, initial);
     return initial;

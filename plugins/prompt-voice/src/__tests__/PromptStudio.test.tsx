@@ -56,6 +56,9 @@ describe('PromptStudio Component', () => {
     expect(screen.getByRole('heading', { name: 'Voice & transcription' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Prompt Voice' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Connections' })).toBeTruthy();
+    expect(screen.queryByLabelText(/OpenAI API key/)).toBeNull();
+    expect(screen.queryByLabelText(/Google AI API key/)).toBeNull();
+    expect(screen.queryByLabelText(/Anthropic API key/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /back to studio/i }));
     expect(screen.getByDisplayValue('Keep this draft')).toBeTruthy();
   });
@@ -586,4 +589,53 @@ describe('PromptStudio Component', () => {
     const sttSelect = (await screen.findByRole('combobox', { name: /speech-to-text provider/i })) as HTMLSelectElement;
     expect(sttSelect.value).toBe('google-gemini');
   });
+
+  it('offers a one-click button to switch to System STT when a direct STT key is unconfigured', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'openai', sttKeyConfigured: false };
+      if (method === 'promptVoice.availableModels') return [];
+      if (method === 'promptVoice.settings.update') return {};
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const switchBtn = await screen.findByRole('button', { name: /switch to system \(zana voice\)/i });
+    expect(switchBtn).toBeTruthy();
+
+    fireEvent.click(switchBtn);
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', {
+      sttProvider: 'system'
+    });
+  });
+
+  it('shows quick-action switch to System STT when dictation returns MISSING_KEY', async () => {
+    const session = fakeSession();
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'google-gemini', sttKeyConfigured: true };
+      if (method === 'promptVoice.availableModels') return [];
+      if (method === 'promptVoice.transcribe') {
+        return {
+          ok: false,
+          code: 'MISSING_KEY',
+          message: 'Add your Google AI API key in Prompt Voice settings.'
+        };
+      }
+      if (method === 'promptVoice.settings.update') return {};
+      return {};
+    });
+
+    render(<PromptStudio startSession={async () => session} />);
+    fireEvent.click(screen.getByRole('button', { name: /start dictation/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /stop dictation/i }));
+
+    const errorAlert = await screen.findByRole('alert');
+    expect(errorAlert.textContent).toContain('Add your Google AI API key');
+
+    const switchBtn = screen.getByRole('button', { name: /switch to system \(zana voice\)/i });
+    fireEvent.click(switchBtn);
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', {
+      sttProvider: 'system'
+    });
+  });
 });
+

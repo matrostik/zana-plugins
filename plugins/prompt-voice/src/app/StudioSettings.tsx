@@ -12,11 +12,7 @@ const sections: Record<string, Field[]> = {
     { key: 'tone', label: 'Cleanup tone', options: ['conversational', 'formal', 'casual', 'technical', 'custom'] },
     { key: 'customPrompt', label: 'Custom cleanup instructions', multiline: true }
   ],
-  'Connections': [
-    { key: 'openaiApiKey', label: 'OpenAI API key', secret: true, help: 'Required for direct OpenAI Whisper speech-to-text.' },
-    { key: 'googleApiKey', label: 'Google AI API key', secret: true, help: 'Required for direct Google Gemini speech-to-text.' },
-    { key: 'anthropicApiKey', label: 'Anthropic API key', secret: true, help: 'For Anthropic Claude models.' }
-  ]
+  'Connections': []
 };
 const defaults: Settings = { inputLanguage: 'auto', tone: 'conversational' };
 const names: Record<string, string> = { auto: 'Detect automatically', system: 'Zana voice', none: 'Off', assistant: 'Zana assistant', openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google AI', 'google-gemini': 'Google Gemini', en: 'English', he: 'Hebrew', de: 'German', fr: 'French', es: 'Spanish', ja: 'Japanese' };
@@ -55,6 +51,7 @@ export function StudioSettings({ rpc, onBack }: { rpc: Rpc; onBack: () => void }
       {Object.entries(sections).map(([category, fields]) => <section key={category} className="ps-pane" style={{ flex: 'none' }}>
         <div className="ps-pane-header"><h2 className="ps-pane-title" style={{ margin: 0 }}>{category}</h2>{category !== 'Connections' && <button className="ps-btn" onClick={() => save(Object.fromEntries(fields.map((field) => [field.key, defaults[field.key] ?? ''])))}>Reset</button>}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14 }}>
+      {category === 'Connections' && <p>Manage API keys in Zana’s Prompt Voice plugin settings.</p>}
       {fields.filter((field) => !(field.key === 'customPrompt' && values.tone !== 'custom')).map((field) => <label key={field.key} className="ps-field-group">
         <span className="ps-field-label">{field.label}</span>
         {field.options ? <select className="ps-select" value={values[field.key] ?? defaults[field.key] ?? ''} onChange={(e) => save({ [field.key]: e.target.value })}>{field.options.map((option) => <option key={option} value={option}>{names[option] ?? option}</option>)}</select> : field.multiline ? <textarea className="ps-custom-prompt-input" value={values[field.key] ?? ''} onChange={(e) => save({ [field.key]: e.target.value })} /> : <input type={field.secret ? 'password' : 'text'} className="ps-select" value={values[field.key] ?? ''} onChange={(e) => save({ [field.key]: e.target.value })} placeholder={field.secret ? 'Enter API key…' : undefined} />}

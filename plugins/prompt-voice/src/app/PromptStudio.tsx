@@ -617,8 +617,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   // ─── Voice Dictation State ───────────────────────────────────────────────────
   const [sttProvider, setSttProvider] = useState<string>('system');
   const [sttModel, setSttModel] = useState<string>('');
-  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
-  const [googleApiKey, setGoogleApiKey] = useState<string>('');
+  const [sttKeyConfigured, setSttKeyConfigured] = useState<boolean>(true);
   const [dictationError, setDictationError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -627,10 +626,6 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customPromptInputRef = useRef<HTMLTextAreaElement>(null);
-
-  const hasCurrentSttKey =
-    sttProvider === 'system' ||
-    (sttProvider === 'openai' ? Boolean(openaiApiKey.trim()) : Boolean(googleApiKey.trim()));
 
   // Load saved draft on mount
   useEffect(() => {
@@ -654,20 +649,30 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   }, []);
 
 
+  // Apply server status to local state; shared by the mount load and post-update refresh.
+  const applyStatus = useCallback((status: StatusResponse | null | undefined) => {
+    if (!status) return;
+    if (status.llmProvider) {
+      setServerLlmProvider(status.llmProvider);
+      setAutoCleanupEnabled(status.llmProvider !== 'none');
+    }
+    if (status.sttProvider) setSttProvider(status.sttProvider);
+    if (typeof status.sttKeyConfigured === 'boolean') setSttKeyConfigured(status.sttKeyConfigured);
+  }, []);
+
+  const refreshStatus = useCallback(() => {
+    rpc
+      .call(STATUS_METHOD)
+      .then((res) => applyStatus(res as StatusResponse))
+      .catch(() => undefined);
+  }, [rpc, applyStatus]);
+
   useEffect(() => {
     let isCurrent = true;
     rpc
       .call(STATUS_METHOD)
       .then((res) => {
-        if (!isCurrent) return;
-        const status = res as StatusResponse;
-        if (status && status.llmProvider) {
-          setServerLlmProvider(status.llmProvider);
-          setAutoCleanupEnabled(status.llmProvider !== 'none');
-        }
-        if (status && status.sttProvider) {
-          setSttProvider(status.sttProvider);
-        }
+        if (isCurrent) applyStatus(res as StatusResponse);
       })
       .catch(() => {
         // Fall back gracefully
@@ -686,8 +691,6 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         const s = (res || {}) as Record<string, string>;
         if (s.sttProvider) setSttProvider(s.sttProvider);
         if (s.sttModel) setSttModel(s.sttModel);
-        if (s.openaiApiKey) setOpenaiApiKey(s.openaiApiKey);
-        if (s.googleApiKey) setGoogleApiKey(s.googleApiKey);
       })
       .catch(() => undefined);
     return () => {
@@ -845,25 +848,15 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   // Speech provider change handler
   const handleSttProviderChange = (newProvider: string) => {
     setSttProvider(newProvider);
+    setDictationError(null);
     rpc
       .call('promptVoice.settings.update', {
         sttProvider: newProvider
       })
+      .then(() => refreshStatus())
       .catch(() => {
         setStatusNotice('Could not update speech provider setting.');
       });
-  };
-
-  // Speech API key change handler
-  const handleApiKeyChange = (provider: string, newKey: string) => {
-    setDictationError(null);
-    if (provider === 'openai') {
-      setOpenaiApiKey(newKey);
-      rpc.call('promptVoice.settings.update', { openaiApiKey: newKey }).catch(() => undefined);
-    } else if (provider === 'google-gemini' || provider === 'google') {
-      setGoogleApiKey(newKey);
-      rpc.call('promptVoice.settings.update', { googleApiKey: newKey }).catch(() => undefined);
-    }
   };
 
   // Speech model change handler
@@ -986,6 +979,9 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         } else if (!response.ok) {
           setStatusNotice(response.message);
           setDictationError(response.message);
+          if (response.code === 'MISSING_KEY') {
+            setSttKeyConfigured(false);
+          }
         }
       } catch (err) {
         setStatusNotice(err instanceof Error ? err.message : 'Transcription failed.');
@@ -997,11 +993,10 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       setDictationError(null);
       setStatusNotice(null);
 
-      if (sttProvider !== 'system' && !hasCurrentSttKey) {
+      if (sttProvider !== 'system' && !sttKeyConfigured) {
         const provName = sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini';
-        const keyName = sttProvider === 'openai' ? 'OpenAI API key' : 'Google AI API key';
-        setDictationError(`Please enter your ${keyName} above, or choose System (Zana Voice).`);
-        setStatusNotice(`API key required for ${provName}. Enter your key or select System (Zana Voice).`);
+        setDictationError(`API key required for direct ${provName} speech-to-text. Switch to System (Zana Voice) below to dictate using host voice.`);
+        setStatusNotice(`API key required for ${provName}. Switch to System (Zana Voice) to dictate thoughts.`);
         return;
       }
 
@@ -1323,38 +1318,20 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             </div>
 
             {sttProvider !== 'system' && (
-              <>
-                <div className="ps-field-group">
-                  <label htmlFor="ps-stt-key-input" className="ps-field-label">
-                    {sttProvider === 'openai' ? 'OpenAI API Key' : 'Google AI API Key'}
-                  </label>
-                  <input
-                    id="ps-stt-key-input"
-                    type="password"
-                    className="ps-select"
-                    aria-label="Speech-to-text API key"
-                    placeholder={sttProvider === 'openai' ? 'sk-...' : 'AIza...'}
-                    value={sttProvider === 'openai' ? openaiApiKey : googleApiKey}
-                    onChange={(e) => handleApiKeyChange(sttProvider, e.target.value)}
-                    disabled={isRecording || isTranscribing}
-                  />
-                </div>
-
-                <div className="ps-field-group">
-                  <label htmlFor="ps-stt-model-input" className="ps-field-label">
-                    Speech Model (Optional)
-                  </label>
-                  <input
-                    id="ps-stt-model-input"
-                    className="ps-select"
-                    aria-label="Speech-to-text model"
-                    placeholder="Provider default"
-                    value={sttModel}
-                    onChange={(e) => handleSttModelChange(e.target.value)}
-                    disabled={isRecording || isTranscribing}
-                  />
-                </div>
-              </>
+              <div className="ps-field-group">
+                <label htmlFor="ps-stt-model-input" className="ps-field-label">
+                  Speech Model (Optional)
+                </label>
+                <input
+                  id="ps-stt-model-input"
+                  className="ps-select"
+                  aria-label="Speech-to-text model"
+                  placeholder="Provider default"
+                  value={sttModel}
+                  onChange={(e) => handleSttModelChange(e.target.value)}
+                  disabled={isRecording || isTranscribing}
+                />
+              </div>
             )}
 
             {dictationError && (
@@ -1368,14 +1345,27 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                   color: '#fca5a5',
                   fontSize: 11,
                   textAlign: 'left',
-                  lineHeight: 1.4
+                  lineHeight: 1.4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6
                 }}
               >
-                ⚠️ {dictationError}
+                <div>⚠️ {dictationError}</div>
+                {sttProvider !== 'system' && (
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-primary"
+                    style={{ alignSelf: 'flex-start', fontSize: 11, padding: '4px 8px' }}
+                    onClick={() => handleSttProviderChange('system')}
+                  >
+                    Switch to System (Zana Voice)
+                  </button>
+                )}
               </div>
             )}
 
-            {sttProvider !== 'system' && !hasCurrentSttKey && !dictationError && (
+            {sttProvider !== 'system' && !sttKeyConfigured && !dictationError && (
               <div
                 style={{
                   padding: '8px 10px',
@@ -1385,10 +1375,23 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                   color: '#fde047',
                   fontSize: 11,
                   textAlign: 'left',
-                  lineHeight: 1.4
+                  lineHeight: 1.4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6
                 }}
               >
-                ℹ️ <strong>API key required:</strong> Enter your {sttProvider === 'openai' ? 'OpenAI' : 'Google AI'} API key above, or switch to <strong>System (Zana Voice)</strong> to dictate without any key.
+                <div>
+                  ℹ️ <strong>API key required:</strong> Direct {sttProvider === 'openai' ? 'OpenAI Whisper' : 'Google Gemini'} speech-to-text requires an API key in Zana Settings.
+                </div>
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  style={{ alignSelf: 'flex-start', fontSize: 11, padding: '4px 8px' }}
+                  onClick={() => handleSttProviderChange('system')}
+                >
+                  Switch to System (Zana Voice)
+                </button>
               </div>
             )}
 
@@ -1421,9 +1424,9 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             <div style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
               {sttProvider === 'system'
                 ? 'Uses host Zana voice transcription without requiring external API keys.'
-                : hasCurrentSttKey
-                ? `Using direct ${sttProvider === 'openai' ? 'OpenAI Whisper' : 'Google Gemini'} API key.`
-                : `⚠️ ${sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'} requires an API key. Enter it above or choose System (Zana Voice).`}
+                : sttKeyConfigured
+                ? `Using direct ${sttProvider === 'openai' ? 'OpenAI Whisper' : 'Google Gemini'} speech-to-text.`
+                : `⚠️ ${sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'} requires an API key in Zana Settings. Choose System (Zana Voice) for built-in free dictation.`}
             </div>
           </section>
 
