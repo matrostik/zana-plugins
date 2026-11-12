@@ -31,6 +31,10 @@ export type PromptVoiceErrorCode =
   | 'AUDIO_TYPE_UNSUPPORTED'
   | 'STT_FAILED'
   | 'LLM_FAILED'
+  | 'DOWNLOAD_FAILED'
+  | 'DOWNLOAD_INTEGRITY'
+  | 'DOWNLOAD_NO_SPACE'
+  | 'DOWNLOAD_CANCELLED'
   | 'INTERNAL';
 
 export interface TranscribeRequest {
