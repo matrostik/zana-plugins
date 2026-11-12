@@ -6,6 +6,8 @@ import { availableModelsHandler, rephraseHandler, statusFromSettings, transcribe
 import type { FetchLike } from './src/server/http.ts';
 import type { AssistantApi } from './src/server/llm/providers.ts';
 import { resolveServerUrl } from './src/server/stt/providers.ts';
+import type { LocalWhisperManager } from './src/server/localWhisper/manager.ts';
+import { createLocalWhisperManager, registerLocalWhisperMethods } from './src/server/localWhisper/rpc.ts';
 import { AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
 
 export interface PromptVoiceDeps {
@@ -13,6 +15,8 @@ export interface PromptVoiceDeps {
   fetch?: FetchLike;
   serverUrl?: string;
   assistant?: AssistantApi;
+  /** Injected in tests; `null` disables Local Whisper. Defaults to a manager for this machine. */
+  localWhisper?: LocalWhisperManager | null;
   providers?: {
     list(args?: unknown): Promise<Array<{ id: string; available?: boolean; displayName?: string }>>;
     models(args: { providerId: string }): Promise<unknown>;
@@ -37,6 +41,10 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   const serverUrl = deps.serverUrl ?? resolveServerUrl();
   const assistant = deps.assistant ?? zcc.sdk?.assistant;
   const providers = deps.providers ?? zcc.sdk?.providers;
+  const localWhisper = deps.localWhisper !== undefined ? deps.localWhisper : await createLocalWhisperManager(zcc, fetchImpl);
+  registerLocalWhisperMethods(zcc, localWhisper);
+  // Stops the server this plugin started; a user-run server is never touched.
+  if (localWhisper) zcc.onDispose?.(() => localWhisper.dispose());
 
   zcc.rpc.method(TRANSCRIBE_METHOD, (request) =>
     transcribeHandler(request, {
@@ -44,7 +52,8 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       fetch: fetchImpl,
       log: zcc.log,
       serverUrl,
-      assistant
+      assistant,
+      localWhisper: localWhisper ?? undefined
     })
   );
 

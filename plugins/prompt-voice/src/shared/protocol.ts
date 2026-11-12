@@ -9,6 +9,44 @@ export const STATUS_METHOD = 'promptVoice.status';
 export const REPHRASE_METHOD = 'promptVoice.rephrase';
 export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 
+/** Local Whisper management. Each returns a LocalWhisperResponse. */
+export const LOCAL_WHISPER_METHODS = {
+  state: 'promptVoice.localWhisper.state',
+  installRuntime: 'promptVoice.localWhisper.installRuntime',
+  cancelRuntimeInstall: 'promptVoice.localWhisper.cancelRuntimeInstall',
+  downloadModel: 'promptVoice.localWhisper.downloadModel',
+  cancelModelDownload: 'promptVoice.localWhisper.cancelModelDownload',
+  removeModel: 'promptVoice.localWhisper.removeModel',
+  selectModel: 'promptVoice.localWhisper.selectModel',
+  start: 'promptVoice.localWhisper.start',
+  stop: 'promptVoice.localWhisper.stop'
+} as const;
+
+export interface LocalWhisperModelView {
+  id: string;
+  label: string;
+  sizeBytes: number;
+  memoryEstimate?: string;
+  recommended: boolean;
+  status: 'available' | 'downloading' | 'installed';
+  /** 0..1 while downloading. */
+  progress?: number;
+}
+
+export interface LocalWhisperStateView {
+  platform: { supported: true } | { supported: false; message: string };
+  runtime: { status: 'not-installed' | 'installing' | 'installed'; version: string; requirements: string[]; progress?: number };
+  server: { state: 'stopped' | 'starting' | 'running' | 'crashed'; modelId?: string; exitCode?: number | null };
+  activeModelId: string | null;
+  models: LocalWhisperModelView[];
+  lastError: { operation: string; code: string; message: string } | null;
+}
+
+/** `state` is null only when Local Whisper could not be initialized at all. */
+export type LocalWhisperResponse =
+  | { ok: true; state: LocalWhisperStateView }
+  | { ok: false; code: string; message: string; state: LocalWhisperStateView | null };
+
 export const STT_PROVIDER_IDS = ['system', 'google-gemini', 'openai', 'local-whisper'] as const;
 export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
 
