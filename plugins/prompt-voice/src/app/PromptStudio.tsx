@@ -16,6 +16,7 @@ import {
 } from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
 import { defaultStartSession, type RecordingSession } from './recorder.ts';
+import { prepareAudioForUpload } from './wav.ts';
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
 
 // ─── Inline CSS Styles for Native Look & Feel ──────────────────────────────────
@@ -963,7 +964,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       setIsTranscribing(true);
 
       try {
-        const audio = await session.stop();
+        const audio = await prepareAudioForUpload(rpc, await session.stop());
         const response = (await rpc.call(TRANSCRIBE_METHOD, {
           audio: audio.base64,
           mimeType: audio.mimeType,

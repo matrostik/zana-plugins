@@ -116,6 +116,7 @@ export function statusFromSettings(raw: Record<string, unknown>, availableProvid
     sttKeyConfigured: hasRequiredKey(settings.sttProvider, STT_PROVIDER_KEYS, settings.keys),
     llmProvider: settings.llmProvider,
     llmKeyConfigured: hasRequiredKey(settings.llmProvider, LLM_PROVIDER_KEYS, settings.keys),
+    audioFormat: settings.sttProvider === 'local-whisper' ? 'wav' : 'recorded',
     ...(availableProviders ? { availableProviders } : {})
   };
 }

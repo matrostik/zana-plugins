@@ -84,8 +84,15 @@ export interface StatusResponse {
   sttKeyConfigured: boolean;
   llmProvider: LlmProviderId;
   llmKeyConfigured: boolean;
+  /**
+   * Upload format the active speech provider needs. `wav` means the app must convert the
+   * recording to 16 kHz mono PCM before transcribing; `recorded` sends it as captured.
+   */
+  audioFormat: AudioUploadFormat;
   availableProviders?: string[];
 }
+
+export type AudioUploadFormat = 'wav' | 'recorded';
 
 export interface DiscoveredModel {
   id: string;

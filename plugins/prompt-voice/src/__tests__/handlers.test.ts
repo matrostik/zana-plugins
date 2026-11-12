@@ -97,8 +97,16 @@ describe('statusFromSettings', () => {
       sttKeyConfigured: true,
       llmProvider: 'assistant',
       llmKeyConfigured: true,
+      audioFormat: 'recorded',
       availableProviders: ['antigravity', 'claude-code']
     });
+  });
+
+  it('asks the app for WAV only when Local Whisper is the speech provider', () => {
+    expect(statusFromSettings({ sttProvider: 'local-whisper', llmProvider: 'none' })).toMatchObject({ audioFormat: 'wav', sttKeyConfigured: true });
+    for (const sttProvider of ['system', 'openai', 'google-gemini']) {
+      expect(statusFromSettings({ sttProvider }).audioFormat).toBe('recorded');
+    }
   });
 
   it('reports missing keys for key-based providers', () => {
