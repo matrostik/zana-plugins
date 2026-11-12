@@ -35,6 +35,7 @@ export type PromptVoiceErrorCode =
   | 'DOWNLOAD_INTEGRITY'
   | 'DOWNLOAD_NO_SPACE'
   | 'DOWNLOAD_CANCELLED'
+  | 'LOCAL_RUNTIME_FAILED'
   | 'INTERNAL';
 
 export interface TranscribeRequest {

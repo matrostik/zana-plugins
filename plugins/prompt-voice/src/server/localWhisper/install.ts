@@ -3,7 +3,7 @@ import { basename, join } from 'node:path';
 import { PromptVoiceError } from '../errors.ts';
 import type { FetchLike } from '../http.ts';
 import { WHISPER_CPP_VERSION, type RuntimeArtifact } from './artifacts.ts';
-import { downloadVerified, removeStalePartials, type DownloadProgress } from './download.ts';
+import { downloadVerified, type DownloadProgress } from './download.ts';
 import { extractArchive, systemTar, type RunCommand } from './extract.ts';
 
 /** Written last, so its presence means the runtime folder is complete. */
@@ -47,6 +47,7 @@ export async function installedRuntime(root: string, artifact: RuntimeArtifact):
 
 /**
  * Downloads, verifies, and unpacks the runtime, returning the server executable path.
+ * Callers must not run two installs of the same artifact at once; the manager serializes them.
  * Already-installed runtimes are reused. The downloaded archive is deleted after a
  * successful install.
  */
@@ -55,9 +56,7 @@ export async function installRuntime(options: RuntimeInstallOptions): Promise<st
   const existing = await installedRuntime(root, artifact);
   if (existing) return existing;
 
-  const downloads = join(root, 'downloads');
-  await removeStalePartials(downloads);
-  const archivePath = join(downloads, basename(new URL(artifact.url).pathname));
+  const archivePath = join(root, 'downloads', basename(new URL(artifact.url).pathname));
   try {
     await downloadVerified({ file: artifact, destination: archivePath, fetch: options.fetch, signal: options.signal, onProgress: options.onProgress, freeBytes: options.freeBytes });
     const directory = runtimeDirectory(root, artifact);
