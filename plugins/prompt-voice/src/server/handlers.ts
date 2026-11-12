@@ -74,7 +74,8 @@ export async function transcribeHandler(request: unknown, deps: HandlerDeps): Pr
       fetch: deps.fetch,
       log: deps.log,
       serverUrl: deps.serverUrl,
-      assistant: deps.assistant
+      assistant: deps.assistant,
+      localWhisper: deps.localWhisper
     });
   } catch (err) {
     return failureResponse(err, deps.log);

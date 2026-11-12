@@ -9,7 +9,7 @@ export const STATUS_METHOD = 'promptVoice.status';
 export const REPHRASE_METHOD = 'promptVoice.rephrase';
 export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 
-export const STT_PROVIDER_IDS = ['system', 'google-gemini', 'openai'] as const;
+export const STT_PROVIDER_IDS = ['system', 'google-gemini', 'openai', 'local-whisper'] as const;
 export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
 
 /**

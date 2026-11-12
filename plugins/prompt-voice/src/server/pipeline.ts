@@ -6,6 +6,7 @@ import { buildSystemPrompt, buildUserMessage } from './llm/prompts.ts';
 import type { PromptVoiceSettings } from './settings.ts';
 import { cleanTranscription, isMeaningfulSpeech } from './stt/clean.ts';
 import { createSttProvider, type SttProvider } from './stt/providers.ts';
+import type { LocalWhisperEndpoint } from './stt/localWhisper.ts';
 import type {
   LlmProviderId,
   RefineNotice,
@@ -25,6 +26,7 @@ export interface PipelineDeps {
   log: PipelineLogger;
   serverUrl?: string;
   assistant?: AssistantApi;
+  localWhisper?: LocalWhisperEndpoint;
 }
 
 export type PipelineOutcome = TranscribeSuccess | TranscribeNoSpeech;
@@ -32,7 +34,8 @@ export type PipelineOutcome = TranscribeSuccess | TranscribeNoSpeech;
 const STT_LABELS: Record<string, string> = {
   system: 'Zana Voice',
   openai: 'OpenAI',
-  'google-gemini': 'Google Gemini'
+  'google-gemini': 'Google Gemini',
+  'local-whisper': 'Local Whisper'
 };
 
 const LLM_LABELS: Record<string, string> = {
@@ -105,7 +108,7 @@ export async function runDictation(
   settings: PromptVoiceSettings,
   deps: PipelineDeps
 ): Promise<PipelineOutcome> {
-  const stt = createSttProvider(settings, deps.fetch, { serverUrl: deps.serverUrl });
+  const stt = createSttProvider(settings, deps.fetch, { serverUrl: deps.serverUrl, localWhisper: deps.localWhisper });
   const spoken = await transcribeAudio(stt, audio, settings.inputLanguage);
   const rawText = cleanTranscription(spoken);
   if (!isMeaningfulSpeech(rawText)) {

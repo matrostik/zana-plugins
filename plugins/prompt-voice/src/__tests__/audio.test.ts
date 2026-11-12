@@ -23,9 +23,14 @@ describe('decodeAudioRequest', () => {
   });
 
   it('rejects an unsupported MIME type', () => {
-    expect(() => decodeAudioRequest({ audio: SAMPLE, mimeType: 'audio/wav' })).toThrow(
+    expect(() => decodeAudioRequest({ audio: SAMPLE, mimeType: 'audio/flac' })).toThrow(
       expect.objectContaining({ code: 'AUDIO_TYPE_UNSUPPORTED' })
     );
+  });
+
+  it('accepts WAV produced in the app for Local Whisper', () => {
+    const result = decodeAudioRequest({ audio: SAMPLE, mimeType: 'audio/wav' });
+    expect(result).toMatchObject({ mimeType: 'audio/wav', fileName: 'audio.wav' });
   });
 
   it('rejects payloads whose decoded size exceeds the cap, before decoding', () => {

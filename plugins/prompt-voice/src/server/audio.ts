@@ -7,7 +7,9 @@ export const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const EXTENSION_BY_MIME: Record<string, string> = {
   'audio/webm': 'webm',
   'audio/ogg': 'ogg',
-  'audio/mp4': 'mp4'
+  'audio/mp4': 'mp4',
+  // 16 kHz PCM produced in the app for Local Whisper, so the runtime needs no FFmpeg.
+  'audio/wav': 'wav'
 };
 
 export interface AudioInput {
