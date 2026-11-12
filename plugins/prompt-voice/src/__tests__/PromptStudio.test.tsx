@@ -56,6 +56,8 @@ describe('PromptStudio Component', () => {
     expect(screen.getByRole('heading', { name: 'Voice & transcription' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Prompt Voice' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Connections' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Local Whisper' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Local Whisper (on this device)' })).toBeTruthy();
     expect(screen.queryByLabelText(/OpenAI API key/)).toBeNull();
     expect(screen.queryByLabelText(/Google AI API key/)).toBeNull();
     expect(screen.queryByLabelText(/Anthropic API key/)).toBeNull();
@@ -559,7 +561,7 @@ describe('PromptStudio Component', () => {
     expect(sttSelect).toBeTruthy();
 
     const options = Array.from(sttSelect.options).map((o) => o.textContent?.trim());
-    expect(options).toEqual(['Google Gemini', 'OpenAI (Whisper)', 'System (Zana Voice)']);
+    expect(options).toEqual(['Google Gemini', 'Local Whisper (on this device)', 'OpenAI (Whisper)', 'System (Zana Voice)']);
     expect(sttSelect.value).toBe('system');
 
     // Change speech provider to openai

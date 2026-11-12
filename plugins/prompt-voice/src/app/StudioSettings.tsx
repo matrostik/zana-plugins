@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LocalWhisperSettings } from './LocalWhisperSettings.tsx';
 
 type Settings = Record<string, string>;
 type Rpc = { call(method: string, input?: unknown): Promise<unknown> };
 type Field = { key: string; label: string; options?: string[]; multiline?: boolean; secret?: boolean; help?: string };
 const sections: Record<string, Field[]> = {
   'Voice & transcription': [
+    { key: 'sttProvider', label: 'Speech-to-text provider', options: ['system', 'google-gemini', 'openai', 'local-whisper'] },
     { key: 'inputLanguage', label: 'Input language', options: ['auto', 'en', 'he', 'de', 'fr', 'es', 'ja'] },
     { key: 'dictionary', label: 'Personal dictionary', multiline: true, help: 'Names and terms, one per line.' }
   ],
@@ -14,8 +16,8 @@ const sections: Record<string, Field[]> = {
   ],
   'Connections': []
 };
-const defaults: Settings = { inputLanguage: 'auto', tone: 'conversational' };
-const names: Record<string, string> = { auto: 'Detect automatically', system: 'Zana voice', none: 'Off', assistant: 'Zana assistant', openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google AI', 'google-gemini': 'Google Gemini', en: 'English', he: 'Hebrew', de: 'German', fr: 'French', es: 'Spanish', ja: 'Japanese' };
+const defaults: Settings = { sttProvider: 'system', inputLanguage: 'auto', tone: 'conversational' };
+const names: Record<string, string> = { auto: 'Detect automatically', system: 'Zana voice', none: 'Off', assistant: 'Zana assistant', openai: 'OpenAI', anthropic: 'Anthropic', google: 'Google AI', 'google-gemini': 'Google Gemini', 'local-whisper': 'Local Whisper (on this device)', en: 'English', he: 'Hebrew', de: 'German', fr: 'French', es: 'Spanish', ja: 'Japanese' };
 
 export function StudioSettings({ rpc, onBack }: { rpc: Rpc; onBack: () => void }) {
   const [values, setValues] = useState<Settings>({});
@@ -48,7 +50,7 @@ export function StudioSettings({ rpc, onBack }: { rpc: Rpc; onBack: () => void }
         <button className="ps-btn" onClick={onBack}>← Back to Studio</button>
       </div>
       <div style={{ color: 'var(--ps-text-muted)', fontSize: 11 }}><span role="status">{status}</span>{failedPatch && <button className="ps-btn" onClick={() => save(failedPatch)}>Retry</button>}</div>
-      {Object.entries(sections).map(([category, fields]) => <section key={category} className="ps-pane" style={{ flex: 'none' }}>
+      {Object.entries(sections).map(([category, fields]) => <React.Fragment key={category}><section className="ps-pane" style={{ flex: 'none' }}>
         <div className="ps-pane-header"><h2 className="ps-pane-title" style={{ margin: 0 }}>{category}</h2>{category !== 'Connections' && <button className="ps-btn" onClick={() => save(Object.fromEntries(fields.map((field) => [field.key, defaults[field.key] ?? ''])))}>Reset</button>}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14 }}>
       {category === 'Connections' && <p>Manage API keys in Zana’s Prompt Voice plugin settings.</p>}
@@ -58,7 +60,9 @@ export function StudioSettings({ rpc, onBack }: { rpc: Rpc; onBack: () => void }
         {field.help && <small style={{ color: 'var(--ps-text-muted)' }}>{field.help}</small>}
       </label>)}
         </div>
-      </section>)}
+      </section>
+      {category === 'Voice & transcription' && <LocalWhisperSettings rpc={rpc} sttProvider={values.sttProvider ?? defaults.sttProvider} llmProvider={values.llmProvider} onApplyPreset={save} />}
+      </React.Fragment>)}
       </div>
     </main>
   </div>;

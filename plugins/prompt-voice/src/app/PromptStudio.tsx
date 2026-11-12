@@ -522,8 +522,17 @@ export interface SttProviderOption {
   label: string;
 }
 
+/** Short provider names for the dictation card header. */
+const STT_SHORT_LABELS: Record<string, string> = { system: 'Host STT', openai: 'OpenAI', 'google-gemini': 'Google Gemini', 'local-whisper': 'Local Whisper' };
+
+/** Providers that call a cloud API with the user's own key. */
+export function usesSttApiKey(provider: string): boolean {
+  return provider === 'openai' || provider === 'google-gemini';
+}
+
 export const STT_PROVIDER_OPTIONS: SttProviderOption[] = [
   { id: 'google-gemini', label: 'Google Gemini' },
+  { id: 'local-whisper', label: 'Local Whisper (on this device)' },
   { id: 'openai', label: 'OpenAI (Whisper)' },
   { id: 'system', label: 'System (Zana Voice)' }
 ];
@@ -1290,7 +1299,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             <div className="ps-section-title">
               <span>Voice Dictation</span>
               <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>
-                {sttProvider === 'system' ? 'Host STT' : sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'}
+                {STT_SHORT_LABELS[sttProvider] ?? sttProvider}
               </span>
             </div>
 
@@ -1318,7 +1327,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
               </select>
             </div>
 
-            {sttProvider !== 'system' && (
+            {usesSttApiKey(sttProvider) && (
               <div className="ps-field-group">
                 <label htmlFor="ps-stt-model-input" className="ps-field-label">
                   Speech Model (Optional)
@@ -1353,7 +1362,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 }}
               >
                 <div>⚠️ {dictationError}</div>
-                {sttProvider !== 'system' && (
+                {usesSttApiKey(sttProvider) && (
                   <button
                     type="button"
                     className="ps-btn ps-btn-primary"
@@ -1425,6 +1434,8 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             <div style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
               {sttProvider === 'system'
                 ? 'Uses host Zana voice transcription without requiring external API keys.'
+                : sttProvider === 'local-whisper'
+                ? 'Transcribes on this device. Install the runtime and a model in Settings.'
                 : sttKeyConfigured
                 ? `Using direct ${sttProvider === 'openai' ? 'OpenAI Whisper' : 'Google Gemini'} speech-to-text.`
                 : `⚠️ ${sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'} requires an API key in Zana Settings. Choose System (Zana Voice) for built-in free dictation.`}
