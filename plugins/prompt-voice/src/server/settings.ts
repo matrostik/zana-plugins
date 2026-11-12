@@ -60,30 +60,6 @@ export const API_KEY_LABELS: Readonly<Record<ApiKeyName, string>> = {
  * keys are only required for the optional direct-API providers.
  */
 export const SETTING_DESCRIPTORS = {
-  sttProvider: {
-    type: 'select' as const,
-    label: 'Speech-to-text provider',
-    description: 'Uses Zana host voice transcription by default without needing an API key.',
-    options: [...STT_PROVIDER_IDS],
-    default: 'system'
-  },
-  sttModel: {
-    type: 'string' as const,
-    label: 'Speech-to-text model',
-    description: 'Applies to OpenAI and Google Gemini only; leave empty for the provider default. System transcription always uses the host-configured model.'
-  },
-  llmProvider: {
-    type: 'select' as const,
-    label: 'Cleanup (LLM) provider',
-    description: 'Refines the transcript using an existing Zana AI provider or assistant. Choose None to insert the raw transcript.',
-    options: [...LLM_PROVIDER_IDS],
-    default: 'assistant'
-  },
-  llmModel: {
-    type: 'string' as const,
-    label: 'Cleanup model',
-    description: 'Applies to OpenAI, Anthropic, and Google only; leave empty for the provider default. The Zana assistant always uses its own model.'
-  },
   tone: {
     type: 'select' as const,
     label: 'Tone',

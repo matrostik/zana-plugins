@@ -118,14 +118,15 @@ describe('statusFromSettings', () => {
 });
 
 describe('mergeCatalogModels', () => {
-  it('merges models and selectedOnlyModels into unique list', () => {
+  it('merges models and selectedOnlyModels into unique list sorted alphabetically', () => {
     const models = mergeCatalogModels({
-      models: [{ id: 'm1', model: 'Model One' }],
-      selectedOnlyModels: [{ id: 'm1', model: 'Model One Dup' }, { id: 'm2', model: 'Model Two' }]
+      models: [{ id: 'm2', model: 'Zebra Model' }, { id: 'm1', model: 'Alpha Model' }],
+      selectedOnlyModels: [{ id: 'm1', model: 'Alpha Model Dup' }, { id: 'm3', model: 'Beta Model' }]
     });
     expect(models).toEqual([
-      { id: 'm1', label: 'Model One' },
-      { id: 'm2', label: 'Model Two' }
+      { id: 'm1', label: 'Alpha Model' },
+      { id: 'm3', label: 'Beta Model' },
+      { id: 'm2', label: 'Zebra Model' }
     ]);
   });
 
@@ -158,5 +159,50 @@ describe('availableModelsHandler', () => {
         })
       ])
     );
+  });
+
+  it('orders providers and their models alphabetically by ABC', async () => {
+    const res = await availableModelsHandler({
+      readSettings: async () => ({
+        openaiApiKey: 'sk-test',
+        anthropicApiKey: 'ak-test'
+      }),
+      providers: {
+        list: async () => [
+          { id: 'zed-ai', displayName: 'Zed AI' },
+          { id: 'antigravity', displayName: 'Antigravity ACP' }
+        ],
+        models: async ({ providerId }: { providerId: string }) => {
+          if (providerId === 'zed-ai') {
+            return {
+              models: [
+                { id: 'z-model-2', model: 'Zed Beta' },
+                { id: 'z-model-1', model: 'Zed Alpha' }
+              ]
+            };
+          }
+          return {
+            models: [
+              { id: 'ag-2', model: 'Gemini 2.5 Pro' },
+              { id: 'ag-1', model: 'Gemini 2.5 Flash' }
+            ]
+          };
+        }
+      }
+    });
+
+    const displayNames = res.map((p) => p.displayName);
+    const sortedDisplayNames = [...displayNames].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+    );
+    expect(displayNames).toEqual(sortedDisplayNames);
+
+    for (const prov of res) {
+      const labels = prov.models.map((m) => m.label);
+      const sortedLabels = [...labels].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+      );
+      expect(labels).toEqual(sortedLabels);
+    }
   });
 });

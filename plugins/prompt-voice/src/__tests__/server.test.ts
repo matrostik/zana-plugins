@@ -33,8 +33,7 @@ describe('createPromptVoicePlugin', () => {
     await createPromptVoicePlugin(zcc as never);
     expect(zcc.settings.define).toHaveBeenCalledWith(
       expect.objectContaining({
-        sttProvider: expect.objectContaining({ default: 'system' }),
-        llmProvider: expect.objectContaining({ default: 'assistant' }),
+        tone: expect.objectContaining({ default: 'conversational' }),
         openaiApiKey: expect.objectContaining({ secret: true }),
         googleApiKey: expect.objectContaining({ secret: true }),
         anthropicApiKey: expect.objectContaining({ secret: true })

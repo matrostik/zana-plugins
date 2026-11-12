@@ -1,5 +1,17 @@
 const KEY = 'prompt-voice-preferences-v1';
-const FIELDS = ['sttProvider', 'sttModel', 'llmProvider', 'llmModel', 'tone', 'customPrompt', 'dictionary', 'inputLanguage', 'studioProvider', 'studioModel'] as const;
+const FIELDS = [
+  'sttProvider',
+  'sttModel',
+  'llmProvider',
+  'llmModel',
+  'tone',
+  'customPrompt',
+  'dictionary',
+  'inputLanguage',
+  'openaiApiKey',
+  'googleApiKey',
+  'anthropicApiKey'
+] as const;
 type Values = Record<string, unknown>;
 type Store = { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> };
 

@@ -254,8 +254,7 @@ export class GoogleLlmProvider implements LlmProvider {
 function requireText(text: string | null | undefined, label: string): string {
   const trimmed = text?.trim();
   if (!trimmed) {
-    throw new PromptVoiceError('LLM_FAILED', `${label} returned an empty response. Try again.`, {
-      detail: `${label} returned no text content`
+    throw new PromptVoiceError('LLM_FAILED', `${label} returned an empty response. Try again.`, {\n      detail: `${label} returned no text content`
     });
   }
   return trimmed;
@@ -286,7 +285,12 @@ export function createLlmProvider(
 ): LlmProvider | null {
   if (settings.llmProvider === 'none') return null;
   if (settings.llmProvider === 'assistant') return createAssistantProvider(deps.assistant);
-  const direct = createDirectProvider(settings, resolvedModel ?? resolveLlmModel(settings), fetchImpl);
+  const direct = createDirectProvider(
+    settings,
+    resolvedModel ?? resolveLlmModel(settings),
+    fetchImpl,
+    Boolean(deps.assistant)
+  );
   if (direct) return direct;
   if (deps.assistant) {
     return new AssistantLlmProvider(
@@ -298,7 +302,7 @@ export function createLlmProvider(
   }
   throw new PromptVoiceError(
     'LLM_FAILED',
-    `Cleanup provider \"${settings.llmProvider}\" is not supported. Choose another in Prompt Voice settings.`
+    `Cleanup provider "${settings.llmProvider}" is not supported. Choose another in Prompt Voice settings.`
   );
 }
 
@@ -310,12 +314,22 @@ function createAssistantProvider(assistant: AssistantApi | undefined): LlmProvid
 /**
  * Direct API providers. Each one needs its own key and throws MISSING_KEY without it, like the
  * STT factory. Returns null for a provider id that is not a direct API provider.
+ * When hasAssistantFallback is true and the key is missing, returns null so the factory falls
+ * back to host assistant inference instead of failing.
  */
-function createDirectProvider(settings: PromptVoiceSettings, model: string, fetchImpl: FetchLike): LlmProvider | null {
+function createDirectProvider(
+  settings: PromptVoiceSettings,
+  model: string,
+  fetchImpl: FetchLike,
+  hasAssistantFallback = false
+): LlmProvider | null {
   const keyName = LLM_PROVIDER_KEYS[settings.llmProvider];
   if (!keyName) return null;
   const apiKey = settings.keys[keyName];
-  if (!apiKey) throw missingKeyError(API_KEY_LABELS[keyName]);
+  if (!apiKey) {
+    if (hasAssistantFallback) return null;
+    throw missingKeyError(API_KEY_LABELS[keyName]);
+  }
   switch (settings.llmProvider) {
     case 'openai':
       return new OpenAiLlmProvider(apiKey, model, fetchImpl);

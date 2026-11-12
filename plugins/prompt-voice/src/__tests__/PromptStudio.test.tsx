@@ -55,7 +55,6 @@ describe('PromptStudio Component', () => {
     expect(screen.getByRole('heading', { name: /settings/i })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Voice & transcription' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Prompt Voice' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Prompt Studio' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Connections' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /back to studio/i }));
     expect(screen.getByDisplayValue('Keep this draft')).toBeTruthy();
@@ -429,5 +428,162 @@ describe('PromptStudio Component', () => {
 
     expect(execCommandSpy).toHaveBeenCalledWith('copy');
     expect((await screen.findAllByText(/copied/i)).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('orders providers and models alphabetically by ABC in selector dropdowns', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') {
+        return [
+          {
+            providerId: 'zed',
+            displayName: 'Zed AI',
+            models: [
+              { id: 'z2', label: 'Zed Model B' },
+              { id: 'z1', label: 'Zed Model A' }
+            ]
+          },
+          {
+            providerId: 'antigravity',
+            displayName: 'Antigravity ACP',
+            models: [
+              { id: 'ag2', label: 'Pro Model' },
+              { id: 'ag1', label: 'Flash Model' }
+            ]
+          }
+        ];
+      }
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const providerSelect = (await screen.findByRole('combobox', { name: /refinement provider/i })) as HTMLSelectElement;
+    const providerOptionTexts = Array.from(providerSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(providerOptionTexts).toEqual(['Antigravity ACP', 'Zed AI']);
+
+    // Check models for Antigravity ACP (first provider)
+    const modelSelect = screen.getByRole('combobox', { name: /refinement model/i }) as HTMLSelectElement;
+    const modelOptionTexts = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(modelOptionTexts).toEqual(['Flash Model', 'Pro Model']);
+
+    // Switch to Zed AI
+    fireEvent.change(providerSelect, { target: { value: 'zed' } });
+    const zedModelOptions = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(zedModelOptions).toEqual(['Zed Model A', 'Zed Model B']);
+  });
+
+  it('orders fallback providers and models alphabetically by ABC when host models are empty', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') return [];
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const providerSelect = (await screen.findByRole('combobox', { name: /refinement provider/i })) as HTMLSelectElement;
+    const providerOptionTexts = Array.from(providerSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(providerOptionTexts).toEqual(['Anthropic', 'Google Gemini', 'OpenAI', 'Zana Assistant']);
+
+    // Check models for Anthropic
+    fireEvent.change(providerSelect, { target: { value: 'anthropic' } });
+    const modelSelect = screen.getByRole('combobox', { name: /refinement model/i }) as HTMLSelectElement;
+    const anthropicModelTexts = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(anthropicModelTexts).toEqual(['Claude 4.5 Haiku', 'Claude 5 Sonnet']);
+
+    // Check models for OpenAI
+    fireEvent.change(providerSelect, { target: { value: 'openai' } });
+    const openaiModelTexts = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(openaiModelTexts).toEqual(['GPT-5.4 Nano (Fast)', 'GPT-5.6 Luna (Smart)']);
+  });
+
+  it('controls dictation auto-cleanup setting directly from Prompt Studio', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') return [];
+      if (method === 'promptVoice.settings.update') return {};
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const cleanupToggle = (await screen.findByRole('checkbox', { name: /auto-cleanup mic dictations/i })) as HTMLInputElement;
+    expect(cleanupToggle.checked).toBe(true);
+
+    // Toggle off
+    fireEvent.click(cleanupToggle);
+    expect(cleanupToggle.checked).toBe(false);
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', {
+      llmProvider: 'none',
+      llmModel: ''
+    });
+
+    // Toggle back on
+    fireEvent.click(cleanupToggle);
+    expect(cleanupToggle.checked).toBe(true);
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', expect.objectContaining({
+      llmProvider: expect.any(String)
+    }));
+
+    // Changing provider while auto-cleanup is enabled updates settings
+    const providerSelect = screen.getByRole('combobox', { name: /refinement provider/i });
+    fireEvent.change(providerSelect, { target: { value: 'openai' } });
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', expect.objectContaining({
+      llmProvider: 'openai'
+    }));
+  });
+
+  it('initializes auto-cleanup toggle as unchecked when server status is none', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'none' };
+      if (method === 'promptVoice.availableModels') return [];
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const cleanupToggle = (await screen.findByRole('checkbox', { name: /auto-cleanup mic dictations/i })) as HTMLInputElement;
+    expect(cleanupToggle.checked).toBe(false);
+  });
+
+  it('configures speech-to-text provider directly from Prompt Studio', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'system' };
+      if (method === 'promptVoice.availableModels') return [];
+      if (method === 'promptVoice.settings.update') return {};
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const sttSelect = (await screen.findByRole('combobox', { name: /speech-to-text provider/i })) as HTMLSelectElement;
+    expect(sttSelect).toBeTruthy();
+
+    const options = Array.from(sttSelect.options).map((o) => o.textContent?.trim());
+    expect(options).toEqual(['Google Gemini', 'OpenAI (Whisper)', 'System (Zana Voice)']);
+    expect(sttSelect.value).toBe('system');
+
+    // Change speech provider to openai
+    fireEvent.change(sttSelect, { target: { value: 'openai' } });
+    expect(sttSelect.value).toBe('openai');
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', {
+      sttProvider: 'openai'
+    });
+
+    // Model input appears when non-system
+    const modelInput = screen.getByRole('textbox', { name: /speech-to-text model/i }) as HTMLInputElement;
+    expect(modelInput).toBeTruthy();
+    fireEvent.change(modelInput, { target: { value: 'whisper-1' } });
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', {
+      sttModel: 'whisper-1'
+    });
+  });
+
+  it('initializes speech provider from status response', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'google-gemini' };
+      if (method === 'promptVoice.availableModels') return [];
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const sttSelect = (await screen.findByRole('combobox', { name: /speech-to-text provider/i })) as HTMLSelectElement;
+    expect(sttSelect.value).toBe('google-gemini');
   });
 });

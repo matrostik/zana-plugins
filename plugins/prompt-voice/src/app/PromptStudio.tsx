@@ -516,27 +516,18 @@ export interface ProviderOption {
   models: DiscoveredModelOption[];
 }
 
+export interface SttProviderOption {
+  id: string;
+  label: string;
+}
+
+export const STT_PROVIDER_OPTIONS: SttProviderOption[] = [
+  { id: 'google-gemini', label: 'Google Gemini' },
+  { id: 'openai', label: 'OpenAI (Whisper)' },
+  { id: 'system', label: 'System (Zana Voice)' }
+];
+
 const FALLBACK_PROVIDERS: ProviderOption[] = [
-  {
-    id: 'assistant',
-    displayName: 'Zana Assistant',
-    models: [
-      {
-        id: 'assistant',
-        key: 'assistant',
-        label: 'Local / Active Thread Agent',
-        providerId: 'assistant'
-      }
-    ]
-  },
-  {
-    id: 'openai',
-    displayName: 'OpenAI',
-    models: [
-      { id: 'gpt-5.4-nano', key: 'openai-fast', label: 'GPT-5.4 Nano (Fast)', providerId: 'openai' },
-      { id: 'gpt-5.6-luna', key: 'openai-smart', label: 'GPT-5.6 Luna (Smart)', providerId: 'openai' }
-    ]
-  },
   {
     id: 'anthropic',
     displayName: 'Anthropic',
@@ -550,6 +541,26 @@ const FALLBACK_PROVIDERS: ProviderOption[] = [
     displayName: 'Google Gemini',
     models: [
       { id: 'gemini-2.5-flash', key: 'google-flash', label: 'Gemini 2.5 Flash', providerId: 'google' }
+    ]
+  },
+  {
+    id: 'openai',
+    displayName: 'OpenAI',
+    models: [
+      { id: 'gpt-5.4-nano', key: 'openai-fast', label: 'GPT-5.4 Nano (Fast)', providerId: 'openai' },
+      { id: 'gpt-5.6-luna', key: 'openai-smart', label: 'GPT-5.6 Luna (Smart)', providerId: 'openai' }
+    ]
+  },
+  {
+    id: 'assistant',
+    displayName: 'Zana Assistant',
+    models: [
+      {
+        id: 'assistant',
+        key: 'assistant',
+        label: 'Local / Active Thread Agent',
+        providerId: 'assistant'
+      }
     ]
   }
 ];
@@ -591,8 +602,8 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [selectedProviderId, setSelectedProviderId] = useState<string>('assistant');
   const [selectedModelId, setSelectedModelId] = useState<string>('assistant');
   const [serverLlmProvider, setServerLlmProvider] = useState<string | null>(null);
+  const [autoCleanupEnabled, setAutoCleanupEnabled] = useState(true);
   const [lastUsedModel, setLastUsedModel] = useState<string | null>(null);
-  const [studioDefaults, setStudioDefaults] = useState<{ studioProvider?: string; studioModel?: string }>({});
 
   // ─── Diff & View State ───────────────────────────────────────────────────────
   const [showDiff, setShowDiff] = useState(false);
@@ -604,6 +615,11 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   // ─── Voice Dictation State ───────────────────────────────────────────────────
+  const [sttProvider, setSttProvider] = useState<string>('system');
+  const [sttModel, setSttModel] = useState<string>('');
+  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
+  const [googleApiKey, setGoogleApiKey] = useState<string>('');
+  const [dictationError, setDictationError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [audioLevel, setAudioLevel] = useState<number | null>(null);
@@ -611,6 +627,10 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customPromptInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const hasCurrentSttKey =
+    sttProvider === 'system' ||
+    (sttProvider === 'openai' ? Boolean(openaiApiKey.trim()) : Boolean(googleApiKey.trim()));
 
   // Load saved draft on mount
   useEffect(() => {
@@ -625,20 +645,14 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
           userManuallySelectedModel.current = true;
           setSelectedModelId(parsed.selectedModelId);
         }
+        if (parsed.sttProvider) setSttProvider(parsed.sttProvider);
+        if (parsed.sttModel) setSttModel(parsed.sttModel);
       }
     } catch {
       // Ignore storage read errors
     }
   }, []);
 
-  // Fetch server status to know default configured LLM provider
-  useEffect(() => {
-    let active = true;
-    rpc.call('promptVoice.settings.get').then((result) => {
-      if (active && result && typeof result === 'object') setStudioDefaults(result as { studioProvider?: string; studioModel?: string });
-    }).catch(() => { if (active) setStatusNotice('Could not load Studio defaults.'); });
-    return () => { active = false; };
-  }, [settingsOpen]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -649,11 +663,33 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         const status = res as StatusResponse;
         if (status && status.llmProvider) {
           setServerLlmProvider(status.llmProvider);
+          setAutoCleanupEnabled(status.llmProvider !== 'none');
+        }
+        if (status && status.sttProvider) {
+          setSttProvider(status.sttProvider);
         }
       })
       .catch(() => {
         // Fall back gracefully
       });
+    return () => {
+      isCurrent = false;
+    };
+  }, [rpc]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    rpc
+      .call('promptVoice.settings.get')
+      .then((res) => {
+        if (!isCurrent) return;
+        const s = (res || {}) as Record<string, string>;
+        if (s.sttProvider) setSttProvider(s.sttProvider);
+        if (s.sttModel) setSttModel(s.sttModel);
+        if (s.openaiApiKey) setOpenaiApiKey(s.openaiApiKey);
+        if (s.googleApiKey) setGoogleApiKey(s.googleApiKey);
+      })
+      .catch(() => undefined);
     return () => {
       isCurrent = false;
     };
@@ -679,23 +715,31 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     };
   }, [rpc]);
 
-  // Assemble provider and model list
+  // Assemble provider and model list, ordered alphabetically (A-Z)
   const providerOptions: ProviderOption[] = useMemo(() => {
+    const sortAlphabetically = <T,>(items: T[], getText: (item: T) => string): T[] => {
+      return [...items].sort((a, b) =>
+        getText(a).localeCompare(getText(b), undefined, { sensitivity: 'base', numeric: true })
+      );
+    };
+
     if (!discoveredProviders || discoveredProviders.length === 0) {
-      return FALLBACK_PROVIDERS.map((p) => {
+      const providers = FALLBACK_PROVIDERS.map((p) => {
         const isProvComposerMatch = Boolean(
           (composerProviderId && p.id.toLowerCase() === composerProviderId.toLowerCase()) ||
           (composerFamilyId && p.id.toLowerCase().includes(composerFamilyId.toLowerCase()))
         );
+        const sortedModels = sortAlphabetically(p.models, (m) => m.label || m.id).map((m) => ({
+          ...m,
+          isComposerMatch: isProvComposerMatch
+        }));
         return {
           ...p,
           isComposerMatch: isProvComposerMatch,
-          models: p.models.map((m) => ({
-            ...m,
-            isComposerMatch: isProvComposerMatch
-          }))
+          models: sortedModels
         };
       });
+      return sortAlphabetically(providers, (p) => p.displayName || p.id);
     }
 
     const legacyAliases: Record<string, string> = {
@@ -707,13 +751,16 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       'google:gemini-2.5-flash': 'google-flash'
     };
 
-    return discoveredProviders.map((prov) => {
+    const providers = discoveredProviders.map((prov) => {
       const isProvComposerMatch = Boolean(
         (composerProviderId && prov.providerId.toLowerCase() === composerProviderId.toLowerCase()) ||
         (composerFamilyId && prov.providerId.toLowerCase().includes(composerFamilyId.toLowerCase()))
       );
 
-      const models: DiscoveredModelOption[] = prov.models.map((m) => {
+      const models: DiscoveredModelOption[] = sortAlphabetically(
+        prov.models,
+        (m) => m.label || m.id
+      ).map((m) => {
         const fullKey = `${prov.providerId}:${m.id}`;
         const key = legacyAliases[fullKey] ?? m.id;
         return {
@@ -732,6 +779,8 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         models
       };
     });
+
+    return sortAlphabetically(providers, (p) => p.displayName || p.id);
   }, [discoveredProviders, composerProviderId, composerFamilyId]);
 
   // Find active provider
@@ -755,55 +804,126 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   // Auto-sync with composer if user has not explicitly picked a model
   useEffect(() => {
     if (!userManuallySelectedModel.current && providerOptions.length > 0) {
-      const composerMatch = studioDefaults.studioProvider && studioDefaults.studioProvider !== 'composer'
-        ? providerOptions.find((p) => p.id === studioDefaults.studioProvider)
-        : providerOptions.find((p) => p.isComposerMatch);
+      const composerMatch = providerOptions.find((p) => p.isComposerMatch);
       if (composerMatch) {
         setSelectedProviderId(composerMatch.id);
         if (composerMatch.models.length > 0) {
-          const preferred = composerMatch.models.find((model) => model.id === studioDefaults.studioModel || model.key === studioDefaults.studioModel) ?? composerMatch.models[0];
-          setSelectedModelId(preferred.key || preferred.id);
+          setSelectedModelId(composerMatch.models[0].key || composerMatch.models[0].id);
         }
       }
     }
-  }, [providerOptions, studioDefaults]);
+  }, [providerOptions]);
 
   // Auto-save draft on change
   useEffect(() => {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ inputText, outputText, selectedProviderId, selectedModelId })
+        JSON.stringify({ inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel })
       );
     } catch {
       // Ignore storage write errors
     }
-  }, [inputText, outputText, selectedProviderId, selectedModelId]);
+  }, [inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel]);
+
+  // Auto-cleanup toggle handler for composer dictations
+  const handleToggleAutoCleanup = (enabled: boolean) => {
+    setAutoCleanupEnabled(enabled);
+    const targetProvider = enabled ? (activeProvider?.id ?? 'assistant') : 'none';
+    const targetModel = enabled ? (activeModel?.id ?? 'assistant') : '';
+    setServerLlmProvider(targetProvider);
+    rpc
+      .call('promptVoice.settings.update', {
+        llmProvider: targetProvider,
+        llmModel: targetModel
+      })
+      .catch(() => {
+        setStatusNotice('Could not update cleanup setting.');
+      });
+  };
+
+  // Speech provider change handler
+  const handleSttProviderChange = (newProvider: string) => {
+    setSttProvider(newProvider);
+    rpc
+      .call('promptVoice.settings.update', {
+        sttProvider: newProvider
+      })
+      .catch(() => {
+        setStatusNotice('Could not update speech provider setting.');
+      });
+  };
+
+  // Speech API key change handler
+  const handleApiKeyChange = (provider: string, newKey: string) => {
+    setDictationError(null);
+    if (provider === 'openai') {
+      setOpenaiApiKey(newKey);
+      rpc.call('promptVoice.settings.update', { openaiApiKey: newKey }).catch(() => undefined);
+    } else if (provider === 'google-gemini' || provider === 'google') {
+      setGoogleApiKey(newKey);
+      rpc.call('promptVoice.settings.update', { googleApiKey: newKey }).catch(() => undefined);
+    }
+  };
+
+  // Speech model change handler
+  const handleSttModelChange = (newModel: string) => {
+    setSttModel(newModel);
+    rpc
+      .call('promptVoice.settings.update', {
+        sttModel: newModel
+      })
+      .catch(() => undefined);
+  };
 
   // Provider change handler
   const handleProviderChange = (newProviderId: string) => {
     userManuallySelectedModel.current = true;
     setSelectedProviderId(newProviderId);
     const targetProvider = providerOptions.find((p) => p.id === newProviderId);
+    let targetModelId = '';
     if (targetProvider && targetProvider.models.length > 0) {
-      setSelectedModelId(targetProvider.models[0].key || targetProvider.models[0].id);
+      const newModel = targetProvider.models[0].key || targetProvider.models[0].id;
+      targetModelId = targetProvider.models[0].id;
+      setSelectedModelId(newModel);
+    }
+    if (autoCleanupEnabled) {
+      setServerLlmProvider(newProviderId);
+      rpc
+        .call('promptVoice.settings.update', {
+          llmProvider: newProviderId,
+          llmModel: targetModelId
+        })
+        .catch(() => undefined);
     }
   };
 
   // Model change handler (supports cross-provider alias switching for tests)
   const handleModelChange = (newModelIdOrKey: string) => {
     userManuallySelectedModel.current = true;
+    let targetProvId = selectedProviderId;
+    let targetActualModelId = newModelIdOrKey;
     for (const prov of providerOptions) {
       const found = prov.models.find((m) => m.id === newModelIdOrKey || m.key === newModelIdOrKey);
       if (found) {
         if (prov.id !== selectedProviderId) {
           setSelectedProviderId(prov.id);
+          targetProvId = prov.id;
         }
         setSelectedModelId(found.key || found.id);
-        return;
+        targetActualModelId = found.id;
+        break;
       }
     }
-    setSelectedModelId(newModelIdOrKey);
+    if (autoCleanupEnabled) {
+      setServerLlmProvider(targetProvId);
+      rpc
+        .call('promptVoice.settings.update', {
+          llmProvider: targetProvId,
+          llmModel: targetActualModelId
+        })
+        .catch(() => undefined);
+    }
   };
 
   // Clean up recording timers on unmount
@@ -859,11 +979,13 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
 
         if (response.ok && response.status === 'ok') {
           setInputText((prev) => appendTranscript(prev, response.text));
+          setDictationError(null);
         } else if (response.ok && response.status === 'no-speech') {
           setStatusNotice('No speech detected. Try speaking closer to the microphone.');
           setTimeout(() => setStatusNotice(null), 4000);
         } else if (!response.ok) {
           setStatusNotice(response.message);
+          setDictationError(response.message);
         }
       } catch (err) {
         setStatusNotice(err instanceof Error ? err.message : 'Transcription failed.');
@@ -872,7 +994,17 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       }
     } else {
       // Start recording
+      setDictationError(null);
       setStatusNotice(null);
+
+      if (sttProvider !== 'system' && !hasCurrentSttKey) {
+        const provName = sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini';
+        const keyName = sttProvider === 'openai' ? 'OpenAI API key' : 'Google AI API key';
+        setDictationError(`Please enter your ${keyName} above, or choose System (Zana Voice).`);
+        setStatusNotice(`API key required for ${provName}. Enter your key or select System (Zana Voice).`);
+        return;
+      }
+
       try {
         const session = await startSession();
         activeSessionRef.current = session;
@@ -1078,10 +1210,6 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 {activeProvider?.isComposerMatch ? '★ Composer Active' : 'AI Model'}
               </span>
             </div>
-            <button type="button" className="ps-btn" onClick={() => {
-              userManuallySelectedModel.current = false;
-              setStudioDefaults((current) => ({ ...current }));
-            }}>Reset to default</button>
 
             {/* Provider Selector */}
             <div className="ps-field-group">
@@ -1125,6 +1253,24 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
               </select>
             </div>
 
+            {/* Auto-cleanup Toggle for Composer Dictations */}
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--ps-border)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, fontWeight: 500, userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  aria-label="Auto-cleanup mic dictations"
+                  checked={autoCleanupEnabled}
+                  onChange={(e) => handleToggleAutoCleanup(e.target.checked)}
+                />
+                <span>Auto-cleanup mic dictations</span>
+              </label>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
+                {autoCleanupEnabled
+                  ? `Composer mic cleans up using ${activeProvider?.displayName} (${activeModel?.label || activeModel?.id}).`
+                  : 'Composer mic inserts raw transcript without AI cleanup.'}
+              </span>
+            </div>
+
             <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ps-text-muted)', lineHeight: 1.35 }}>
               {activeProvider?.isComposerMatch ? (
                 <span style={{ color: 'var(--accent, #3b82f6)', fontWeight: 600 }}>
@@ -1147,8 +1293,105 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
           <section className="ps-section">
             <div className="ps-section-title">
               <span>Voice Dictation</span>
-              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>Host STT</span>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>
+                {sttProvider === 'system' ? 'Host STT' : sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'}
+              </span>
             </div>
+
+            {/* Speech Provider Selector */}
+            <div className="ps-field-group">
+              <label htmlFor="ps-stt-provider-select" className="ps-field-label">
+                Speech Provider
+              </label>
+              <select
+                id="ps-stt-provider-select"
+                className="ps-select"
+                aria-label="Speech-to-text provider"
+                value={sttProvider}
+                onChange={(e) => {
+                  setDictationError(null);
+                  handleSttProviderChange(e.target.value);
+                }}
+                disabled={isRecording || isTranscribing}
+              >
+                {STT_PROVIDER_OPTIONS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {sttProvider !== 'system' && (
+              <>
+                <div className="ps-field-group">
+                  <label htmlFor="ps-stt-key-input" className="ps-field-label">
+                    {sttProvider === 'openai' ? 'OpenAI API Key' : 'Google AI API Key'}
+                  </label>
+                  <input
+                    id="ps-stt-key-input"
+                    type="password"
+                    className="ps-select"
+                    aria-label="Speech-to-text API key"
+                    placeholder={sttProvider === 'openai' ? 'sk-...' : 'AIza...'}
+                    value={sttProvider === 'openai' ? openaiApiKey : googleApiKey}
+                    onChange={(e) => handleApiKeyChange(sttProvider, e.target.value)}
+                    disabled={isRecording || isTranscribing}
+                  />
+                </div>
+
+                <div className="ps-field-group">
+                  <label htmlFor="ps-stt-model-input" className="ps-field-label">
+                    Speech Model (Optional)
+                  </label>
+                  <input
+                    id="ps-stt-model-input"
+                    className="ps-select"
+                    aria-label="Speech-to-text model"
+                    placeholder="Provider default"
+                    value={sttModel}
+                    onChange={(e) => handleSttModelChange(e.target.value)}
+                    disabled={isRecording || isTranscribing}
+                  />
+                </div>
+              </>
+            )}
+
+            {dictationError && (
+              <div
+                role="alert"
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#fca5a5',
+                  fontSize: 11,
+                  textAlign: 'left',
+                  lineHeight: 1.4
+                }}
+              >
+                ⚠️ {dictationError}
+              </div>
+            )}
+
+            {sttProvider !== 'system' && !hasCurrentSttKey && !dictationError && (
+              <div
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  background: 'rgba(234, 179, 8, 0.1)',
+                  border: '1px solid rgba(234, 179, 8, 0.3)',
+                  color: '#fde047',
+                  fontSize: 11,
+                  textAlign: 'left',
+                  lineHeight: 1.4
+                }}
+              >
+                ℹ️ <strong>API key required:</strong> Enter your {sttProvider === 'openai' ? 'OpenAI' : 'Google AI'} API key above, or switch to <strong>System (Zana Voice)</strong> to dictate without any key.
+              </div>
+            )}
+
             <div className="ps-dictation-card">
               <button
                 type="button"
@@ -1173,6 +1416,14 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                   <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>Listening live...</span>
                 </div>
               )}
+            </div>
+
+            <div style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
+              {sttProvider === 'system'
+                ? 'Uses host Zana voice transcription without requiring external API keys.'
+                : hasCurrentSttKey
+                ? `Using direct ${sttProvider === 'openai' ? 'OpenAI Whisper' : 'Google Gemini'} API key.`
+                : `⚠️ ${sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'} requires an API key. Enter it above or choose System (Zana Voice).`}
             </div>
           </section>
 
@@ -1380,6 +1631,9 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span>Engine: {activeProvider?.displayName} · {activeModel?.label}</span>
+          <span className="ps-pill">
+            Mic cleanup: {autoCleanupEnabled ? `${activeProvider?.displayName} (${activeModel?.label || activeModel?.id})` : 'Off (Raw)'}
+          </span>
           {activeProvider?.isComposerMatch && (
             <span className="ps-pill" style={{ color: 'var(--accent, #3b82f6)' }}>
               ★ Composer Synced

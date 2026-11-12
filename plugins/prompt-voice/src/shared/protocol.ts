@@ -9,14 +9,15 @@ export const STATUS_METHOD = 'promptVoice.status';
 export const REPHRASE_METHOD = 'promptVoice.rephrase';
 export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 
-export const STT_PROVIDER_IDS = ['system', 'openai', 'google-gemini'] as const;
+export const STT_PROVIDER_IDS = ['system', 'google-gemini', 'openai'] as const;
 export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
 
 /**
  * Cleanup engines. Agent-thread providers (Claude Code, Codex, ...) are intentionally excluded:
  * they are full coding agents with tool access, and dictated text must never run as an agent prompt.
+ * Listed with 'none' first, then AI providers alphabetically by display name (Anthropic, Google AI, OpenAI, Zana Assistant).
  */
-export const LLM_PROVIDER_IDS = ['none', 'assistant', 'openai', 'anthropic', 'google'] as const;
+export const LLM_PROVIDER_IDS = ['none', 'anthropic', 'google', 'openai', 'assistant'] as const;
 export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number] | string;
 
 export const TONE_IDS = ['formal', 'casual', 'technical', 'conversational', 'custom'] as const;

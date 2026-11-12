@@ -119,7 +119,7 @@ export function statusFromSettings(raw: Record<string, unknown>, availableProvid
   };
 }
 
-/** Union of catalog models and selected-only entries, keyed by model id. */
+/** Union of catalog models and selected-only entries, keyed by model id and sorted alphabetically. */
 export function mergeCatalogModels(catalog: unknown): DiscoveredModel[] {
   if (!catalog || typeof catalog !== 'object') return [];
   const rec = catalog as {
@@ -136,10 +136,12 @@ export function mergeCatalogModels(catalog: unknown): DiscoveredModel[] {
   };
   for (const m of rec.models ?? []) add(m);
   for (const m of rec.selectedOnlyModels ?? []) add(m);
-  return Array.from(seen.values());
+  return Array.from(seen.values()).sort((a, b) =>
+    (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base', numeric: true })
+  );
 }
 
-/** RPC `promptVoice.availableModels`. Discovers available providers and models from Zana host. */
+/** RPC `promptVoice.availableModels`. Discovers available providers and models from Zana host, ordered alphabetically. */
 export async function availableModelsHandler(deps: AvailableModelsDeps): Promise<AvailableModelsResponse> {
   const result: AvailableModelsResponse = [
     {
@@ -194,22 +196,13 @@ export async function availableModelsHandler(deps: AvailableModelsDeps): Promise
     }
   }
 
-  // Fallback direct providers configured in Prompt Voice settings (OpenAI / Anthropic / Google)
+  // Fallback direct providers configured in Prompt Voice settings (Anthropic / Google / OpenAI)
   const directFallbacks: Array<{
     providerId: string;
     displayName: string;
     keyName: ApiKeyName;
     models: DiscoveredModel[];
   }> = [
-    {
-      providerId: 'openai',
-      displayName: 'OpenAI',
-      keyName: 'openai',
-      models: [
-        { id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano (Fast)' },
-        { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (Smart)' }
-      ]
-    },
     {
       providerId: 'anthropic',
       displayName: 'Anthropic',
@@ -224,6 +217,15 @@ export async function availableModelsHandler(deps: AvailableModelsDeps): Promise
       displayName: 'Google Gemini',
       keyName: 'google',
       models: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }]
+    },
+    {
+      providerId: 'openai',
+      displayName: 'OpenAI',
+      keyName: 'openai',
+      models: [
+        { id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano (Fast)' },
+        { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (Smart)' }
+      ]
     }
   ];
 
@@ -241,6 +243,18 @@ export async function availableModelsHandler(deps: AvailableModelsDeps): Promise
       }
     }
   }
+
+  // Sort models in each provider alphabetically (A-Z) by label
+  for (const prov of result) {
+    prov.models.sort((a, b) =>
+      (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base', numeric: true })
+    );
+  }
+
+  // Sort providers alphabetically (A-Z) by displayName
+  result.sort((a, b) =>
+    (a.displayName || a.providerId).localeCompare(b.displayName || b.providerId, undefined, { sensitivity: 'base', numeric: true })
+  );
 
   return result;
 }
