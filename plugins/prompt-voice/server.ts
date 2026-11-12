@@ -1,19 +1,24 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import { describeUnexpectedFailure } from './src/server/errors.ts';
 import { SETTING_DESCRIPTORS } from './src/server/settings.ts';
-import { rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
+import { createSettingsStore } from './src/server/settingsStore.ts';
+import { availableModelsHandler, rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
 import type { FetchLike } from './src/server/http.ts';
 import type { AssistantApi } from './src/server/llm/providers.ts';
 import { resolveServerUrl } from './src/server/stt/providers.ts';
-import { REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
+import type { LocalWhisperManager } from './src/server/localWhisper/manager.ts';
+import { createLocalWhisperManager, registerLocalWhisperMethods } from './src/server/localWhisper/rpc.ts';
+import { AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
 
 export interface PromptVoiceDeps {
   /** Injected in tests. Defaults to the runtime's global fetch. */
   fetch?: FetchLike;
   serverUrl?: string;
   assistant?: AssistantApi;
+  /** Injected in tests; `null` disables Local Whisper. Defaults to a manager for this machine. */
+  localWhisper?: LocalWhisperManager | null;
   providers?: {
-    list(args?: unknown): Promise<Array<{ id: string }>>;
+    list(args?: unknown): Promise<Array<{ id: string; available?: boolean; displayName?: string }>>;
     models(args: { providerId: string }): Promise<unknown>;
   };
 }
@@ -27,10 +32,19 @@ const STATUS_UNAVAILABLE_MESSAGE = 'Prompt Voice status is unavailable. See the 
 export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: PromptVoiceDeps = {}): Promise<void> {
   const settings = zcc.settings.define(SETTING_DESCRIPTORS);
   const fetchImpl: FetchLike = deps.fetch ?? fetch;
-  const readSettings = () => settings.get() as Promise<Record<string, unknown>>;
+  const store = zcc.storage?.kv ? createSettingsStore(zcc.storage.kv, () => settings.get()) : null;
+  const readSettings = () => store ? store.readEffective() : settings.get() as Promise<Record<string, unknown>>;
+  if (store) {
+    zcc.rpc.method('promptVoice.settings.get', () => store.readPublic());
+    zcc.rpc.method('promptVoice.settings.update', (patch) => store.update(patch));
+  }
   const serverUrl = deps.serverUrl ?? resolveServerUrl();
   const assistant = deps.assistant ?? zcc.sdk?.assistant;
   const providers = deps.providers ?? zcc.sdk?.providers;
+  const localWhisper = deps.localWhisper !== undefined ? deps.localWhisper : await createLocalWhisperManager(zcc, fetchImpl);
+  registerLocalWhisperMethods(zcc, localWhisper);
+  // Stops the server this plugin started; a user-run server is never touched.
+  if (localWhisper) zcc.onDispose?.(() => localWhisper.dispose());
 
   zcc.rpc.method(TRANSCRIBE_METHOD, (request) =>
     transcribeHandler(request, {
@@ -38,7 +52,8 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       fetch: fetchImpl,
       log: zcc.log,
       serverUrl,
-      assistant
+      assistant,
+      localWhisper: localWhisper ?? undefined
     })
   );
 
@@ -69,4 +84,12 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       : [];
     return statusFromSettings(raw, available.map((p) => p.id));
   });
+
+  zcc.rpc.method(AVAILABLE_MODELS_METHOD, () =>
+    availableModelsHandler({
+      readSettings,
+      providers,
+      log: zcc.log
+    })
+  );
 }

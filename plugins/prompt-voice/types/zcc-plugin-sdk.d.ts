@@ -654,7 +654,16 @@ declare module '@zana-ai/zcc-plugin-sdk/app' {
     addThreadContext?(reference: ContextReference): boolean;
     openPanelAgent(options: ZccPanelAgentOptions): boolean;
   }
+  export interface ComposerView {
+    scope?: string;
+    layout?: 'expanded' | 'compact' | 'zen';
+    draft?: { text: string; isEmpty: boolean; attachmentCount: number };
+    run?: { isRunning: boolean; isSubmitting: boolean };
+    familyId?: string;
+    providerId?: string;
+  }
   export function useComposer(): PluginComposerApi;
+  export function useComposerView(): ComposerView;
   export function useZccNavigate(): ZccNavigate;
 
   /** Read-only fleet projection shared with the built-in Agents views. */

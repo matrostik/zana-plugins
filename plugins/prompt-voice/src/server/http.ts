@@ -73,14 +73,16 @@ export interface ProviderCall {
  * Sends a request with the plugin timeout applied. Non-2xx responses become a
  * PromptVoiceError with a safe user message. Only allowlisted identifiers from the
  * body go to the detail field (for logs). Transport errors propagate unchanged for the caller to classify.
+ * `timeoutMs` overrides the default for local inference, which can take longer than a cloud call.
  */
 export async function sendRequest(
   fetchImpl: FetchLike,
   url: string,
   init: RequestInit,
-  call: ProviderCall
+  call: ProviderCall,
+  options: { timeoutMs?: number } = {}
 ): Promise<Response> {
-  const response = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) });
+  const response = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(options.timeoutMs ?? PROVIDER_TIMEOUT_MS) });
   if (response.ok) return response;
 
   const body = await response.text().catch(() => '');

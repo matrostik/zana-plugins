@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { statusFromSettings, transcribeHandler } from '../server/handlers.ts';
+import { availableModelsHandler, mergeCatalogModels, statusFromSettings, transcribeHandler } from '../server/handlers.ts';
 import { PromptVoiceError } from '../server/errors.ts';
 
 const VALID_REQUEST = { audio: Buffer.from('audio').toString('base64'), mimeType: 'audio/webm' };
@@ -17,6 +17,15 @@ function deps(
 }
 
 describe('transcribeHandler', () => {
+  it('skips automatic cleanup when transcription-only is requested', async () => {
+    const assistant = { complete: vi.fn(async () => ({ text: 'rewritten' })) };
+    const result = await transcribeHandler(
+      { ...VALID_REQUEST, transcriptionOnly: true },
+      { ...deps({ llmProvider: 'assistant' }), assistant }
+    );
+    expect(result).toEqual(expect.objectContaining({ ok: true, text: 'hello', llmProvider: 'none' }));
+    expect(assistant.complete).not.toHaveBeenCalled();
+  });
   it('returns a success envelope for a valid request using system STT', async () => {
     const result = await transcribeHandler(VALID_REQUEST, deps({}));
     expect(result).toEqual(expect.objectContaining({ ok: true, status: 'ok', text: 'hello' }));
@@ -88,8 +97,16 @@ describe('statusFromSettings', () => {
       sttKeyConfigured: true,
       llmProvider: 'assistant',
       llmKeyConfigured: true,
+      audioFormat: 'recorded',
       availableProviders: ['antigravity', 'claude-code']
     });
+  });
+
+  it('asks the app for WAV only when Local Whisper is the speech provider', () => {
+    expect(statusFromSettings({ sttProvider: 'local-whisper', llmProvider: 'none' })).toMatchObject({ audioFormat: 'wav', sttKeyConfigured: true });
+    for (const sttProvider of ['system', 'openai', 'google-gemini']) {
+      expect(statusFromSettings({ sttProvider }).audioFormat).toBe('recorded');
+    }
   });
 
   it('reports missing keys for key-based providers', () => {
@@ -105,5 +122,95 @@ describe('statusFromSettings', () => {
       openaiApiKey: 'sk-key'
     });
     expect(status).toMatchObject({ sttKeyConfigured: true, llmKeyConfigured: true });
+  });
+});
+
+describe('mergeCatalogModels', () => {
+  it('merges models and selectedOnlyModels into unique list sorted alphabetically', () => {
+    const models = mergeCatalogModels({
+      models: [{ id: 'm2', model: 'Zebra Model' }, { id: 'm1', model: 'Alpha Model' }],
+      selectedOnlyModels: [{ id: 'm1', model: 'Alpha Model Dup' }, { id: 'm3', model: 'Beta Model' }]
+    });
+    expect(models).toEqual([
+      { id: 'm1', label: 'Alpha Model' },
+      { id: 'm3', label: 'Beta Model' },
+      { id: 'm2', label: 'Zebra Model' }
+    ]);
+  });
+
+  it('handles empty or malformed catalog objects gracefully', () => {
+    expect(mergeCatalogModels(null)).toEqual([]);
+    expect(mergeCatalogModels({})).toEqual([]);
+    expect(mergeCatalogModels({ models: [{ id: '' }] })).toEqual([]);
+  });
+});
+
+describe('availableModelsHandler', () => {
+  it('returns assistant and discovered models from host providers', async () => {
+    const res = await availableModelsHandler({
+      readSettings: async () => ({}),
+      providers: {
+        list: async () => [{ id: 'antigravity', displayName: 'Antigravity ACP' }],
+        models: async () => ({
+          models: [{ id: 'gemini-2.5-flash', model: 'Gemini 2.5 Flash' }]
+        })
+      }
+    });
+
+    expect(res).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ providerId: 'assistant' }),
+        expect.objectContaining({
+          providerId: 'antigravity',
+          displayName: 'Antigravity ACP',
+          models: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }]
+        })
+      ])
+    );
+  });
+
+  it('orders providers and their models alphabetically by ABC', async () => {
+    const res = await availableModelsHandler({
+      readSettings: async () => ({
+        openaiApiKey: 'sk-test',
+        anthropicApiKey: 'ak-test'
+      }),
+      providers: {
+        list: async () => [
+          { id: 'zed-ai', displayName: 'Zed AI' },
+          { id: 'antigravity', displayName: 'Antigravity ACP' }
+        ],
+        models: async ({ providerId }: { providerId: string }) => {
+          if (providerId === 'zed-ai') {
+            return {
+              models: [
+                { id: 'z-model-2', model: 'Zed Beta' },
+                { id: 'z-model-1', model: 'Zed Alpha' }
+              ]
+            };
+          }
+          return {
+            models: [
+              { id: 'ag-2', model: 'Gemini 2.5 Pro' },
+              { id: 'ag-1', model: 'Gemini 2.5 Flash' }
+            ]
+          };
+        }
+      }
+    });
+
+    const displayNames = res.map((p) => p.displayName);
+    const sortedDisplayNames = [...displayNames].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+    );
+    expect(displayNames).toEqual(sortedDisplayNames);
+
+    for (const prov of res) {
+      const labels = prov.models.map((m) => m.label);
+      const sortedLabels = [...labels].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+      );
+      expect(labels).toEqual(sortedLabels);
+    }
   });
 });

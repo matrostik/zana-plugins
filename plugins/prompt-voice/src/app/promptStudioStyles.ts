@@ -139,6 +139,17 @@ export const PROMPT_STUDIO_STYLES = `
   background: rgba(229, 83, 75, 0.25) !important;
 }
 
+/* Small status label, for example "Active" or "Recommended". */
+.ps-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--ps-border-strong);
+  color: var(--ps-text-muted);
+  white-space: nowrap;
+}
+
 .ps-btn-sm {
   height: 24px !important;
   padding: 2px 8px !important;

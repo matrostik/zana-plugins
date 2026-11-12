@@ -4,6 +4,7 @@ import { TRANSCRIBE_METHOD, type TranscribeResponse } from '../shared/protocol.t
 import { appendTranscript } from './appendText.ts';
 import { dictationReducer, initialDictationState, type DictationEvent } from './dictationMachine.ts';
 import { defaultStartSession, type RecordedAudio, type RecordingSession } from './recorder.ts';
+import { prepareAudioForUpload } from './wav.ts';
 
 export const UNEXPECTED_RESPONSE_MESSAGE = 'Prompt Voice returned an unexpected response. Try again.';
 export const GENERIC_FAILURE_MESSAGE = 'Dictation failed. Try again.';
@@ -16,7 +17,8 @@ function isTranscribeResponse(value: unknown): value is TranscribeResponse {
 type RpcClient = ReturnType<typeof useRpc>;
 type ComposerClient = ReturnType<typeof useComposer>;
 
-async function requestTranscription(rpc: RpcClient, audio: RecordedAudio): Promise<TranscribeResponse> {
+async function requestTranscription(rpc: RpcClient, recorded: RecordedAudio): Promise<TranscribeResponse> {
+  const audio = await prepareAudioForUpload(rpc, recorded);
   const value = await rpc.call(TRANSCRIBE_METHOD, { audio: audio.base64, mimeType: audio.mimeType });
   if (!isTranscribeResponse(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE);
   return value;

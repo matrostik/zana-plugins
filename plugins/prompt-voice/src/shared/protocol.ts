@@ -7,15 +7,55 @@
 export const TRANSCRIBE_METHOD = 'promptVoice.transcribe';
 export const STATUS_METHOD = 'promptVoice.status';
 export const REPHRASE_METHOD = 'promptVoice.rephrase';
+export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 
-export const STT_PROVIDER_IDS = ['system', 'openai', 'google-gemini'] as const;
+/** Local Whisper management. Each returns a LocalWhisperResponse. */
+export const LOCAL_WHISPER_METHODS = {
+  state: 'promptVoice.localWhisper.state',
+  installRuntime: 'promptVoice.localWhisper.installRuntime',
+  cancelRuntimeInstall: 'promptVoice.localWhisper.cancelRuntimeInstall',
+  downloadModel: 'promptVoice.localWhisper.downloadModel',
+  cancelModelDownload: 'promptVoice.localWhisper.cancelModelDownload',
+  removeModel: 'promptVoice.localWhisper.removeModel',
+  selectModel: 'promptVoice.localWhisper.selectModel',
+  start: 'promptVoice.localWhisper.start',
+  stop: 'promptVoice.localWhisper.stop'
+} as const;
+
+export interface LocalWhisperModelView {
+  id: string;
+  label: string;
+  sizeBytes: number;
+  memoryEstimate?: string;
+  recommended: boolean;
+  status: 'available' | 'downloading' | 'installed';
+  /** 0..1 while downloading. */
+  progress?: number;
+}
+
+export interface LocalWhisperStateView {
+  platform: { supported: true } | { supported: false; message: string };
+  runtime: { status: 'not-installed' | 'installing' | 'installed'; version: string; requirements: string[]; progress?: number };
+  server: { state: 'stopped' | 'starting' | 'running' | 'crashed'; modelId?: string; exitCode?: number | null };
+  activeModelId: string | null;
+  models: LocalWhisperModelView[];
+  lastError: { operation: string; code: string; message: string } | null;
+}
+
+/** `state` is null only when Local Whisper could not be initialized at all. */
+export type LocalWhisperResponse =
+  | { ok: true; state: LocalWhisperStateView }
+  | { ok: false; code: string; message: string; state: LocalWhisperStateView | null };
+
+export const STT_PROVIDER_IDS = ['system', 'google-gemini', 'openai', 'local-whisper'] as const;
 export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
 
 /**
  * Cleanup engines. Agent-thread providers (Claude Code, Codex, ...) are intentionally excluded:
  * they are full coding agents with tool access, and dictated text must never run as an agent prompt.
+ * Listed with 'none' first, then AI providers alphabetically by display name (Anthropic, Google AI, OpenAI, Zana Assistant).
  */
-export const LLM_PROVIDER_IDS = ['none', 'assistant', 'openai', 'anthropic', 'google'] as const;
+export const LLM_PROVIDER_IDS = ['none', 'anthropic', 'google', 'openai', 'assistant'] as const;
 export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number] | string;
 
 export const TONE_IDS = ['formal', 'casual', 'technical', 'conversational', 'custom'] as const;
@@ -29,6 +69,11 @@ export type PromptVoiceErrorCode =
   | 'AUDIO_TYPE_UNSUPPORTED'
   | 'STT_FAILED'
   | 'LLM_FAILED'
+  | 'DOWNLOAD_FAILED'
+  | 'DOWNLOAD_INTEGRITY'
+  | 'DOWNLOAD_NO_SPACE'
+  | 'DOWNLOAD_CANCELLED'
+  | 'LOCAL_RUNTIME_FAILED'
   | 'INTERNAL';
 
 export interface TranscribeRequest {
@@ -38,6 +83,8 @@ export interface TranscribeRequest {
   mimeType: string;
   /** BCP-47 code or `auto`. Defaults to the plugin setting. */
   language?: string;
+  /** Skip automatic cleanup for Studio's editable input draft. */
+  transcriptionOnly?: boolean;
 }
 
 /** Set when transcription succeeded but LLM cleanup did not; the raw text is still returned. */
@@ -75,8 +122,29 @@ export interface StatusResponse {
   sttKeyConfigured: boolean;
   llmProvider: LlmProviderId;
   llmKeyConfigured: boolean;
+  /**
+   * Upload format the active speech provider needs. `wav` means the app must convert the
+   * recording to 16 kHz mono PCM before transcribing; `recorded` sends it as captured.
+   */
+  audioFormat: AudioUploadFormat;
   availableProviders?: string[];
 }
+
+export type AudioUploadFormat = 'wav' | 'recorded';
+
+export interface DiscoveredModel {
+  id: string;
+  label: string;
+}
+
+export interface DiscoveredProvider {
+  providerId: string;
+  displayName: string;
+  models: DiscoveredModel[];
+  error?: string | null;
+}
+
+export type AvailableModelsResponse = DiscoveredProvider[];
 
 export interface RephraseRequest {
   text: string;

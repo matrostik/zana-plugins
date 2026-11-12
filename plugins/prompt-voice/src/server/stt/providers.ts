@@ -4,6 +4,7 @@ import { sendRequest, parseJsonResponse, postJson, type FetchLike, type Provider
 import type { AudioInput } from '../audio.ts';
 import { API_KEY_LABELS, STT_PROVIDER_KEYS, type PromptVoiceSettings } from '../settings.ts';
 import type { SttProviderId } from '../../shared/protocol.ts';
+import { LocalWhisperSttProvider, type LocalWhisperEndpoint } from './localWhisper.ts';
 
 export const STT_DEFAULT_MODELS: Record<string, string> = {
   system: 'default',
@@ -173,6 +174,8 @@ function extractGeminiText(data: GeminiGenerateResponse): string {
 
 export interface SttOptions {
   serverUrl?: string;
+  /** Present when Local Whisper is installed or an external server is configured. */
+  localWhisper?: LocalWhisperEndpoint;
 }
 
 /**
@@ -184,6 +187,7 @@ export function createSttProvider(
   fetchImpl: FetchLike,
   options: SttOptions = {}
 ): SttProvider {
+  if (settings.sttProvider === 'local-whisper') return createLocalWhisperProvider(fetchImpl, options);
   const model = settings.sttModel || STT_DEFAULT_MODELS[settings.sttProvider] || STT_DEFAULT_MODELS.system;
   const keyName = STT_PROVIDER_KEYS[settings.sttProvider];
   const apiKey = keyName ? settings.keys[keyName] : '';
@@ -191,6 +195,16 @@ export function createSttProvider(
   if (settings.sttProvider === 'openai') return new OpenAiSttProvider(apiKey, model, fetchImpl);
   if (settings.sttProvider === 'google-gemini') return new GeminiSttProvider(apiKey, model, fetchImpl);
   return new SystemSttProvider(options.serverUrl || resolveServerUrl(), fetchImpl);
+}
+
+/** Local Whisper never falls back to another provider: audio must not leave the device unexpectedly. */
+function createLocalWhisperProvider(fetchImpl: FetchLike, options: SttOptions): SttProvider {
+  if (!options.localWhisper) {
+    throw new PromptVoiceError('STT_FAILED', "Local Whisper isn't set up yet. Finish setup in Prompt Voice settings.", {
+      detail: 'Local Whisper selected but no endpoint is available'
+    });
+  }
+  return new LocalWhisperSttProvider(options.localWhisper, fetchImpl);
 }
 
 /** Local Zana server used when ZCC_SERVER_URL is not set. */
