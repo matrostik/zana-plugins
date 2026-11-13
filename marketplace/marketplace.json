@@ -99,6 +99,31 @@
           "ref": "master"
         }
       }
+    },
+    {
+      "id": "ai-usage-monitor",
+      "displayName": "AI Usage Monitor",
+      "description": "Cross-provider AI usage, spend, subscription quota windows, cloud credits, budgets, and error telemetry for Zana Command Center.",
+      "icon": {
+        "lucide": "Activity"
+      },
+      "tags": [
+        "community",
+        "analytics",
+        "productivity"
+      ],
+      "author": {
+        "name": "Ros Haitovich",
+        "github": "matrostik",
+        "url": "https://github.com/matrostik"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/matrostik/zana-plugins",
+          "subdir": "plugins/ai-usage-monitor",
+          "ref": "master"
+        }
+      }
     }
   ]
 }

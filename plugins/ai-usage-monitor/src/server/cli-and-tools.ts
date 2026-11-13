@@ -1,0 +1,151 @@
+import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
+import type { LogEventKind, TimeRangeKey } from '../shared/types.ts';
+import type { DashboardService } from './dashboard.ts';
+import type { UsageStore } from './db.ts';
+
+export interface CliAndToolsApp {
+  dashboard: DashboardService;
+  store: UsageStore;
+  refreshNow: () => Promise<void>;
+}
+
+type ToolRegistration = Parameters<ZccPluginApi['agents']['registerTool']>[0] & {
+  presentation?: {
+    label: { pending: string; completed: string };
+    icon?: { glyph: string };
+  };
+};
+
+const VALID_RANGES = new Set<TimeRangeKey>(['today', '7d', '30d', 'all']);
+
+function parseRange(raw: string | undefined): TimeRangeKey {
+  if (raw && VALID_RANGES.has(raw as TimeRangeKey)) return raw as TimeRangeKey;
+  return '30d';
+}
+
+function parseFlag(argv: readonly string[], name: string): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token === name && i + 1 < argv.length) return argv[i + 1];
+    if (token.startsWith(`${name}=`)) return token.slice(name.length + 1);
+  }
+  return undefined;
+}
+
+export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void {
+  cli.register({
+    name: 'ai-usage',
+    summary: 'Inspect cross-provider AI consumption, spend, quotas, budgets, and logs.',
+    commands: [
+      { name: 'summary', summary: 'Show spend and token KPIs + top models', usage: 'zcc ai-usage summary [--range today|7d|30d|all] [--refresh]' },
+      { name: 'quotas', summary: 'Show configured providers, subscription windows, and remaining credits', usage: 'zcc ai-usage quotas [--refresh]' },
+      { name: 'budgets', summary: 'Show budget rules and remaining allowance', usage: 'zcc ai-usage budgets' },
+      { name: 'logs', summary: 'Show recent usage, rate-limit, fallback, and error logs', usage: 'zcc ai-usage logs [--kind all|turn_usage|rate_limit|fallback|error] [--limit 20]' }
+    ],
+    async run(argv: string[]) {
+      const sub = argv[0] ?? 'summary';
+      const wantsRefresh = argv.includes('--refresh');
+      if (wantsRefresh) await app.refreshNow();
+
+      if (sub === 'summary') {
+        const range = parseRange(parseFlag(argv, '--range'));
+        const data = await app.dashboard.buildDashboard(range);
+        return { exitCode: 0, stdout: JSON.stringify({ kpis: data.kpis, topModels: data.models.slice(0, 15) }, null, 2) + '\n' };
+      }
+
+      if (sub === 'quotas') {
+        const data = await app.dashboard.buildDashboard('30d');
+        return { exitCode: 0, stdout: JSON.stringify({ providers: data.providers, cloudConnectors: data.cloudConnectors }, null, 2) + '\n' };
+      }
+
+      if (sub === 'budgets') {
+        const data = await app.dashboard.buildDashboard('30d');
+        return { exitCode: 0, stdout: JSON.stringify({ budgets: data.budgets }, null, 2) + '\n' };
+      }
+
+      if (sub === 'logs') {
+        const kindRaw = parseFlag(argv, '--kind') ?? 'all';
+        const limitRaw = Number.parseInt(parseFlag(argv, '--limit') ?? '20', 10);
+        const kind = (['all', 'turn_usage', 'rate_limit', 'fallback', 'error'].includes(kindRaw) ? kindRaw : 'all') as LogEventKind | 'all';
+        const projectMap = await app.dashboard.projectNamesMap();
+        const logs = app.store.queryLogs({ kind, limit: Number.isFinite(limitRaw) ? Math.min(100, Math.max(1, limitRaw)) : 20 }, projectMap);
+        return { exitCode: 0, stdout: JSON.stringify(logs, null, 2) + '\n' };
+      }
+
+      return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs.\n` };
+    }
+  });
+}
+
+export function registerAgentTools(agents: ZccPluginApi['agents'], app: CliAndToolsApp): void {
+  const summaryTool: ToolRegistration = {
+    name: 'ai_usage_summary',
+    description: 'Read cross-provider AI token usage, estimated/billed USD spend, subscription quota windows, remaining credits, and budget status.',
+    presentation: {
+      label: { pending: 'Reading AI usage metrics', completed: 'Read AI usage metrics' },
+      icon: { glyph: 'Activity' }
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        range: { type: 'string', enum: ['today', '7d', '30d', 'all'] },
+        refresh: { type: 'boolean' }
+      }
+    },
+    async execute(raw: unknown) {
+      const input = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+      if (input.refresh === true) await app.refreshNow();
+      const range = parseRange(typeof input.range === 'string' ? input.range : undefined);
+      const data = await app.dashboard.buildDashboard(range);
+      return JSON.stringify(
+        {
+          kpis: data.kpis,
+          providers: data.providers,
+          budgets: data.budgets,
+          topModels: data.models.slice(0, 12),
+          topProjects: data.projects.slice(0, 10)
+        },
+        null,
+        2
+      );
+    }
+  };
+
+  const logsTool: ToolRegistration = {
+    name: 'ai_usage_logs',
+    description: 'Query AI usage turns, rate-limit events, model fallbacks, and provider billing errors recorded in Zana.',
+    presentation: {
+      label: { pending: 'Querying AI usage logs', completed: 'Queried AI usage logs' },
+      icon: { glyph: 'List' }
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['all', 'turn_usage', 'rate_limit', 'fallback', 'error'] },
+        providerId: { type: 'string' },
+        search: { type: 'string' },
+        limit: { type: 'number' }
+      }
+    },
+    async execute(raw: unknown) {
+      const input = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+      const kind = typeof input.kind === 'string' && ['all', 'turn_usage', 'rate_limit', 'fallback', 'error'].includes(input.kind)
+        ? (input.kind as LogEventKind | 'all')
+        : 'all';
+      const projectMap = await app.dashboard.projectNamesMap();
+      const result = app.store.queryLogs(
+        {
+          kind,
+          providerId: typeof input.providerId === 'string' ? input.providerId : undefined,
+          search: typeof input.search === 'string' ? input.search : undefined,
+          limit: typeof input.limit === 'number' ? Math.min(100, Math.max(1, input.limit)) : 25
+        },
+        projectMap
+      );
+      return JSON.stringify(result, null, 2);
+    }
+  };
+
+  agents.registerTool(summaryTool);
+  agents.registerTool(logsTool);
+}
