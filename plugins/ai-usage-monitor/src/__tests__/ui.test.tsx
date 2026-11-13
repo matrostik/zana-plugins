@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RPC_METHODS, type DashboardPayload, type LogsResponse } from '../shared/types.ts';
 
@@ -298,6 +298,114 @@ function makeDashboard(): DashboardPayload {
     lastSyncedAtMs: Date.now()
   };
 }
+
+describe('overview clarity', () => {
+  afterEach(cleanup);
+
+  it('separates estimated value and recorded activity from latest reported limits', () => {
+    render(<OverviewTab data={makeDashboard()} onJumpToTab={vi.fn()} />);
+    const usage = screen.getByRole('region', { name: 'Recorded usage' });
+    expect(within(usage).getByText('API usage estimate')).toBeTruthy();
+    expect(within(usage).getByText('Subscription usage estimate')).toBeTruthy();
+    expect(within(usage).getByText('50% of input tokens served from cache')).toBeTruthy();
+    expect(within(usage).getByText('Last 30 calendar days')).toBeTruthy();
+    const limits = screen.getByRole('region', { name: 'Balances & subscription limits' });
+    expect(within(limits).getByText('Latest reported')).toBeTruthy();
+    expect(within(limits).getByText('82% used')).toBeTruthy();
+    expect(within(limits).getByText('18% remaining')).toBeTruthy();
+    expect(within(limits).getByRole('progressbar', { name: 'Subscription quota used' }).getAttribute('aria-valuenow')).toBe('82');
+    // Period-scoped provider card footer
+    expect(screen.getByText(/30d: 900\.0k tok • 30 turns/)).toBeTruthy();
+  });
+
+  it('shows missing quotas as unknown and unavailable balances separately from zero', () => {
+    const data = makeDashboard();
+    data.kpis.tightestQuota = null;
+    data.kpis.cloudCreditsRemainingUsd = null;
+    data.providers.forEach(p => { p.windows = []; p.creditRemainingUsd = null; });
+    const { rerender } = render(<OverviewTab data={data} onJumpToTab={vi.fn()} />);
+    expect(screen.getByText('Quota unavailable')).toBeTruthy();
+    expect(screen.queryByText('Unbounded')).toBeNull();
+    expect(screen.getByText('Balance unavailable')).toBeTruthy();
+    data.kpis.cloudCreditsRemainingUsd = 0;
+    rerender(<OverviewTab data={data} onJumpToTab={vi.fn()} />);
+    const balance = screen.getByRole('article', { name: 'Credits & prepaid balance' });
+    expect(within(balance).getByText('$0.00')).toBeTruthy();
+    expect(within(balance).queryByText('Balance unavailable')).toBeNull();
+  });
+
+  it('does not call an unconfigured budget healthy and links to budgets and diagnostics', () => {
+    const data = makeDashboard();
+    data.budgets[0].rule.enabled = false;
+    const jump = vi.fn();
+    render(<OverviewTab data={data} onJumpToTab={jump} />);
+    expect(screen.getByText('No budget configured')).toBeTruthy();
+    expect(screen.queryByText('On Track')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Set a budget' }));
+    expect(jump).toHaveBeenCalledWith('models');
+    fireEvent.click(screen.getByRole('button', { name: /Activity & diagnostics/ }));
+    expect(jump).toHaveBeenCalledWith('logs');
+    expect(screen.getByText(/3 events · All recorded history/)).toBeTruthy();
+  });
+
+  it('keeps provider issues separate from budget alerts and picks the most urgent budget', () => {
+    const data = makeDashboard();
+    data.budgets.push({ ...data.budgets[0], rule: { ...data.budgets[0].rule, id: 'urgent', name: 'Weekly threshold' }, percentUsed: 110, status: 'exceeded' });
+    render(<OverviewTab data={data} onJumpToTab={vi.fn()} />);
+    const budget = screen.getByRole('article', { name: 'Budget alerts' });
+    expect(within(budget).getByText('1 budget alert')).toBeTruthy();
+    expect(within(budget).getByText('Weekly threshold: 110% used')).toBeTruthy();
+    expect(screen.getByText('1 provider needs attention')).toBeTruthy();
+  });
+
+  it('uses the latest provider windows instead of stale summary quota and excludes historical providers', () => {
+    const data = makeDashboard();
+    data.providers[0].windows[0].remainingPercent = 63;
+    data.providers[0].windows[0].usedPercent = 37;
+    data.providers.push({ ...data.providers[0], providerId: 'historical', available: false, windows: [{ ...data.providers[0].windows[0], remainingPercent: 1 }] });
+    render(<OverviewTab data={data} onJumpToTab={vi.fn()} />);
+    const limits = screen.getByRole('region', { name: 'Balances & subscription limits' });
+    expect(within(limits).getByText('63% remaining')).toBeTruthy();
+    expect(within(limits).queryByText('1% remaining')).toBeNull();
+  });
+
+  it('shows balance-source failures and no-input cache state without inventing a balance', () => {
+    const data = makeDashboard();
+    data.kpis.inputTokens = 0;
+    data.kpis.cloudCreditsRemainingUsd = null;
+    data.cloudConnectors[0].status = 'error';
+    render(<OverviewTab data={data} onJumpToTab={vi.fn()} />);
+    expect(screen.getByText('No input tokens recorded')).toBeTruthy();
+    const balance = screen.getByRole('article', { name: 'Credits & prepaid balance' });
+    expect(within(balance).getByText(/1 balance source needs attention/)).toBeTruthy();
+    fireEvent.click(within(balance).getByText('View balance sources'));
+    expect(within(balance).getByText('Balance refresh failed')).toBeTruthy();
+  });
+
+  it('surfaces secondary subscription windows, unauthenticated subscription issues, and focuses affected providers', () => {
+    const data = makeDashboard();
+    data.providers[0].windows.push({
+      key: 'weekly',
+      label: 'Weekly Window',
+      usedPercent: 40,
+      remainingPercent: 60,
+      status: 'allowed',
+      resetsAtIso: null
+    });
+    const onRefreshProvider = vi.fn();
+    render(<OverviewTab data={data} onJumpToTab={vi.fn()} onRefreshProvider={onRefreshProvider} />);
+    const limits = screen.getByRole('region', { name: 'Balances & subscription limits' });
+    expect(within(limits).getByText('Claude Code · Weekly Window: 60% left')).toBeTruthy();
+
+    // Direct refresh button inside Closest subscription limit
+    fireEvent.click(within(limits).getByRole('button', { name: 'Check limit now' }));
+    expect(onRefreshProvider).toHaveBeenCalledWith('claude-code');
+
+    // Quick-action button in DiagnosticsStatus filters provider grid to affected providers
+    fireEvent.click(screen.getByRole('button', { name: /Show affected providers \(1\)/ }));
+    expect(screen.queryByText('OpenRouter Credits')).toBeNull();
+  });
+});
 
 function makeLogs(): LogsResponse {
   return {

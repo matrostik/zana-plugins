@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Usage Monitor — Overview &amp; Quotas Proposal</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;background:#0b0d11;color:#e2e8f0;--surface:#12151c;--surface2:#181c26;--border:#1f2430;--border-strong:#2c3446;--muted:#94a3b8;--accent:#6366f1;--emerald:#10b981;--amber:#f59e0b;--rose:#f43f5e;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;font-size:13px;line-height:1.45}
+button,select{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border-strong);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:500}
+button:hover,button[aria-pressed=true]{background:#222736;border-color:#6366f1;color:#a5b4fc}
+button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.review{padding:12px 20px;background:#161a24;border-bottom:1px solid #2c3446;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.review small{color:var(--muted)}
+.workspace{max-width:1280px;margin:auto;padding:20px}
+header{display:flex;justify-content:space-between;gap:12px;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border)}
+h1{font-size:16px;margin:0}h2{font-size:14px;margin:0}h3{font-size:12px;font-weight:500;color:var(--muted);margin:0}
+p{line-height:1.5;margin:0}.muted,small{color:var(--muted);font-size:12px}.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:16px;font-size:12px;color:var(--muted)}
+.tabs span:first-child{color:#a5b4fc;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px}
+.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{border:1px solid var(--border);border-radius:7px;padding:15px 16px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.card.amber{border-color:rgba(245,158,11,.42)}
+.value{font-size:22px;font-weight:700;font-family:var(--mono);letter-spacing:-.02em}
+.green{color:var(--emerald)}.amber-txt{color:var(--amber)}
+.line{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.bar{height:6px;border-radius:3px;background:#1c212e;overflow:hidden;display:flex}
+.fill{height:100%;background:var(--emerald)}
+.pill{font-size:10px;padding:2px 7px;border:1px solid var(--border-strong);border-radius:4px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em}
+.pill-indigo{background:rgba(99,102,241,.14);color:#a5b4fc;border-color:rgba(99,102,241,.35)}
+.pill-emerald{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.3)}
+.pill-amber{background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.3)}
+.chip{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--muted)}
+.note{font-size:11px;color:var(--muted)}
+details{border-top:1px solid var(--border);margin-top:auto;padding-top:10px;font-size:12px}
+summary{cursor:pointer;color:#a5b4fc;font-weight:500}
+details p{margin-top:6px;color:var(--muted)}
+.status{font-size:18px;font-weight:600}
+.diag{margin-top:16px;border:1px solid var(--border);border-radius:7px;padding:11px 14px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.provider{display:flex;align-items:center;gap:10px}
+.icon{width:28px;height:28px;border-radius:6px;background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.35);color:#34d399;display:grid;place-items:center;font-weight:700;font-family:var(--mono);font-size:11px}
+.window-box{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:5px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
+.card-foot{padding-top:8px;border-top:1px solid var(--border);margin-top:auto;display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+dialog{max-width:460px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface2);color:#eee;padding:20px}
+dialog::backdrop{background:#0009}
+[hidden]{display:none!important}
+@media(max-width:900px){.grid,.four{grid-template-columns:1fr 1fr}#quota-card{grid-column:auto!important}}
+@media(max-width:600px){.grid,.four{grid-template-columns:1fr}}
+</style>
+<div class="review">
+  <strong>Overview &amp; Quotas · UI Review</strong>
+  <button id="current" aria-pressed="false">Previous 4-KPI Strip</button>
+  <button id="proposed" aria-pressed="true">Improved Overview &amp; Quotas</button>
+  <label>Scenario
+    <select id="state">
+      <option value="snapshot">Healthy multi-window (37% used)</option>
+      <option value="warning">Approaching limit (88% used)</option>
+      <option value="missing">Quota unavailable / sign-in needed</option>
+    </select>
+  </label>
+  <small>Interactive comparison of the updated OverviewSummary &amp; Provider Cards</small>
+</div>
+<main class="workspace">
+  <header>
+    <div>
+      <h1>AI Usage Monitor</h1>
+      <p class="note">Cross-provider quotas, spend, credits &amp; telemetry</p>
+    </div>
+    <span class="chip">Local TZ · Last 30 calendar days</span>
+  </header>
+  <div class="tabs">
+    <span>Overview &amp; Quotas</span>
+    <span>Models, Spend &amp; Budgets</span>
+    <span>Usage &amp; Error Logs <span class="pill">213</span></span>
+  </div>
+
+  <section id="old" hidden>
+    <div class="grid four">
+      <article class="card"><h3>Total Value (30D) <small>85 turns</small></h3><div class="value">$8.55</div><div class="bar"><div class="fill" style="width:100%"></div></div><div class="line"><span>$0.00 Billed</span><span>$8.55 Sub Equiv</span></div></article>
+      <article class="card"><h3>Credits &amp; Prepaid Left</h3><div class="value">—</div><div class="bar"></div><p class="note">112.9M tok (94.6% cached)</p></article>
+      <article class="card"><h3>Tightest Subscription Window · Codex</h3><div class="value green" id="old-quota">63% Left</div><div class="bar"><div id="old-fill" class="fill" style="width:37%"></div></div><p class="note" id="old-reset">Weekly limit · Resets in 4d 22h</p></article>
+      <article class="card"><h3>Budgets &amp; Telemetry · Rules (0)</h3><div class="value" id="old-status">On Track</div><div class="bar"></div><p class="note">213 logs · Add a budget cap in Models &amp; Budgets</p></article>
+    </div>
+  </section>
+
+  <section id="new" style="display:flex;flex-direction:column;gap:18px">
+    <div>
+      <div class="line"><h2>Recorded usage</h2><span class="chip">Last 30 calendar days</span></div>
+      <p class="muted" style="margin-top:4px">Based on usage captured by the monitor. Subscription fees are not included.</p>
+      <div class="grid">
+        <article class="card">
+          <div class="line"><h3>Estimated usage value</h3><span class="pill pill-indigo">Equiv + Billed</span></div>
+          <div class="value">$8.55</div>
+          <p class="muted">API-price equivalent of recorded usage</p>
+          <div class="bar"><div class="fill" style="width:100%"></div></div>
+          <div class="line"><span>Subscription usage estimate</span><strong class="mono">$8.55</strong></div>
+          <div class="line"><span>API usage estimate</span><strong class="mono">$0.00</strong></div>
+          <details><summary>What does this amount mean?</summary><p>Token-price estimates for recorded subscription and API usage. This is not an invoice or an additional subscription charge.</p></details>
+        </article>
+        <article class="card">
+          <div class="line"><h3>Recorded activity</h3><span class="pill">12 subagent</span></div>
+          <div class="value">85 <span class="muted" style="font-size:14px">turns</span></div>
+          <div class="line"><span>Total tokens</span><strong class="mono">112.9M</strong></div>
+          <div class="line note mono"><span>In: 108.4M</span><span>Out: 4.5M</span></div>
+          <p class="muted">94.6% of input tokens served from cache</p>
+          <details><summary>How are these counted?</summary><p>Counts cover usage captured during the selected period. Cache percentage is based on input tokens, not total tokens.</p></details>
+        </article>
+        <article class="card">
+          <div class="line"><h3>Budget alerts</h3><span class="pill">0 active</span></div>
+          <div class="status">No budget configured</div>
+          <p class="muted">Set a threshold for spending estimates or token usage.</p>
+          <button data-dialog="budget" style="align-self:flex-start">Set a budget</button>
+          <p class="note">Alerts do not stop provider spending.</p>
+        </article>
+      </div>
+    </div>
+
+    <div>
+      <div class="line"><h2>Balances &amp; subscription limits</h2><span class="chip">Latest reported</span></div>
+      <p class="muted" style="margin-top:4px">Provider balances and reset windows are independent of the selected usage period.</p>
+      <div class="grid">
+        <article class="card" style="grid-column:span 2" id="quota-card">
+          <div class="line">
+            <h3>Closest subscription limit</h3>
+            <button data-dialog="refresh">Check limit now</button>
+          </div>
+          <div id="quota-known" style="display:flex;flex-direction:column;gap:8px">
+            <div class="provider">
+              <span class="icon">OX</span>
+              <div>
+                <strong>Codex · Weekly limit</strong>
+                <div class="note mono">ChatGPT Plus · dev@example.com</div>
+              </div>
+            </div>
+            <div class="line"><strong id="used">37% used</strong><strong class="green" id="remaining">63% remaining</strong></div>
+            <div class="bar"><div id="quota-fill" class="fill" style="width:37%"></div></div>
+            <p id="reset">Resets in 4d 22h</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span class="chip">Codex · 5h Window: 84% left</span>
+              <span class="chip">Claude Code · 5h Window: 72% left</span>
+            </div>
+            <p class="note">Updated just now · Source: zcc-host-usage</p>
+          </div>
+          <div id="quota-missing" hidden style="display:flex;flex-direction:column;gap:6px">
+            <div class="status">Quota unavailable</div>
+            <p class="muted">No usable subscription quota was reported. Remaining capacity is unknown.</p>
+            <p class="amber-txt">Codex (sign-in needed) could not report a quota window.</p>
+          </div>
+          <details><summary>Why is this limit shown?</summary><p>The available subscription window with the least reported capacity remaining. Provider reset windows are independent of the selected usage period.</p></details>
+        </article>
+
+        <article class="card">
+          <div class="line"><h3>Credits &amp; prepaid balance</h3></div>
+          <div class="status">Balance unavailable</div>
+          <p class="muted">No remaining credit balance was reported. This does not mean your balance is zero.</p>
+          <details>
+            <summary>View balance sources</summary>
+            <p>OpenRouter: Connection not configured</p>
+            <p>OpenCode: Console prepaid balance pending endpoint qualification</p>
+          </details>
+        </article>
+      </div>
+    </div>
+
+    <div class="diag">
+      <div>
+        <strong id="health">No provider alerts reported</strong>
+        <p class="note" id="health-sub">Provider issues are separate from budget alerts. Missing readings may still need checking.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="focus-btn" hidden data-dialog="focus">Show affected providers (1)</button>
+        <button data-dialog="logs">Activity &amp; diagnostics · 213 events · All recorded history</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="line">
+        <div>
+          <strong style="font-size:14px">Configured Providers &amp; Live Subscription Quotas</strong>
+          <div class="note">Provider cards now explicitly scope footer totals to the active time period (e.g. <span class="mono">30d:</span>)</div>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card" id="prov-card">
+          <div class="line" style="border-bottom:1px solid var(--border);padding-bottom:8px">
+            <div class="provider">
+              <span class="icon">OX</span>
+              <div><strong>Codex</strong><div class="note mono">ChatGPT Plus</div></div>
+            </div>
+            <span class="pill pill-emerald" id="prov-pill">Healthy</span>
+          </div>
+          <div class="window-box">
+            <div class="line mono" style="font-size:11px"><span>Weekly limit</span><span class="green" id="prov-win">37% used • 63% left</span></div>
+            <div class="bar"><div class="fill" id="prov-bar" style="width:37%"></div></div>
+            <div class="note mono">Resets in 4d 22h</div>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap"><span class="chip">gpt-5.3-codex</span><span class="chip">o3</span></div>
+          <div class="card-foot"><span>30d: 112.9M tok • 85 turns</span><strong style="color:#e2e8f0">~$8.55 equiv</strong></div>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+<dialog id="info"><h2 id="dialog-title" style="margin-top:0"></h2><p id="dialog-body" style="margin:12px 0"></p><form method="dialog"><button>Close</button></form></dialog>
+<script>
+const byId = id => document.getElementById(id);
+function showVariant(proposed) {
+  byId('old').hidden = proposed;
+  byId('new').hidden = !proposed;
+  byId('current').setAttribute('aria-pressed', String(!proposed));
+  byId('proposed').setAttribute('aria-pressed', String(proposed));
+}
+byId('current').onclick = () => showVariant(false);
+byId('proposed').onclick = () => showVariant(true);
+byId('state').onchange = event => {
+  const missing = event.target.value === 'missing';
+  const warning = event.target.value === 'warning';
+  const used = warning ? 88 : 37;
+  byId('quota-known').hidden = missing;
+  byId('quota-missing').hidden = !missing;
+  byId('quota-card').className = (warning || missing) ? 'card amber' : 'card';
+  byId('used').textContent = `${used}% used`;
+  byId('remaining').textContent = `${100 - used}% remaining`;
+  byId('remaining').className = warning ? 'amber-txt' : 'green';
+  byId('quota-fill').style.width = `${used}%`;
+  byId('quota-fill').style.background = warning ? '#f59e0b' : '#10b981';
+  byId('health').textContent = (warning || missing) ? '1 provider needs attention' : 'No provider alerts reported';
+  byId('health-sub').textContent = (warning || missing) ? 'Codex' : 'Provider issues are separate from budget alerts. Missing readings may still need checking.';
+  byId('focus-btn').hidden = !(warning || missing);
+  byId('prov-card').className = (warning || missing) ? 'card amber' : 'card';
+  byId('prov-pill').className = (warning || missing) ? 'pill pill-amber' : 'pill pill-emerald';
+  byId('prov-pill').textContent = missing ? 'Sign-in Needed' : warning ? '12% Left' : 'Healthy';
+  byId('prov-win').textContent = `${used}% used • ${100 - used}% left`;
+  byId('prov-bar').style.width = `${used}%`;
+  byId('prov-bar').style.background = warning ? '#f59e0b' : '#10b981';
+  byId('old-quota').textContent = missing ? 'Unbounded' : `${100 - used}% Left`;
+  byId('old-fill').style.width = missing ? '0%' : `${used}%`;
+  byId('old-reset').textContent = missing ? 'Live quota windows populate on probe' : 'Weekly limit · Resets in 4d 22h';
+  byId('old-status').textContent = warning ? '1 Alert' : 'On Track';
+};
+const explanations = {
+  budget: ['Set a budget', 'Opens Models, Spend & Budgets so you can configure spending or token thresholds.'],
+  refresh: ['Check limit now', 'Directly probes the provider reporting the closest subscription limit without waiting for a full sync.'],
+  focus: ['Show affected providers', 'Filters the provider grid below to Near Limit / Attention Needed so you can immediately inspect and refresh the affected provider card.'],
+  logs: ['Activity & diagnostics', 'Opens Usage & Error Logs across all recorded history to inspect turn telemetry, rate limits, fallbacks, and probe errors.']
+};
+document.querySelectorAll('[data-dialog]').forEach(button => {
+  button.onclick = () => {
+    const [title, body] = explanations[button.dataset.dialog];
+    byId('dialog-title').textContent = title;
+    byId('dialog-body').textContent = body;
+    byId('info').showModal();
+  };
+});
+</script>
+</html>

@@ -139,6 +139,36 @@ export const USAGE_MONITOR_STYLES = `
 }
 
 .aum-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.aum-summary { display: flex; flex-direction: column; gap: 18px; container-type: inline-size; }
+.aum-summary h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.aum-summary h3 { font-size: 12px; font-weight: 500; color: var(--aum-muted); margin: 0; }
+.aum-summary p { margin: 0; line-height: 1.5; }
+.aum-summary section > p { margin-top: 4px; }
+.aum-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+.aum-summary .aum-card { padding: 15px 16px; min-width: 0; gap: 10px; overflow-wrap: anywhere; }
+.aum-summary .aum-muted { font-size: 12px; }
+.aum-summary-quota { grid-column: span 2; }
+.aum-summary-provider { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.aum-summary-other-windows { display: flex; flex-wrap: wrap; gap: 6px; }
+.aum-summary-status { font-size: 18px; font-weight: 600; }
+.aum-summary-remaining { color: var(--aum-emerald); }
+.aum-summary-warning { color: var(--aum-amber); }
+.aum-explanation { border-top: 1px solid var(--aum-border); padding-top: 10px; font-size: 12px; margin-top: auto; }
+.aum-explanation summary { cursor: pointer; color: #a5b4fc; font-weight: 500; }
+.aum-explanation p, .aum-summary-source { margin-top: 8px; }
+.aum-explanation summary:focus-visible, .aum-summary button:focus-visible { outline: 2px solid var(--aum-accent); outline-offset: 3px; }
+.aum-summary-diagnostics {
+  border: 1px solid var(--aum-border); border-radius: 7px; padding: 11px 14px;
+  background: color-mix(in srgb, var(--aum-surface) 80%, var(--aum-bg));
+}
+.aum-summary .aum-btn { white-space: normal; text-align: left; align-self: flex-start; }
+@container (max-width: 850px) {
+  .aum-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aum-summary-quota { grid-column: auto; }
+}
+@container (max-width: 540px) {
+  .aum-summary-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .aum-prov-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .aum-split-2 { display: grid; grid-template-columns: 1.55fr 1fr; gap: 10px; }
 .aum-logs-split { display: grid; grid-template-columns: 1.75fr 1fr; gap: 10px; align-items: start; }
@@ -189,7 +219,7 @@ export const USAGE_MONITOR_STYLES = `
   font-weight: 700; font-family: var(--aum-mono); font-size: 11px; flex-shrink: 0;
 }
 .aum-card-footer {
-  padding-top: 8px; border-top: 1px solid var(--aum-border);
+  padding-top: 8px; border-top: 1px solid var(--aum-border); margin-top: auto;
   display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--aum-muted);
 }
 .aum-chip-row { display: flex; flex-wrap: wrap; gap: 4px; }

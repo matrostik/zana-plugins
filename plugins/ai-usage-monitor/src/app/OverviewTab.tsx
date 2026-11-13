@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isProviderIssueStatus, OverviewSummary } from './OverviewSummary.tsx';
 import {
   DEFAULT_PROVIDER_ORDER,
   mergeCustomOrder,
@@ -14,9 +15,17 @@ import type {
   ProviderOrderPrefs,
   ProviderQuotaSnapshot,
   ProviderSortMode,
-  QuotaWindowStatus
+  QuotaWindowStatus,
+  TimeRangeKey
 } from '../shared/types.ts';
-import { formatCountdown, formatShortLocalDateTime, formatTokens, formatUsd, providerBadgeCode, providerColor } from './format.ts';
+import {
+  formatCountdown,
+  formatShortLocalDateTime,
+  formatTokens,
+  formatUsd,
+  providerBadgeCode,
+  providerColor
+} from './format.ts';
 
 interface OverviewTabProps {
   data: DashboardPayload;
@@ -28,6 +37,16 @@ interface OverviewTabProps {
 }
 
 type ProviderFilter = 'all' | 'limited' | 'api' | 'historical';
+
+type ResolvedProviderSnapshot = ProviderQuotaSnapshot & { visibleModels: string[] };
+
+const SHORT_RANGE_PREFIX: Record<TimeRangeKey, string> = {
+  today: 'Today',
+  '7d': '7d',
+  last_week: 'Last wk',
+  '30d': '30d',
+  all: 'All-time'
+};
 
 export function ReloadSpinner({ label, spinning = true }: { label?: string; spinning?: boolean }) {
   return (
@@ -80,7 +99,7 @@ function renderStatusLabel(prov: ProviderQuotaSnapshot): string {
   return prov.billingMode === 'billed_api' ? 'Pay-As-You-Go' : prov.billingMode === 'free' ? 'Free / Local' : 'Healthy';
 }
 
-function resolveVisibleProvider(prov: ProviderQuotaSnapshot): ProviderQuotaSnapshot & { visibleModels: string[] } {
+function resolveVisibleProvider(prov: ProviderQuotaSnapshot): ResolvedProviderSnapshot {
   const visibleModels =
     prov.providerId === 'antigravity'
       ? prov.configuredModels.filter((model) => /^(?:google\/)?gemini(?:[-/]|$)/i.test(model))
@@ -303,6 +322,217 @@ function OpenCodeLocalStatsCard({
   );
 }
 
+interface ProviderCardProps {
+  prov: ResolvedProviderSnapshot;
+  index: number;
+  totalCount: number;
+  range: TimeRangeKey;
+  reordering: boolean;
+  isCardRefreshing: boolean;
+  isDragged: boolean;
+  isDragOver: boolean;
+  onRefreshProvider?: (providerId: string) => void | Promise<void>;
+  onMoveProvider: (providerId: string, delta: -1 | 1) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
+}
+
+function ProviderCard({
+  prov,
+  index,
+  totalCount,
+  range,
+  reordering,
+  isCardRefreshing,
+  isDragged,
+  isDragOver,
+  onRefreshProvider,
+  onMoveProvider,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop
+}: ProviderCardProps) {
+  const color = providerColor(prov.providerId);
+  const { visibleModels, windows: visibleWindows, status: visibleStatus } = prov;
+  const baseCls =
+    visibleStatus === 'blocked' || visibleStatus === 'error' || visibleStatus === 'expired'
+      ? 'aum-card aum-card-rose'
+      : visibleStatus === 'warning' || visibleStatus === 'unauthenticated'
+        ? 'aum-card aum-card-amber'
+        : 'aum-card';
+  const cardCls = [
+    baseCls,
+    isCardRefreshing && !isProviderIssueStatus(visibleStatus) ? 'aum-card-refreshing' : '',
+    reordering ? 'aum-card-reordering' : '',
+    isDragged ? 'aum-card-dragging' : '',
+    isDragOver ? 'aum-card-drag-over' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div
+      data-provider-id={prov.providerId}
+      className={cardCls}
+      draggable={reordering}
+      onDragStart={reordering ? onDragStart : undefined}
+      onDragEnd={reordering ? onDragEnd : undefined}
+      onDragOver={reordering ? onDragOver : undefined}
+      onDragLeave={reordering ? onDragLeave : undefined}
+      onDrop={reordering ? onDrop : undefined}
+    >
+      {reordering && (
+        <div className="aum-reorder-bar">
+          <span className="aum-subtext aum-mono">#{index + 1} • Drag</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              type="button"
+              className="aum-btn aum-btn-sm"
+              aria-label={`Move ${prov.displayName} earlier`}
+              disabled={index === 0}
+              onClick={() => onMoveProvider(prov.providerId, -1)}
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="aum-btn aum-btn-sm"
+              aria-label={`Move ${prov.displayName} later`}
+              disabled={index === totalCount - 1}
+              onClick={() => onMoveProvider(prov.providerId, 1)}
+            >
+              →
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="aum-prov-head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+          <div
+            className="aum-prov-avatar"
+            style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}
+          >
+            {providerBadgeCode(prov.providerId)}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {prov.displayName}
+            </div>
+            <div className="aum-subtext aum-mono">
+              {prov.planLabel ?? prov.source}
+              {prov.accountLabel ? ` • ${prov.accountLabel}` : ''}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {isCardRefreshing && (
+            <span
+              className="aum-refresh-badge"
+              role="status"
+              aria-label={`Refreshing ${prov.displayName} quota`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              <ReloadSpinner />
+              <span>Refreshing</span>
+            </span>
+          )}
+          <span className={pillClassForQuota(visibleStatus)}>{renderStatusLabel(prov)}</span>
+          {onRefreshProvider && !isCardRefreshing && (
+            <button
+              type="button"
+              className="aum-icon-btn"
+              aria-label={`Refresh ${prov.displayName}`}
+              title={`Refresh ${prov.displayName} quota`}
+              onClick={() => void onRefreshProvider(prov.providerId)}
+            >
+              <ReloadSpinner spinning={false} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {visibleWindows.length > 0 ? (
+        <>
+          {visibleWindows.map((win) => (
+            <div key={win.key} className="aum-window-box">
+              <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
+                <span>{win.label}</span>
+                <span style={{ color: barColorForPercent(win.usedPercent, win.status) }}>
+                  {win.usedPercent !== null
+                    ? `${win.usedPercent}% used • ${win.remainingPercent}% left`
+                    : win.status}
+                </span>
+              </div>
+              {win.usedPercent !== null && (
+                <div className="aum-bar-track">
+                  <div
+                    className="aum-bar-fill"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, win.usedPercent))}%`,
+                      background: barColorForPercent(win.usedPercent, win.status)
+                    }}
+                  />
+                </div>
+              )}
+              <div className="aum-subtext aum-mono">
+                {win.limitUsdCents
+                  ? `${formatUsd((win.usedUsdCents ?? 0) / 100)} / ${formatUsd(win.limitUsdCents / 100)} • `
+                  : ''}
+                {formatCountdown(win.resetsAtIso)}
+              </div>
+            </div>
+          ))}
+          {prov.errorMessage && <div className="aum-subtext aum-mono aum-stale-warn">{prov.errorMessage}</div>}
+        </>
+      ) : (
+        <div className="aum-window-box">
+          <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
+            <span>{prov.creditRemainingUsd !== null ? 'Prepaid Wallet' : 'Telemetry Tracking'}</span>
+            <span>{prov.available ? 'Active' : 'Historical'}</span>
+          </div>
+          <div className="aum-subtext aum-mono">
+            {prov.errorMessage
+              ? prov.errorMessage
+              : prov.creditRemainingUsd !== null
+                ? `Credits left: ${formatUsd(prov.creditRemainingUsd)}${prov.creditLimitUsd ? ` of ${formatUsd(prov.creditLimitUsd)}` : ''}`
+                : 'Tracks tokens, context, fallbacks & errors from threads'}
+          </div>
+        </div>
+      )}
+
+      {visibleModels.length > 0 && (
+        <div className="aum-chip-row">
+          {visibleModels.slice(0, 4).map((m) => (
+            <span key={m} className="aum-chip">
+              {m}
+            </span>
+          ))}
+          {visibleModels.length > 4 && <span className="aum-chip">+{visibleModels.length - 4} more</span>}
+        </div>
+      )}
+
+      <div className="aum-card-footer aum-mono">
+        <span>
+          {SHORT_RANGE_PREFIX[range]}: {formatTokens(prov.totalTokens)} tok • {prov.turnCount} turns
+        </span>
+        <strong style={{ color: '#e2e8f0' }}>
+          {prov.billedCostUsd !== null
+            ? `${formatUsd(prov.billedCostUsd)} billed`
+            : prov.billingMode === 'free'
+              ? '$0.00 local'
+              : `~${formatUsd(prov.estimatedCostUsd)} equiv`}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
 export function OverviewTab({
   data,
   onJumpToTab,
@@ -323,17 +553,16 @@ export function OverviewTab({
     }
   }, [data.providerOrder]);
 
-  const { kpis } = data;
   const globalRefreshing = Boolean(isRefreshing || data.isSyncing);
   const hasConfiguredConnectors = data.cloudConnectors.some((c) => c.configured);
-  const billedPct = kpis.totalValueUsd > 0 ? Math.min(100, (kpis.billedSpendUsd / kpis.totalValueUsd) * 100) : 0;
-  const subPct = kpis.totalValueUsd > 0 ? Math.max(0, 100 - billedPct) : 0;
 
   const resolvedProviders = data.providers.map(resolveVisibleProvider);
   const installedProviders = resolvedProviders.filter((p) => p.available && p.status !== 'not_installed');
+  const issueCount = installedProviders.filter((p) => isProviderIssueStatus(p.status)).length;
+  const apiCount = installedProviders.filter((p) => p.billingMode === 'billed_api' || p.creditRemainingUsd !== null).length;
   const historicalProviders = resolvedProviders.filter((p) => p.turnCount > 0 || p.totalTokens > 0);
   const filteredProviders = (filter === 'historical' ? historicalProviders : installedProviders).filter((p) => {
-    if (filter === 'limited') return p.status === 'warning' || p.status === 'blocked' || p.status === 'error';
+    if (filter === 'limited') return isProviderIssueStatus(p.status);
     if (filter === 'api') return p.billingMode === 'billed_api' || p.creditRemainingUsd !== null;
     return true;
   });
@@ -369,8 +598,7 @@ export function OverviewTab({
   }
 
   function handleEnterReorder() {
-    const baseProviders = installedProviders;
-    const displayed = sortProviders(baseProviders, orderPrefs).map((p) => p.providerId);
+    const displayed = sortProviders(installedProviders, orderPrefs).map((p) => p.providerId);
     const seeded =
       orderPrefs.sortMode === 'custom' && orderPrefs.customOrder.length > 0
         ? mergeCustomOrder(orderPrefs.customOrder, displayed)
@@ -400,107 +628,15 @@ export function OverviewTab({
     commitOrder({ sortMode: 'custom', customOrder: nextCustom });
   }
 
-  const activeBudgets = data.budgets.filter((b) => b.rule.enabled);
-  const topBudget = activeBudgets[0] ?? null;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="aum-kpi-grid">
-        <div className="aum-card">
-          <div className="aum-card-label">
-            <span>Total Value ({kpis.range})</span>
-            <span className="aum-pill aum-pill-indigo">{kpis.turnCount} turns</span>
-          </div>
-          <div className="aum-kpi-val">{formatUsd(kpis.totalValueUsd)}</div>
-          <div className="aum-bar-track">
-            <div className="aum-bar-fill" style={{ width: `${billedPct}%`, background: '#6366f1' }} />
-            <div className="aum-bar-fill" style={{ width: `${subPct}%`, background: '#10b981' }} />
-          </div>
-          <div className="aum-row-between aum-subtext aum-mono">
-            <span>{formatUsd(kpis.billedSpendUsd)} Billed</span>
-            <span>{formatUsd(kpis.subscriptionEquivUsd)} Sub Equiv</span>
-          </div>
-        </div>
-
-        <div className="aum-card">
-          <div className="aum-card-label">
-            <span>Credits &amp; Prepaid Left</span>
-            <span className="aum-pill aum-pill-cyan">Balances</span>
-          </div>
-          <div className="aum-kpi-val" style={{ color: kpis.cloudCreditsRemainingUsd !== null ? '#34d399' : undefined }}>
-            {kpis.cloudCreditsRemainingUsd !== null ? formatUsd(kpis.cloudCreditsRemainingUsd) : '—'}
-          </div>
-          <div className="aum-bar-track">
-            <div
-              className="aum-bar-fill"
-              style={{
-                width:
-                  kpis.cloudCreditsRemainingUsd !== null && kpis.cloudCreditsTotalLimitUsd
-                    ? `${Math.min(100, (kpis.cloudCreditsRemainingUsd / kpis.cloudCreditsTotalLimitUsd) * 100)}%`
-                    : '0%',
-                background: '#10b981'
-              }}
-            />
-          </div>
-          <div className="aum-subtext aum-mono">
-            {kpis.cloudCreditsRemainingUsd !== null
-              ? `of ${formatUsd(kpis.cloudCreditsTotalLimitUsd)} total limit`
-              : `${formatTokens(kpis.totalTokens)} tok (${kpis.cacheHitPercent}% cached)`}
-          </div>
-        </div>
-
-        <div className={kpis.tightestQuota && kpis.tightestQuota.remainingPercent <= 25 ? 'aum-card aum-card-amber' : 'aum-card'}>
-          <div className="aum-card-label">
-            <span>Tightest Subscription Window</span>
-            <span className="aum-mono">{kpis.tightestQuota?.displayName ?? 'None'}</span>
-          </div>
-          <div className="aum-row-between">
-            <div className="aum-kpi-val" style={{ color: kpis.tightestQuota && kpis.tightestQuota.remainingPercent <= 25 ? '#fbbf24' : '#34d399' }}>
-              {kpis.tightestQuota ? `${kpis.tightestQuota.remainingPercent}% Left` : 'Unbounded'}
-            </div>
-            {kpis.tightestQuota && (
-              <span className="aum-pill aum-pill-amber">{formatCountdown(kpis.tightestQuota.resetsAtIso)}</span>
-            )}
-          </div>
-          <div className="aum-bar-track">
-            <div
-              className="aum-bar-fill"
-              style={{
-                width: kpis.tightestQuota ? `${Math.max(0, 100 - kpis.tightestQuota.remainingPercent)}%` : '0%',
-                background: kpis.tightestQuota && kpis.tightestQuota.remainingPercent <= 25 ? '#f59e0b' : '#10b981'
-              }}
-            />
-          </div>
-          <div className="aum-subtext aum-mono">{kpis.tightestQuota?.windowLabel ?? 'Live quota windows populate on probe'}</div>
-        </div>
-
-        <div className={kpis.alertCount > 0 ? 'aum-card aum-card-amber' : 'aum-card'}>
-          <div className="aum-card-label">
-            <span>Budgets &amp; Telemetry</span>
-            <button className="aum-btn aum-btn-sm" type="button" onClick={() => onJumpToTab('models')}>
-              Rules ({activeBudgets.length})
-            </button>
-          </div>
-          <div className="aum-row-between">
-            <div className="aum-kpi-val">{kpis.alertCount > 0 ? `${kpis.alertCount} Alert${kpis.alertCount === 1 ? '' : 's'}` : 'On Track'}</div>
-            <span className={kpis.alertCount > 0 ? 'aum-pill aum-pill-amber' : 'aum-pill aum-pill-emerald'}>
-              {kpis.logCount} logs
-            </span>
-          </div>
-          <div className="aum-bar-track">
-            <div
-              className="aum-bar-fill"
-              style={{
-                width: topBudget ? `${Math.min(100, topBudget.percentUsed)}%` : '0%',
-                background: topBudget?.status === 'exceeded' ? '#f43f5e' : '#6366f1'
-              }}
-            />
-          </div>
-          <div className="aum-subtext aum-mono">
-            {topBudget ? `${topBudget.rule.name}: ${topBudget.percentUsed}% used` : 'Add a budget cap in Models & Budgets'}
-          </div>
-        </div>
-      </div>
+      <OverviewSummary
+        data={data}
+        providers={resolvedProviders}
+        onJumpToTab={onJumpToTab}
+        onFocusIssueProviders={() => handleSelectFilter('limited')}
+        onRefreshProvider={onRefreshProvider}
+      />
 
       <div className="aum-row-between">
         <div>
@@ -515,10 +651,10 @@ export function OverviewTab({
               All ({installedProviders.length})
             </button>
             <button type="button" className={filter === 'limited' ? 'active' : ''} onClick={() => handleSelectFilter('limited')}>
-              Near Limit ({installedProviders.filter((p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error').length})
+              Near Limit ({issueCount})
             </button>
             <button type="button" className={filter === 'api' ? 'active' : ''} onClick={() => handleSelectFilter('api')}>
-              Paid API / Credits ({installedProviders.filter((p) => p.billingMode === 'billed_api' || p.creditRemainingUsd !== null).length})
+              Paid API / Credits ({apiCount})
             </button>
             <button type="button" className={filter === 'historical' ? 'active' : ''} onClick={() => handleSelectFilter('historical')}>
               Historical ({historicalProviders.length})
@@ -586,227 +722,43 @@ export function OverviewTab({
       ) : (
         <div className="aum-prov-grid">
           {sortedProviders.map((prov, index) => {
-            const color = providerColor(prov.providerId);
-            const { visibleModels, windows: visibleWindows, status: visibleStatus } = prov;
             const isCardRefreshing =
               (refreshingProviderIds?.has(prov.providerId) ?? false) ||
               (globalRefreshing && prov.available && prov.status !== 'not_installed');
-            const baseCls =
-              visibleStatus === 'blocked' || visibleStatus === 'error'
-                ? 'aum-card aum-card-rose'
-                : visibleStatus === 'warning'
-                  ? 'aum-card aum-card-amber'
-                  : 'aum-card';
-            const cardCls = [
-              baseCls,
-              isCardRefreshing && visibleStatus !== 'blocked' && visibleStatus !== 'error' && visibleStatus !== 'warning'
-                ? 'aum-card-refreshing'
-                : '',
-              reordering ? 'aum-card-reordering' : '',
-              draggedProviderId === prov.providerId ? 'aum-card-dragging' : '',
-              dragOverProviderId === prov.providerId && draggedProviderId !== prov.providerId ? 'aum-card-drag-over' : ''
-            ]
-              .filter(Boolean)
-              .join(' ');
             return (
-              <div
+              <ProviderCard
                 key={prov.providerId}
-                data-provider-id={prov.providerId}
-                className={cardCls}
-                draggable={reordering}
-                onDragStart={
-                  reordering
-                    ? () => {
-                        setDraggedProviderId(prov.providerId);
-                      }
-                    : undefined
-                }
-                onDragEnd={
-                  reordering
-                    ? () => {
-                        setDraggedProviderId(null);
-                        setDragOverProviderId(null);
-                      }
-                    : undefined
-                }
-                onDragOver={
-                  reordering
-                    ? (e) => {
-                        e.preventDefault();
-                        if (dragOverProviderId !== prov.providerId) {
-                          setDragOverProviderId(prov.providerId);
-                        }
-                      }
-                    : undefined
-                }
-                onDragLeave={
-                  reordering
-                    ? () => {
-                        if (dragOverProviderId === prov.providerId) {
-                          setDragOverProviderId(null);
-                        }
-                      }
-                    : undefined
-                }
-                onDrop={
-                  reordering
-                    ? (e) => {
-                        e.preventDefault();
-                        handleDropProvider(prov.providerId);
-                      }
-                    : undefined
-                }
-              >
-                {reordering && (
-                  <div className="aum-reorder-bar">
-                    <span className="aum-subtext aum-mono">#{index + 1} • Drag</span>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        type="button"
-                        className="aum-btn aum-btn-sm"
-                        aria-label={`Move ${prov.displayName} earlier`}
-                        disabled={index === 0}
-                        onClick={() => handleMoveProvider(prov.providerId, -1)}
-                      >
-                        ←
-                      </button>
-                      <button
-                        type="button"
-                        className="aum-btn aum-btn-sm"
-                        aria-label={`Move ${prov.displayName} later`}
-                        disabled={index === sortedProviders.length - 1}
-                        onClick={() => handleMoveProvider(prov.providerId, 1)}
-                      >
-                        →
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="aum-prov-head">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                    <div
-                      className="aum-prov-avatar"
-                      style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}
-                    >
-                      {providerBadgeCode(prov.providerId)}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {prov.displayName}
-                      </div>
-                      <div className="aum-subtext aum-mono">
-                        {prov.planLabel ?? prov.source}
-                        {prov.accountLabel ? ` • ${prov.accountLabel}` : ''}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    {isCardRefreshing && (
-                      <span
-                        className="aum-refresh-badge"
-                        role="status"
-                        aria-label={`Refreshing ${prov.displayName} quota`}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <ReloadSpinner />
-                        <span>Refreshing</span>
-                      </span>
-                    )}
-                    <span className={pillClassForQuota(visibleStatus)}>{renderStatusLabel(prov)}</span>
-                    {onRefreshProvider && !isCardRefreshing && (
-                      <button
-                        type="button"
-                        className="aum-icon-btn"
-                        aria-label={`Refresh ${prov.displayName}`}
-                        title={`Refresh ${prov.displayName} quota`}
-                        onClick={() => void onRefreshProvider(prov.providerId)}
-                      >
-                        <ReloadSpinner spinning={false} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {visibleWindows.length > 0 ? (
-                  <>
-                    {visibleWindows.map((win) => (
-                      <div key={win.key} className="aum-window-box">
-                        <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
-                          <span>{win.label}</span>
-                          <span style={{ color: barColorForPercent(win.usedPercent, win.status) }}>
-                            {win.usedPercent !== null
-                              ? `${win.usedPercent}% used • ${win.remainingPercent}% left`
-                              : win.status}
-                          </span>
-                        </div>
-                        {win.usedPercent !== null && (
-                          <div className="aum-bar-track">
-                            <div
-                              className="aum-bar-fill"
-                              style={{
-                                width: `${Math.min(100, Math.max(0, win.usedPercent))}%`,
-                                background: barColorForPercent(win.usedPercent, win.status)
-                              }}
-                            />
-                          </div>
-                        )}
-                        <div className="aum-subtext aum-mono">
-                          {win.limitUsdCents
-                            ? `${formatUsd((win.usedUsdCents ?? 0) / 100)} / ${formatUsd(win.limitUsdCents / 100)} • `
-                            : ''}
-                          {formatCountdown(win.resetsAtIso)}
-                        </div>
-                      </div>
-                    ))}
-                    {prov.errorMessage && (
-                      <div className="aum-subtext aum-mono aum-stale-warn">
-                        {prov.errorMessage}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="aum-window-box">
-                    <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
-                      <span>Telemetry Tracking</span>
-                      <span>{prov.available ? 'Active' : 'Unavailable'}</span>
-                    </div>
-                    <div className="aum-subtext aum-mono">
-                      {prov.errorMessage
-                        ? prov.errorMessage
-                        : prov.creditRemainingUsd !== null
-                          ? `Credits left: ${formatUsd(prov.creditRemainingUsd)}`
-                          : 'Tracks tokens, context, fallbacks & errors from threads'}
-                    </div>
-                  </div>
-                )}
-
-                {visibleModels.length > 0 && (
-                  <div className="aum-chip-row">
-                    {visibleModels.slice(0, 4).map((m) => (
-                      <span key={m} className="aum-chip">
-                        {m}
-                      </span>
-                    ))}
-                    {visibleModels.length > 4 && (
-                      <span className="aum-chip">+{visibleModels.length - 4} more</span>
-                    )}
-                  </div>
-                )}
-
-                <div className="aum-card-footer aum-mono">
-                  <span>
-                    {formatTokens(prov.totalTokens)} tok • {prov.turnCount} turns
-                  </span>
-                  <strong style={{ color: '#e2e8f0' }}>
-                    {prov.billedCostUsd !== null
-                      ? `${formatUsd(prov.billedCostUsd)} billed`
-                      : prov.billingMode === 'free'
-                        ? '$0.00 local'
-                        : `~${formatUsd(prov.estimatedCostUsd)} equiv`}
-                  </strong>
-                </div>
-              </div>
+                prov={prov}
+                index={index}
+                totalCount={sortedProviders.length}
+                range={data.kpis.range}
+                reordering={reordering}
+                isCardRefreshing={isCardRefreshing}
+                isDragged={draggedProviderId === prov.providerId}
+                isDragOver={dragOverProviderId === prov.providerId && draggedProviderId !== prov.providerId}
+                onRefreshProvider={onRefreshProvider}
+                onMoveProvider={handleMoveProvider}
+                onDragStart={() => setDraggedProviderId(prov.providerId)}
+                onDragEnd={() => {
+                  setDraggedProviderId(null);
+                  setDragOverProviderId(null);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragOverProviderId !== prov.providerId) {
+                    setDragOverProviderId(prov.providerId);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverProviderId === prov.providerId) {
+                    setDragOverProviderId(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDropProvider(prov.providerId);
+                }}
+              />
             );
           })}
         </div>
