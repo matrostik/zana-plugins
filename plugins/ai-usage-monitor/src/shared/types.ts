@@ -306,6 +306,7 @@ export const RPC_METHODS = {
   dashboard: 'dashboard',
   logs: 'logs',
   refreshNow: 'refreshNow',
+  refreshProvider: 'refreshProvider',
   setBudget: 'setBudget',
   deleteBudget: 'deleteBudget',
   setPricingOverride: 'setPricingOverride',

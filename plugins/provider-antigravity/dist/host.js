@@ -16,12 +16,8 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
-var __commonJS = (cb, mod) => function __require2() {
-  try {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  } catch (e) {
-    throw mod = 0, e;
-  }
+var __commonJS = (cb, mod) => function __require3() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target2, all) => {
   for (var name in all)
@@ -44,9 +40,9 @@ var __toESM = (mod, isNodeMode, target2) => (target2 = mod != null ? __create(__
   mod
 ));
 
-// D:/Dev/code/zana-plugins/node_modules/isexe/windows.js
+// ../../node_modules/isexe/windows.js
 var require_windows = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/isexe/windows.js"(exports, module) {
+  "../../node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require("fs");
@@ -84,9 +80,9 @@ var require_windows = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/isexe/mode.js
+// ../../node_modules/isexe/mode.js
 var require_mode = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/isexe/mode.js"(exports, module) {
+  "../../node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
     var fs3 = __require("fs");
@@ -117,9 +113,9 @@ var require_mode = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/isexe/index.js
+// ../../node_modules/isexe/index.js
 var require_isexe = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/isexe/index.js"(exports, module) {
+  "../../node_modules/isexe/index.js"(exports, module) {
     var fs3 = __require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
@@ -172,9 +168,9 @@ var require_isexe = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/which/which.js
+// ../../node_modules/which/which.js
 var require_which = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/which/which.js"(exports, module) {
+  "../../node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
     var path5 = __require("path");
     var COLON = isWindows ? ";" : ":";
@@ -268,9 +264,9 @@ var require_which = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/path-key/index.js
+// ../../node_modules/path-key/index.js
 var require_path_key = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/path-key/index.js"(exports, module) {
+  "../../node_modules/path-key/index.js"(exports, module) {
     "use strict";
     var pathKey = (options = {}) => {
       const environment = options.env || process.env;
@@ -285,9 +281,9 @@ var require_path_key = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/util/resolveCommand.js
+// ../../node_modules/cross-spawn/lib/util/resolveCommand.js
 var require_resolveCommand = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
     var path5 = __require("path");
     var which = require_which();
@@ -327,9 +323,9 @@ var require_resolveCommand = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/util/escape.js
+// ../../node_modules/cross-spawn/lib/util/escape.js
 var require_escape = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
     "use strict";
     var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
     function escapeCommand(arg) {
@@ -352,17 +348,17 @@ var require_escape = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/shebang-regex/index.js
+// ../../node_modules/shebang-regex/index.js
 var require_shebang_regex = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/shebang-regex/index.js"(exports, module) {
+  "../../node_modules/shebang-regex/index.js"(exports, module) {
     "use strict";
     module.exports = /^#!(.*)/;
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/shebang-command/index.js
+// ../../node_modules/shebang-command/index.js
 var require_shebang_command = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/shebang-command/index.js"(exports, module) {
+  "../../node_modules/shebang-command/index.js"(exports, module) {
     "use strict";
     var shebangRegex = require_shebang_regex();
     module.exports = (string4 = "") => {
@@ -380,9 +376,9 @@ var require_shebang_command = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/util/readShebang.js
+// ../../node_modules/cross-spawn/lib/util/readShebang.js
 var require_readShebang = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
     var fs3 = __require("fs");
     var shebangCommand = require_shebang_command();
@@ -402,9 +398,9 @@ var require_readShebang = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/parse.js
+// ../../node_modules/cross-spawn/lib/parse.js
 var require_parse = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/parse.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
     var path5 = __require("path");
     var resolveCommand = require_resolveCommand();
@@ -464,9 +460,9 @@ var require_parse = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/enoent.js
+// ../../node_modules/cross-spawn/lib/enoent.js
 var require_enoent = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+  "../../node_modules/cross-spawn/lib/enoent.js"(exports, module) {
     "use strict";
     var isWin = process.platform === "win32";
     function notFoundError(original, syscall) {
@@ -514,9 +510,9 @@ var require_enoent = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/cross-spawn/index.js
+// ../../node_modules/cross-spawn/index.js
 var require_cross_spawn = __commonJS({
-  "D:/Dev/code/zana-plugins/node_modules/cross-spawn/index.js"(exports, module) {
+  "../../node_modules/cross-spawn/index.js"(exports, module) {
     "use strict";
     var cp = __require("child_process");
     var parse3 = require_parse();
@@ -541,7 +537,7 @@ var require_cross_spawn = __commonJS({
   }
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/external.js
+// ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -804,7 +800,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/index.js
+// ../../node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -1121,7 +1117,7 @@ __export(core_exports2, {
   withParser: () => withParser
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/util.js
+// ../../node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1977,7 +1973,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/core.js
+// ../../node_modules/zod/v4/core/core.js
 var _a;
 var NEVER = /* @__PURE__ */ Object.freeze({
   status: "aborted"
@@ -2099,7 +2095,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/errors.js
+// ../../node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -2291,7 +2287,7 @@ function prettifyError(error62) {
   return lines.join("\n");
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/parse.js
+// ../../node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -2451,7 +2447,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/regexes.js
+// ../../node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   anyString: () => anyString,
@@ -2623,7 +2619,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/checks.js
+// ../../node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a3;
   inst._zod ?? (inst._zod = {});
@@ -3099,7 +3095,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/doc.js
+// ../../node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -3140,14 +3136,14 @@ ${content.join("\n")}
   }
 };
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/versions.js
+// ../../node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 7
 };
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/schemas.js
+// ../../node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a3;
   inst ?? (inst = {});
@@ -5589,7 +5585,7 @@ function handleRefineResult(result, payload, input2, inst) {
   }
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/memoizer.js
+// ../../node_modules/zod/v4/core/memoizer.js
 var $ZodCyclicError = class extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -5866,7 +5862,7 @@ function isBackEdge(ctx, value) {
   return backEdges !== void 0 && isRef(value) && backEdges.has(value);
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/index.js
+// ../../node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -5934,7 +5930,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ar.js
+// ../../node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -6046,7 +6042,7 @@ function ar_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/az.js
+// ../../node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -6157,7 +6153,7 @@ function az_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/be.js
+// ../../node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -6326,7 +6322,7 @@ function be_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/bg.js
+// ../../node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -6452,7 +6448,7 @@ function bg_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/bn.js
+// ../../node_modules/zod/v4/locales/bn.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "\u0985\u0995\u09CD\u09B7\u09B0", verb: "\u09A5\u09BE\u0995\u09A4\u09C7 \u09B9\u09AC\u09C7" },
@@ -6566,7 +6562,7 @@ function bn_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ca.js
+// ../../node_modules/zod/v4/locales/ca.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -6680,7 +6676,7 @@ function ca_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ckb.js
+// ../../node_modules/zod/v4/locales/ckb.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "\u067E\u06CC\u062A", verb: "\u0628\u06CE\u062A" },
@@ -6813,7 +6809,7 @@ function ckb_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/cs.js
+// ../../node_modules/zod/v4/locales/cs.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -6930,7 +6926,7 @@ function cs_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/da.js
+// ../../node_modules/zod/v4/locales/da.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -7051,7 +7047,7 @@ function da_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/de.js
+// ../../node_modules/zod/v4/locales/de.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -7165,7 +7161,7 @@ function de_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/el.js
+// ../../node_modules/zod/v4/locales/el.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
@@ -7278,7 +7274,7 @@ function el_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/en.js
+// ../../node_modules/zod/v4/locales/en.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7403,7 +7399,7 @@ function en_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/eo.js
+// ../../node_modules/zod/v4/locales/eo.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -7518,7 +7514,7 @@ function eo_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/es.js
+// ../../node_modules/zod/v4/locales/es.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -7655,7 +7651,7 @@ function es_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/fa.js
+// ../../node_modules/zod/v4/locales/fa.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -7775,7 +7771,7 @@ function fa_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/fi.js
+// ../../node_modules/zod/v4/locales/fi.js
 var error16 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -7893,7 +7889,7 @@ function fi_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/fr.js
+// ../../node_modules/zod/v4/locales/fr.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8023,7 +8019,7 @@ function fr_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/fr-CA.js
+// ../../node_modules/zod/v4/locales/fr-CA.js
 var error18 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -8136,7 +8132,7 @@ function fr_CA_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/gu.js
+// ../../node_modules/zod/v4/locales/gu.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "\u0A85\u0A95\u0ACD\u0AB7\u0AB0", verb: "\u0AB9\u0ACB\u0AB5\u0ABE \u0A9C\u0ACB\u0A88\u0A8F" },
@@ -8250,7 +8246,7 @@ function gu_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/he.js
+// ../../node_modules/zod/v4/locales/he.js
 var error20 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -8452,7 +8448,7 @@ function he_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/hi.js
+// ../../node_modules/zod/v4/locales/hi.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0930\u0916\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F" },
@@ -8564,7 +8560,7 @@ function hi_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/hr.js
+// ../../node_modules/zod/v4/locales/hr.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "znakova", verb: "imati" },
@@ -8691,7 +8687,7 @@ function hr_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/hu.js
+// ../../node_modules/zod/v4/locales/hu.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -8805,7 +8801,7 @@ function hu_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/hy.js
+// ../../node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -8964,7 +8960,7 @@ function hy_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/id.js
+// ../../node_modules/zod/v4/locales/id.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -9076,7 +9072,7 @@ function id_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/is.js
+// ../../node_modules/zod/v4/locales/is.js
 var error26 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -9191,7 +9187,7 @@ function is_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/it.js
+// ../../node_modules/zod/v4/locales/it.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -9305,7 +9301,7 @@ function it_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ja.js
+// ../../node_modules/zod/v4/locales/ja.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -9418,7 +9414,7 @@ function ja_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ka.js
+// ../../node_modules/zod/v4/locales/ka.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -9536,7 +9532,7 @@ function ka_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/km.js
+// ../../node_modules/zod/v4/locales/km.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -9652,12 +9648,12 @@ function km_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/kh.js
+// ../../node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/kn.js
+// ../../node_modules/zod/v4/locales/kn.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "\u0C85\u0C95\u0CCD\u0CB7\u0CB0\u0C97\u0CB3\u0CC1", verb: "\u0CB9\u0CCA\u0C82\u0CA6\u0CB2\u0CC1" },
@@ -9773,7 +9769,7 @@ function kn_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ko.js
+// ../../node_modules/zod/v4/locales/ko.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -9890,7 +9886,7 @@ function ko_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/lt.js
+// ../../node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -10098,7 +10094,7 @@ function lt_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/mk.js
+// ../../node_modules/zod/v4/locales/mk.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -10213,7 +10209,7 @@ function mk_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ms.js
+// ../../node_modules/zod/v4/locales/ms.js
 var error35 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -10326,7 +10322,7 @@ function ms_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ne.js
+// ../../node_modules/zod/v4/locales/ne.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "\u0905\u0915\u094D\u0937\u0930", verb: "\u0939\u0941\u0928\u0941\u092A\u0930\u094D\u091B" },
@@ -10438,7 +10434,7 @@ function ne_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/nl.js
+// ../../node_modules/zod/v4/locales/nl.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -10554,7 +10550,7 @@ function nl_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/nn.js
+// ../../node_modules/zod/v4/locales/nn.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "teikn", verb: "\xE5 ha" },
@@ -10668,7 +10664,7 @@ function nn_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/no.js
+// ../../node_modules/zod/v4/locales/no.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -10782,7 +10778,7 @@ function no_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ota.js
+// ../../node_modules/zod/v4/locales/ota.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -10897,7 +10893,7 @@ function ota_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ps.js
+// ../../node_modules/zod/v4/locales/ps.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -11017,7 +11013,7 @@ function ps_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/pl.js
+// ../../node_modules/zod/v4/locales/pl.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -11132,7 +11128,7 @@ function pl_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/pt.js
+// ../../node_modules/zod/v4/locales/pt.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11276,7 +11272,7 @@ function pt_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/pt-BR.js
+// ../../node_modules/zod/v4/locales/pt-BR.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "caracteres" },
@@ -11421,7 +11417,7 @@ function pt_BR_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ro.js
+// ../../node_modules/zod/v4/locales/ro.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
@@ -11544,7 +11540,7 @@ function ro_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ru.js
+// ../../node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -11713,7 +11709,7 @@ function ru_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/sk.js
+// ../../node_modules/zod/v4/locales/sk.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "ma\u0165" },
@@ -11830,7 +11826,7 @@ function sk_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/sl.js
+// ../../node_modules/zod/v4/locales/sl.js
 var error48 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -11945,7 +11941,7 @@ function sl_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/sv.js
+// ../../node_modules/zod/v4/locales/sv.js
 var error49 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -12061,7 +12057,7 @@ function sv_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ta.js
+// ../../node_modules/zod/v4/locales/ta.js
 var error50 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -12177,7 +12173,7 @@ function ta_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/tg.js
+// ../../node_modules/zod/v4/locales/tg.js
 var error51 = () => {
   const Sizable = {
     string: { unit: "\u0430\u043B\u043E\u043C\u0430\u0442", verb: "\u0434\u043E\u0448\u0442\u0430 \u0431\u043E\u0448\u0430\u0434" },
@@ -12294,7 +12290,7 @@ function tg_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/th.js
+// ../../node_modules/zod/v4/locales/th.js
 var error52 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -12410,7 +12406,7 @@ function th_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/tk.js
+// ../../node_modules/zod/v4/locales/tk.js
 var error53 = () => {
   const Sizable = {
     string: { unit: "simwol", verb: "bolmaly" },
@@ -12518,7 +12514,7 @@ function tk_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/tr.js
+// ../../node_modules/zod/v4/locales/tr.js
 var error54 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -12629,7 +12625,7 @@ function tr_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/uk.js
+// ../../node_modules/zod/v4/locales/uk.js
 var error55 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -12743,12 +12739,12 @@ function uk_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ua.js
+// ../../node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/ur.js
+// ../../node_modules/zod/v4/locales/ur.js
 var error56 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -12864,7 +12860,7 @@ function ur_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/uz.js
+// ../../node_modules/zod/v4/locales/uz.js
 var error57 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -12978,7 +12974,7 @@ function uz_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/vi.js
+// ../../node_modules/zod/v4/locales/vi.js
 var error58 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -13092,7 +13088,7 @@ function vi_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/zh-CN.js
+// ../../node_modules/zod/v4/locales/zh-CN.js
 var error59 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -13207,7 +13203,7 @@ function zh_CN_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/zh-TW.js
+// ../../node_modules/zod/v4/locales/zh-TW.js
 var error60 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -13320,7 +13316,7 @@ function zh_TW_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/locales/yo.js
+// ../../node_modules/zod/v4/locales/yo.js
 var error61 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -13433,7 +13429,7 @@ function yo_default() {
   };
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/registries.js
+// ../../node_modules/zod/v4/core/registries.js
 var _a2;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -13483,9 +13479,9 @@ function registry() {
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/compile.js
-var INVALID = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
-var FALLBACK_FLAG = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
+// ../../node_modules/zod/v4/core/compile.js
+var INVALID = Symbol.for("zod.compile.invalid");
+var FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
 var ZodCompileAsyncError = class extends Error {
   constructor(message = "z.compile does not support async refinements, transforms, or checks") {
     super(message);
@@ -15093,7 +15089,7 @@ function generateTransformCheck(doc, ctx, schema, accessor) {
   return accessor;
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/api.js
+// ../../node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -16152,7 +16148,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/to-json-schema.js
+// ../../node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target2, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -16682,7 +16678,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/json-schema-processors.js
+// ../../node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === void 0 || value > agg[key])
     agg[key] = value;
@@ -17273,7 +17269,7 @@ var nonoptionalProcessor = (schema, ctx, _json, params) => {
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
-var UNREPRESENTABLE_DEFAULT = /* @__PURE__ */ Symbol();
+var UNREPRESENTABLE_DEFAULT = Symbol();
 function serializeDefaultValue(value, schema, ctx, json2, params) {
   let unrepresentable = false;
   const serialized = JSON.stringify(value, (_, val) => {
@@ -17430,7 +17426,7 @@ function toJSONSchema(input2, params) {
   return finalize(ctx, input2);
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/json-schema-generator.js
+// ../../node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -17508,10 +17504,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/json-schema.js
+// ../../node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -17692,7 +17688,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/checks.js
+// ../../node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -17727,7 +17723,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/errors.js
+// ../../node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -17773,7 +17769,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, void 0
   Parent: Error
 });
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/parse.js
+// ../../node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -17787,7 +17783,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -19252,7 +19248,7 @@ function preprocess(fn, schema) {
   });
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/compat.js
+// ../../node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -19278,7 +19274,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/iso.js
+// ../../node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19303,7 +19299,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/from-json-schema.js
+// ../../node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -20036,8 +20032,8 @@ function fromJSONSchema(schema, params) {
   return convertSchema(normalized, ctx);
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/core/visit.js
-var RESOLVING = /* @__PURE__ */ Symbol("z.visit/resolving");
+// ../../node_modules/zod/v4/core/visit.js
+var RESOLVING = Symbol("z.visit/resolving");
 function visit(schema, fnOrHandlers) {
   const fn = typeof fnOrHandlers === "function" ? fnOrHandlers : (node2, rewritten) => {
     const h = fnOrHandlers[node2._zod.def.type];
@@ -20191,7 +20187,7 @@ function visit(schema, fnOrHandlers) {
   return run(schema);
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/deep-partial.js
+// ../../node_modules/zod/v4/classic/deep-partial.js
 function deepPartial(schema) {
   return visit(schema, {
     object: (s) => s.partial(),
@@ -20203,7 +20199,7 @@ function deepPartial(schema) {
   });
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/in-out.js
+// ../../node_modules/zod/v4/classic/in-out.js
 function withChecks(side, checks) {
   if (!checks?.length)
     return side;
@@ -20233,7 +20229,7 @@ function output(schema) {
   });
 }
 
-// D:/Dev/code/zana-plugins/node_modules/zod/v4/classic/coerce.js
+// ../../node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -20258,7 +20254,7 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/active-thinking.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/active-thinking.ts
 var activeThinkingSchema = external_exports.object({
   id: external_exports.string(),
   text: external_exports.string(),
@@ -20266,7 +20262,7 @@ var activeThinkingSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/shared-types.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/shared-types.ts
 var reasoningLevelValues = [
   "none",
   "low",
@@ -20636,7 +20632,7 @@ var projectExecutionDefaultsSchema = external_exports.object({
   permissionMode: permissionModeSchema
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/acp-cli.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/acp-cli.ts
 var ACP_DEFAULT_MODEL_ID = "acp-default";
 var providerSkillRootPathSchema = external_exports.string().min(1).refine((value) => {
   const normalized = value.replaceAll("\\", "/");
@@ -20719,7 +20715,7 @@ var acpPermissionCliSchema = external_exports.object({
   }
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/app-settings.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/app-settings.ts
 var appSettingsSchema = external_exports.object({
   /** Show shortcut hints after holding Command or Control. */
   showKeyboardHints: external_exports.boolean(),
@@ -20757,7 +20753,7 @@ var appSettingsSchema = external_exports.object({
   onboardingCompletedAt: external_exports.string().nullable()
 }).strict();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/app-keybindings.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/app-keybindings.ts
 var THREAD_JUMP_APP_COMMAND_IDS = [
   "thread.jump.1",
   "thread.jump.2",
@@ -20895,7 +20891,7 @@ var appKeybindingOverridesSchema = external_exports.array(appKeybindingOverrideS
   }
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/json-value.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/json-value.ts
 var jsonValueSchema = external_exports.lazy(
   () => external_exports.union([
     external_exports.string(),
@@ -20911,7 +20907,7 @@ var jsonObjectSchema = external_exports.record(
   jsonValueSchema
 );
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/code-theme.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/code-theme.ts
 var DEFAULT_CODE_THEME_DARK = "pierre-dark";
 var DEFAULT_CODE_THEME_LIGHT = "pierre-light";
 var codeThemeNameSchema = external_exports.string().min(1).max(128).regex(
@@ -20941,7 +20937,7 @@ var uiCodeThemeDeclarationSchema = external_exports.object({
   light: external_exports.string().min(1).max(256).optional()
 }).strict();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/app-theme.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/app-theme.ts
 var builtInThemeIdSchema = external_exports.enum([
   "default",
   "nord",
@@ -20999,7 +20995,7 @@ var appThemeSelectionSchema = external_exports.object({
   faviconColor: faviconColorPreferenceSchema
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/background-task.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/background-task.ts
 var backgroundTaskStatusValues = [
   "pending",
   "running",
@@ -21059,7 +21055,7 @@ var backgroundTaskUsageSchema = external_exports.object({
   durationMs: external_exports.number()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-interaction-limits.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-interaction-limits.ts
 var PLUGIN_INTERACTION_MAX_TITLE_LENGTH = 160;
 var PLUGIN_INTERACTION_MAX_PAYLOAD_BYTES = 64 * 1024;
 var PLUGIN_INTERACTION_MAX_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1e3;
@@ -21067,7 +21063,7 @@ function jsonByteLength(value) {
   return new TextEncoder().encode(JSON.stringify(value)).length;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/item-presentation.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/item-presentation.ts
 var THREAD_EVENT_ITEM_PRESENTATION_DETAIL_MAX_LENGTH = 280;
 var threadEventItemPresentationLabelSchema = external_exports.object({
   /** Present-tense row title while the item is in flight ("Reading file"). */
@@ -21105,7 +21101,7 @@ var threadEventItemPresentationSchema = external_exports.object({
   }).optional()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/provider-extension-kind.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-extension-kind.ts
 var EXTENSION_KIND_PATTERN = /^[a-z0-9-]+\/[a-z0-9-]+$/u;
 function isExtensionKind(value) {
   return EXTENSION_KIND_PATTERN.test(value);
@@ -21114,7 +21110,7 @@ var extensionKindSchema = external_exports.string().refine(isExtensionKind, {
   message: 'extension kinds are "<pluginId>/<name>" (lowercase letters, digits, and "-")'
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/pending-interactions.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/pending-interactions.ts
 var pendingInteractionStatusSchema = external_exports.enum([
   "pending",
   "resolving",
@@ -21519,10 +21515,10 @@ var interactionLifecycleSchema = external_exports.union([
   pluginExtensionInteractionLifecycleSchema
 ]);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/protocol-ids.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/protocol-ids.ts
 var clientTurnRequestIdSchema = external_exports.string().regex(/^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/system-message.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/system-message.ts
 var systemMessageKindValues = [
   "ownership-assigned",
   "ownership-removed",
@@ -21546,7 +21542,7 @@ var systemMessageSubjectSchema = external_exports.discriminatedUnion("kind", [
   })
 ]);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-events.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-events.ts
 var systemEventTypeValues = [
   "client/thread/start",
   "client/turn/requested",
@@ -21751,7 +21747,7 @@ var systemProviderTurnWatchdogEventDataSchema = external_exports.object({
   firedAt: external_exports.number().int().nonnegative()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-event-scope.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-event-scope.ts
 var threadEventScopeKindValues = ["thread", "turn"];
 var threadEventScopeKindSchema = external_exports.enum(threadEventScopeKindValues);
 var threadEventScopeSchema = external_exports.discriminatedUnion("kind", [
@@ -21939,7 +21935,7 @@ function validateThreadEventScope(args) {
   return { valid: true };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-timeline-goal.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-goal.ts
 var threadTimelineGoalStatusSchema = external_exports.enum([
   "active",
   "paused",
@@ -21956,7 +21952,7 @@ var threadTimelineGoalSchema = external_exports.object({
   timeUsedSeconds: external_exports.number()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/provider-event.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-event.ts
 var threadEventItemStatusSchema = external_exports.enum([
   "pending",
   "completed",
@@ -22683,7 +22679,7 @@ var threadEventTypeSchema = external_exports.string().refine(
   "Invalid thread event type"
 );
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/change-kinds.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/change-kinds.ts
 var THREAD_CHANGE_KINDS = [
   "thread-created",
   "thread-deleted",
@@ -22887,7 +22883,7 @@ var changedMessageLenientSchema = external_exports.discriminatedUnion("entity", 
   systemChangedMessageLenientSchema
 ]);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/claude-task-tools.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/claude-task-tools.ts
 var claudeTaskToolNameValues = [
   "TaskCreate",
   "TaskGet",
@@ -22959,7 +22955,7 @@ var claudeTaskToolOutputSchema = external_exports.union([
   claudeTaskUpdateOutputSchema
 ]);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/environment.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/environment.ts
 var environmentStatusValues = [
   "provisioning",
   "ready",
@@ -23009,7 +23005,7 @@ var environmentSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/experiments.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/experiments.ts
 var experimentKeys = [
   "claudeCodeMockCliTraffic",
   "newOnboarding",
@@ -23018,7 +23014,7 @@ var experimentKeys = [
 var experimentKeySchema = external_exports.enum(experimentKeys);
 var experimentsSchema = external_exports.record(experimentKeySchema, external_exports.boolean());
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/feature-flags.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/feature-flags.ts
 var featureFlagsSchema = external_exports.object({
   placeholder: external_exports.boolean(),
   /**
@@ -23036,7 +23032,7 @@ var featureFlagsSchema = external_exports.object({
   timelineWindowEventBudget: external_exports.number().int().positive()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/git-checkout.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/git-checkout.ts
 var gitBranchForbiddenCharacterPattern = /[\u0000-\u001f\u007f\\:~^?*\[]/u;
 var gitBranchWhitespacePattern = /[ \t]/u;
 var gitReservedBranchNames = /* @__PURE__ */ new Set([
@@ -23131,13 +23127,7 @@ var projectSourceCheckoutSchema = external_exports.object({
   selectedBranch: gitBranchRefClassificationSchema.nullable()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/host-list-limits.ts
-var FILE_LIST_QUERY_MAX_LENGTH = 256;
-var FILE_LIST_LIMIT_MAX = 1e4;
-var BRANCH_LIST_QUERY_MAX_LENGTH = 256;
-var BRANCH_LIST_LIMIT_MAX = 1e3;
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/host.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/host.ts
 var hostTypeValues = ["persistent"];
 var hostTypeSchema = external_exports.enum(hostTypeValues);
 var hostStatusValues = ["connected", "disconnected"];
@@ -23181,7 +23171,7 @@ var hostSchema = external_exports.object({
   updatedAt: external_exports.number()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/provider-skill-roots.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-skill-roots.ts
 function isAbsoluteProviderSkillRootPath(value) {
   if (value.length === 0) {
     return false;
@@ -23202,7 +23192,7 @@ function isRelativeProviderSkillRootPath(value) {
   return !normalized.startsWith("/") && !/^[a-zA-Z]:\//u.test(normalized) && normalized.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/native-roots.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/native-roots.ts
 var PROVIDER_NATIVE_ROOTS_MAX = 32;
 var PROVIDER_NATIVE_ROOT_NAME_PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}:$/u;
 var nativeRootNamePrefixSchema = external_exports.string().refine(
@@ -23387,7 +23377,7 @@ var providerNativeRootSetSchema = external_exports.object({
   resolved: providerResolvedNativeRootsSchema
 }).strict();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/legacy-thread-events.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/legacy-thread-events.ts
 var LEGACY_CODEX_GOAL_EXTENSION_KIND = "provider-codex/goal";
 var LEGACY_THREAD_EVENT_TYPES = [
   "thread/goal/updated",
@@ -23654,7 +23644,7 @@ function upgradeLegacyToolItem(item) {
   return item;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-catalog-category.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-catalog-category.ts
 var PLUGIN_CATALOG_CATEGORY_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var pluginCatalogCategoryIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
 var pluginMarketplaceCollectionIdSchema = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN);
@@ -23760,7 +23750,7 @@ var PLUGIN_CATALOG_CATEGORIES = [
 ];
 var pluginCatalogCategoryById = new Map(PLUGIN_CATALOG_CATEGORIES.map((category) => [category.id, category]));
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-icon.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-icon.ts
 function isPluginOwnedIconPath(icon) {
   return icon.startsWith("./");
 }
@@ -23773,10 +23763,10 @@ function isNamespacedGlyph(glyph) {
   return NAMESPACED_GLYPH_PATTERN.test(glyph);
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-id.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-id.ts
 var pluginIdSchema = external_exports.string().regex(/^[a-z0-9][a-z0-9-]*$/u);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-metadata.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-metadata.ts
 var PLUGIN_METADATA_MAX_BYTES = 256 * 1024;
 function exceedsPluginMetadataLimit(metadataJson) {
   return new TextEncoder().encode(metadataJson).byteLength > PLUGIN_METADATA_MAX_BYTES;
@@ -23790,7 +23780,7 @@ var pluginMetadataSchema = jsonObjectSchema.superRefine((value, ctx) => {
   }
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-manifest.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-manifest.ts
 var requiredManifestString = external_exports.string().trim().min(1);
 var pluginBrandingIconsSchema = external_exports.record(
   external_exports.string().max(
@@ -23866,7 +23856,7 @@ var pluginPackageJsonSchema = external_exports.object({
   bb: pluginBbManifestSchema
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-marketplace-entry.ts
 var MARKETPLACE_MAX_SCREENSHOTS = 6;
 var NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 var TAG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -24006,11 +23996,11 @@ var marketplaceEntryV2Schema = external_exports.object({
   ...marketplaceEntryMetadataShape(false)
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/plugin-sdk-version.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/plugin-sdk-version.ts
 var PLUGIN_SDK_VERSION = "0.4.8";
 var PLUGIN_SDK_MAJOR = Number(PLUGIN_SDK_VERSION.split(".", 1)[0]);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/project.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/project.ts
 var projectKindValues = ["standard", "personal"];
 var projectKindSchema = external_exports.enum(projectKindValues);
 var projectSchema = external_exports.object({
@@ -24036,7 +24026,7 @@ var localPathProjectSourceSchema = baseProjectSourceSchema.extend({
   path: external_exports.string()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/prompt-history.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/prompt-history.ts
 var promptHistoryScopeValues = ["project", "thread"];
 var promptHistoryScopeSchema = external_exports.enum(promptHistoryScopeValues);
 var promptHistoryEntrySchema = external_exports.object({
@@ -24045,11 +24035,11 @@ var promptHistoryEntrySchema = external_exports.object({
   input: external_exports.array(promptInputSchema).min(1)
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/provider-fork.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-fork.ts
 var PROVIDER_FORK_VALUES = ["none", "tip", "checkpoint"];
 var providerForkSchema = external_exports.enum(PROVIDER_FORK_VALUES);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/provider-types.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/provider-types.ts
 var modelReasoningEffortSchema = external_exports.object({
   reasoningEffort: reasoningLevelSchema,
   description: external_exports.string()
@@ -24220,7 +24210,7 @@ var dynamicToolSchema = external_exports.object({
   presentation: threadEventItemPresentationSchema.optional()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/queued-message.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/queued-message.ts
 var queuedMessageWaitingOnKindValues = [
   "time",
   "thread-busy",
@@ -24292,7 +24282,7 @@ var queuedMessageSystemNoticeSchema = external_exports.object({
   subject: systemMessageSubjectSchema.nullable()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/raw-thread-id.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/raw-thread-id.ts
 var GENERATED_ID_ALPHABET = "23456789abcdefghijkmnpqrstuvwxyz";
 var GENERATED_ID_SUFFIX_LENGTH = 10;
 var THREAD_ID_PREFIX = "thr_";
@@ -24300,7 +24290,7 @@ var RAW_THREAD_ID_PATTERN_SOURCE = `${THREAD_ID_PREFIX}[${GENERATED_ID_ALPHABET}
 var rawThreadIdPattern = new RegExp(`^${RAW_THREAD_ID_PATTERN_SOURCE}$`, "u");
 var rawThreadIdSchema = external_exports.string().regex(rawThreadIdPattern);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/reasoning-efforts.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/reasoning-efforts.ts
 var NONE_REASONING_EFFORT = {
   reasoningEffort: "none",
   description: "No extended thinking"
@@ -24347,7 +24337,7 @@ function reasoningEffortsForLevels(levels) {
   return levels.map((level) => ({ ...REASONING_EFFORT_BY_LEVEL[level] }));
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/stored-thread-event.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/stored-thread-event.ts
 var threadEventRowInputSchema = external_exports.object({
   id: external_exports.string(),
   scope: threadEventScopeSchema,
@@ -24429,7 +24419,7 @@ var threadEventRowSchema = threadEventRowInputSchema.transform(
   (row) => parseThreadEventRowInput(row)
 );
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/terminal.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/terminal.ts
 var TERMINAL_COLS_MAX = 500;
 var TERMINAL_ROWS_MAX = 200;
 var TERMINAL_DATA_MAX_BYTES = 64 * 1024;
@@ -24473,7 +24463,7 @@ var terminalDataBase64Schema = external_exports.string().min(1).max(TERMINAL_DAT
   }
 );
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-git-diff.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-git-diff.ts
 var workspaceDiffTargetSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     type: external_exports.literal("uncommitted")
@@ -24518,7 +24508,7 @@ var threadGitDiffResponseSchema = external_exports.object({
   mergeBaseRef: external_exports.string().nullable()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-search.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-search.ts
 var threadSearchSourceKindValues = [
   "title",
   "title_fallback",
@@ -24530,7 +24520,7 @@ var threadSearchSourceKindSchema = external_exports.enum(
   threadSearchSourceKindValues
 );
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-active-prompt-mode.ts
 var threadTimelineActivePromptModeSchema = external_exports.object({
   mode: external_exports.literal("plan"),
   /**
@@ -24544,7 +24534,7 @@ var threadTimelineActivePromptModeSchema = external_exports.object({
   prompt: external_exports.string()
 }).strict();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-model-fallback.ts
 var threadTimelineModelFallbackSchema = external_exports.object({
   sourceSeq: external_exports.number().int().nonnegative(),
   detectedAt: external_exports.number(),
@@ -24554,7 +24544,7 @@ var threadTimelineModelFallbackSchema = external_exports.object({
   message: external_exports.string()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-timeline-pending-todos.ts
 var threadTimelinePendingTodoItemStatusSchema = external_exports.enum([
   "pending",
   "in_progress",
@@ -24571,11 +24561,11 @@ var threadTimelinePendingTodosSchema = external_exports.object({
   items: external_exports.array(threadTimelinePendingTodoItemSchema)
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-visibility.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-visibility.ts
 var threadVisibilityValues = ["visible", "hidden"];
 var threadVisibilitySchema = external_exports.enum(threadVisibilityValues);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-status.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-status.ts
 var threadStatusValues = [
   "pending",
   "idle",
@@ -24586,11 +24576,11 @@ var threadStatusValues = [
 ];
 var threadStatusSchema = external_exports.enum(threadStatusValues);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread-origin-kind.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread-origin-kind.ts
 var threadOriginKindValues = ["fork"];
 var threadOriginKindSchema = external_exports.enum(threadOriginKindValues);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/thread.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/thread.ts
 var threadRuntimeDisplayStatusValues = [
   ...threadStatusValues,
   "provisioning",
@@ -24867,7 +24857,7 @@ var threadListEntrySchema = threadWithRuntimeSchema.extend({
   environmentWorkspaceDisplayKind: environmentWorkspaceDisplayKindSchema
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/update-state.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/update-state.ts
 var RUN_STATE_PRESENTATION = {
   "in-progress": { icon: "Loading", label: "In progress", inFlight: true },
   succeeded: { icon: "CircleCheck", label: "Succeeded", inFlight: false },
@@ -24911,10 +24901,10 @@ var UPDATE_STATE_PRESENTATION = {
   offline: { icon: "CircleX", label: "Offline", tone: "muted" }
 };
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/domain/src/bb-thread/prompt-attachment-limits.ts
+// ../../.zana-sdk/packages/domain/src/bb-thread/prompt-attachment-limits.ts
 var PROMPT_ATTACHMENT_MAX_BYTES = 35 * 1024 * 1024;
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/launch-spec.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/launch-spec.ts
 var acpNativeSkillRootsSchema = external_exports.object({
   user: external_exports.array(providerNativeRootInputSchema).default([]),
   project: external_exports.array(providerNativeRootInputSchema).default([])
@@ -24952,11 +24942,11 @@ var acpLaunchSpecSchema = external_exports.object({
   permissionCli: acpPermissionCliSchema.optional()
 }).strict();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/version.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/version.ts
 var PROVIDER_BRIDGE_PROTOCOL_VERSION = 2;
 var THREAD_DELTA_GRAMMAR_V3 = 3;
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/handshake.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/handshake.ts
 var bridgeGrammarVersionsSchema = external_exports.tuple([external_exports.number().int().positive(), external_exports.number().int().positive()]).refine(([min, max]) => min <= max, {
   message: "grammarVersions must be an ascending [min, max] range"
 });
@@ -25064,7 +25054,7 @@ var initializeResultSchema = external_exports.object({
   )
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/execution-options.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/execution-options.ts
 var bridgeExecutionOptionsSchema = external_exports.object({
   model: external_exports.string().min(1).optional(),
   serviceTier: serviceTierSchema.optional(),
@@ -25076,7 +25066,7 @@ var bridgeExecutionOptionsSchema = external_exports.object({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 }).and(runtimePermissionPolicySchema);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/requests.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/requests.ts
 var BRIDGE_REQUEST_METHODS = {
   initialize: "initialize",
   modelList: "model/list",
@@ -25197,7 +25187,7 @@ var modelListResultSchema = external_exports.object({
   }).optional()
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/errors.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/errors.ts
 var BRIDGE_JSON_RPC_ERRORS = {
   /** Standard JSON-RPC: params failed schema validation. */
   INVALID_PARAMS: -32602,
@@ -25221,7 +25211,7 @@ var providerRecoveryHintSchema = external_exports.object({
 });
 var bridgeErrorDataSchema = external_exports.object({ recovery: providerRecoveryHintSchema.optional() }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/notifications.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/notifications.ts
 var BRIDGE_NOTIFICATION_METHODS = {
   threadIdentity: "thread/identity",
   sessionReplaced: "session/replaced",
@@ -25263,7 +25253,7 @@ var errorNotificationSchema = external_exports.object({
   message: external_exports.string().min(1)
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-requests.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-requests.ts
 var BRIDGE_INBOUND_REQUEST_METHODS = {
   toolCall: "item/tool/call",
   interactionRequest: "interaction/request"
@@ -25295,7 +25285,7 @@ var interactionRequestParamsSchema = external_exports.object({
   payload: pendingInteractionPayloadSchema
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/thread-delta.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/thread-delta.ts
 var THREAD_DELTA_NOTIFICATION_METHOD = "thread/delta";
 var deltaPresentationSchema = threadEventItemPresentationSchema;
 var THREAD_DELTA_KEY_SEPARATOR = "";
@@ -25807,7 +25797,7 @@ var threadDeltaNotificationParamsSchema = external_exports.object({
   deltas: external_exports.array(threadDeltaSchema)
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/provider-maintenance.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/provider-maintenance.ts
 var providerMaintenanceParamsSchema = external_exports.object({
   providerId: external_exports.string().min(1),
   cwd: external_exports.string().min(1).optional(),
@@ -25940,7 +25930,7 @@ var providerInstallationRunResultSchema = external_exports.discriminatedUnion(
   ]
 );
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/tool-arg-schemas.ts
 var bashArgsSchema = external_exports.object({
   command: external_exports.string().optional(),
   cwd: external_exports.string().optional()
@@ -25950,7 +25940,7 @@ var textBlockSchema = external_exports.object({
   text: external_exports.string()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility-helpers.ts
 function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -25959,7 +25949,7 @@ function getStringProperty(value, key) {
   return typeof next === "string" ? next : void 0;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/adapter-utils.ts
 var contentWrapperSchema = external_exports.object({
   content: external_exports.array(external_exports.unknown())
 }).passthrough();
@@ -26036,7 +26026,7 @@ function describeResultContentBlock(block) {
   return `[${type}]`;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bounded-line-reader.ts
 var MAX_JSON_RPC_LINE_BYTES = 64 * 1024 * 1024;
 function createBoundedLineFramer(args) {
   const maxLineBytes = args.maxLineBytes ?? MAX_JSON_RPC_LINE_BYTES;
@@ -26114,7 +26104,7 @@ function createBoundedLineFramer(args) {
   return { push, end, clear: clearLine };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-harness.ts
 var BridgeRecoveryError = class extends Error {
   code;
   recovery;
@@ -26177,7 +26167,7 @@ function runBridgeRequest(args) {
   });
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-recorder.ts
 import {
   closeSync,
   mkdirSync,
@@ -26361,7 +26351,7 @@ function createBridgeRecorder(args) {
     }
   };
 }
-var RECORDER_GLOBAL_KEY = /* @__PURE__ */ Symbol.for("zcc.providerBridgeRecorder");
+var RECORDER_GLOBAL_KEY = Symbol.for("zcc.providerBridgeRecorder");
 function globalSlot() {
   const holder = globalThis;
   const existing = holder[RECORDER_GLOBAL_KEY];
@@ -26387,7 +26377,7 @@ function experimental_recordProviderChildIo(child, scope) {
   getBridgeRecorder()?.recordChildIo(child, scope);
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-runtime-env.ts
 function withoutBridgeRuntimeEnv(env) {
   const childEnv = { ...env };
   delete childEnv.ELECTRON_RUN_AS_NODE;
@@ -26395,7 +26385,7 @@ function withoutBridgeRuntimeEnv(env) {
   return childEnv;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
 var providerToolCallResponseSchema = external_exports.object({
   success: external_exports.boolean(),
   contentItems: external_exports.array(
@@ -26516,7 +26506,7 @@ function buildBridgeToolCallContent(result) {
   return blocks;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/json-rpc-envelope.ts
 var recordSchema = external_exports.record(external_exports.string(), external_exports.unknown());
 var jsonRpcEnvelopeSchema = external_exports.object({
   jsonrpc: external_exports.literal("2.0"),
@@ -26560,7 +26550,7 @@ var errorEnvelopeSchema = external_exports.object({
   }).passthrough().optional()
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/mime-types.ts
 import { extname } from "node:path";
 function mimeTypeFromExtension(filePath) {
   switch (extname(filePath).toLowerCase()) {
@@ -26580,7 +26570,7 @@ function mimeTypeFromExtension(filePath) {
   }
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/agent-process-utils/src/index.ts
+// ../../.zana-sdk/packages/agent-process-utils/src/index.ts
 var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 function spawnPortableProcess(request) {
   return (0, import_cross_spawn.default)(request.command, request.args, {
@@ -26616,7 +26606,7 @@ function spawnPortableOutputProcess(request) {
   assertPortableOutputProcess(child);
   return child;
 }
-var portableCommandCleanupKey = /* @__PURE__ */ Symbol.for("zcc.portable-command-cleanup.v1");
+var portableCommandCleanupKey = Symbol.for("zcc.portable-command-cleanup.v1");
 var portableCommandGlobal = globalThis;
 var portableCommandCleanup = portableCommandGlobal[portableCommandCleanupKey] ?? (() => {
   const state = { children: /* @__PURE__ */ new Set(), aborters: /* @__PURE__ */ new Map(), closed: false };
@@ -26709,7 +26699,7 @@ function killProcessGroup(args) {
   args.child.kill(args.signal);
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-maintenance-kit.ts
 import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -26764,7 +26754,7 @@ function clampPercent(value) {
   );
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/presentation.ts
 var PRESENTATION_TITLE_MAX_LENGTH = 160;
 function presentationTitle(text) {
   const firstLine = text.trim().split("\n", 1)[0]?.trim() ?? "";
@@ -26836,12 +26826,12 @@ function toolPresentation(tool) {
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-bridge-entry.ts
 function experimental_defineProviderBridge(definition) {
   return { experimental_apiVersion: 1, ...definition };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
 var normalizedToolCallRequestSchema = external_exports.object({
   providerThreadId: external_exports.string().min(1),
   threadId: external_exports.string().min(1).optional(),
@@ -26853,7 +26843,7 @@ var normalizedToolCallRequestSchema = external_exports.object({
   arguments: external_exports.unknown()
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/provider-visibility.ts
 function createProviderVisibilityMetadata(args) {
   return {
     parseRawEvent: args.parseRawEvent,
@@ -26864,10 +26854,10 @@ function createProviderVisibilityMetadata(args) {
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
+// ../../.zana-sdk/packages/provider-bridge-protocol/src/bridge-kit/runtime-json-rpc.ts
 var ignoredJsonRpcResultSchema = external_exports.unknown();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
 import { execFile as execFile3 } from "node:child_process";
 import { randomBytes as randomBytes2 } from "node:crypto";
 import { promises as fs2, readFileSync } from "node:fs";
@@ -26876,7 +26866,7 @@ import { dirname as dirname2, isAbsolute, basename as basename3, relative, resol
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/wire.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/wire.ts
 var acpTextContentBlockSchema = external_exports.object({
   type: external_exports.literal("text"),
   text: external_exports.string()
@@ -27194,7 +27184,7 @@ var acpWriteTextFileParamsSchema = external_exports.object({
   content: external_exports.string()
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge-protocol.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge-protocol.ts
 var acpModelListParamsSchema = modelListParamsSchema.extend({
   providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
 });
@@ -27311,10 +27301,10 @@ var acpWarningNotificationParamsSchema = external_exports.object({
   details: external_exports.string().optional()
 }).passthrough();
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
 import { basename } from "node:path";
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -27323,7 +27313,7 @@ import path2 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/launch-health.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/launch-health.ts
 import { stat } from "node:fs/promises";
 var PROBE_TIMEOUT_MS = 5e3;
 var PROBE_OUTPUT_MAX_BYTES = 64 * 1024;
@@ -27376,7 +27366,7 @@ ${output2.stderr}`);
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/provider-maintenance.ts
 var execFileAsync2 = promisify(execFile);
 var USAGE_FETCH_TIMEOUT_MS = 15e3;
 var CURSOR_DASHBOARD_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService";
@@ -27702,7 +27692,7 @@ async function readCursorUsage() {
   }
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/presentation.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/presentation.ts
 function stripCodeTicks(text) {
   const trimmed = text.trim();
   return trimmed.length >= 2 && trimmed.startsWith("`") && trimmed.endsWith("`") ? trimmed.slice(1, -1) : trimmed;
@@ -27798,7 +27788,7 @@ function toolKindPresentation(args) {
   );
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/dialect.ts
 var GENERIC_ACP_DIALECT = { id: "acp" };
 var grokToolMetaSchema = external_exports.object({
   "x.ai/tool": external_exports.object({
@@ -28058,7 +28048,7 @@ function resolveAcpDialect(launch) {
   return byCommand === void 0 ? GENERIC_ACP_DIALECT : DIALECTS_BY_ID.get(byCommand) ?? GENERIC_ACP_DIALECT;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/tool-call-operation.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/tool-call-operation.ts
 import path3 from "node:path";
 var acpRawInputCommandSchema = external_exports.object({ command: external_exports.string() }).passthrough();
 var acpRawInputPathSchema = external_exports.object({
@@ -28152,7 +28142,7 @@ function resolveAcpFileChangeWriteScope(paths) {
   return candidate;
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/tool-classification.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/tool-classification.ts
 var ZCC_TOOL_SERVER = "zcc";
 function isInjectedToolCandidate(event) {
   if (event.kind !== void 0 && event.kind !== "other") {
@@ -28522,7 +28512,7 @@ function classifyAcpToolCall2(event, injected, options) {
   }
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/visibility.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/visibility.ts
 var NORMALIZED_ACP_METHODS = /* @__PURE__ */ new Set([
   "thread/identity",
   "error",
@@ -28587,7 +28577,7 @@ var acpVisibilityMetadata = createProviderVisibilityMetadata({
   describeParsedRawEvent: describeParsedAcpRawEvent
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/system-instruction-echo.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/system-instruction-echo.ts
 var SYSTEM_INSTRUCTIONS_OPEN = "<system_instructions>";
 var SYSTEM_INSTRUCTIONS_CLOSE = "</system_instructions>";
 var SYSTEM_INSTRUCTION_ECHO_MAX_CHARS = 256 * 1024;
@@ -28669,7 +28659,7 @@ function consumeEchoBuffer(buffer, expectedEcho) {
   return { emit: buffer, buffer: "", done: true };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/delta-translation.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/delta-translation.ts
 var ASSISTANT_STREAM_KEY = "assistant";
 var THOUGHT_STREAM_KEY = "thought";
 var ACP_PLAN_STEP_STATUS_BY_ENTRY_STATUS = {
@@ -29463,7 +29453,7 @@ function createAcpDeltaTranslator(options = {}) {
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/interactions.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/interactions.ts
 function classifyAcpPermission(toolCall, options) {
   const own2 = classifyAcpToolCall(toolCall, options);
   if (own2.kind !== "generic" || !toolCall.startedToolCall) {
@@ -29580,10 +29570,10 @@ function resolveAcpPermissionDecision(args) {
   return { decision: args.resolution.decision };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
 import path4 from "node:path";
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/model-catalog.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/model-catalog.ts
 var ACP_NATIVE_REASONING_EFFORTS = [
   {
     reasoningEffort: "medium",
@@ -29942,7 +29932,7 @@ function splitPrimaryModels(catalogModels, primaryModels) {
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/cursor-model-selection.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/cursor-model-selection.ts
 var CURSOR_LEGACY_FAMILY_SELECTIONS = {
   "claude-4-sonnet": { modelId: "claude-sonnet-4" },
   "claude-4.5-opus": { modelId: "claude-opus-4-5" },
@@ -30029,7 +30019,7 @@ function buildCursorParameterizedModelCatalog(models) {
   return [...normalized.values()].map((entry) => entry.model);
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/session-params.ts
 function sanitizeAcpSkillDescription(description) {
   const sanitized = description.replace(/[\r\n]+/gu, " ").replace(/\s+/gu, " ").replace(/[<>]/gu, "").trim();
   return sanitized.length > 0 ? sanitized : "(description unavailable)";
@@ -30192,7 +30182,7 @@ function buildAcpSessionParams(args) {
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/agent-connection.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/agent-connection.ts
 import { createInterface } from "node:readline";
 var STDERR_TAIL_MAX_CHUNKS = 40;
 var CLOSED_STDIN_ERROR_CODES = /* @__PURE__ */ new Set(["EPIPE", "ERR_STREAM_DESTROYED"]);
@@ -30466,14 +30456,14 @@ function createAcpAgentConnection(options) {
   };
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 import { execFile as execFile2 } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat as stat2, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename as basename2, dirname, join as join2, resolve as resolve2 } from "node:path";
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/tool-proxy-mcp.ts
 import { createConnection } from "node:net";
 import { createInterface as createInterface2 } from "node:readline";
 var ACP_BRIDGE_MCP_SERVER_NAME = "zcc";
@@ -30721,7 +30711,7 @@ function runAcpDynamicToolMcpServer() {
   });
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/cursor-mcp-approval.ts
 var CURSOR_MCP_APPROVAL_FILE = "mcp-approvals.json";
 var CURSOR_APPROVAL_LOCK_STALE_MS = 3e4;
 var CURSOR_APPROVAL_LOCK_TIMEOUT_MS = 5e3;
@@ -30883,7 +30873,7 @@ async function revokeCursorSessionMcpServer(approval) {
   );
 }
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/bridge/bridge.ts
 var sessionsByBbThreadId = /* @__PURE__ */ new Map();
 var bbThreadIdByProviderThreadId = /* @__PURE__ */ new Map();
 var pendingRuntimeRequests = /* @__PURE__ */ new Map();
@@ -33078,13 +33068,6003 @@ var experimental_providerBridge = experimental_defineProviderBridge({
   onSigint: shutdownBridge
 });
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/provider-bridge-acp/src/probe.ts
+// ../../.zana-sdk/packages/provider-bridge-acp/src/probe.ts
 var acpAgentProbeSchema = external_exports.union([
   external_exports.object({ reachable: external_exports.literal(true), fork: external_exports.boolean() }),
   external_exports.object({ reachable: external_exports.literal(false), reason: external_exports.string() })
 ]);
 
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/local.ts
+// ../../.zana-sdk/packages/plugin-sdk/dist/provider-bridge.js
+var __create2 = Object.create;
+var __defProp2 = Object.defineProperty;
+var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames2 = Object.getOwnPropertyNames;
+var __getProtoOf2 = Object.getPrototypeOf;
+var __hasOwnProp2 = Object.prototype.hasOwnProperty;
+var __require2 = /* @__PURE__ */ ((x) => typeof __require !== "undefined" ? __require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof __require !== "undefined" ? __require : a)[b]
+}) : x)(function(x) {
+  if (typeof __require !== "undefined") return __require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+var __commonJS2 = (cb, mod) => function __require22() {
+  return mod || (0, cb[__getOwnPropNames2(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps2 = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames2(from))
+      if (!__hasOwnProp2.call(to, key) && key !== except)
+        __defProp2(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM2 = (mod, isNodeMode, target2) => (target2 = mod != null ? __create2(__getProtoOf2(mod)) : {}, __copyProps2(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp2(target2, "default", { value: mod, enumerable: true }) : target2,
+  mod
+));
+var require_windows2 = __commonJS2({
+  "node_modules/isexe/windows.js"(exports, module) {
+    module.exports = isexe;
+    isexe.sync = sync;
+    var fs3 = __require2("fs");
+    function checkPathExt(path22, options) {
+      var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
+      if (!pathext) {
+        return true;
+      }
+      pathext = pathext.split(";");
+      if (pathext.indexOf("") !== -1) {
+        return true;
+      }
+      for (var i = 0; i < pathext.length; i++) {
+        var p = pathext[i].toLowerCase();
+        if (p && path22.substr(-p.length).toLowerCase() === p) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function checkStat(stat3, path22, options) {
+      if (!stat3.isSymbolicLink() && !stat3.isFile()) {
+        return false;
+      }
+      return checkPathExt(path22, options);
+    }
+    function isexe(path22, options, cb) {
+      fs3.stat(path22, function(er, stat3) {
+        cb(er, er ? false : checkStat(stat3, path22, options));
+      });
+    }
+    function sync(path22, options) {
+      return checkStat(fs3.statSync(path22), path22, options);
+    }
+  }
+});
+var require_mode2 = __commonJS2({
+  "node_modules/isexe/mode.js"(exports, module) {
+    module.exports = isexe;
+    isexe.sync = sync;
+    var fs3 = __require2("fs");
+    function isexe(path22, options, cb) {
+      fs3.stat(path22, function(er, stat3) {
+        cb(er, er ? false : checkStat(stat3, options));
+      });
+    }
+    function sync(path22, options) {
+      return checkStat(fs3.statSync(path22), options);
+    }
+    function checkStat(stat3, options) {
+      return stat3.isFile() && checkMode(stat3, options);
+    }
+    function checkMode(stat3, options) {
+      var mod = stat3.mode;
+      var uid = stat3.uid;
+      var gid = stat3.gid;
+      var myUid = options.uid !== void 0 ? options.uid : process.getuid && process.getuid();
+      var myGid = options.gid !== void 0 ? options.gid : process.getgid && process.getgid();
+      var u = parseInt("100", 8);
+      var g = parseInt("010", 8);
+      var o = parseInt("001", 8);
+      var ug = u | g;
+      var ret = mod & o || mod & g && gid === myGid || mod & u && uid === myUid || mod & ug && myUid === 0;
+      return ret;
+    }
+  }
+});
+var require_isexe2 = __commonJS2({
+  "node_modules/isexe/index.js"(exports, module) {
+    var fs3 = __require2("fs");
+    var core;
+    if (process.platform === "win32" || global.TESTING_WINDOWS) {
+      core = require_windows2();
+    } else {
+      core = require_mode2();
+    }
+    module.exports = isexe;
+    isexe.sync = sync;
+    function isexe(path22, options, cb) {
+      if (typeof options === "function") {
+        cb = options;
+        options = {};
+      }
+      if (!cb) {
+        if (typeof Promise !== "function") {
+          throw new TypeError("callback not provided");
+        }
+        return new Promise(function(resolve42, reject) {
+          isexe(path22, options || {}, function(er, is) {
+            if (er) {
+              reject(er);
+            } else {
+              resolve42(is);
+            }
+          });
+        });
+      }
+      core(path22, options || {}, function(er, is) {
+        if (er) {
+          if (er.code === "EACCES" || options && options.ignoreErrors) {
+            er = null;
+            is = false;
+          }
+        }
+        cb(er, is);
+      });
+    }
+    function sync(path22, options) {
+      try {
+        return core.sync(path22, options || {});
+      } catch (er) {
+        if (options && options.ignoreErrors || er.code === "EACCES") {
+          return false;
+        } else {
+          throw er;
+        }
+      }
+    }
+  }
+});
+var require_which2 = __commonJS2({
+  "node_modules/which/which.js"(exports, module) {
+    var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
+    var path22 = __require2("path");
+    var COLON = isWindows ? ";" : ":";
+    var isexe = require_isexe2();
+    var getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
+    var getPathInfo = (cmd, opt) => {
+      const colon = opt.colon || COLON;
+      const pathEnv = cmd.match(/\//) || isWindows && cmd.match(/\\/) ? [""] : [
+        // windows always checks the cwd first
+        ...isWindows ? [process.cwd()] : [],
+        ...(opt.path || process.env.PATH || /* istanbul ignore next: very unusual */
+        "").split(colon)
+      ];
+      const pathExtExe = isWindows ? opt.pathExt || process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM" : "";
+      const pathExt = isWindows ? pathExtExe.split(colon) : [""];
+      if (isWindows) {
+        if (cmd.indexOf(".") !== -1 && pathExt[0] !== "")
+          pathExt.unshift("");
+      }
+      return {
+        pathEnv,
+        pathExt,
+        pathExtExe
+      };
+    };
+    var which = (cmd, opt, cb) => {
+      if (typeof opt === "function") {
+        cb = opt;
+        opt = {};
+      }
+      if (!opt)
+        opt = {};
+      const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
+      const found = [];
+      const step = (i) => new Promise((resolve42, reject) => {
+        if (i === pathEnv.length)
+          return opt.all && found.length ? resolve42(found) : reject(getNotFoundError(cmd));
+        const ppRaw = pathEnv[i];
+        const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
+        const pCmd = path22.join(pathPart, cmd);
+        const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
+        resolve42(subStep(p, i, 0));
+      });
+      const subStep = (p, i, ii) => new Promise((resolve42, reject) => {
+        if (ii === pathExt.length)
+          return resolve42(step(i + 1));
+        const ext = pathExt[ii];
+        isexe(p + ext, { pathExt: pathExtExe }, (er, is) => {
+          if (!er && is) {
+            if (opt.all)
+              found.push(p + ext);
+            else
+              return resolve42(p + ext);
+          }
+          return resolve42(subStep(p, i, ii + 1));
+        });
+      });
+      return cb ? step(0).then((res) => cb(null, res), cb) : step(0);
+    };
+    var whichSync = (cmd, opt) => {
+      opt = opt || {};
+      const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
+      const found = [];
+      for (let i = 0; i < pathEnv.length; i++) {
+        const ppRaw = pathEnv[i];
+        const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
+        const pCmd = path22.join(pathPart, cmd);
+        const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
+        for (let j = 0; j < pathExt.length; j++) {
+          const cur = p + pathExt[j];
+          try {
+            const is = isexe.sync(cur, { pathExt: pathExtExe });
+            if (is) {
+              if (opt.all)
+                found.push(cur);
+              else
+                return cur;
+            }
+          } catch (ex) {
+          }
+        }
+      }
+      if (opt.all && found.length)
+        return found;
+      if (opt.nothrow)
+        return null;
+      throw getNotFoundError(cmd);
+    };
+    module.exports = which;
+    which.sync = whichSync;
+  }
+});
+var require_path_key2 = __commonJS2({
+  "node_modules/path-key/index.js"(exports, module) {
+    "use strict";
+    var pathKey = (options = {}) => {
+      const environment = options.env || process.env;
+      const platform = options.platform || process.platform;
+      if (platform !== "win32") {
+        return "PATH";
+      }
+      return Object.keys(environment).reverse().find((key) => key.toUpperCase() === "PATH") || "Path";
+    };
+    module.exports = pathKey;
+    module.exports.default = pathKey;
+  }
+});
+var require_resolveCommand2 = __commonJS2({
+  "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
+    "use strict";
+    var path22 = __require2("path");
+    var which = require_which2();
+    var getPathKey = require_path_key2();
+    function resolveCommandAttempt(parsed, withoutPathExt) {
+      const env = parsed.options.env || process.env;
+      const cwd = process.cwd();
+      const hasCustomCwd = parsed.options.cwd != null;
+      const shouldSwitchCwd = hasCustomCwd && process.chdir !== void 0 && !process.chdir.disabled;
+      if (shouldSwitchCwd) {
+        try {
+          process.chdir(parsed.options.cwd);
+        } catch (err) {
+        }
+      }
+      let resolved;
+      try {
+        resolved = which.sync(parsed.command, {
+          path: env[getPathKey({ env })],
+          pathExt: withoutPathExt ? path22.delimiter : void 0
+        });
+      } catch (e) {
+      } finally {
+        if (shouldSwitchCwd) {
+          process.chdir(cwd);
+        }
+      }
+      if (resolved) {
+        resolved = path22.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
+      }
+      return resolved;
+    }
+    function resolveCommand(parsed) {
+      return resolveCommandAttempt(parsed) || resolveCommandAttempt(parsed, true);
+    }
+    module.exports = resolveCommand;
+  }
+});
+var require_escape2 = __commonJS2({
+  "node_modules/cross-spawn/lib/util/escape.js"(exports, module) {
+    "use strict";
+    var metaCharsRegExp = /([()\][%!^"`<>&|;, *?])/g;
+    function escapeCommand(arg) {
+      arg = arg.replace(metaCharsRegExp, "^$1");
+      return arg;
+    }
+    function escapeArgument(arg, doubleEscapeMetaChars) {
+      arg = `${arg}`;
+      arg = arg.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
+      arg = arg.replace(/(?=(\\+?)?)\1$/, "$1$1");
+      arg = `"${arg}"`;
+      arg = arg.replace(metaCharsRegExp, "^$1");
+      if (doubleEscapeMetaChars) {
+        arg = arg.replace(metaCharsRegExp, "^$1");
+      }
+      return arg;
+    }
+    module.exports.command = escapeCommand;
+    module.exports.argument = escapeArgument;
+  }
+});
+var require_shebang_regex2 = __commonJS2({
+  "node_modules/shebang-regex/index.js"(exports, module) {
+    "use strict";
+    module.exports = /^#!(.*)/;
+  }
+});
+var require_shebang_command2 = __commonJS2({
+  "node_modules/shebang-command/index.js"(exports, module) {
+    "use strict";
+    var shebangRegex = require_shebang_regex2();
+    module.exports = (string4 = "") => {
+      const match = string4.match(shebangRegex);
+      if (!match) {
+        return null;
+      }
+      const [path22, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const binary = path22.split("/").pop();
+      if (binary === "env") {
+        return argument;
+      }
+      return argument ? `${binary} ${argument}` : binary;
+    };
+  }
+});
+var require_readShebang2 = __commonJS2({
+  "node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
+    "use strict";
+    var fs3 = __require2("fs");
+    var shebangCommand = require_shebang_command2();
+    function readShebang(command) {
+      const size = 150;
+      const buffer = Buffer.alloc(size);
+      let fd;
+      try {
+        fd = fs3.openSync(command, "r");
+        fs3.readSync(fd, buffer, 0, size, 0);
+        fs3.closeSync(fd);
+      } catch (e) {
+      }
+      return shebangCommand(buffer.toString());
+    }
+    module.exports = readShebang;
+  }
+});
+var require_parse2 = __commonJS2({
+  "node_modules/cross-spawn/lib/parse.js"(exports, module) {
+    "use strict";
+    var path22 = __require2("path");
+    var resolveCommand = require_resolveCommand2();
+    var escape = require_escape2();
+    var readShebang = require_readShebang2();
+    var isWin = process.platform === "win32";
+    var isExecutableRegExp = /\.(?:com|exe)$/i;
+    var isCmdShimRegExp = /node_modules[\\/].bin[\\/][^\\/]+\.cmd$/i;
+    function detectShebang(parsed) {
+      parsed.file = resolveCommand(parsed);
+      const shebang = parsed.file && readShebang(parsed.file);
+      if (shebang) {
+        parsed.args.unshift(parsed.file);
+        parsed.command = shebang;
+        return resolveCommand(parsed);
+      }
+      return parsed.file;
+    }
+    function parseNonShell(parsed) {
+      if (!isWin) {
+        return parsed;
+      }
+      const commandFile = detectShebang(parsed);
+      const needsShell = !isExecutableRegExp.test(commandFile);
+      if (parsed.options.forceShell || needsShell) {
+        const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
+        parsed.command = path22.normalize(parsed.command);
+        parsed.command = escape.command(parsed.command);
+        parsed.args = parsed.args.map((arg) => escape.argument(arg, needsDoubleEscapeMetaChars));
+        const shellCommand = [parsed.command].concat(parsed.args).join(" ");
+        parsed.args = ["/d", "/s", "/c", `"${shellCommand}"`];
+        parsed.command = process.env.comspec || "cmd.exe";
+        parsed.options.windowsVerbatimArguments = true;
+      }
+      return parsed;
+    }
+    function parse3(command, args, options) {
+      if (args && !Array.isArray(args)) {
+        options = args;
+        args = null;
+      }
+      args = args ? args.slice(0) : [];
+      options = Object.assign({}, options);
+      const parsed = {
+        command,
+        args,
+        options,
+        file: void 0,
+        original: {
+          command,
+          args
+        }
+      };
+      return options.shell ? parsed : parseNonShell(parsed);
+    }
+    module.exports = parse3;
+  }
+});
+var require_enoent2 = __commonJS2({
+  "node_modules/cross-spawn/lib/enoent.js"(exports, module) {
+    "use strict";
+    var isWin = process.platform === "win32";
+    function notFoundError(original, syscall) {
+      return Object.assign(new Error(`${syscall} ${original.command} ENOENT`), {
+        code: "ENOENT",
+        errno: "ENOENT",
+        syscall: `${syscall} ${original.command}`,
+        path: original.command,
+        spawnargs: original.args
+      });
+    }
+    function hookChildProcess(cp, parsed) {
+      if (!isWin) {
+        return;
+      }
+      const originalEmit = cp.emit;
+      cp.emit = function(name, arg1) {
+        if (name === "exit") {
+          const err = verifyENOENT(arg1, parsed);
+          if (err) {
+            return originalEmit.call(cp, "error", err);
+          }
+        }
+        return originalEmit.apply(cp, arguments);
+      };
+    }
+    function verifyENOENT(status, parsed) {
+      if (isWin && status === 1 && !parsed.file) {
+        return notFoundError(parsed.original, "spawn");
+      }
+      return null;
+    }
+    function verifyENOENTSync(status, parsed) {
+      if (isWin && status === 1 && !parsed.file) {
+        return notFoundError(parsed.original, "spawnSync");
+      }
+      return null;
+    }
+    module.exports = {
+      hookChildProcess,
+      verifyENOENT,
+      verifyENOENTSync,
+      notFoundError
+    };
+  }
+});
+var require_cross_spawn2 = __commonJS2({
+  "node_modules/cross-spawn/index.js"(exports, module) {
+    "use strict";
+    var cp = __require2("child_process");
+    var parse3 = require_parse2();
+    var enoent = require_enoent2();
+    function spawn2(command, args, options) {
+      const parsed = parse3(command, args, options);
+      const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
+      enoent.hookChildProcess(spawned, parsed);
+      return spawned;
+    }
+    function spawnSync(command, args, options) {
+      const parsed = parse3(command, args, options);
+      const result = cp.spawnSync(parsed.command, parsed.args, parsed.options);
+      result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
+      return result;
+    }
+    module.exports = spawn2;
+    module.exports.spawn = spawn2;
+    module.exports.sync = spawnSync;
+    module.exports._parse = parse3;
+    module.exports._enoent = enoent;
+  }
+});
+var import_cross_spawn2 = __toESM2(require_cross_spawn2(), 1);
+var portableCommandCleanupKey2 = Symbol.for("zcc.portable-command-cleanup.v1");
+var portableCommandGlobal2 = globalThis;
+var portableCommandCleanup2 = portableCommandGlobal2[portableCommandCleanupKey2] ?? (() => {
+  const state = { children: /* @__PURE__ */ new Set(), aborters: /* @__PURE__ */ new Map(), closed: false };
+  portableCommandGlobal2[portableCommandCleanupKey2] = state;
+  const cleanup = () => {
+    for (const child of state.children) terminatePortableCommandTree2(child);
+    state.children.clear();
+  };
+  process.once("exit", cleanup);
+  for (const signal of ["SIGTERM", "SIGINT"]) {
+    const onSignal = () => {
+      const hasOwnerHandler = process.listeners(signal).some((listener) => listener !== onSignal);
+      cleanup();
+      if (!hasOwnerHandler) {
+        process.removeListener(signal, onSignal);
+        process.kill(process.pid, signal);
+      }
+    };
+    process.prependListener(signal, onSignal);
+  }
+  return state;
+})();
+function terminatePortableCommandTree2(child) {
+  try {
+    killProcessGroup2({ child, signal: "SIGKILL" });
+  } catch {
+  }
+}
+function supportsProcessGroups2() {
+  return process.platform !== "win32";
+}
+function killProcessGroup2(args) {
+  if (supportsProcessGroups2() && args.child.pid !== void 0) {
+    try {
+      process.kill(-args.child.pid, args.signal);
+      return;
+    } catch {
+    }
+  }
+  args.child.kill(args.signal);
+}
+var activeThinkingSchema2 = external_exports.object({
+  id: external_exports.string(),
+  text: external_exports.string(),
+  startedAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+var reasoningLevelValues2 = [
+  "none",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "ultracode",
+  "max",
+  "ultra"
+];
+var reasoningLevelSchema2 = external_exports.enum(reasoningLevelValues2);
+var serviceTierSchema2 = external_exports.string().min(1).max(64).regex(/^[a-zA-Z0-9._-]+$/);
+var instructionModeValues2 = ["append", "replace"];
+var instructionModeSchema2 = external_exports.enum(instructionModeValues2);
+var permissionModeValues2 = ["accept-edits", "auto", "full"];
+var permissionModeSchema2 = external_exports.enum(permissionModeValues2);
+var permissionModeInputSchema2 = external_exports.union([permissionModeSchema2, external_exports.literal("workspace-write")]).transform(
+  (permissionMode) => permissionMode === "workspace-write" ? "accept-edits" : permissionMode
+);
+var legacyRecordedPermissionModeValues2 = [
+  "workspace-write",
+  "readonly"
+];
+var recordedPermissionModeSchema2 = external_exports.enum([
+  ...permissionModeValues2,
+  ...legacyRecordedPermissionModeValues2
+]);
+var permissionEscalationValues2 = ["ask", "deny"];
+var permissionEscalationSchema2 = external_exports.enum(permissionEscalationValues2);
+var LOOPBACK_HOSTNAMES2 = /* @__PURE__ */ new Set(["127.0.0.1", "::1", "localhost"]);
+var CLAUDE_CODE_MOCK_CLI_TRAFFIC_TEST_HOSTNAME2 = "api.anthropic.com";
+function normalizeUrlHostname2(value) {
+  return value.toLowerCase().replace(/^\[(.*)\]$/u, "$1");
+}
+function isClaudeCodeMockCliTrafficEndpoint2(value) {
+  let url2;
+  try {
+    url2 = new URL(value);
+  } catch {
+    return false;
+  }
+  const hostname3 = normalizeUrlHostname2(url2.hostname);
+  if (url2.protocol === "http:" && LOOPBACK_HOSTNAMES2.has(hostname3)) {
+    return true;
+  }
+  return url2.protocol === "https:" && hostname3 === CLAUDE_CODE_MOCK_CLI_TRAFFIC_TEST_HOSTNAME2 && url2.port === "" && url2.username === "" && url2.password === "";
+}
+var claudeCodeMockCliTrafficEndpointSchema2 = external_exports.string().url().refine(
+  isClaudeCodeMockCliTrafficEndpoint2,
+  "Endpoint must be an http:// loopback URL or https://api.anthropic.com"
+);
+var claudeCodeMockCliTrafficConfigSchema2 = external_exports.object({
+  enabled: external_exports.boolean(),
+  endpoint: claudeCodeMockCliTrafficEndpointSchema2
+}).strict();
+var promptInputVisibilityValues2 = ["agent-only"];
+var promptInputVisibilitySchema2 = external_exports.enum(promptInputVisibilityValues2);
+var promptInputVisibilityFields2 = {
+  visibility: promptInputVisibilitySchema2.optional()
+};
+var promptMentionPathSourceValues2 = [
+  "workspace",
+  "thread-storage"
+];
+var promptMentionPathSourceSchema2 = external_exports.enum(
+  promptMentionPathSourceValues2
+);
+var promptMentionPathEntryKindValues2 = ["file", "directory"];
+var promptMentionPathEntryKindSchema2 = external_exports.enum(
+  promptMentionPathEntryKindValues2
+);
+var promptMentionCommandTriggerValues2 = ["/"];
+var promptMentionCommandTriggerSchema2 = external_exports.enum(
+  promptMentionCommandTriggerValues2
+);
+var promptMentionCommandSourceValues2 = ["skill", "command"];
+var promptMentionCommandSourceSchema2 = external_exports.enum(
+  promptMentionCommandSourceValues2
+);
+var promptMentionCommandOriginValues2 = [
+  "builtin",
+  "project",
+  "user"
+];
+var promptMentionCommandOriginSchema2 = external_exports.enum(
+  promptMentionCommandOriginValues2
+);
+var canonicalPromptMentionResourceSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("thread"),
+    threadId: external_exports.string(),
+    projectId: external_exports.string().optional(),
+    label: external_exports.string()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("project"),
+    projectId: external_exports.string(),
+    label: external_exports.string()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("section"),
+    sectionId: external_exports.string(),
+    label: external_exports.string()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("path"),
+    source: promptMentionPathSourceSchema2,
+    entryKind: promptMentionPathEntryKindSchema2,
+    path: external_exports.string(),
+    label: external_exports.string()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("command"),
+    trigger: promptMentionCommandTriggerSchema2,
+    name: external_exports.string(),
+    source: promptMentionCommandSourceSchema2,
+    origin: promptMentionCommandOriginSchema2,
+    label: external_exports.string(),
+    argumentHint: external_exports.string().nullable()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("plugin"),
+    pluginId: external_exports.string(),
+    /**
+     * Named shared-UI icon hint supplied by the plugin mention item. Omitted
+     * by mentions persisted before icon hints were stored.
+     */
+    icon: external_exports.string().nullable().optional(),
+    /**
+     * Opaque item reference minted by the server's mention search
+     * (`<providerId>:<provider item id>`); resolved back through the same
+     * plugin's mention provider at send time (plugin design §4.9).
+     */
+    itemId: external_exports.string(),
+    label: external_exports.string()
+  })
+]);
+function normalizeLegacyPromptMentionResource2(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+  const record2 = value;
+  if (record2.kind !== "folder" || typeof record2.folderId !== "string") {
+    return value;
+  }
+  const { folderId, ...rest } = record2;
+  return { ...rest, kind: "section", sectionId: folderId };
+}
+var promptMentionResourceSchema2 = external_exports.preprocess(
+  normalizeLegacyPromptMentionResource2,
+  canonicalPromptMentionResourceSchema2
+);
+var promptTextMentionSchema2 = external_exports.object({
+  start: external_exports.number().int().nonnegative(),
+  end: external_exports.number().int().nonnegative(),
+  resource: promptMentionResourceSchema2
+});
+var promptInputSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("text"),
+    text: external_exports.string(),
+    mentions: external_exports.array(promptTextMentionSchema2).default([]),
+    ...promptInputVisibilityFields2
+  }),
+  external_exports.object({
+    type: external_exports.literal("image"),
+    url: external_exports.string().url(),
+    ...promptInputVisibilityFields2
+  }),
+  external_exports.object({
+    type: external_exports.literal("localImage"),
+    name: external_exports.string().optional(),
+    sizeBytes: external_exports.number().int().nonnegative().optional(),
+    mimeType: external_exports.string().optional(),
+    /**
+     * Absolute paths and URI-like values are passed through to the runtime.
+     * Relative paths are server-managed attachment references, not workspace
+     * relative files.
+     */
+    path: external_exports.string(),
+    sourceProjectId: external_exports.string().min(1).max(100).optional(),
+    hostId: external_exports.string().min(1).max(100).optional(),
+    ...promptInputVisibilityFields2
+  }),
+  external_exports.object({
+    type: external_exports.literal("localFile"),
+    /**
+     * Absolute paths and URI-like values are passed through to the runtime.
+     * Relative paths are server-managed attachment references, not workspace
+     * relative files.
+     */
+    path: external_exports.string(),
+    sourceProjectId: external_exports.string().min(1).max(100).optional(),
+    hostId: external_exports.string().min(1).max(100).optional(),
+    name: external_exports.string().optional(),
+    sizeBytes: external_exports.number().int().nonnegative().optional(),
+    mimeType: external_exports.string().optional(),
+    ...promptInputVisibilityFields2
+  })
+]);
+var threadExecutionSourceSchema2 = external_exports.enum([
+  "client/thread/start",
+  "client/turn/requested",
+  "client/turn/start"
+]);
+var callerExecutionInputSourceValues2 = [
+  "explicit",
+  "client-preference"
+];
+var callerExecutionInputSourceSchema2 = external_exports.enum(
+  callerExecutionInputSourceValues2
+);
+var threadExecutionOptionsSchema2 = external_exports.object({
+  model: external_exports.string().optional(),
+  serviceTier: serviceTierSchema2.optional(),
+  reasoningLevel: reasoningLevelSchema2.optional(),
+  permissionMode: permissionModeSchema2.optional(),
+  source: threadExecutionSourceSchema2.optional(),
+  seq: external_exports.number().int().optional(),
+  /**
+   * Provider-native session mode/role (e.g. an ACP provider's session-mode
+   * selector). Recorded on the turn so the running thread's picked role can be
+   * read back and re-applied on follow-ups; absent for providers without one.
+   */
+  acpMode: external_exports.string().optional()
+});
+var resolvedThreadExecutionOptionsSchema2 = threadExecutionOptionsSchema2.extend({
+  model: external_exports.string().min(1),
+  serviceTier: serviceTierSchema2,
+  reasoningLevel: reasoningLevelSchema2,
+  permissionMode: permissionModeSchema2,
+  source: threadExecutionSourceSchema2
+});
+var recordedThreadExecutionOptionsSchema2 = resolvedThreadExecutionOptionsSchema2.extend({
+  permissionMode: recordedPermissionModeSchema2
+});
+var runtimePermissionScopeValues2 = ["workspace", "full"];
+var runtimePermissionScopeSchema2 = external_exports.enum(
+  runtimePermissionScopeValues2
+);
+var approvalReviewerValues2 = ["user", "automatic"];
+var approvalReviewerSchema2 = external_exports.enum(approvalReviewerValues2);
+var runtimePermissionPolicySchema2 = external_exports.discriminatedUnion(
+  "permissionMode",
+  [
+    external_exports.object({
+      permissionMode: external_exports.literal("accept-edits"),
+      permissionScope: external_exports.literal("workspace"),
+      approvalReviewer: external_exports.literal("user"),
+      permissionEscalation: permissionEscalationSchema2
+    }),
+    external_exports.object({
+      permissionMode: external_exports.literal("auto"),
+      permissionScope: external_exports.literal("workspace"),
+      approvalReviewer: external_exports.literal("automatic"),
+      permissionEscalation: permissionEscalationSchema2
+    }),
+    external_exports.object({
+      permissionMode: external_exports.literal("full"),
+      permissionScope: external_exports.literal("full"),
+      approvalReviewer: external_exports.null(),
+      permissionEscalation: external_exports.null()
+    })
+  ]
+);
+var runtimeThreadExecutionBaseOptionsSchema2 = external_exports.object({
+  model: external_exports.string().min(1),
+  serviceTier: serviceTierSchema2,
+  reasoningLevel: reasoningLevelSchema2,
+  claudeCodePermissionMode: external_exports.literal("plan").optional(),
+  // Optional for legacy command compatibility; the server fills the current
+  // app setting before dispatching new runtime work.
+  claudeCodeMockCliTraffic: claudeCodeMockCliTrafficConfigSchema2.optional(),
+  /**
+   * Server-owned product policy: whether the provider session may use the
+   * Workflows feature. Filled explicitly at the server boundary (per-provider
+   * policy), never defaulted downstream.
+   */
+  workflowsEnabled: external_exports.boolean(),
+  // Optional for legacy command compatibility; the server fills the current
+  // provider preference before dispatching new runtime work.
+  memoryEnabled: external_exports.boolean().optional(),
+  // Optional for legacy command compatibility; the server fills the current
+  // provider preference before dispatching new runtime work.
+  providerSubagentsEnabled: external_exports.boolean().optional(),
+  /** Provider-scoped runtime options. Core transports this opaque bag only. */
+  providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
+});
+var runtimeThreadExecutionOptionsSchema2 = runtimeThreadExecutionBaseOptionsSchema2.and(runtimePermissionPolicySchema2);
+var projectExecutionDefaultsSchema2 = external_exports.object({
+  providerId: external_exports.string().min(1),
+  model: external_exports.string().min(1),
+  serviceTier: serviceTierSchema2,
+  reasoningLevel: reasoningLevelSchema2,
+  permissionMode: permissionModeSchema2
+});
+var providerSkillRootPathSchema2 = external_exports.string().min(1).refine((value) => {
+  const normalized = value.replaceAll("\\", "/");
+  return !normalized.startsWith("/") && !/^[a-zA-Z]:\//u.test(normalized) && normalized.split("/").every(
+    (segment) => segment !== "" && segment !== "." && segment !== ".."
+  );
+}, "Skill roots must be relative paths without dot segments");
+var uniqueProviderSkillRootPathsSchema2 = external_exports.array(providerSkillRootPathSchema2).superRefine((paths, context) => {
+  if (new Set(paths).size !== paths.length) {
+    context.addIssue({
+      code: "custom",
+      message: "Skill roots must not contain duplicates"
+    });
+  }
+});
+var providerNativeSkillRootsSchema2 = external_exports.object({
+  user: uniqueProviderSkillRootPathsSchema2.default([]),
+  project: uniqueProviderSkillRootPathsSchema2.default([])
+}).strict();
+var acpReasoningCliLevelValueOverridesSchema2 = external_exports.partialRecord(
+  reasoningLevelSchema2,
+  external_exports.string().min(1)
+);
+var acpReasoningCliSchema2 = external_exports.object({
+  flag: external_exports.string().min(1),
+  supportedLevels: external_exports.array(reasoningLevelSchema2).min(1),
+  levelValues: acpReasoningCliLevelValueOverridesSchema2.optional(),
+  defaultLevel: reasoningLevelSchema2.optional()
+}).strict().superRefine((reasoningCli, context) => {
+  const supportedLevels = new Set(reasoningCli.supportedLevels);
+  if (supportedLevels.size !== reasoningCli.supportedLevels.length) {
+    context.addIssue({
+      code: "custom",
+      message: "supportedLevels must not contain duplicates",
+      path: ["supportedLevels"]
+    });
+  }
+  if (reasoningCli.defaultLevel !== void 0 && !supportedLevels.has(reasoningCli.defaultLevel)) {
+    context.addIssue({
+      code: "custom",
+      message: "defaultLevel must be one of supportedLevels",
+      path: ["defaultLevel"]
+    });
+  }
+});
+var acpNativeReasoningSchema2 = external_exports.object({
+  configId: external_exports.string().min(1),
+  supportedLevels: external_exports.array(reasoningLevelSchema2).min(1),
+  levelValues: acpReasoningCliLevelValueOverridesSchema2.optional(),
+  defaultLevel: reasoningLevelSchema2.optional()
+}).strict().superRefine((nativeReasoning2, context) => {
+  const supportedLevels = new Set(nativeReasoning2.supportedLevels);
+  if (supportedLevels.size !== nativeReasoning2.supportedLevels.length) {
+    context.addIssue({
+      code: "custom",
+      message: "supportedLevels must not contain duplicates",
+      path: ["supportedLevels"]
+    });
+  }
+  if (nativeReasoning2.defaultLevel !== void 0 && !supportedLevels.has(nativeReasoning2.defaultLevel)) {
+    context.addIssue({
+      code: "custom",
+      message: "defaultLevel must be one of supportedLevels",
+      path: ["defaultLevel"]
+    });
+  }
+});
+var acpPermissionCliArgsSchema2 = external_exports.array(external_exports.string().min(1)).min(1);
+var acpPermissionCliSchema2 = external_exports.object({
+  full: acpPermissionCliArgsSchema2.optional(),
+  workspaceWrite: acpPermissionCliArgsSchema2.optional(),
+  readonly: acpPermissionCliArgsSchema2.optional(),
+  insertAfterArgs: external_exports.number().int().min(0).optional()
+}).strict().superRefine((permissionCli, context) => {
+  if (permissionCli.full === void 0 && permissionCli.workspaceWrite === void 0 && permissionCli.readonly === void 0) {
+    context.addIssue({
+      code: "custom",
+      message: "permissionCli must configure at least one permission mode"
+    });
+  }
+});
+var appSettingsSchema2 = external_exports.object({
+  /** Show shortcut hints after holding Command or Control. */
+  showKeyboardHints: external_exports.boolean(),
+  /**
+   * While a thread is running, make Enter steer the active turn and use
+   * Command+Enter to queue a follow-up.
+   */
+  steerActiveThreadOnEnter: external_exports.boolean(),
+  /** Show raw provider events that bb does not yet understand. */
+  showUnhandledProviderEvents: external_exports.boolean(),
+  /**
+   * Alias of showUnhandledProviderEvents. Kept so older persisted
+   * settings continue to parse; prefer this name in new UI copy.
+   */
+  showDiagnosticEvents: external_exports.boolean().optional(),
+  /** Enable Codex's native memory recall and generation for bb threads. */
+  codexMemoryEnabled: external_exports.boolean(),
+  /** Enable Claude Code's native auto-memory reads and writes for bb threads. */
+  claudeCodeMemoryEnabled: external_exports.boolean(),
+  /** Prevent Codex from exposing its native multi-agent tools to bb threads. */
+  codexSubagentsDisabled: external_exports.boolean(),
+  /** Prevent Claude Code from exposing its native Task tool to bb threads. */
+  claudeCodeSubagentsDisabled: external_exports.boolean(),
+  /** Prevent Claude Code from exposing its native Workflow tool. */
+  claudeCodeWorkflowsDisabled: external_exports.boolean(),
+  /**
+   * ISO timestamp of when first-run onboarding last finished or was
+   * dismissed; null means it has never run. A timestamp rather than a boolean
+   * so we also know *when*, and so "never ran" has an honest value.
+   *
+   * Deliberately not a proxy for "is bb set up": whether an agent is usable is
+   * answered live by `provider.usage`, so dismissing onboarding never claims
+   * the machine is configured. Setting this back to null re-triggers the flow.
+   */
+  onboardingCompletedAt: external_exports.string().nullable()
+}).strict();
+var THREAD_JUMP_APP_COMMAND_IDS2 = [
+  "thread.jump.1",
+  "thread.jump.2",
+  "thread.jump.3",
+  "thread.jump.4",
+  "thread.jump.5",
+  "thread.jump.6",
+  "thread.jump.7",
+  "thread.jump.8",
+  "thread.jump.9"
+];
+var QUESTION_SELECT_APP_COMMAND_IDS2 = [
+  "question.select.1",
+  "question.select.2",
+  "question.select.3",
+  "question.select.4",
+  "question.select.5",
+  "question.select.6",
+  "question.select.7",
+  "question.select.8",
+  "question.select.9"
+];
+var PANE_DIRECTION_APP_COMMAND_IDS2 = [
+  "pane.focus.left",
+  "pane.focus.right",
+  "pane.focus.up",
+  "pane.focus.down"
+];
+var PANE_FOCUS_APP_COMMAND_IDS2 = [
+  "pane.focus.1",
+  "pane.focus.2",
+  "pane.focus.3",
+  "pane.focus.4",
+  "pane.focus.5",
+  "pane.focus.6",
+  "pane.focus.7",
+  "pane.focus.8"
+];
+var APP_COMMAND_IDS2 = [
+  "thread.new",
+  "thread.search",
+  "thread.find",
+  "thread.rename",
+  "thread.archive",
+  "thread.previous",
+  "thread.next",
+  ...THREAD_JUMP_APP_COMMAND_IDS2,
+  ...PANE_DIRECTION_APP_COMMAND_IDS2,
+  "pane.focus.previous",
+  "pane.focus.next",
+  ...PANE_FOCUS_APP_COMMAND_IDS2,
+  "pane.maximize.toggle",
+  "pane.close",
+  "window.new",
+  "settings.open",
+  "settings.openServers",
+  "sidebar.toggle",
+  "panel.newTab",
+  "panel.close",
+  "panel.toggle",
+  "file.quickOpen",
+  "diff.toggle",
+  "terminal.open",
+  "composer.focus",
+  "modelPicker.toggle",
+  "modelPicker.cycleModel",
+  "modelPicker.cycleModelBackward",
+  "modelPicker.cycleProvider",
+  "modelPicker.cycleProviderBackward",
+  "modelPicker.cycleReasoning",
+  "modelPicker.cycleReasoningBackward",
+  "browser.focusLocation",
+  "browser.reload",
+  "browser.find",
+  "workspace.openPreferred",
+  ...QUESTION_SELECT_APP_COMMAND_IDS2
+];
+var appCommandIdSchema2 = external_exports.enum(APP_COMMAND_IDS2);
+var APP_COMMAND_CONTEXT_KEYS2 = [
+  "mainSurface",
+  "modalOpen",
+  "editableFocus",
+  "terminalFocus",
+  "browserFocus",
+  "modelPickerOpen",
+  "questionOpen",
+  "promptAvailable",
+  "splitActive",
+  "webSurface",
+  "macPlatform"
+];
+var appCommandContextKeySchema2 = external_exports.enum(APP_COMMAND_CONTEXT_KEYS2);
+var appShortcutSchema2 = external_exports.object({
+  // Store the unshifted base key; `shift` records the modifier separately.
+  // For example, Command+Shift+[ is `{ key: "[", shift: true }`.
+  key: external_exports.string().min(1).max(32),
+  mod: external_exports.boolean(),
+  meta: external_exports.boolean(),
+  control: external_exports.boolean(),
+  alt: external_exports.boolean(),
+  shift: external_exports.boolean()
+}).strict();
+var appCommandWhenSchema2 = external_exports.object({
+  all: external_exports.array(appCommandContextKeySchema2),
+  none: external_exports.array(appCommandContextKeySchema2)
+}).strict();
+var appKeybindingSchema2 = external_exports.object({
+  command: appCommandIdSchema2,
+  desktopOnly: external_exports.boolean(),
+  shortcut: appShortcutSchema2,
+  when: appCommandWhenSchema2
+}).strict();
+var appDefaultKeybindingSchema2 = appKeybindingSchema2.extend({
+  // Null keeps a command assignable without shipping a default shortcut.
+  shortcut: appShortcutSchema2.nullable()
+});
+var appKeybindingsSchema2 = external_exports.array(appKeybindingSchema2).max(256);
+var appDefaultKeybindingsSchema2 = external_exports.array(appDefaultKeybindingSchema2).max(256);
+var appKeybindingOverrideSchema2 = external_exports.object({
+  command: appCommandIdSchema2,
+  // Null has explicit meaning: disable every default binding for this command.
+  shortcut: appShortcutSchema2.nullable()
+}).strict();
+var appKeybindingOverridesSchema2 = external_exports.array(appKeybindingOverrideSchema2).max(APP_COMMAND_IDS2.length).superRefine((overrides, context) => {
+  const seen = /* @__PURE__ */ new Set();
+  for (const [index, override] of overrides.entries()) {
+    if (seen.has(override.command)) {
+      context.addIssue({
+        code: "custom",
+        message: `Duplicate override for ${override.command}`,
+        path: [index, "command"]
+      });
+    }
+    seen.add(override.command);
+  }
+});
+var jsonValueSchema2 = external_exports.lazy(
+  () => external_exports.union([
+    external_exports.string(),
+    external_exports.number(),
+    external_exports.boolean(),
+    external_exports.null(),
+    external_exports.array(jsonValueSchema2),
+    external_exports.record(external_exports.string(), jsonValueSchema2)
+  ])
+);
+var jsonObjectSchema2 = external_exports.record(
+  external_exports.string(),
+  jsonValueSchema2
+);
+var DEFAULT_CODE_THEME_DARK2 = "pierre-dark";
+var DEFAULT_CODE_THEME_LIGHT2 = "pierre-light";
+var codeThemeNameSchema2 = external_exports.string().min(1).max(128).regex(
+  /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/,
+  "Code theme names may use letters, digits, '.', '_', ':', and '-' and cannot start with '.'"
+);
+var codeThemePairSchema2 = external_exports.object({
+  dark: codeThemeNameSchema2,
+  light: codeThemeNameSchema2
+}).strict();
+var vscodeThemeJsonSchema2 = jsonObjectSchema2.refine(
+  (value) => typeof value.name === "string" && value.name.length > 0,
+  { message: "Code theme JSON must include a non-empty name" }
+);
+var resolvedCodeThemeSchema2 = external_exports.object({
+  dark: codeThemeNameSchema2,
+  light: codeThemeNameSchema2,
+  files: external_exports.record(external_exports.string(), jsonObjectSchema2)
+}).strict();
+var defaultResolvedCodeTheme2 = {
+  dark: DEFAULT_CODE_THEME_DARK2,
+  light: DEFAULT_CODE_THEME_LIGHT2,
+  files: {}
+};
+var uiCodeThemeDeclarationSchema2 = external_exports.object({
+  dark: external_exports.string().min(1).max(256).optional(),
+  light: external_exports.string().min(1).max(256).optional()
+}).strict();
+var builtInThemeIdSchema2 = external_exports.enum([
+  "default",
+  "nord",
+  "dracula",
+  "solarized",
+  "gruvbox",
+  "catppuccin"
+]);
+var BUILTIN_THEME_IDS2 = builtInThemeIdSchema2.options;
+function isBuiltInThemeId2(id2) {
+  return BUILTIN_THEME_IDS2.includes(id2);
+}
+var customThemeNameSchema2 = external_exports.string().min(1).max(64).regex(
+  /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+  "Custom theme names may use letters, digits, '.', '_', and '-' and cannot start with '.'"
+).refine((name) => name !== "." && name !== "..", "Invalid custom theme name").refine(
+  (name) => !isBuiltInThemeId2(name),
+  "Custom theme name collides with a built-in palette id"
+);
+var CUSTOM_THEME_CSS_MAX_LENGTH2 = 256e3;
+var FAVICON_COLORS2 = [
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "teal",
+  "blue",
+  "purple",
+  "pink"
+];
+var faviconColorPreferenceSchema2 = external_exports.enum([
+  "default",
+  ...FAVICON_COLORS2
+]);
+var appThemeSchema2 = external_exports.object({
+  themeId: external_exports.string().min(1),
+  /** Resolved CSS for a custom palette; null for built-ins. */
+  customCss: external_exports.string().max(CUSTOM_THEME_CSS_MAX_LENGTH2).nullable(),
+  /** Browser tab icon tint; "default" leaves the glyph untinted. */
+  faviconColor: faviconColorPreferenceSchema2,
+  /**
+   * Pierre / Shiki names (and any custom JSON) derived from the active
+   * palette. Always filled at the server boundary.
+   */
+  resolvedCodeTheme: resolvedCodeThemeSchema2.default(defaultResolvedCodeTheme2)
+});
+var pluginThemeMetaSchema2 = external_exports.object({
+  id: external_exports.string().min(1),
+  pluginId: external_exports.string().min(1),
+  name: external_exports.string().min(1),
+  description: external_exports.string().nullable()
+});
+var appThemeSelectionSchema2 = external_exports.object({
+  themeId: external_exports.string().min(1),
+  faviconColor: faviconColorPreferenceSchema2
+});
+var backgroundTaskStatusValues2 = [
+  "pending",
+  "running",
+  "paused",
+  "completed",
+  "failed",
+  "killed",
+  "stopped"
+];
+var backgroundTaskStatusSchema2 = external_exports.enum(backgroundTaskStatusValues2);
+var workflowAgentStateValues2 = [
+  "queued",
+  "running",
+  "done",
+  "failed",
+  "skipped"
+];
+var workflowAgentStateSchema2 = external_exports.enum(workflowAgentStateValues2);
+var workflowAgentSnapshotSchema2 = external_exports.object({
+  /** 1-based agent counter; the stable identity for fold/replace semantics. */
+  index: external_exports.number().int().positive(),
+  label: external_exports.string(),
+  state: workflowAgentStateSchema2,
+  model: external_exports.string(),
+  attempt: external_exports.number().int().positive(),
+  cached: external_exports.boolean(),
+  lastProgressAt: external_exports.number(),
+  phaseIndex: external_exports.number().int().positive().optional(),
+  phaseTitle: external_exports.string().optional(),
+  agentType: external_exports.string().optional(),
+  isolation: external_exports.string().optional(),
+  queuedAt: external_exports.number().optional(),
+  startedAt: external_exports.number().optional(),
+  lastToolName: external_exports.string().optional(),
+  lastToolSummary: external_exports.string().optional(),
+  promptPreview: external_exports.string().optional(),
+  resultPreview: external_exports.string().optional(),
+  error: external_exports.string().optional(),
+  tokens: external_exports.number().optional(),
+  toolCalls: external_exports.number().optional(),
+  durationMs: external_exports.number().optional()
+});
+var workflowPhaseSnapshotSchema2 = external_exports.object({
+  /** 1-based phase counter; meta.phases are seeded before any agent runs. */
+  index: external_exports.number().int().positive(),
+  title: external_exports.string(),
+  /** "child" marks a nested workflow() sub-run group. */
+  kind: external_exports.string().optional()
+});
+var workflowProgressSnapshotSchema2 = external_exports.object({
+  phases: external_exports.array(workflowPhaseSnapshotSchema2),
+  agents: external_exports.array(workflowAgentSnapshotSchema2)
+});
+var backgroundTaskUsageSchema2 = external_exports.object({
+  totalTokens: external_exports.number(),
+  toolUses: external_exports.number(),
+  durationMs: external_exports.number()
+});
+var PLUGIN_INTERACTION_MAX_TITLE_LENGTH2 = 160;
+var PLUGIN_INTERACTION_MAX_PAYLOAD_BYTES2 = 64 * 1024;
+var PLUGIN_INTERACTION_MAX_TIMEOUT_MS2 = 7 * 24 * 60 * 60 * 1e3;
+function jsonByteLength2(value) {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+var THREAD_EVENT_ITEM_PRESENTATION_DETAIL_MAX_LENGTH2 = 280;
+var threadEventItemPresentationLabelSchema2 = external_exports.object({
+  /** Present-tense row title while the item is in flight ("Reading file"). */
+  pending: external_exports.string().min(1),
+  /** Past-tense row title once the item settled ("Read file"). */
+  completed: external_exports.string().min(1)
+});
+var threadEventItemPresentationIconSchema2 = external_exports.object({
+  glyph: external_exports.string().min(1)
+});
+var threadEventItemPresentationTintSchema2 = external_exports.object({
+  light: external_exports.string().min(1),
+  dark: external_exports.string().min(1)
+});
+var threadEventItemPresentationSchema2 = external_exports.object({
+  label: threadEventItemPresentationLabelSchema2,
+  icon: threadEventItemPresentationIconSchema2,
+  /** Row headline beside the label (a path, a query, a child thread title). */
+  title: external_exports.string().optional(),
+  /**
+   * Short Markdown summary shown in the row body. Length-capped here so a
+   * bridge cannot turn the persisted row into a transcript.
+   */
+  detail: external_exports.string().max(THREAD_EVENT_ITEM_PRESENTATION_DETAIL_MAX_LENGTH2).optional(),
+  /** Low-value rows (TodoWrite, ToolSearch) clients collapse by default. */
+  suppress: external_exports.boolean().optional(),
+  /** Accent colour per theme; omitted rows use the neutral row tint. */
+  tint: threadEventItemPresentationTintSchema2.optional(),
+  /** Optional status badge (sandbox escape, approval, etc.). */
+  badge: external_exports.object({
+    glyph: external_exports.string().min(1),
+    label: external_exports.string().min(1),
+    hint: external_exports.string().min(1).optional(),
+    tone: external_exports.string().min(1).optional()
+  }).optional()
+});
+var EXTENSION_KIND_PATTERN2 = /^[a-z0-9-]+\/[a-z0-9-]+$/u;
+function isExtensionKind2(value) {
+  return EXTENSION_KIND_PATTERN2.test(value);
+}
+var extensionKindSchema2 = external_exports.string().refine(isExtensionKind2, {
+  message: 'extension kinds are "<pluginId>/<name>" (lowercase letters, digits, and "-")'
+});
+var pendingInteractionStatusSchema2 = external_exports.enum([
+  "pending",
+  "resolving",
+  "resolved",
+  "interrupted"
+]);
+var pendingInteractionCommandActionSchema2 = external_exports.discriminatedUnion(
+  "type",
+  [
+    external_exports.object({
+      type: external_exports.literal("read"),
+      command: external_exports.string(),
+      name: external_exports.string(),
+      path: external_exports.string()
+    }),
+    external_exports.object({
+      type: external_exports.literal("listFiles"),
+      command: external_exports.string(),
+      path: external_exports.string().nullable()
+    }),
+    external_exports.object({
+      type: external_exports.literal("search"),
+      command: external_exports.string(),
+      query: external_exports.string().nullable(),
+      path: external_exports.string().nullable()
+    }),
+    external_exports.object({
+      type: external_exports.literal("unknown"),
+      command: external_exports.string()
+    })
+  ]
+);
+var pendingInteractionNetworkPermissionsSchema2 = external_exports.object({
+  enabled: external_exports.boolean().nullable()
+});
+var pendingInteractionFileSystemPermissionsSchema2 = external_exports.object({
+  read: external_exports.array(external_exports.string()),
+  write: external_exports.array(external_exports.string())
+});
+var pendingInteractionMacOsPreferencesPermissionSchema2 = external_exports.enum([
+  "none",
+  "read_only",
+  "read_write"
+]);
+var pendingInteractionMacOsContactsPermissionSchema2 = external_exports.enum([
+  "none",
+  "read_only",
+  "read_write"
+]);
+var pendingInteractionMacOsAutomationPermissionSchema2 = external_exports.union([
+  external_exports.literal("none"),
+  external_exports.literal("all"),
+  external_exports.object({
+    kind: external_exports.literal("bundle_ids"),
+    bundleIds: external_exports.array(external_exports.string())
+  })
+]);
+var pendingInteractionMacOsPermissionsSchema2 = external_exports.object({
+  preferences: pendingInteractionMacOsPreferencesPermissionSchema2,
+  automations: pendingInteractionMacOsAutomationPermissionSchema2,
+  launchServices: external_exports.boolean(),
+  accessibility: external_exports.boolean(),
+  calendar: external_exports.boolean(),
+  reminders: external_exports.boolean(),
+  contacts: pendingInteractionMacOsContactsPermissionSchema2
+});
+var pendingInteractionRequestedPermissionProfileSchema2 = external_exports.object({
+  network: pendingInteractionNetworkPermissionsSchema2.nullable(),
+  fileSystem: pendingInteractionFileSystemPermissionsSchema2.nullable(),
+  macos: pendingInteractionMacOsPermissionsSchema2.nullable()
+});
+var pendingInteractionGrantablePermissionProfileSchema2 = external_exports.object({
+  network: pendingInteractionNetworkPermissionsSchema2.nullable(),
+  fileSystem: pendingInteractionFileSystemPermissionsSchema2.nullable()
+}).strict();
+var pendingInteractionGrantedPermissionProfileSchema2 = pendingInteractionGrantablePermissionProfileSchema2;
+var pendingInteractionApprovalDecisionSchema2 = external_exports.enum([
+  "allow_once",
+  "allow_for_session",
+  "deny"
+]);
+var pendingInteractionFileChangeWriteScopeSchema2 = external_exports.string().min(1);
+var pendingInteractionCommandApprovalSubjectSchema2 = external_exports.object({
+  kind: external_exports.literal("command"),
+  itemId: external_exports.string().min(1),
+  command: external_exports.string().min(1),
+  cwd: external_exports.string().nullable(),
+  actions: external_exports.array(pendingInteractionCommandActionSchema2),
+  sessionGrant: pendingInteractionGrantablePermissionProfileSchema2.nullable()
+});
+var pendingInteractionFileChangeApprovalSubjectSchema2 = external_exports.object({
+  kind: external_exports.literal("file_change"),
+  itemId: external_exports.string().min(1),
+  writeScope: pendingInteractionFileChangeWriteScopeSchema2.nullable(),
+  sessionGrant: pendingInteractionGrantablePermissionProfileSchema2.nullable()
+});
+var pendingInteractionPermissionGrantApprovalSubjectSchema2 = external_exports.object({
+  kind: external_exports.literal("permission_grant"),
+  itemId: external_exports.string().min(1),
+  toolName: external_exports.string().nullable(),
+  permissions: pendingInteractionGrantablePermissionProfileSchema2
+});
+var pendingInteractionPlanApprovalSubjectSchema2 = external_exports.object({
+  kind: external_exports.literal("plan"),
+  itemId: external_exports.string().min(1),
+  /** The plan body, as Markdown. */
+  plan: external_exports.string().min(1),
+  /** Where the provider saved the plan, or null when it kept it in memory. */
+  planFilePath: external_exports.string().min(1).nullable()
+});
+var pendingInteractionToolUseApprovalSubjectSchema2 = external_exports.object({
+  kind: external_exports.literal("tool_use"),
+  itemId: external_exports.string().min(1),
+  tool: external_exports.string().min(1),
+  presentation: threadEventItemPresentationSchema2
+});
+var pendingInteractionApprovalSubjectSchema2 = external_exports.discriminatedUnion("kind", [
+  pendingInteractionCommandApprovalSubjectSchema2,
+  pendingInteractionFileChangeApprovalSubjectSchema2,
+  pendingInteractionPermissionGrantApprovalSubjectSchema2,
+  pendingInteractionPlanApprovalSubjectSchema2,
+  pendingInteractionToolUseApprovalSubjectSchema2
+]);
+var approvalPendingInteractionPayloadSchema2 = external_exports.object({
+  kind: external_exports.literal("approval"),
+  subject: pendingInteractionApprovalSubjectSchema2,
+  reason: external_exports.string().nullable(),
+  availableDecisions: external_exports.array(pendingInteractionApprovalDecisionSchema2).min(1)
+});
+var USER_QUESTION_MAX_QUESTIONS2 = 4;
+var USER_QUESTION_MAX_OPTIONS2 = 4;
+var USER_QUESTION_MAX_SELECTED2 = 4;
+var USER_QUESTION_MAX_FREE_TEXT_LENGTH2 = 4096;
+var pendingInteractionUserQuestionIdSchema2 = external_exports.string().min(1).refine((value) => value.trim().length > 0, {
+  message: "User question ids cannot be blank"
+});
+var pendingInteractionUserQuestionPromptSchema2 = external_exports.string().min(1).refine((value) => value.trim().length > 0, {
+  message: "User question prompts cannot be blank"
+});
+var pendingInteractionUserQuestionShortLabelSchema2 = external_exports.string().min(1).refine((value) => value.trim().length > 0, {
+  message: "User question short labels cannot be blank"
+});
+var pendingInteractionUserQuestionOptionValueSchema2 = external_exports.string().min(1).refine((value) => value.trim().length > 0, {
+  message: "User question option values cannot be blank"
+});
+var pendingInteractionUserQuestionOptionLabelSchema2 = external_exports.string().min(1).refine((value) => value.trim().length > 0, {
+  message: "User question option labels cannot be blank"
+});
+var pendingInteractionUserQuestionOptionDescriptionSchema2 = external_exports.string().min(1).refine((value) => value.trim().length > 0, {
+  message: "User question option descriptions cannot be blank"
+});
+var pendingInteractionUserQuestionFreeTextSchema2 = external_exports.string().min(1).max(
+  USER_QUESTION_MAX_FREE_TEXT_LENGTH2,
+  `User question free text cannot exceed ${USER_QUESTION_MAX_FREE_TEXT_LENGTH2} characters`
+).refine((value) => value.trim().length > 0, {
+  message: "User question free text cannot be blank"
+});
+var pendingInteractionUserQuestionOptionSchema2 = external_exports.object({
+  value: pendingInteractionUserQuestionOptionValueSchema2,
+  label: pendingInteractionUserQuestionOptionLabelSchema2,
+  description: pendingInteractionUserQuestionOptionDescriptionSchema2.optional()
+});
+var pendingInteractionUserQuestionQuestionSchema2 = external_exports.object({
+  id: pendingInteractionUserQuestionIdSchema2,
+  prompt: pendingInteractionUserQuestionPromptSchema2,
+  shortLabel: pendingInteractionUserQuestionShortLabelSchema2.optional(),
+  multiSelect: external_exports.boolean(),
+  options: external_exports.array(pendingInteractionUserQuestionOptionSchema2).max(
+    USER_QUESTION_MAX_OPTIONS2,
+    `User questions cannot include more than ${USER_QUESTION_MAX_OPTIONS2} options`
+  ).optional(),
+  allowFreeText: external_exports.boolean()
+}).superRefine((question, context) => {
+  const optionValues = /* @__PURE__ */ new Set();
+  question.options?.forEach((option, index) => {
+    if (optionValues.has(option.value)) {
+      context.addIssue({
+        code: external_exports.ZodIssueCode.custom,
+        message: "User question option values must be unique",
+        path: ["options", index, "value"]
+      });
+      return;
+    }
+    optionValues.add(option.value);
+  });
+}).refine(
+  (question) => question.allowFreeText || (question.options?.length ?? 0) > 0,
+  {
+    message: "User questions must allow free text or provide at least one option",
+    path: ["options"]
+  }
+);
+var userQuestionPendingInteractionPayloadSchema2 = external_exports.object({
+  kind: external_exports.literal("user_question"),
+  questions: external_exports.array(pendingInteractionUserQuestionQuestionSchema2).min(1).max(
+    USER_QUESTION_MAX_QUESTIONS2,
+    `User questions cannot include more than ${USER_QUESTION_MAX_QUESTIONS2} questions`
+  )
+}).superRefine((payload, context) => {
+  const questionIds = /* @__PURE__ */ new Set();
+  payload.questions.forEach((question, index) => {
+    if (questionIds.has(question.id)) {
+      context.addIssue({
+        code: external_exports.ZodIssueCode.custom,
+        message: "User question ids must be unique",
+        path: ["questions", index, "id"]
+      });
+      return;
+    }
+    questionIds.add(question.id);
+  });
+});
+var pluginPendingInteractionPayloadSchema2 = external_exports.object({
+  kind: external_exports.literal("plugin"),
+  title: external_exports.string().trim().min(1).max(PLUGIN_INTERACTION_MAX_TITLE_LENGTH2),
+  data: jsonValueSchema2
+});
+var pluginExtensionInteractionRequestPayloadSchema2 = external_exports.object({
+  kind: extensionKindSchema2,
+  title: external_exports.string().trim().min(1).max(PLUGIN_INTERACTION_MAX_TITLE_LENGTH2),
+  data: jsonValueSchema2.refine(
+    (value) => jsonByteLength2(value) <= PLUGIN_INTERACTION_MAX_PAYLOAD_BYTES2,
+    { message: "Plugin request data exceeds 64 KiB" }
+  )
+});
+var interactionRequestPayloadSchema2 = external_exports.union([
+  userQuestionPendingInteractionPayloadSchema2,
+  pluginExtensionInteractionRequestPayloadSchema2
+]);
+var pendingInteractionPayloadSchema2 = external_exports.union([
+  approvalPendingInteractionPayloadSchema2,
+  userQuestionPendingInteractionPayloadSchema2,
+  pluginExtensionInteractionRequestPayloadSchema2
+]);
+var approvalDecisionDiscriminatorError2 = "Invalid discriminator value. Expected 'allow_once' | 'allow_for_session' | 'deny'";
+var approvalPendingInteractionResolutionSchema2 = external_exports.discriminatedUnion(
+  "decision",
+  [
+    external_exports.object({
+      decision: external_exports.literal("allow_once"),
+      grantedPermissions: pendingInteractionGrantedPermissionProfileSchema2.nullable()
+    }),
+    external_exports.object({
+      decision: external_exports.literal("allow_for_session"),
+      grantedPermissions: pendingInteractionGrantedPermissionProfileSchema2.nullable()
+    }),
+    external_exports.object({
+      decision: external_exports.literal("deny")
+    })
+  ],
+  approvalDecisionDiscriminatorError2
+);
+var pendingInteractionUserAnswerSchema2 = external_exports.object({
+  selected: external_exports.array(external_exports.string().min(1)).max(
+    USER_QUESTION_MAX_SELECTED2,
+    `User question selected choices cannot exceed ${USER_QUESTION_MAX_SELECTED2}`
+  ),
+  freeText: pendingInteractionUserQuestionFreeTextSchema2.optional()
+});
+var userQuestionPendingInteractionResolutionSchema2 = external_exports.object({
+  kind: external_exports.literal("user_answer"),
+  answers: external_exports.record(external_exports.string().min(1), pendingInteractionUserAnswerSchema2)
+});
+var pluginPendingInteractionResolutionSchema2 = external_exports.object({
+  kind: external_exports.literal("plugin_submitted")
+});
+var pluginExtensionInteractionResolutionSchema2 = external_exports.object({
+  kind: external_exports.literal("request_answer"),
+  value: jsonValueSchema2
+});
+var pendingInteractionResolutionSchema2 = external_exports.union(
+  [
+    approvalPendingInteractionResolutionSchema2,
+    userQuestionPendingInteractionResolutionSchema2,
+    pluginPendingInteractionResolutionSchema2,
+    pluginExtensionInteractionResolutionSchema2
+  ],
+  approvalDecisionDiscriminatorError2
+);
+var approvalInteractionOutcomeSchema2 = external_exports.object({
+  payload: approvalPendingInteractionPayloadSchema2,
+  resolution: approvalPendingInteractionResolutionSchema2
+});
+var userQuestionInteractionOutcomeSchema2 = external_exports.object({
+  payload: userQuestionPendingInteractionPayloadSchema2,
+  resolution: userQuestionPendingInteractionResolutionSchema2
+});
+var pluginExtensionInteractionOutcomeSchema2 = external_exports.object({
+  payload: pluginExtensionInteractionRequestPayloadSchema2,
+  resolution: pluginExtensionInteractionResolutionSchema2
+});
+var providerInteractionOutcomeSchema2 = external_exports.union([
+  approvalInteractionOutcomeSchema2,
+  userQuestionInteractionOutcomeSchema2,
+  pluginExtensionInteractionOutcomeSchema2
+]);
+var pendingInteractionProviderOriginSchema2 = external_exports.object({
+  kind: external_exports.literal("provider"),
+  providerId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  providerRequestId: external_exports.string().min(1)
+});
+var pendingInteractionPluginOriginSchema2 = external_exports.object({
+  kind: external_exports.literal("plugin"),
+  pluginId: external_exports.string().min(1),
+  rendererId: external_exports.string().min(1)
+});
+var pendingInteractionCreateSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  turnId: external_exports.string().min(1),
+  providerId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  providerRequestId: external_exports.string().min(1),
+  payload: pendingInteractionPayloadSchema2
+});
+var pendingInteractionBaseSchema2 = external_exports.object({
+  id: external_exports.string().min(1),
+  threadId: external_exports.string().min(1),
+  status: pendingInteractionStatusSchema2,
+  statusReason: external_exports.string().nullable(),
+  createdAt: external_exports.number().int().nonnegative(),
+  expiresAt: external_exports.number().int().nonnegative().nullable().optional(),
+  resolvedAt: external_exports.number().int().nonnegative().nullable()
+});
+var providerPendingInteractionBaseSchema2 = pendingInteractionBaseSchema2.extend({
+  turnId: external_exports.string().min(1),
+  providerId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  providerRequestId: external_exports.string().min(1),
+  origin: pendingInteractionProviderOriginSchema2.optional()
+});
+var approvalPendingInteractionSchema2 = providerPendingInteractionBaseSchema2.extend({
+  payload: approvalPendingInteractionPayloadSchema2,
+  resolution: approvalPendingInteractionResolutionSchema2.nullable()
+});
+var userQuestionPendingInteractionSchema2 = providerPendingInteractionBaseSchema2.extend({
+  payload: userQuestionPendingInteractionPayloadSchema2,
+  resolution: userQuestionPendingInteractionResolutionSchema2.nullable()
+});
+var pluginExtensionPendingInteractionSchema2 = providerPendingInteractionBaseSchema2.extend({
+  payload: pluginExtensionInteractionRequestPayloadSchema2,
+  resolution: pluginExtensionInteractionResolutionSchema2.nullable()
+});
+var providerPendingInteractionSchema2 = external_exports.union([
+  approvalPendingInteractionSchema2,
+  userQuestionPendingInteractionSchema2,
+  pluginExtensionPendingInteractionSchema2
+]);
+var pluginPendingInteractionSchema2 = pendingInteractionBaseSchema2.extend({
+  turnId: external_exports.string().min(1).nullable(),
+  origin: pendingInteractionPluginOriginSchema2,
+  payload: pluginPendingInteractionPayloadSchema2,
+  resolution: pluginPendingInteractionResolutionSchema2.nullable()
+});
+var pendingInteractionSchema2 = external_exports.union([
+  providerPendingInteractionSchema2,
+  pluginPendingInteractionSchema2
+]);
+var interactionLifecycleRecordBaseSchema2 = external_exports.object({
+  id: external_exports.string().min(1),
+  status: pendingInteractionStatusSchema2,
+  statusReason: external_exports.string().nullable()
+});
+var interactionLifecycleProviderOriginSchema2 = external_exports.object({
+  kind: external_exports.literal("provider"),
+  providerId: external_exports.string().min(1),
+  providerRequestId: external_exports.string().min(1)
+});
+var approvalInteractionLifecycleRecordPayloadSchema2 = approvalPendingInteractionPayloadSchema2.omit({ availableDecisions: true });
+var approvalInteractionLifecycleSchema2 = interactionLifecycleRecordBaseSchema2.extend({
+  origin: interactionLifecycleProviderOriginSchema2,
+  payload: approvalInteractionLifecycleRecordPayloadSchema2,
+  resolution: approvalPendingInteractionResolutionSchema2.nullable()
+});
+var userQuestionInteractionLifecycleSchema2 = interactionLifecycleRecordBaseSchema2.extend({
+  origin: interactionLifecycleProviderOriginSchema2,
+  payload: userQuestionPendingInteractionPayloadSchema2,
+  resolution: userQuestionPendingInteractionResolutionSchema2.nullable()
+});
+var pluginInteractionLifecycleSchema2 = interactionLifecycleRecordBaseSchema2.extend({
+  origin: pendingInteractionPluginOriginSchema2,
+  payload: pluginPendingInteractionPayloadSchema2.omit({ data: true }),
+  resolution: pluginPendingInteractionResolutionSchema2.nullable()
+});
+var pluginExtensionInteractionLifecycleSchema2 = interactionLifecycleRecordBaseSchema2.extend({
+  origin: interactionLifecycleProviderOriginSchema2,
+  payload: pluginExtensionInteractionRequestPayloadSchema2.omit({
+    data: true
+  }),
+  resolution: pluginExtensionInteractionResolutionSchema2.omit({ value: true }).nullable()
+});
+var interactionLifecycleSchema2 = external_exports.union([
+  approvalInteractionLifecycleSchema2,
+  userQuestionInteractionLifecycleSchema2,
+  pluginInteractionLifecycleSchema2,
+  pluginExtensionInteractionLifecycleSchema2
+]);
+var clientTurnRequestIdSchema2 = external_exports.string().regex(/^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u);
+var systemMessageKindValues2 = [
+  "ownership-assigned",
+  "ownership-removed",
+  "child-needs-attention",
+  "child-completed",
+  "child-failed",
+  "child-interrupted",
+  "child-outcome-batch",
+  "unlabeled"
+];
+var systemMessageKindSchema2 = external_exports.enum(systemMessageKindValues2);
+var systemMessageSubjectSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("thread"),
+    threadId: external_exports.string(),
+    threadName: external_exports.string()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("thread-batch"),
+    count: external_exports.number()
+  })
+]);
+var systemEventTypeValues2 = [
+  "client/thread/start",
+  "client/turn/requested",
+  "client/turn/rejected",
+  "client/turn/start",
+  "system/error",
+  // Legacy persisted user-visible system event from a removed runtime path.
+  // Retained for read/decode/render compatibility only.
+  "system/manager/user_message",
+  "system/thread/interrupted",
+  "system/operation",
+  "system/interaction/lifecycle",
+  // Legacy persisted per-shape interaction events; every status change now
+  // appends one `system/interaction/lifecycle`. Retained for read/decode
+  // only: `convertLegacyStoredThreadEvent` projects a stored row into the
+  // lifecycle event, so no consumer sees these types.
+  "system/permissionGrant/lifecycle",
+  "system/userQuestion/lifecycle",
+  "system/thread-provisioning",
+  // Legacy persisted watchdog diagnostic; retained for read/decode/render
+  // only, with no current producer.
+  "system/provider-turn-watchdog"
+];
+var threadTurnInitiatorValues2 = ["user", "agent", "system"];
+var threadTurnInitiatorSchema2 = external_exports.enum(threadTurnInitiatorValues2);
+var turnRequestOptionsSchema2 = recordedThreadExecutionOptionsSchema2;
+var turnRequestTargetSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("thread-start") }),
+  external_exports.object({ kind: external_exports.literal("new-turn") }),
+  external_exports.object({
+    kind: external_exports.literal("auto"),
+    expectedTurnId: external_exports.string().nullable()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("steer"),
+    expectedTurnId: external_exports.string().nullable()
+  })
+]);
+var clientTurnLifecycleEventDataSchema2 = external_exports.object({
+  direction: external_exports.literal("outbound"),
+  source: external_exports.enum(["spawn", "tell"]),
+  initiator: threadTurnInitiatorSchema2,
+  request: external_exports.object({
+    method: external_exports.enum(["thread/start", "turn/start"]),
+    params: external_exports.record(external_exports.string(), external_exports.unknown())
+  })
+});
+var turnRequestEventDataSchema2 = external_exports.object({
+  direction: external_exports.literal("outbound"),
+  requestId: clientTurnRequestIdSchema2,
+  /** Failed request resumed by a guarded system continuation, when present. */
+  continuationOfRequestId: clientTurnRequestIdSchema2.optional(),
+  source: external_exports.enum(["spawn", "tell"]),
+  initiator: threadTurnInitiatorSchema2,
+  // Non-null only when initiator === "agent". The invariant is enforced by
+  // writer typings rather than a schema refine so legacy persisted events
+  // (initiator: "agent", senderThreadId: null from before the field
+  // existed) still parse — the stored variant defaults both fields.
+  senderThreadId: external_exports.string().nullable(),
+  // Family-B system-message taxonomy fields. Optional at the persisted-event
+  // level: legacy events (pre-taxonomy) lack them and must still parse. The
+  // projection defaults absent values to `unlabeled` / `null`.
+  systemMessageKind: systemMessageKindSchema2.optional(),
+  systemMessageSubject: systemMessageSubjectSchema2.nullable().optional(),
+  input: external_exports.array(promptInputSchema2),
+  inputGroups: external_exports.array(external_exports.array(promptInputSchema2).min(1)).min(1).optional(),
+  target: turnRequestTargetSchema2,
+  request: external_exports.object({
+    method: external_exports.enum(["thread/start", "turn/start"]),
+    params: external_exports.record(external_exports.string(), external_exports.unknown())
+  }),
+  execution: turnRequestOptionsSchema2
+});
+var turnRequestRejectedEventDataSchema2 = external_exports.object({
+  requestId: clientTurnRequestIdSchema2,
+  reason: external_exports.string().min(1),
+  message: external_exports.string().min(1)
+});
+var systemErrorEventDataSchema2 = external_exports.object({
+  code: external_exports.string().optional(),
+  message: external_exports.string(),
+  detail: external_exports.string().optional(),
+  reconnectAttempt: external_exports.number().int().positive().optional(),
+  reconnectTotal: external_exports.number().int().positive().optional()
+}).superRefine((value, ctx) => {
+  const hasReconnectAttempt = value.reconnectAttempt !== void 0;
+  const hasReconnectTotal = value.reconnectTotal !== void 0;
+  if (hasReconnectAttempt !== hasReconnectTotal) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: "system/error reconnectAttempt and reconnectTotal must be provided together"
+    });
+    return;
+  }
+  if (value.reconnectAttempt !== void 0 && value.reconnectTotal !== void 0 && value.reconnectAttempt > value.reconnectTotal) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: "system/error reconnectAttempt cannot be greater than reconnectTotal"
+    });
+  }
+});
+var ownershipChangeOperationActionValues2 = [
+  "assign",
+  "release",
+  "transfer"
+];
+var ownershipChangeOperationActionSchema2 = external_exports.enum(
+  ownershipChangeOperationActionValues2
+);
+var ownershipChangeOperationMetadataSchema2 = external_exports.object({
+  action: ownershipChangeOperationActionSchema2,
+  nextParentThreadId: external_exports.string().nullable(),
+  nextParentThreadTitle: external_exports.string().nullable(),
+  previousParentThreadId: external_exports.string().nullable(),
+  previousParentThreadTitle: external_exports.string().nullable()
+});
+var systemOperationEventDataSchema2 = external_exports.object({
+  operation: external_exports.string(),
+  status: external_exports.string(),
+  message: external_exports.string(),
+  operationId: external_exports.string(),
+  metadata: external_exports.record(external_exports.string(), jsonValueSchema2).optional()
+});
+var systemInteractionLifecycleEventDataSchema2 = external_exports.object({
+  interaction: interactionLifecycleSchema2
+});
+var systemPermissionGrantLifecycleEventDataSchema2 = external_exports.object({
+  interactionId: external_exports.string(),
+  providerId: external_exports.string(),
+  providerRequestId: external_exports.string(),
+  status: pendingInteractionStatusSchema2,
+  resolution: approvalPendingInteractionResolutionSchema2.nullable().default(null),
+  statusReason: external_exports.string().nullable().default(null),
+  subject: pendingInteractionPermissionGrantApprovalSubjectSchema2
+});
+var systemUserQuestionLifecycleEventDataSchema2 = external_exports.object({
+  interactionId: external_exports.string(),
+  providerId: external_exports.string(),
+  providerRequestId: external_exports.string(),
+  status: pendingInteractionStatusSchema2,
+  resolution: userQuestionPendingInteractionResolutionSchema2.nullable().default(null),
+  statusReason: external_exports.string().nullable().default(null),
+  payload: userQuestionPendingInteractionPayloadSchema2
+});
+var systemThreadInterruptedReasonValues2 = [
+  "manual-stop",
+  "host-daemon-restarted",
+  // Legacy persisted watchdog interruption; retained for read/replay only,
+  // with no current producer.
+  "provider-turn-idle"
+];
+var systemThreadInterruptedReasonSchema2 = external_exports.enum(
+  systemThreadInterruptedReasonValues2
+);
+var systemThreadInterruptedEventDataSchema2 = external_exports.object({
+  reason: systemThreadInterruptedReasonSchema2
+});
+var provisioningTranscriptEntrySchema2 = external_exports.object({
+  type: external_exports.enum(["step", "output"]),
+  key: external_exports.string(),
+  text: external_exports.string(),
+  startedAt: external_exports.number().optional(),
+  status: external_exports.enum(["started", "completed", "failed"]).optional(),
+  metadata: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
+});
+var systemThreadProvisioningStatusValues2 = [
+  "active",
+  "completed",
+  "failed",
+  "cancelled"
+];
+var systemThreadProvisioningStatusSchema2 = external_exports.enum(
+  systemThreadProvisioningStatusValues2
+);
+var systemThreadProvisioningEventDataSchema2 = external_exports.object({
+  provisioningId: external_exports.string(),
+  status: systemThreadProvisioningStatusSchema2,
+  environmentId: external_exports.string(),
+  entries: external_exports.array(provisioningTranscriptEntrySchema2)
+});
+var systemLegacyUserMessageEventDataSchema2 = external_exports.object({
+  text: external_exports.string(),
+  toolCallId: external_exports.string().optional(),
+  turnId: external_exports.string().optional()
+});
+var systemProviderTurnWatchdogEventDataSchema2 = external_exports.object({
+  reason: external_exports.literal("provider-turn-idle"),
+  thresholdMs: external_exports.number().int().positive(),
+  elapsedMs: external_exports.number().int().nonnegative(),
+  activeTurnId: external_exports.string().min(1),
+  activeTurnStartedAt: external_exports.number().int().nonnegative(),
+  lastActivityEventSequence: external_exports.number().int().positive(),
+  /**
+   * Diagnostic label only (the UI interpolates it verbatim). A plain string —
+   * not the activity enum — so editing event classifications never makes
+   * previously persisted watchdog events unparseable.
+   */
+  lastActivityEventType: external_exports.string().min(1),
+  lastActivityEventAt: external_exports.number().int().nonnegative(),
+  providerId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1).nullable(),
+  firedAt: external_exports.number().int().nonnegative()
+});
+var threadEventScopeKindValues2 = ["thread", "turn"];
+var threadEventScopeKindSchema2 = external_exports.enum(threadEventScopeKindValues2);
+var threadEventScopeSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("thread") }),
+  external_exports.object({ kind: external_exports.literal("turn"), turnId: external_exports.string().min(1) })
+]);
+var threadEventScopePolicyValues2 = [
+  "thread",
+  "turn",
+  "thread-or-turn"
+];
+var threadEventScopePolicySchema2 = external_exports.enum(
+  threadEventScopePolicyValues2
+);
+var threadEventScopeDefinitionByType2 = {
+  "thread/started": {
+    policy: "thread",
+    rationale: "Thread lifecycle event; it creates the thread timeline itself."
+  },
+  "thread/identity": {
+    policy: "thread",
+    rationale: "Thread metadata event; it identifies the provider thread outside turn chronology."
+  },
+  "turn/started": { policy: "turn" },
+  "turn/completed": { policy: "turn" },
+  "turn/input/accepted": { policy: "turn" },
+  "thread/name/updated": {
+    policy: "thread",
+    rationale: "Thread metadata event; names are not part of a specific turn transcript."
+  },
+  "thread/compacted": { policy: "turn" },
+  "thread/context/cleared": { policy: "turn" },
+  "thread/goal/updated": {
+    policy: "thread",
+    rationale: "Thread goal state is current thread metadata, not part of a specific turn transcript."
+  },
+  "thread/goal/cleared": {
+    policy: "thread",
+    rationale: "Thread goal state is current thread metadata, not part of a specific turn transcript."
+  },
+  "thread/extensionState/updated": {
+    policy: "thread",
+    rationale: "Plugin thread state is current thread metadata, not part of a specific turn transcript."
+  },
+  "item/started": { policy: "turn" },
+  "item/completed": { policy: "turn" },
+  "item/agentMessage/delta": { policy: "turn" },
+  "item/commandExecution/outputDelta": { policy: "turn" },
+  "item/fileChange/outputDelta": { policy: "turn" },
+  "item/reasoning/summaryTextDelta": { policy: "turn" },
+  "item/reasoning/textDelta": { policy: "turn" },
+  "item/plan/delta": { policy: "turn" },
+  "item/mcpToolCall/progress": { policy: "turn" },
+  "item/toolCall/progress": { policy: "turn" },
+  "item/delegation/progress": { policy: "turn" },
+  "item/delegation/completed": { policy: "turn" },
+  "item/backgroundTask/progress": {
+    policy: "thread",
+    rationale: "Background tasks outlive their spawning turn; thread scope keeps turn windows sequence-contiguous (late progress must not interleave into later turns' ranges)."
+  },
+  "item/backgroundTask/completed": {
+    policy: "thread",
+    rationale: "Terminal task state can arrive turns after the spawning turn completed; thread scope avoids appending into a closed turn's sequence range."
+  },
+  "thread/tokenUsage/updated": { policy: "turn" },
+  "thread/contextWindowUsage/updated": {
+    policy: "thread-or-turn",
+    rationale: "Context usage is session state; providers can report it before, during, or after a turn."
+  },
+  "turn/plan/updated": { policy: "turn" },
+  "turn/diff/updated": { policy: "turn" },
+  "provider/error": {
+    policy: "thread-or-turn",
+    rationale: "Provider diagnostics use thread scope for provider setup/session failures; in-turn failures use turn scope."
+  },
+  "provider/rateLimits/updated": {
+    policy: "thread",
+    rationale: "Subscription usage is account-scoped state that can affect multiple turns and threads."
+  },
+  "provider/warning": {
+    policy: "thread-or-turn",
+    rationale: "Provider warnings use thread scope for config, deprecation, or global notices; turn-specific warnings use turn scope."
+  },
+  "provider/modelFallback": {
+    policy: "thread-or-turn",
+    rationale: "Provider model fallback signals can occur while a turn is active or at session scope before a turn is established."
+  },
+  "provider/unhandled": {
+    policy: "thread-or-turn",
+    rationale: "Unhandled provider events use thread scope only when no active turn context exists; in-turn unknown events use turn scope."
+  },
+  "client/thread/start": {
+    policy: "thread",
+    rationale: "Outbound client lifecycle event; it requests thread creation before any turn exists."
+  },
+  "client/turn/requested": {
+    policy: "thread",
+    rationale: "Outbound client lifecycle event; it records the request before provider turn acceptance."
+  },
+  "client/turn/rejected": {
+    policy: "thread",
+    rationale: "Client request rejection occurs before provider turn acceptance and identifies the request at thread scope."
+  },
+  "client/turn/start": {
+    policy: "thread",
+    rationale: "Outbound client lifecycle event; it records the start request before provider turn acceptance."
+  },
+  "system/error": {
+    policy: "thread-or-turn",
+    rationale: "System errors use thread scope for app, daemon, or session failures outside a turn; turn failures use turn scope."
+  },
+  "system/manager/user_message": {
+    policy: "thread-or-turn",
+    rationale: "Legacy persisted user-visible system messages may be thread-scoped for general updates or turn-scoped for in-turn updates."
+  },
+  "system/thread/interrupted": {
+    policy: "thread",
+    rationale: "Thread stop lifecycle event; it represents user interruption of the whole running thread."
+  },
+  "system/operation": {
+    policy: "thread-or-turn",
+    rationale: "Thread-management operations use thread scope outside provider turns; tool-owned operations use turn scope so the operation stays with the tool call that caused it."
+  },
+  "system/interaction/lifecycle": {
+    policy: "thread-or-turn",
+    rationale: "Pending approvals and questions can be thread-scoped when they arrive outside a turn, or turn-scoped when they belong to one."
+  },
+  "system/permissionGrant/lifecycle": { policy: "turn" },
+  "system/userQuestion/lifecycle": { policy: "turn" },
+  "system/thread-provisioning": {
+    policy: "thread",
+    rationale: "Workspace provisioning lifecycle event; environment setup belongs to the thread, not a turn."
+  },
+  "system/provider-turn-watchdog": {
+    policy: "thread",
+    rationale: "Legacy persisted watchdog diagnostics are decoded for old timelines only; there is no current producer."
+  }
+};
+function getThreadEventScopePolicyDefinitionEntries2() {
+  return Object.entries(threadEventScopeDefinitionByType2).map(
+    ([type, definition]) => ({
+      type,
+      definition
+    })
+  );
+}
+function getThreadEventTypesForScopePolicy2(policy) {
+  return getThreadEventScopePolicyDefinitionEntries2().filter((entry) => entry.definition.policy === policy).map((entry) => entry.type);
+}
+function buildThreadEventScopePolicyByType2() {
+  const policies = {};
+  for (const entry of getThreadEventScopePolicyDefinitionEntries2()) {
+    policies[entry.type] = entry.definition.policy;
+  }
+  return policies;
+}
+function buildThreadScopeRationaleByType2() {
+  const rationales = {};
+  for (const entry of getThreadEventScopePolicyDefinitionEntries2()) {
+    if (entry.definition.rationale) {
+      rationales[entry.type] = entry.definition.rationale;
+    }
+  }
+  return rationales;
+}
+var turnOnlyThreadEventTypes2 = getThreadEventTypesForScopePolicy2("turn");
+var threadOnlyThreadEventTypes2 = getThreadEventTypesForScopePolicy2("thread");
+var threadOrTurnThreadEventTypes2 = getThreadEventTypesForScopePolicy2("thread-or-turn");
+var threadEventScopePolicyByType2 = buildThreadEventScopePolicyByType2();
+var threadScopeRationaleByType2 = buildThreadScopeRationaleByType2();
+function getThreadEventScopeTurnId2(scope) {
+  return scope.kind === "turn" ? scope.turnId : void 0;
+}
+function validateThreadEventScope2(args) {
+  const policy = threadEventScopePolicyByType2[args.type];
+  if (policy === "thread-or-turn") {
+    return { valid: true };
+  }
+  if (policy !== args.scope.kind) {
+    return {
+      valid: false,
+      message: `${args.type} requires ${policy} scope but received ${args.scope.kind} scope`
+    };
+  }
+  return { valid: true };
+}
+var threadTimelineGoalStatusSchema2 = external_exports.enum([
+  "active",
+  "paused",
+  "budgetLimited",
+  "complete"
+]);
+var threadTimelineGoalSchema2 = external_exports.object({
+  sourceSeq: external_exports.number().int().nonnegative(),
+  updatedAt: external_exports.number(),
+  objective: external_exports.string(),
+  status: threadTimelineGoalStatusSchema2,
+  tokenBudget: external_exports.number().nullable(),
+  tokensUsed: external_exports.number(),
+  timeUsedSeconds: external_exports.number()
+});
+var threadEventItemStatusSchema2 = external_exports.enum([
+  "pending",
+  "completed",
+  "failed",
+  "interrupted"
+]);
+var threadEventItemApprovalStatusSchema2 = external_exports.enum(["waiting_for_approval", "denied"]).nullable();
+var threadEventTurnStatusSchema2 = external_exports.enum([
+  "completed",
+  "failed",
+  "interrupted"
+]);
+var providerErrorCategoryValues2 = [
+  "active-turn-not-steerable",
+  "bad-request",
+  "connection-failed",
+  "context-window-exceeded",
+  "billing",
+  "budget-exceeded",
+  "internal",
+  "max-output-tokens",
+  "max-turns",
+  "overloaded",
+  "policy",
+  "rate-limit",
+  "sandbox",
+  "stream-disconnected",
+  "structured-output-retries",
+  "thread-rollback-failed",
+  "too-many-failed-attempts",
+  "unauthorized",
+  "unknown"
+];
+var providerErrorCategorySchema2 = external_exports.enum(providerErrorCategoryValues2);
+var providerErrorInfoSchema2 = external_exports.object({
+  category: providerErrorCategorySchema2,
+  providerCode: external_exports.string().nullable(),
+  httpStatusCode: external_exports.number().nullable()
+});
+var providerRateLimitStatusSchema2 = external_exports.enum([
+  "allowed",
+  "warning",
+  "blocked",
+  "unknown"
+]);
+var providerRateLimitWindowSchema2 = external_exports.object({
+  /** Opaque provider-issued key. New provider windows must not break parsing. */
+  providerKey: external_exports.string().min(1).nullable(),
+  label: external_exports.string().min(1).nullable(),
+  status: providerRateLimitStatusSchema2,
+  resetsAtMs: external_exports.number().int().nonnegative().nullable()
+});
+var providerRateLimitStateSchema2 = external_exports.object({
+  providerId: external_exports.string().min(1),
+  status: providerRateLimitStatusSchema2,
+  kind: external_exports.enum(["subscription-window", "credits", "spend-control", "unknown"]),
+  windows: external_exports.array(providerRateLimitWindowSchema2),
+  reachedReason: external_exports.string().min(1).nullable(),
+  overageStatus: external_exports.enum(["allowed", "warning", "rejected", "unavailable"]).nullable(),
+  overageReason: external_exports.string().min(1).nullable()
+});
+var threadEventFileChangeKindSchema2 = external_exports.enum(["add", "delete", "update"]);
+var threadEventFileChangeSchema2 = external_exports.object({
+  path: external_exports.string(),
+  kind: threadEventFileChangeKindSchema2,
+  movePath: external_exports.string().optional(),
+  diff: external_exports.string().optional()
+});
+var threadEventPlanStepStatusSchema2 = external_exports.enum([
+  "pending",
+  "active",
+  "completed",
+  "failed"
+]);
+var threadEventPlanStepSchema2 = external_exports.object({
+  step: external_exports.string(),
+  status: threadEventPlanStepStatusSchema2.optional()
+});
+var itemPresentationField2 = {
+  presentation: threadEventItemPresentationSchema2.optional()
+};
+var threadEventWebSearchItemSchema2 = external_exports.object({
+  type: external_exports.literal("webSearch"),
+  id: external_exports.string(),
+  queries: external_exports.array(external_exports.string()).min(1),
+  resultText: external_exports.string().nullable(),
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventWebFetchItemSchema2 = external_exports.object({
+  type: external_exports.literal("webFetch"),
+  id: external_exports.string(),
+  url: external_exports.string(),
+  prompt: external_exports.string().nullable(),
+  pattern: external_exports.string().nullable(),
+  resultText: external_exports.string().nullable(),
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventImageViewItemSchema2 = external_exports.object({
+  type: external_exports.literal("imageView"),
+  id: external_exports.string(),
+  path: external_exports.string(),
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventFileReadItemSchema2 = external_exports.object({
+  type: external_exports.literal("fileRead"),
+  id: external_exports.string(),
+  path: external_exports.string(),
+  cmd: external_exports.string().optional(),
+  status: threadEventItemStatusSchema2,
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventSearchModeSchema2 = external_exports.enum(["content", "path", "list"]);
+var threadEventSearchItemSchema2 = external_exports.object({
+  type: external_exports.literal("search"),
+  id: external_exports.string(),
+  mode: threadEventSearchModeSchema2,
+  query: external_exports.string(),
+  path: external_exports.string().optional(),
+  cmd: external_exports.string().optional(),
+  status: threadEventItemStatusSchema2,
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventDelegationItemSchema2 = external_exports.object({
+  type: external_exports.literal("delegation"),
+  id: external_exports.string(),
+  childRef: external_exports.string().min(1),
+  /** Human label for the delegated work (the child's description). */
+  label: external_exports.string(),
+  status: threadEventItemStatusSchema2,
+  background: external_exports.boolean(),
+  /** Terminal summary from the child; absent while it runs. */
+  summary: external_exports.string().optional(),
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventPlanStepsItemSchema2 = external_exports.object({
+  type: external_exports.literal("planSteps"),
+  id: external_exports.string(),
+  steps: external_exports.array(threadEventPlanStepSchema2),
+  explanation: external_exports.string().optional(),
+  status: threadEventItemStatusSchema2,
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventExtensionItemSchema2 = external_exports.object({
+  type: external_exports.literal("extension"),
+  id: external_exports.string(),
+  kind: extensionKindSchema2,
+  payload: jsonValueSchema2,
+  status: threadEventItemStatusSchema2,
+  presentation: threadEventItemPresentationSchema2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventTextTruncationSchema2 = external_exports.object({
+  originalLength: external_exports.number(),
+  retainedHeadLength: external_exports.number(),
+  retainedTailLength: external_exports.number(),
+  truncatedAt: external_exports.number()
+});
+var threadEventItemTruncationSchema2 = external_exports.object({
+  aggregatedOutput: threadEventTextTruncationSchema2.optional(),
+  result: threadEventTextTruncationSchema2.optional(),
+  resultText: threadEventTextTruncationSchema2.optional()
+});
+var threadEventUserContentSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({ type: external_exports.literal("text"), text: external_exports.string() }),
+  external_exports.object({ type: external_exports.literal("image"), url: external_exports.string() }),
+  external_exports.object({ type: external_exports.literal("localImage"), path: external_exports.string() }),
+  external_exports.object({ type: external_exports.literal("localFile"), path: external_exports.string() })
+]);
+var threadEventTokenUsageBreakdownSchema2 = external_exports.object({
+  totalTokens: external_exports.number(),
+  inputTokens: external_exports.number(),
+  cachedInputTokens: external_exports.number(),
+  outputTokens: external_exports.number(),
+  reasoningOutputTokens: external_exports.number()
+});
+var threadEventContextWindowUsageSchema2 = external_exports.object({
+  usedTokens: external_exports.number().nullable(),
+  modelContextWindow: external_exports.number().nullable(),
+  estimated: external_exports.boolean()
+});
+var threadEventTokenUsageSchema2 = external_exports.object({
+  total: threadEventTokenUsageBreakdownSchema2,
+  last: threadEventTokenUsageBreakdownSchema2,
+  modelContextWindow: external_exports.number().nullable()
+});
+var threadEventWarningCategorySchema2 = external_exports.enum([
+  "deprecation",
+  "config",
+  "general",
+  /**
+   * The provider declined a compaction that bb asked for because there was
+   * nothing to compact. The warning settles the pending compaction row.
+   */
+  "compaction-skipped"
+]);
+var providerRawEventSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  id: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+  method: external_exports.string(),
+  params: jsonValueSchema2.optional()
+});
+var providerUnhandledEventSchema2 = external_exports.object({
+  type: external_exports.literal("provider/unhandled"),
+  threadId: external_exports.string(),
+  providerThreadId: external_exports.string(),
+  providerId: external_exports.string(),
+  rawType: external_exports.string(),
+  rawEvent: providerRawEventSchema2,
+  parentToolCallId: external_exports.string().optional()
+});
+var toolCallProgressEventSchema2 = external_exports.object({
+  type: external_exports.literal("item/toolCall/progress"),
+  threadId: external_exports.string(),
+  providerThreadId: external_exports.string(),
+  itemId: external_exports.string(),
+  message: external_exports.string().optional(),
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventBackgroundTaskItemSchema2 = external_exports.object({
+  type: external_exports.literal("backgroundTask"),
+  id: external_exports.string(),
+  /**
+   * The provider's stable task id, shared by every generation (restart) of
+   * the same task; consumers use it to correlate a restarted task with its
+   * earlier generations. Absent only on events persisted before the field
+   * existed — those encoded the family in the item id's legacy `#N`
+   * generation suffix instead.
+   */
+  familyId: external_exports.string().optional(),
+  /** Raw SDK task discriminant (e.g. "local_workflow"); "unknown" when the provider omitted it. */
+  taskType: external_exports.string(),
+  description: external_exports.string(),
+  status: threadEventItemStatusSchema2,
+  taskStatus: backgroundTaskStatusSchema2,
+  /** Ambient/housekeeping task; consumers hide it from the inline transcript. */
+  skipTranscript: external_exports.boolean(),
+  /** meta.name of the workflow script; only present for workflow tasks. */
+  workflowName: external_exports.string().optional(),
+  /** Merged workflow tree; absent until the provider reports progress records. */
+  workflow: workflowProgressSnapshotSchema2.optional(),
+  /** Absent until the provider reports usage. */
+  usage: backgroundTaskUsageSchema2.optional(),
+  /** Terminal summary from the provider; absent while the task runs. */
+  summary: external_exports.string().optional(),
+  error: external_exports.string().optional(),
+  outputFile: external_exports.string().optional(),
+  ...itemPresentationField2,
+  parentToolCallId: external_exports.string().optional()
+});
+var threadEventItemSchema2 = external_exports.discriminatedUnion("type", [
+  // bb authors user messages itself, so they carry no bridge presentation.
+  external_exports.object({
+    type: external_exports.literal("userMessage"),
+    id: external_exports.string(),
+    content: external_exports.array(threadEventUserContentSchema2),
+    clientRequestId: clientTurnRequestIdSchema2.optional(),
+    parentToolCallId: external_exports.string().optional()
+  }).strict(),
+  external_exports.object({
+    type: external_exports.literal("agentMessage"),
+    id: external_exports.string(),
+    text: external_exports.string(),
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("commandExecution"),
+    id: external_exports.string(),
+    command: external_exports.string(),
+    cwd: external_exports.string(),
+    status: threadEventItemStatusSchema2,
+    approvalStatus: threadEventItemApprovalStatusSchema2,
+    /**
+     * Omitted when the process produced no stdout/stderr. Adapters should omit
+     * this field instead of emitting an empty string placeholder.
+     */
+    aggregatedOutput: external_exports.string().optional(),
+    exitCode: external_exports.number().optional(),
+    durationMs: external_exports.number().optional(),
+    truncation: threadEventItemTruncationSchema2.optional(),
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("fileChange"),
+    id: external_exports.string(),
+    changes: external_exports.array(threadEventFileChangeSchema2),
+    status: threadEventItemStatusSchema2,
+    approvalStatus: threadEventItemApprovalStatusSchema2,
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  threadEventWebSearchItemSchema2,
+  threadEventWebFetchItemSchema2,
+  threadEventImageViewItemSchema2,
+  threadEventFileReadItemSchema2,
+  threadEventSearchItemSchema2,
+  external_exports.object({
+    type: external_exports.literal("toolCall"),
+    id: external_exports.string(),
+    server: external_exports.string().optional(),
+    tool: external_exports.string(),
+    arguments: external_exports.record(external_exports.string(), external_exports.unknown()).optional(),
+    status: threadEventItemStatusSchema2,
+    result: external_exports.unknown().optional(),
+    error: external_exports.string().optional(),
+    durationMs: external_exports.number().optional(),
+    truncation: threadEventItemTruncationSchema2.optional(),
+    /**
+     * The escape hatch for tools with no core kind: the bridge says how the
+     * row reads (label, glyph, headline, suppression).
+     */
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("reasoning"),
+    id: external_exports.string(),
+    summary: external_exports.array(external_exports.string()),
+    content: external_exports.array(external_exports.string()),
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("plan"),
+    id: external_exports.string(),
+    text: external_exports.string(),
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  threadEventPlanStepsItemSchema2,
+  external_exports.object({
+    type: external_exports.literal("contextCompaction"),
+    id: external_exports.string(),
+    ...itemPresentationField2,
+    parentToolCallId: external_exports.string().optional()
+  }),
+  threadEventBackgroundTaskItemSchema2,
+  threadEventDelegationItemSchema2,
+  threadEventExtensionItemSchema2
+]);
+var unscopedProviderEventSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("thread/started"),
+    threadId: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/identity"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("turn/started"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("turn/completed"),
+    threadId: external_exports.string(),
+    // Server reconciliation can synthesize interrupted completions when the
+    // original provider thread id was never persisted.
+    providerThreadId: external_exports.string().nullable(),
+    status: threadEventTurnStatusSchema2,
+    error: external_exports.object({ message: external_exports.string() }).optional(),
+    /** Provider-native point through which a replacement branch should retain history. */
+    providerCheckpointId: external_exports.string().min(1).optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("turn/input/accepted"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    clientRequestId: clientTurnRequestIdSchema2,
+    scope: threadEventScopeSchema2
+  }).strict(),
+  external_exports.object({
+    type: external_exports.literal("thread/name/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    threadName: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/compacted"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/context/cleared"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/goal/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    objective: external_exports.string(),
+    status: threadTimelineGoalStatusSchema2,
+    tokenBudget: external_exports.number().nullable(),
+    tokensUsed: external_exports.number(),
+    timeUsedSeconds: external_exports.number()
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/goal/cleared"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/started"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    item: threadEventItemSchema2
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/completed"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    item: threadEventItemSchema2
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/agentMessage/delta"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    delta: external_exports.string(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/commandExecution/outputDelta"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    delta: external_exports.string(),
+    /**
+     * When true, this delta replaces previously accumulated command output
+     * instead of appending to it. Omission means the delta appends.
+     */
+    reset: external_exports.boolean().optional(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/fileChange/outputDelta"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    delta: external_exports.string(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/reasoning/summaryTextDelta"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    delta: external_exports.string(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/reasoning/textDelta"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    delta: external_exports.string(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/plan/delta"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    delta: external_exports.string(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("item/mcpToolCall/progress"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    itemId: external_exports.string(),
+    message: external_exports.string().optional(),
+    parentToolCallId: external_exports.string().optional()
+  }),
+  toolCallProgressEventSchema2,
+  /**
+   * Superseding state snapshot for an in-flight background task. Thread-scoped
+   * (not turn-scoped) because tasks outlive their spawning turn: late events
+   * must not interleave into later turns' sequence-contiguous windows. Each
+   * progress event carries the full current item state; consumers replace, not
+   * merge. The item is placed in the timeline by its turn-scoped item/started.
+   */
+  external_exports.object({
+    type: external_exports.literal("item/backgroundTask/progress"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    item: threadEventBackgroundTaskItemSchema2
+  }),
+  /**
+   * Terminal state for a background task, carrying the full final item
+   * payload. Dedicated event (instead of the generic turn-scoped
+   * item/completed) because it may arrive turns after the item/started.
+   */
+  external_exports.object({
+    type: external_exports.literal("item/backgroundTask/completed"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    item: threadEventBackgroundTaskItemSchema2
+  }),
+  /**
+   * Superseding snapshot for an in-flight background delegation (`background:
+   * true`). Thread-scoped for the same reason as `item/backgroundTask/
+   * progress`: a background child outlives its spawning turn, and late events
+   * must not interleave into later turns' sequence-contiguous windows. The
+   * item is placed in the timeline by its turn-scoped `item/started`.
+   */
+  external_exports.object({
+    type: external_exports.literal("item/delegation/progress"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    item: threadEventDelegationItemSchema2
+  }),
+  /**
+   * Terminal state for a background delegation, carrying the full final item.
+   * Dedicated event (instead of the turn-scoped `item/completed`) because it
+   * may arrive turns after the `item/started`. Foreground delegations settle
+   * through `item/completed`.
+   */
+  external_exports.object({
+    type: external_exports.literal("item/delegation/completed"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    item: threadEventDelegationItemSchema2
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/tokenUsage/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    tokenUsage: threadEventTokenUsageSchema2
+  }),
+  external_exports.object({
+    type: external_exports.literal("thread/contextWindowUsage/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    contextWindowUsage: threadEventContextWindowUsageSchema2
+  }),
+  external_exports.object({
+    type: external_exports.literal("turn/plan/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    plan: external_exports.array(threadEventPlanStepSchema2),
+    explanation: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("turn/diff/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    diff: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("provider/error"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    message: external_exports.string(),
+    detail: external_exports.string().optional(),
+    willRetry: external_exports.boolean().optional(),
+    errorInfo: providerErrorInfoSchema2.optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("provider/rateLimits/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    rateLimits: providerRateLimitStateSchema2
+  }),
+  /**
+   * Plugin-declared thread state (grammar v3): a `"<pluginId>/<name>"` kind
+   * beside the core thread-state family (usage, context window, rate limits,
+   * model fallback, context cleared). Latest snapshot wins per `kind`: a
+   * bridge re-sends the whole state, never a diff, and a consumer keeps one
+   * value per kind. The server validated `payload` against the owning
+   * plugin's declared `state` schema at ingest; a payload that failed that
+   * check was persisted as `provider/unhandled` instead, so every stored row
+   * of this type carries a payload its plugin vouched for.
+   */
+  external_exports.object({
+    type: external_exports.literal("thread/extensionState/updated"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    kind: extensionKindSchema2,
+    payload: jsonValueSchema2
+  }),
+  external_exports.object({
+    type: external_exports.literal("provider/warning"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    category: threadEventWarningCategorySchema2,
+    summary: external_exports.string().optional(),
+    details: external_exports.string().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("provider/modelFallback"),
+    threadId: external_exports.string(),
+    providerThreadId: external_exports.string(),
+    originalModel: external_exports.string().min(1),
+    fallbackModel: external_exports.string().min(1),
+    reason: external_exports.enum(["refusal", "provider"]),
+    message: external_exports.string()
+  }),
+  providerUnhandledEventSchema2
+]);
+var scopedEventDataSchema2 = external_exports.object({
+  scope: threadEventScopeSchema2
+});
+var providerEventSchema2 = unscopedProviderEventSchema2.and(
+  scopedEventDataSchema2
+);
+var providerEventTypeValues2 = unscopedProviderEventSchema2.options.map(
+  (option) => option.shape.type.value
+);
+var unscopedSystemEventSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("client/thread/start"),
+    threadId: external_exports.string()
+  }).merge(clientTurnLifecycleEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("client/turn/requested"),
+    threadId: external_exports.string()
+  }).merge(turnRequestEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("client/turn/rejected"),
+    threadId: external_exports.string()
+  }).merge(turnRequestRejectedEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("client/turn/start"),
+    threadId: external_exports.string()
+  }).merge(clientTurnLifecycleEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/error"),
+    threadId: external_exports.string()
+  }).merge(systemErrorEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/manager/user_message"),
+    threadId: external_exports.string()
+  }).merge(systemLegacyUserMessageEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/thread/interrupted"),
+    threadId: external_exports.string()
+  }).merge(systemThreadInterruptedEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/operation"),
+    threadId: external_exports.string()
+  }).merge(systemOperationEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/interaction/lifecycle"),
+    threadId: external_exports.string()
+  }).merge(systemInteractionLifecycleEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/permissionGrant/lifecycle"),
+    threadId: external_exports.string()
+  }).merge(systemPermissionGrantLifecycleEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/userQuestion/lifecycle"),
+    threadId: external_exports.string()
+  }).merge(systemUserQuestionLifecycleEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/thread-provisioning"),
+    threadId: external_exports.string()
+  }).merge(systemThreadProvisioningEventDataSchema2),
+  external_exports.object({
+    type: external_exports.literal("system/provider-turn-watchdog"),
+    threadId: external_exports.string()
+  }).merge(systemProviderTurnWatchdogEventDataSchema2)
+]);
+var systemEventSchema2 = unscopedSystemEventSchema2.and(scopedEventDataSchema2);
+var legacyClientRequestKey2 = ["clientRequest", "Sequence"].join("");
+function isEventPropertyBag2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+var rejectLegacyClientRequestSequenceSchema2 = external_exports.unknown().superRefine((value, ctx) => {
+  if (!isEventPropertyBag2(value)) {
+    return;
+  }
+  if (Object.hasOwn(value, legacyClientRequestKey2)) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: "legacy request sequence field is no longer accepted",
+      path: [legacyClientRequestKey2]
+    });
+  }
+  const item = value.item;
+  if (isEventPropertyBag2(item) && item.type === "userMessage" && Object.hasOwn(item, legacyClientRequestKey2)) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: "legacy user-message request sequence field is no longer accepted",
+      path: ["item", legacyClientRequestKey2]
+    });
+  }
+});
+var threadEventSchema2 = rejectLegacyClientRequestSequenceSchema2.pipe(
+  external_exports.union([providerEventSchema2, systemEventSchema2]).superRefine((event, ctx) => {
+    const result = validateThreadEventScope2({
+      type: event.type,
+      scope: event.scope
+    });
+    if (!result.valid) {
+      ctx.addIssue({
+        code: external_exports.ZodIssueCode.custom,
+        message: result.message ?? "Invalid thread event scope",
+        path: ["scope"]
+      });
+      return;
+    }
+  })
+);
+var threadEventTypeValues2 = [
+  ...providerEventTypeValues2,
+  ...systemEventTypeValues2
+];
+var threadEventTypeSet2 = new Set(threadEventTypeValues2);
+var threadEventTypeSchema2 = external_exports.string().refine(
+  (value) => threadEventTypeSet2.has(value),
+  "Invalid thread event type"
+);
+var THREAD_CHANGE_KINDS2 = [
+  "thread-created",
+  "thread-deleted",
+  "events-appended",
+  "history-rewritten",
+  "interactions-changed",
+  "status-changed",
+  "title-changed",
+  "queue-changed",
+  "archived-changed",
+  "pin-state-changed",
+  "parent-changed",
+  "environment-changed",
+  "read-state-changed",
+  "order-changed",
+  "tabs-changed",
+  "terminals-changed"
+];
+var PROJECT_CHANGE_KINDS2 = [
+  "project-created",
+  "project-updated",
+  "project-deleted",
+  "project-sources-changed",
+  "threads-changed",
+  "project-order-changed"
+];
+var ENVIRONMENT_CHANGE_KINDS2 = [
+  "environment-created",
+  "environment-deleted",
+  "metadata-changed",
+  "status-changed",
+  "work-status-changed",
+  "git-refs-changed",
+  "thread-storage-changed"
+];
+var HOST_CHANGE_KINDS2 = [
+  "host-connected",
+  "host-disconnected"
+];
+var SYSTEM_CHANGE_KINDS2 = [
+  "config-changed",
+  "plugins-changed"
+];
+var threadChangeKindSchema2 = external_exports.enum(THREAD_CHANGE_KINDS2);
+var projectChangeKindSchema2 = external_exports.enum(PROJECT_CHANGE_KINDS2);
+var environmentChangeKindSchema2 = external_exports.enum(ENVIRONMENT_CHANGE_KINDS2);
+var hostChangeKindSchema2 = external_exports.enum(HOST_CHANGE_KINDS2);
+var systemChangeKindSchema2 = external_exports.enum(SYSTEM_CHANGE_KINDS2);
+var realtimeSubscriptionTargetSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("thread-detail"),
+    threadId: external_exports.string().min(1)
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("thread-list")
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("project-detail"),
+    projectId: external_exports.string().min(1)
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("project-list")
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("environment-detail"),
+    environmentId: external_exports.string().min(1)
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("environment-list")
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("host-detail"),
+    hostId: external_exports.string().min(1)
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("host-list")
+  }).strict(),
+  external_exports.object({
+    kind: external_exports.literal("system")
+  }).strict()
+]);
+var subscribeMessageSchema2 = external_exports.object({
+  type: external_exports.literal("subscribe"),
+  target: realtimeSubscriptionTargetSchema2
+});
+var unsubscribeMessageSchema2 = external_exports.object({
+  type: external_exports.literal("unsubscribe"),
+  target: realtimeSubscriptionTargetSchema2
+});
+var pingMessageSchema2 = external_exports.object({
+  type: external_exports.literal("ping")
+});
+var clientMessageSchema2 = external_exports.discriminatedUnion("type", [
+  subscribeMessageSchema2,
+  unsubscribeMessageSchema2,
+  pingMessageSchema2
+]);
+var pongMessageSchema2 = external_exports.object({
+  type: external_exports.literal("pong")
+}).strict();
+var pongMessageLenientSchema2 = external_exports.object({
+  type: external_exports.literal("pong")
+});
+var threadChangeMetadataSchema2 = external_exports.object({
+  backgroundActivityChanged: external_exports.boolean().optional(),
+  eventTypes: external_exports.array(threadEventTypeSchema2).readonly().optional(),
+  hasPendingInteraction: external_exports.boolean().optional(),
+  projectId: external_exports.string().optional()
+}).strict();
+var threadChangedMessageSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("thread"),
+  id: external_exports.string().optional(),
+  metadata: threadChangeMetadataSchema2.optional(),
+  changes: external_exports.array(threadChangeKindSchema2).readonly()
+}).strict();
+var projectChangedMessageSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("project"),
+  id: external_exports.string().optional(),
+  changes: external_exports.array(projectChangeKindSchema2).readonly()
+}).strict();
+var environmentChangedMessageSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("environment"),
+  id: external_exports.string().optional(),
+  changes: external_exports.array(environmentChangeKindSchema2).readonly()
+}).strict();
+var hostChangedMessageSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("host"),
+  id: external_exports.string().optional(),
+  changes: external_exports.array(hostChangeKindSchema2).readonly()
+}).strict();
+var systemChangedMessageSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("system"),
+  changes: external_exports.array(systemChangeKindSchema2).readonly()
+}).strict();
+var changedMessageSchema2 = external_exports.discriminatedUnion("entity", [
+  threadChangedMessageSchema2,
+  projectChangedMessageSchema2,
+  environmentChangedMessageSchema2,
+  hostChangedMessageSchema2,
+  systemChangedMessageSchema2
+]);
+function lenientKinds2(kinds) {
+  const known = new Set(kinds);
+  return external_exports.array(external_exports.string()).transform(
+    (values) => values.filter((value) => known.has(value))
+  );
+}
+var knownThreadEventTypes2 = new Set(
+  threadEventTypeValues2
+);
+var threadChangeMetadataLenientSchema2 = external_exports.object({
+  backgroundActivityChanged: external_exports.boolean().optional(),
+  eventTypes: external_exports.array(external_exports.string()).transform(
+    (values) => values.filter(
+      (value) => knownThreadEventTypes2.has(value)
+    )
+  ).optional(),
+  hasPendingInteraction: external_exports.boolean().optional(),
+  projectId: external_exports.string().optional()
+});
+var threadChangedMessageLenientSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("thread"),
+  id: external_exports.string().optional(),
+  metadata: threadChangeMetadataLenientSchema2.optional(),
+  changes: lenientKinds2(THREAD_CHANGE_KINDS2)
+});
+var projectChangedMessageLenientSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("project"),
+  id: external_exports.string().optional(),
+  changes: lenientKinds2(PROJECT_CHANGE_KINDS2)
+});
+var environmentChangedMessageLenientSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("environment"),
+  id: external_exports.string().optional(),
+  changes: lenientKinds2(ENVIRONMENT_CHANGE_KINDS2)
+});
+var hostChangedMessageLenientSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("host"),
+  id: external_exports.string().optional(),
+  changes: lenientKinds2(HOST_CHANGE_KINDS2)
+});
+var systemChangedMessageLenientSchema2 = external_exports.object({
+  type: external_exports.literal("changed"),
+  entity: external_exports.literal("system"),
+  changes: lenientKinds2(SYSTEM_CHANGE_KINDS2)
+});
+var changedMessageLenientSchema2 = external_exports.discriminatedUnion("entity", [
+  threadChangedMessageLenientSchema2,
+  projectChangedMessageLenientSchema2,
+  environmentChangedMessageLenientSchema2,
+  hostChangedMessageLenientSchema2,
+  systemChangedMessageLenientSchema2
+]);
+var claudeTaskToolNameValues2 = [
+  "TaskCreate",
+  "TaskGet",
+  "TaskList",
+  "TaskUpdate"
+];
+var claudeTaskToolNameSchema2 = external_exports.enum(claudeTaskToolNameValues2);
+var claudeTaskStatusValues2 = [
+  "pending",
+  "in_progress",
+  "completed"
+];
+var claudeTaskStatusSchema2 = external_exports.enum(claudeTaskStatusValues2);
+var claudeTaskUpdateStatusValues2 = [
+  ...claudeTaskStatusValues2,
+  "deleted"
+];
+var claudeTaskUpdateStatusSchema2 = external_exports.enum(
+  claudeTaskUpdateStatusValues2
+);
+var claudeTaskListStatusValues2 = [
+  ...claudeTaskStatusValues2,
+  "deleted"
+];
+var claudeTaskListStatusSchema2 = external_exports.enum(claudeTaskListStatusValues2);
+var claudeTaskCreateArgsSchema2 = external_exports.object({
+  activeForm: external_exports.string().optional(),
+  subject: external_exports.string()
+}).passthrough();
+var claudeTaskGetArgsSchema2 = external_exports.object({
+  taskId: external_exports.string()
+}).passthrough();
+var claudeTaskUpdateArgsSchema2 = external_exports.object({
+  activeForm: external_exports.string().optional(),
+  status: claudeTaskUpdateStatusSchema2.optional(),
+  subject: external_exports.string().optional(),
+  taskId: external_exports.string()
+}).passthrough();
+var claudeTaskCreateOutputSchema2 = external_exports.object({
+  task: external_exports.object({
+    id: external_exports.string(),
+    subject: external_exports.string()
+  }).passthrough()
+}).passthrough();
+var claudeTaskGetOutputTaskSchema2 = external_exports.object({
+  id: external_exports.string(),
+  status: claudeTaskStatusSchema2,
+  subject: external_exports.string()
+}).passthrough();
+var claudeTaskGetOutputSchema2 = external_exports.object({
+  task: claudeTaskGetOutputTaskSchema2.nullable()
+}).passthrough();
+var claudeTaskUpdateOutputSchema2 = external_exports.object({
+  success: external_exports.boolean(),
+  taskId: external_exports.string()
+}).passthrough();
+var claudeTaskListItemSchema2 = external_exports.object({
+  id: external_exports.string(),
+  status: claudeTaskListStatusSchema2,
+  subject: external_exports.string()
+}).passthrough();
+var claudeTaskListOutputSchema2 = external_exports.object({
+  tasks: external_exports.array(external_exports.unknown())
+}).passthrough();
+var claudeTaskToolOutputSchema2 = external_exports.union([
+  claudeTaskCreateOutputSchema2,
+  claudeTaskGetOutputSchema2,
+  claudeTaskListOutputSchema2,
+  claudeTaskUpdateOutputSchema2
+]);
+var environmentStatusValues2 = [
+  "provisioning",
+  "ready",
+  "retiring",
+  "error",
+  "destroying",
+  "destroyed"
+];
+var environmentStatusSchema2 = external_exports.enum(environmentStatusValues2);
+var WORKSPACE_PROVISION_TYPES2 = [
+  "unmanaged",
+  "managed-worktree",
+  "personal"
+];
+var workspaceProvisionTypeSchema2 = external_exports.enum(WORKSPACE_PROVISION_TYPES2);
+var environmentWorkspaceDisplayKindValues2 = [
+  "managed-worktree",
+  "unmanaged-worktree",
+  "other"
+];
+var environmentWorkspaceDisplayKindSchema2 = external_exports.enum(
+  environmentWorkspaceDisplayKindValues2
+);
+var discoveredWorkspacePropertiesSchema2 = external_exports.object({
+  path: external_exports.string().min(1),
+  isGitRepo: external_exports.boolean(),
+  isWorktree: external_exports.boolean(),
+  branchName: external_exports.string().nullable(),
+  defaultBranch: external_exports.string().nullable()
+});
+var environmentSchema2 = external_exports.object({
+  id: external_exports.string(),
+  name: external_exports.string().nullable(),
+  projectId: external_exports.string(),
+  hostId: external_exports.string(),
+  path: external_exports.string().nullable(),
+  managed: external_exports.boolean(),
+  isGitRepo: external_exports.boolean(),
+  isWorktree: external_exports.boolean(),
+  workspaceProvisionType: workspaceProvisionTypeSchema2,
+  branchName: external_exports.string().nullable(),
+  baseBranch: external_exports.string().nullable(),
+  defaultBranch: external_exports.string().nullable(),
+  mergeBaseBranch: external_exports.string().nullable(),
+  status: environmentStatusSchema2,
+  createdAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+var experimentKeys2 = [
+  "claudeCodeMockCliTraffic",
+  "newOnboarding",
+  "providerSessionReaping"
+];
+var experimentKeySchema2 = external_exports.enum(experimentKeys2);
+var experimentsSchema2 = external_exports.record(experimentKeySchema2, external_exports.boolean());
+var featureFlagsSchema2 = external_exports.object({
+  placeholder: external_exports.boolean(),
+  /**
+   * Max events a single thread-timeline window may span.
+   *
+   * A window is otherwise bounded only by segment (user-message) count, which
+   * is a weak bound on work: an agentic turn can be thousands of events, so a
+   * thread with few user messages and a long history reprojects all of it on
+   * every request and blocks the server's event loop.
+   *
+   * Operator escape hatch rather than a product knob — raising it far above the
+   * default restores the old unbounded-in-practice behavior without a second
+   * code path.
+   */
+  timelineWindowEventBudget: external_exports.number().int().positive()
+});
+var gitBranchForbiddenCharacterPattern2 = /[\u0000-\u001f\u007f\\:~^?*\[]/u;
+var gitBranchWhitespacePattern2 = /[ \t]/u;
+var gitReservedBranchNames2 = /* @__PURE__ */ new Set([
+  "AUTO_MERGE",
+  "BISECT_HEAD",
+  "CHERRY_PICK_HEAD",
+  "FETCH_HEAD",
+  "HEAD",
+  "MERGE_HEAD",
+  "ORIG_HEAD",
+  "REVERT_HEAD"
+]);
+function isValidGitBranchName2(name) {
+  const components = name.split("/");
+  return name.length > 0 && name.trim().length > 0 && !name.startsWith("-") && !name.startsWith("/") && name !== "@" && !gitReservedBranchNames2.has(name) && !gitBranchForbiddenCharacterPattern2.test(name) && !gitBranchWhitespacePattern2.test(name) && !name.includes("..") && !name.includes("@{") && !name.includes("//") && !name.endsWith("/") && !name.endsWith(".") && components.every(
+    (component) => component.length > 0 && !component.startsWith(".") && !component.endsWith(".lock")
+  );
+}
+var gitBranchNameSchema2 = external_exports.string().refine(isValidGitBranchName2, { message: "Invalid git branch name" });
+var gitCheckoutRefSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("branch"),
+    branchName: external_exports.string().min(1),
+    headSha: external_exports.string().min(1).nullable()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("detached"),
+    headSha: external_exports.string().min(1).nullable()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("unborn"),
+    branchName: external_exports.string().min(1).nullable()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("unknown"),
+    reason: external_exports.string().min(1)
+  })
+]);
+var workspaceGitOperationSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("none") }),
+  external_exports.object({
+    kind: external_exports.literal("merge"),
+    hasConflicts: external_exports.boolean()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("rebase"),
+    hasConflicts: external_exports.boolean()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("cherry-pick"),
+    hasConflicts: external_exports.boolean()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("revert"),
+    hasConflicts: external_exports.boolean()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("unknown"),
+    reason: external_exports.string().min(1),
+    hasConflicts: external_exports.boolean()
+  })
+]);
+var gitBranchRefClassificationSchema2 = external_exports.object({
+  name: external_exports.string().min(1),
+  kind: external_exports.enum(["local", "remote", "missing"])
+});
+var defaultBranchRelationSchema2 = external_exports.enum([
+  "equal",
+  "local-behind",
+  "local-ahead",
+  "diverged",
+  "unknown"
+]);
+var projectSourceCheckoutSchema2 = external_exports.object({
+  /** Local branches under refs/heads, safe for checkout and write targets. */
+  branches: external_exports.array(external_exports.string()),
+  branchesTruncated: external_exports.boolean(),
+  checkout: gitCheckoutRefSchema2,
+  defaultBranch: external_exports.string().min(1).nullable(),
+  defaultBranchRelation: defaultBranchRelationSchema2.nullable(),
+  hasUncommittedChanges: external_exports.boolean(),
+  operation: workspaceGitOperationSchema2,
+  originDefaultBranch: external_exports.string().min(1).nullable(),
+  /** Remote-tracking branches under refs/remotes, for base/diff selection. */
+  remoteBranches: external_exports.array(external_exports.string()),
+  remoteBranchesTruncated: external_exports.boolean(),
+  /**
+   * Exact classification of the requested branch/ref, resolved before branch
+   * list pagination so callers can validate selected refs even when they are
+   * not present in the current page.
+   */
+  selectedBranch: gitBranchRefClassificationSchema2.nullable()
+});
+var FILE_LIST_QUERY_MAX_LENGTH = 256;
+var FILE_LIST_LIMIT_MAX = 1e4;
+var BRANCH_LIST_QUERY_MAX_LENGTH = 256;
+var BRANCH_LIST_LIMIT_MAX = 1e3;
+var hostTypeValues2 = ["persistent"];
+var hostTypeSchema2 = external_exports.enum(hostTypeValues2);
+var hostStatusValues2 = ["connected", "disconnected"];
+var hostStatusSchema2 = external_exports.enum(hostStatusValues2);
+var hostSchema2 = external_exports.object({
+  id: external_exports.string(),
+  name: external_exports.string(),
+  type: hostTypeSchema2,
+  status: hostStatusSchema2,
+  /**
+   * Permission ceiling for work that runs on this machine. Threads resolve
+   * down to this mode, so a sandbox machine can stay at "full" while a
+   * personal laptop refuses to go above "accept-edits". Only an owner session
+   * changes it; machine credentials cannot (see the hosts routes).
+   */
+  maxPermissionMode: permissionModeSchema2,
+  lastSeenAt: external_exports.number().nullable(),
+  lastRejectedProtocolVersion: external_exports.number().int().positive().nullable(),
+  /** True for the co-started local daemon. It cannot be removed. */
+  isPrimary: external_exports.boolean(),
+  /**
+   * True when the server stored an SSH alias for this machine so Fix can
+   * restart or reinstall the daemon without asking the renderer for a host.
+   */
+  canRepairViaSsh: external_exports.boolean().default(false),
+  /**
+   * SSH config alias used to pair this enrolled daemon (`Host.sshHost`).
+   * Lookup for workspace defaults uses this, never the display name.
+   */
+  sshHost: external_exports.string().nullable().optional(),
+  /**
+   * Optional per-machine start path for SSH remotes that do not set a
+   * per-project `remotePath`. Empty/null falls through to Connectivity's
+   * global default, then the remote home directory. Primary (this Mac)
+   * never stores one.
+   */
+  defaultWorkspacePath: external_exports.string().nullable().optional(),
+  /** Last-seen home directory reported by the daemon, used as the Home fallback. */
+  homeDir: external_exports.string().nullable().optional(),
+  createdAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+function isAbsoluteProviderSkillRootPath2(value) {
+  if (value.length === 0) {
+    return false;
+  }
+  const normalized = value.replaceAll("\\", "/");
+  const drive = /^[a-zA-Z]:\//u.exec(normalized);
+  const rest = drive ? normalized.slice(drive[0].length) : normalized.slice(1);
+  if (!drive && !normalized.startsWith("/")) {
+    return false;
+  }
+  return rest.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+function isRelativeProviderSkillRootPath2(value) {
+  if (value.length === 0) {
+    return false;
+  }
+  const normalized = value.replaceAll("\\", "/");
+  return !normalized.startsWith("/") && !/^[a-zA-Z]:\//u.test(normalized) && normalized.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+var PROVIDER_NATIVE_ROOTS_MAX2 = 32;
+var PROVIDER_NATIVE_ROOT_NAME_PREFIX_PATTERN2 = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}:$/u;
+var nativeRootNamePrefixSchema2 = external_exports.string().refine(
+  (value) => value === "" || PROVIDER_NATIVE_ROOT_NAME_PREFIX_PATTERN2.test(value),
+  "A root name prefix is a plugin-name-like token ending in ':'"
+);
+var nativeRootManifestPathSchema2 = external_exports.string().min(1).refine(
+  isRelativeProviderSkillRootPath2,
+  "A manifest marker is a relative path without dot segments"
+);
+var relativeNativeRootPathSchema2 = external_exports.string().min(1).refine(
+  isRelativeProviderSkillRootPath2,
+  "Roots must be relative paths without dot segments"
+);
+var absoluteNativeRootPathSchema2 = external_exports.string().min(1).refine(
+  isAbsoluteProviderSkillRootPath2,
+  "Absolute roots must be absolute paths without dot segments"
+);
+var providerNativeRootInputSchema2 = external_exports.union([
+  external_exports.string().min(1),
+  external_exports.object({
+    path: external_exports.string().min(1),
+    /** Skills nest in subdirectories (the agent scans recursively). */
+    recursive: external_exports.boolean().optional(),
+    /**
+     * Scan the same relative directory in every ancestor of the workspace
+     * up to the repository root (`project` roots only).
+     */
+    ancestors: external_exports.boolean().optional(),
+    /**
+     * Prepended to every name under the root, a vendor plugin's
+     * `plugin-name:`; a prefixed root is listed as a plugin root.
+     */
+    namePrefix: nativeRootNamePrefixSchema2.optional(),
+    /**
+     * A file, relative to a skill directory under this root, that marks the
+     * directory as a vendor plugin rather than a skill (Claude's
+     * `.claude-plugin/plugin.json`): bb skips such a directory. The plugin
+     * that knows the vendor layout declares it; core names no vendor path.
+     */
+    skipIfManifest: nativeRootManifestPathSchema2.optional()
+  }).strict()
+]);
+var providerNativeRootsInputSchema2 = external_exports.object({
+  user: external_exports.array(providerNativeRootInputSchema2).optional(),
+  project: external_exports.array(providerNativeRootInputSchema2).optional()
+}).strict();
+var providerNativeRootSchema2 = external_exports.object({
+  path: external_exports.string().min(1),
+  recursive: external_exports.boolean(),
+  ancestors: external_exports.boolean(),
+  namePrefix: nativeRootNamePrefixSchema2,
+  /** Absent: every skill-shaped directory under the root is a skill. */
+  skipIfManifest: nativeRootManifestPathSchema2.optional()
+}).strict();
+function uniqueByPath2(roots) {
+  return new Set(roots.map((root) => root.path)).size === roots.length;
+}
+function nativeRootSideSchema2(side) {
+  return external_exports.array(
+    providerNativeRootSchema2.extend({ path: relativeNativeRootPathSchema2 }).superRefine((root, context) => {
+      if (root.ancestors && side !== "project") {
+        context.addIssue({
+          code: "custom",
+          message: "Only project roots may walk ancestors"
+        });
+      }
+    })
+  ).max(PROVIDER_NATIVE_ROOTS_MAX2).refine(uniqueByPath2, "Roots must not repeat a path");
+}
+var providerNativeRootsSchema2 = external_exports.object({
+  user: nativeRootSideSchema2("user"),
+  project: nativeRootSideSchema2("project")
+}).strict();
+var EMPTY_PROVIDER_NATIVE_ROOTS2 = Object.freeze({
+  user: Object.freeze([]),
+  project: Object.freeze([])
+});
+var providerResolvedNativeRootShapeSchema2 = external_exports.enum([
+  "skills",
+  "skill",
+  "skill-file",
+  "commands",
+  "command-file"
+]);
+var resolvedNativeRootFieldsSchema2 = external_exports.object({
+  path: absoluteNativeRootPathSchema2,
+  origin: external_exports.enum(["user", "project"]),
+  recursive: external_exports.boolean(),
+  /** Only with origin `project`, for a path inside the workspace. */
+  ancestors: external_exports.boolean(),
+  namePrefix: nativeRootNamePrefixSchema2,
+  shape: providerResolvedNativeRootShapeSchema2,
+  /**
+   * `skill-file` only: the skill name when the file's frontmatter names
+   * none. A vendor plugin's root SKILL.md takes the plugin's name; absent
+   * means the parent directory's name.
+   */
+  fallbackName: external_exports.string().min(1).optional(),
+  /**
+   * `skills` only: a file, relative to a skill directory under this root,
+   * that marks the directory as a vendor plugin rather than a skill; the
+   * daemon skips such a directory (see the declared root's `skipIfManifest`).
+   */
+  skipIfManifest: nativeRootManifestPathSchema2.optional()
+}).strict();
+var providerResolvedNativeRootSchema2 = resolvedNativeRootFieldsSchema2.superRefine((root, context) => {
+  if (root.skipIfManifest !== void 0 && root.shape !== "skills") {
+    context.addIssue({
+      code: "custom",
+      message: "Only a skills root carries a manifest marker"
+    });
+  }
+  if (root.ancestors && root.origin !== "project") {
+    context.addIssue({
+      code: "custom",
+      message: "Only project roots may walk ancestors"
+    });
+  }
+  if (root.fallbackName !== void 0 && root.shape !== "skill-file") {
+    context.addIssue({
+      code: "custom",
+      message: "Only a skill-file root carries a fallback name"
+    });
+  }
+});
+var providerResolvedNativeRootInputSchema2 = resolvedNativeRootFieldsSchema2.partial({
+  recursive: true,
+  ancestors: true,
+  namePrefix: true,
+  shape: true
+});
+var resolvedSkillShapes2 = /* @__PURE__ */ new Set([
+  "skills",
+  "skill",
+  "skill-file"
+]);
+var resolvedCommandShapes2 = /* @__PURE__ */ new Set([
+  "commands",
+  "command-file"
+]);
+var PROVIDER_RESOLVED_NATIVE_ROOTS_MAX2 = 256;
+var providerResolvedNativeRootsSchema2 = external_exports.object({
+  skills: external_exports.array(
+    providerResolvedNativeRootSchema2.refine(
+      (root) => resolvedSkillShapes2.has(root.shape),
+      "A skills root needs a skill shape"
+    )
+  ).max(PROVIDER_RESOLVED_NATIVE_ROOTS_MAX2),
+  commands: external_exports.array(
+    providerResolvedNativeRootSchema2.refine(
+      (root) => resolvedCommandShapes2.has(root.shape),
+      "A commands root needs a command shape"
+    )
+  ).max(PROVIDER_RESOLVED_NATIVE_ROOTS_MAX2)
+}).strict();
+var EMPTY_PROVIDER_RESOLVED_NATIVE_ROOTS2 = Object.freeze({
+  skills: Object.freeze([]),
+  commands: Object.freeze([])
+});
+var providerNativeRootSetSchema2 = external_exports.object({
+  skills: providerNativeRootsSchema2,
+  commands: providerNativeRootsSchema2,
+  resolved: providerResolvedNativeRootsSchema2
+}).strict();
+var LEGACY_CODEX_GOAL_EXTENSION_KIND2 = "provider-codex/goal";
+var LEGACY_THREAD_EVENT_TYPES2 = [
+  "thread/goal/updated",
+  "thread/goal/cleared",
+  "turn/plan/updated",
+  "system/permissionGrant/lifecycle",
+  "system/userQuestion/lifecycle"
+];
+var legacyThreadEventTypeSet2 = new Set(
+  LEGACY_THREAD_EVENT_TYPES2
+);
+function legacyItemId2(prefix, turnId, payload) {
+  const text = JSON.stringify(payload);
+  let hash2 = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash2 = hash2 * 33 ^ text.charCodeAt(index);
+  }
+  return `${prefix}:${turnId ?? "thread"}:${(hash2 >>> 0).toString(36)}`;
+}
+var GOAL_FIELDS2 = [
+  "objective",
+  "status",
+  "tokenBudget",
+  "tokensUsed",
+  "timeUsedSeconds"
+];
+function convertLegacyStoredThreadEvent2(stored, scope = { turnId: null }) {
+  switch (stored.type) {
+    case "item/started":
+    case "item/completed": {
+      const upgraded = upgradeLegacyToolItem2(stored.data.item);
+      return upgraded === stored.data.item ? stored : { type: stored.type, data: { ...stored.data, item: upgraded } };
+    }
+    case "turn/plan/updated": {
+      const { plan, explanation, ...rest } = stored.data;
+      const steps = Array.isArray(plan) ? plan : [];
+      return {
+        type: "item/completed",
+        data: {
+          ...rest,
+          item: {
+            type: "planSteps",
+            id: legacyItemId2("legacy-plan", scope.turnId, {
+              steps,
+              explanation
+            }),
+            steps,
+            ...typeof explanation === "string" ? { explanation } : {},
+            status: "completed"
+          }
+        }
+      };
+    }
+    case "thread/goal/updated": {
+      const payload = {};
+      for (const field of GOAL_FIELDS2) {
+        payload[field] = stored.data[field];
+      }
+      return {
+        type: "thread/extensionState/updated",
+        data: {
+          ...withoutGoalFields2(stored.data),
+          kind: LEGACY_CODEX_GOAL_EXTENSION_KIND2,
+          payload
+        }
+      };
+    }
+    case "thread/goal/cleared":
+      return {
+        type: "thread/extensionState/updated",
+        data: {
+          ...stored.data,
+          kind: LEGACY_CODEX_GOAL_EXTENSION_KIND2,
+          payload: null
+        }
+      };
+    // The per-shape interaction events (one type per payload shape, which
+    // let a row pair an approval subject with a user answer) became the one
+    // `system/interaction/lifecycle` carrying the paired lifecycle record.
+    // A stored row decodes into that record. The old approval event kept
+    // the subject alone, so the record's `reason` is null: the bridge's
+    // reason was not persisted, which is what null says.
+    case "system/permissionGrant/lifecycle": {
+      const { subject, ...rest } = stored.data;
+      return {
+        type: "system/interaction/lifecycle",
+        data: {
+          interaction: legacyInteractionLifecycleRecord2(rest, {
+            kind: "approval",
+            subject,
+            reason: null
+          })
+        }
+      };
+    }
+    case "system/userQuestion/lifecycle": {
+      const { payload, ...rest } = stored.data;
+      return {
+        type: "system/interaction/lifecycle",
+        data: { interaction: legacyInteractionLifecycleRecord2(rest, payload) }
+      };
+    }
+    default:
+      return stored;
+  }
+}
+function legacyInteractionLifecycleRecord2(data, payload) {
+  return {
+    id: data.interactionId,
+    status: data.status,
+    statusReason: data.statusReason ?? null,
+    origin: {
+      kind: "provider",
+      providerId: data.providerId,
+      providerRequestId: data.providerRequestId
+    },
+    payload,
+    resolution: data.resolution ?? null
+  };
+}
+function withoutGoalFields2(data) {
+  const rest = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (!GOAL_FIELDS2.includes(key)) {
+      rest[key] = value;
+    }
+  }
+  return rest;
+}
+var LEGACY_READ_TOOL_NAMES2 = /* @__PURE__ */ new Set(["Read", "read"]);
+var LEGACY_CONTENT_SEARCH_TOOL_NAMES2 = /* @__PURE__ */ new Set([
+  "Grep",
+  "grep"
+]);
+var LEGACY_PATH_SEARCH_TOOL_NAMES2 = /* @__PURE__ */ new Set([
+  "Glob",
+  "glob",
+  "find"
+]);
+var LEGACY_LIST_TOOL_NAMES2 = /* @__PURE__ */ new Set(["ls"]);
+var LEGACY_SUPPRESSED_TOOL_NAMES2 = /* @__PURE__ */ new Set([
+  "TaskCreate",
+  "TaskGet",
+  "TaskList",
+  "TaskUpdate",
+  "TodoRead",
+  "TodoWrite",
+  "ToolSearch",
+  // Fully represented by its own question row; the tool row would duplicate it.
+  "AskUserQuestion"
+]);
+var LEGACY_AGENT_RESULT_TOOL_NAMES2 = /* @__PURE__ */ new Set([
+  "Agent",
+  "Task"
+]);
+function legacyBaseToolName2(tool) {
+  const segments = tool.split(":");
+  return segments[segments.length - 1] ?? tool;
+}
+function firstStringField2(args, keys) {
+  for (const key of keys) {
+    const value = args?.[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return void 0;
+}
+function legacyToolCallCommand2(tool, args) {
+  if (!args) return tool;
+  const entries = Object.entries(args).filter(([, v]) => v !== void 0);
+  if (entries.length === 0) return tool;
+  const compact = entries.map(([k, v]) => {
+    const vs = typeof v === "string" ? v.trim() : JSON.stringify(v);
+    const display = vs.length > 40 ? `${vs.slice(0, 37)}...` : vs;
+    return `${k}: ${display}`;
+  }).join(", ");
+  return `${tool} { ${compact} }`;
+}
+function stripLegacyAgentResultMetadata2(result) {
+  return result.split("\n").map((line) => line.trimEnd()).filter(
+    (line) => !line.startsWith("agentId:") && !line.startsWith("<usage>")
+  ).join("\n").trim();
+}
+function isLegacyToolItem2(item) {
+  if (item === null || typeof item !== "object") return false;
+  const record2 = item;
+  return record2.type === "toolCall" && typeof record2.id === "string" && typeof record2.tool === "string" && typeof record2.status === "string" && // The whole point: a row the bridge already presented is not legacy data.
+  record2.presentation === void 0;
+}
+function isRecord3(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function sharedLegacyItemFields2(item) {
+  return {
+    id: item.id,
+    status: item.status,
+    ...item.parentToolCallId === void 0 ? {} : { parentToolCallId: item.parentToolCallId }
+  };
+}
+function upgradeLegacyToolItem2(item) {
+  if (!isLegacyToolItem2(item)) return item;
+  const tool = legacyBaseToolName2(item.tool);
+  const args = isRecord3(item.arguments) ? item.arguments : void 0;
+  if (LEGACY_READ_TOOL_NAMES2.has(tool)) {
+    const path22 = firstStringField2(args, ["file_path", "file", "path"]);
+    if (path22 === void 0) return item;
+    return {
+      type: "fileRead",
+      ...sharedLegacyItemFields2(item),
+      path: path22,
+      cmd: legacyToolCallCommand2(item.tool, args)
+    };
+  }
+  if (LEGACY_CONTENT_SEARCH_TOOL_NAMES2.has(tool)) {
+    const query = firstStringField2(args, ["pattern", "query"]);
+    if (query === void 0) return item;
+    const path22 = firstStringField2(args, ["path"]);
+    return {
+      type: "search",
+      ...sharedLegacyItemFields2(item),
+      mode: "content",
+      query,
+      ...path22 === void 0 ? {} : { path: path22 },
+      cmd: legacyToolCallCommand2(item.tool, args)
+    };
+  }
+  if (LEGACY_PATH_SEARCH_TOOL_NAMES2.has(tool)) {
+    const query = firstStringField2(args, ["pattern"]);
+    const path22 = firstStringField2(args, ["path"]);
+    if (query === void 0 && path22 === void 0) return item;
+    return {
+      type: "search",
+      ...sharedLegacyItemFields2(item),
+      mode: "path",
+      query: query ?? "",
+      ...path22 === void 0 ? {} : { path: path22 },
+      cmd: legacyToolCallCommand2(item.tool, args)
+    };
+  }
+  if (LEGACY_LIST_TOOL_NAMES2.has(tool)) {
+    const path22 = firstStringField2(args, ["path"]);
+    if (path22 === void 0) return item;
+    return {
+      type: "search",
+      ...sharedLegacyItemFields2(item),
+      mode: "list",
+      query: "",
+      path: path22,
+      cmd: legacyToolCallCommand2(item.tool, args)
+    };
+  }
+  if (LEGACY_SUPPRESSED_TOOL_NAMES2.has(tool)) {
+    if (item.status !== "pending" && item.status !== "completed") return item;
+    const presentation = {
+      label: { pending: `Running ${tool}`, completed: `Ran ${tool}` },
+      icon: { glyph: "Toolbox" },
+      suppress: true
+    };
+    return { ...item, presentation };
+  }
+  if (LEGACY_AGENT_RESULT_TOOL_NAMES2.has(tool) && typeof item.result === "string") {
+    const stripped = stripLegacyAgentResultMetadata2(item.result);
+    return stripped === item.result ? item : { ...item, result: stripped };
+  }
+  return item;
+}
+var PLUGIN_CATALOG_CATEGORY_ID_PATTERN2 = /^[a-z0-9][a-z0-9-]*$/u;
+var pluginCatalogCategoryIdSchema2 = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN2);
+var pluginMarketplaceCollectionIdSchema2 = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN2);
+var pluginMarketplaceCollectionPluginIdSchema2 = external_exports.string().regex(PLUGIN_CATALOG_CATEGORY_ID_PATTERN2);
+var pluginMarketplaceCategorySchema2 = external_exports.object({
+  id: pluginCatalogCategoryIdSchema2,
+  displayName: external_exports.string().min(1),
+  description: external_exports.string().min(1)
+});
+var pluginMarketplaceCollectionSchema2 = external_exports.object({
+  id: pluginMarketplaceCollectionIdSchema2,
+  displayName: external_exports.string().min(1),
+  pluginIds: external_exports.array(pluginMarketplaceCollectionPluginIdSchema2).superRefine((pluginIds, ctx) => {
+    const seen = /* @__PURE__ */ new Set();
+    pluginIds.forEach((pluginId, index) => {
+      if (seen.has(pluginId)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index],
+          message: `duplicate plugin id "${pluginId}"`
+        });
+      }
+      seen.add(pluginId);
+    });
+  })
+});
+var PLUGIN_CATALOG_CATEGORIES2 = [
+  {
+    id: "themes-and-appearance",
+    displayName: "Themes & Appearance",
+    description: "Personalize how ZCC looks and feels."
+  },
+  {
+    id: "thread-management",
+    displayName: "Thread Management",
+    description: "Find, identify, organize, or archive threads."
+  },
+  {
+    id: "thread-content",
+    displayName: "Thread Content",
+    description: "Change what people see or do inside an open thread."
+  },
+  {
+    id: "memory-and-context",
+    displayName: "Memory & Context",
+    description: "Control durable knowledge or standing context available to agents."
+  },
+  {
+    id: "security",
+    displayName: "Security",
+    description: "Protect credentials or prevent unsafe code."
+  },
+  {
+    id: "agents-and-providers",
+    displayName: "Agents & Providers",
+    description: "Add, choose, configure, route, or coordinate who runs a thread."
+  },
+  {
+    id: "token-usage-and-limits",
+    displayName: "Token Usage & Limits",
+    description: "Understand or control token, context-window, and provider-quota use."
+  },
+  {
+    id: "notifications",
+    displayName: "Notifications",
+    description: "Know when work finished, failed, or needs attention."
+  },
+  {
+    id: "code-and-reviews",
+    displayName: "Code & Reviews",
+    description: "Work with repositories, builds, changes, pull requests, issues, and reviews."
+  },
+  {
+    id: "file-viewers-and-editors",
+    displayName: "File Viewers & Editors",
+    description: "Browse, open, preview, or edit files and document vaults."
+  },
+  {
+    id: "cloud-and-remote",
+    displayName: "Cloud & Remote",
+    description: "Run ZCC work in cloud environments or access ZCC from elsewhere."
+  },
+  {
+    id: "command-line",
+    displayName: "Command Line",
+    description: "Work with shells and command-line programs inside ZCC."
+  },
+  {
+    id: "utilities",
+    displayName: "Utilities",
+    description: "Inspect or control the computers ZCC runs on."
+  },
+  {
+    id: "plugin-development",
+    displayName: "Plugin Development",
+    description: "Understand, inspect, build, or debug ZCC and its plugin surfaces."
+  },
+  {
+    id: "tasks-and-workflows",
+    displayName: "Tasks & Workflows",
+    description: "Plan, track, route, schedule, or automate work."
+  }
+];
+var pluginCatalogCategoryById2 = new Map(PLUGIN_CATALOG_CATEGORIES2.map((category) => [category.id, category]));
+function isPluginOwnedIconPath2(icon) {
+  return icon.startsWith("./");
+}
+var PLUGIN_ICON_NAME_PATTERN2 = /^[a-z0-9][a-z0-9-]*$/u;
+var PLUGIN_ICON_NAME_MAX_LENGTH2 = 48;
+var PLUGIN_ICON_MAX_BYTES2 = 32 * 1024;
+var PLUGIN_ICONS_MAX_COUNT2 = 64;
+var NAMESPACED_GLYPH_PATTERN2 = /^[a-z0-9-]+\/[a-z0-9][a-z0-9-]*$/u;
+function isNamespacedGlyph2(glyph) {
+  return NAMESPACED_GLYPH_PATTERN2.test(glyph);
+}
+var pluginIdSchema2 = external_exports.string().regex(/^[a-z0-9][a-z0-9-]*$/u);
+var PLUGIN_METADATA_MAX_BYTES2 = 256 * 1024;
+function exceedsPluginMetadataLimit2(metadataJson) {
+  return new TextEncoder().encode(metadataJson).byteLength > PLUGIN_METADATA_MAX_BYTES2;
+}
+var pluginMetadataSchema2 = jsonObjectSchema2.superRefine((value, ctx) => {
+  if (exceedsPluginMetadataLimit2(JSON.stringify(value))) {
+    ctx.addIssue({
+      code: "custom",
+      message: "pluginMetadata exceeds 256 KiB"
+    });
+  }
+});
+var requiredManifestString2 = external_exports.string().trim().min(1);
+var pluginBrandingIconsSchema2 = external_exports.record(
+  external_exports.string().max(
+    PLUGIN_ICON_NAME_MAX_LENGTH2,
+    `icon names are at most ${PLUGIN_ICON_NAME_MAX_LENGTH2} characters`
+  ).regex(
+    PLUGIN_ICON_NAME_PATTERN2,
+    'icon names use lowercase letters, digits and "-", starting with a letter or digit'
+  ),
+  requiredManifestString2.refine(
+    (path22) => isPluginOwnedIconPath2(path22) && path22.toLowerCase().endsWith(".svg"),
+    {
+      message: 'icon paths are plugin-relative .svg files starting with "./" (for example "./icons/receipt.svg")'
+    }
+  )
+).refine((icons) => Object.keys(icons).length <= PLUGIN_ICONS_MAX_COUNT2, {
+  message: `a plugin declares at most ${PLUGIN_ICONS_MAX_COUNT2} icons`
+});
+var pluginBrandingSchema2 = external_exports.object({
+  icon: requiredManifestString2.optional(),
+  logo: external_exports.object({
+    light: requiredManifestString2,
+    dark: requiredManifestString2.optional()
+  }).strict().optional(),
+  experimental_icons: pluginBrandingIconsSchema2.optional()
+}).strict().superRefine((branding, context) => {
+  if (branding.icon !== void 0 && isPluginOwnedIconPath2(branding.icon) && !branding.icon.toLowerCase().endsWith(".svg")) {
+    context.addIssue({
+      code: "custom",
+      path: ["icon"],
+      message: 'plugin-owned branding.icon paths must point at an .svg file (for example "./assets/icon.svg")'
+    });
+  }
+  if (branding.icon !== void 0 && isNamespacedGlyph2(branding.icon)) {
+    context.addIssue({
+      code: "custom",
+      path: ["icon"],
+      message: `"${branding.icon}" is a namespaced glyph ("<pluginId>/<name>"), which names a declared icon from a tool presentation or a provider declaration; branding.icon is the plugin's own mark, so name a host glyph ("Zap") or the SVG file itself ("./icons/logo.svg")`
+    });
+  }
+}).refine(
+  (branding) => branding.icon !== void 0 || branding.logo !== void 0,
+  {
+    message: "must declare at least branding.icon or branding.logo.light"
+  }
+);
+var pluginBbManifestSchema2 = external_exports.object({
+  name: requiredManifestString2,
+  description: requiredManifestString2,
+  branding: pluginBrandingSchema2,
+  server: requiredManifestString2,
+  app: requiredManifestString2.optional(),
+  host: requiredManifestString2.optional(),
+  peers: external_exports.boolean().optional(),
+  skills: external_exports.array(requiredManifestString2).optional(),
+  themes: external_exports.array(
+    external_exports.object({
+      id: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/).max(64),
+      name: requiredManifestString2,
+      description: requiredManifestString2.optional(),
+      css: requiredManifestString2,
+      codeTheme: uiCodeThemeDeclarationSchema2.optional()
+    }).strict()
+  ).optional()
+}).strict();
+var pluginPackageJsonSchema2 = external_exports.object({
+  name: requiredManifestString2,
+  version: requiredManifestString2,
+  engines: external_exports.object({
+    bb: requiredManifestString2.optional(),
+    bbPluginSdk: requiredManifestString2.optional()
+  }).optional(),
+  bb: pluginBbManifestSchema2
+}).passthrough();
+var MARKETPLACE_MAX_SCREENSHOTS2 = 6;
+var NAME_PATTERN2 = /^[a-z0-9][a-z0-9-]*$/u;
+var TAG_PATTERN2 = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+var GITHUB_LOGIN_PATTERN2 = /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/u;
+var HOST_ICON_PATTERN2 = /^[A-Za-z][A-Za-z0-9]*$/u;
+var HTTPS_URL_PATTERN2 = /^[Hh][Tt][Tt][Pp][Ss]:\/\//u;
+var ICON_URL_PATTERN2 = /^(?:(?![A-Za-z][A-Za-z0-9+.-]*:)|(?=[Hh][Tt][Tt][Pp][Ss]:))[^\s]*\.(?:[Ss][Vv][Gg]|[Pp][Nn][Gg]|[Ww][Ee][Bb][Pp])(?:[?#][^\s]*)?$/u;
+var V2_ICON_URL_PATTERN2 = /^(?!http:)(?:[Hh][Tt][Tt][Pp][Ss]:\/\/)?[^\s]+\.(?:[Ss][Vv][Gg]|[Pp][Nn][Gg]|[Ww][Ee][Bb][Pp])$/u;
+var SCREENSHOT_URL_PATTERN2 = /^(?:[Hh][Tt][Tt][Pp][Ss]:\/\/[^\s]+\.(?:[Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Ww][Ee][Bb][Pp])|\.\/screenshots\/[a-z0-9][a-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*\.(?:[Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Ww][Ee][Bb][Pp]))$/u;
+var NPM_PACKAGE_PATTERN2 = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u;
+var GIT_SUBDIR_PATTERN2 = /^(?![A-Za-z]:)(?!\/)(?!(?:[^/]+\/)*(?:\.|\.\.|\.git)(?:\/|$))[^/\\]+(?:\/[^/\\]+)*$/u;
+var GIT_REF_PATTERN2 = /^(?!-)(?![\s\S]*\.\.)(?![\s\S]*@)(?![\s\S]*:)[\s\S]+$/u;
+var GIT_TAG_PREFIX_PATTERN2 = /^(?!.*\.\.)(?!.*\/\/)(?!.*\/\.)(?![^/]*\.lock(?:\/|$))(?!.*\/[^/]*\.lock(?:\/|$))(?!.*\.$)[A-Za-z0-9][A-Za-z0-9._/-]*$/u;
+var DATE_TIME_SEPARATOR_PATTERN2 = /t|\s/iu;
+var TIME_WITH_OFFSET_PATTERN2 = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)$/iu;
+var SEMVER_NUMBER2 = String.raw`(?:0|[1-9]\d*|[xX*])`;
+var SEMVER_PRERELEASE2 = String.raw`(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?`;
+var SEMVER_BUILD2 = String.raw`(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?`;
+var SEMVER_VERSION2 = String.raw`v?${SEMVER_NUMBER2}(?:\.${SEMVER_NUMBER2}(?:\.${SEMVER_NUMBER2})?)?${SEMVER_PRERELEASE2}${SEMVER_BUILD2}`;
+var SEMVER_COMPARATOR2 = String.raw`(?:[<>]=?|==?|~>?|\^)?\s*${SEMVER_VERSION2}`;
+var SEMVER_SET2 = String.raw`(?:\*|${SEMVER_VERSION2}\s+-\s+${SEMVER_VERSION2}|${SEMVER_COMPARATOR2}(?:\s+${SEMVER_COMPARATOR2})*|)`;
+var MARKETPLACE_SEMVER_RANGE_PATTERN2 = new RegExp(
+  String.raw`^\s*${SEMVER_SET2}(?:\s*\|\|\s*${SEMVER_SET2})*\s*$`,
+  "u"
+);
+var semverRangeSchema2 = external_exports.string().min(1).regex(MARKETPLACE_SEMVER_RANGE_PATTERN2);
+var semverRangeV2Schema2 = external_exports.string().min(1);
+var httpsUrlSchema2 = external_exports.string().regex(HTTPS_URL_PATTERN2);
+var isoDateSchema2 = external_exports.iso.date();
+var marketplaceDateTimeSchema2 = external_exports.string().refine((value) => {
+  const parts = value.split(DATE_TIME_SEPARATOR_PATTERN2);
+  if (parts.length !== 2 || !isoDateSchema2.safeParse(parts[0]).success) {
+    return false;
+  }
+  const match = TIME_WITH_OFFSET_PATTERN2.exec(parts[1] ?? "");
+  if (match === null) return false;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const second = Number(match[3]);
+  const offsetSign = match[5] === "-" ? -1 : 1;
+  const offsetHour = Number(match[6] ?? 0);
+  const offsetMinute = Number(match[7] ?? 0);
+  if (offsetHour > 23 || offsetMinute > 59) return false;
+  if (hour <= 23 && minute <= 59 && second < 60) return true;
+  const utcMinute = minute - offsetMinute * offsetSign;
+  const utcHour = hour - offsetHour * offsetSign - (utcMinute < 0 ? 1 : 0);
+  return (utcHour === 23 || utcHour === -1) && (utcMinute === 59 || utcMinute === -1) && second < 61;
+});
+var marketplaceScreenshotSchema2 = external_exports.string().min(1).regex(
+  SCREENSHOT_URL_PATTERN2,
+  "must be an https URL or relative .png, .jpg, .jpeg, or .webp asset"
+);
+function marketplaceIconSchema2(strict) {
+  const url2 = external_exports.string().min(1).regex(
+    strict ? ICON_URL_PATTERN2 : V2_ICON_URL_PATTERN2,
+    "must be an https URL or relative .svg, .png, or .webp asset"
+  );
+  const object2 = external_exports.object({ url: url2 });
+  return external_exports.union([
+    external_exports.string().regex(HOST_ICON_PATTERN2),
+    strict ? object2.strict() : object2
+  ]);
+}
+function marketplaceAuthorSchema2(strict) {
+  const object2 = external_exports.object({
+    name: external_exports.string().min(1),
+    github: external_exports.string().regex(GITHUB_LOGIN_PATTERN2).optional(),
+    url: httpsUrlSchema2.optional()
+  });
+  return strict ? object2.strict() : object2;
+}
+function marketplaceNpmSourceSchema2(strict) {
+  const npm = external_exports.object({
+    package: external_exports.string().regex(NPM_PACKAGE_PATTERN2, "must be an unambiguous npm package name"),
+    range: (strict ? semverRangeSchema2 : semverRangeV2Schema2).optional(),
+    tag: external_exports.string().regex(/^[A-Za-z][A-Za-z0-9._-]*$/u).optional(),
+    registry: httpsUrlSchema2.optional()
+  }).refine((value) => value.range === void 0 || value.tag === void 0, {
+    message: "range and tag are mutually exclusive"
+  });
+  const nested = npm.strict();
+  const object2 = external_exports.object({ npm: nested });
+  return object2.strict();
+}
+function marketplaceGitSourceSchema2(strict) {
+  const base = {
+    url: httpsUrlSchema2,
+    subdir: external_exports.string().regex(GIT_SUBDIR_PATTERN2).optional()
+  };
+  const ref = external_exports.object({
+    ...base,
+    ref: external_exports.string().regex(GIT_REF_PATTERN2, "git ref must round-trip through install syntax")
+  });
+  const range = external_exports.object({
+    ...base,
+    range: strict ? semverRangeSchema2 : semverRangeV2Schema2,
+    tagPrefix: external_exports.string().max(128).regex(GIT_TAG_PREFIX_PATTERN2).optional()
+  });
+  const refObject = external_exports.object({ git: ref.strict() }).strict();
+  const rangeObject = external_exports.object({ git: range.strict() }).strict();
+  return external_exports.union([refObject, rangeObject]);
+}
+function marketplaceBundledSourceSchema2() {
+  return external_exports.object({
+    bundled: external_exports.object({
+      plugin: external_exports.string().regex(NAME_PATTERN2)
+    }).strict()
+  }).strict();
+}
+function marketplaceSourceSchema2(strict) {
+  const npm = marketplaceNpmSourceSchema2(strict);
+  const git = marketplaceGitSourceSchema2(strict);
+  return strict ? external_exports.union([npm, git]) : external_exports.union([npm, git, marketplaceBundledSourceSchema2()]);
+}
+var marketplaceEntryIdentityShape2 = (strict) => ({
+  id: external_exports.string().regex(NAME_PATTERN2),
+  displayName: external_exports.string().min(1),
+  description: external_exports.string().min(1),
+  icon: marketplaceIconSchema2(strict)
+});
+var marketplaceEntryMetadataShape2 = (strict) => ({
+  tags: external_exports.array(external_exports.string().max(32).regex(TAG_PATTERN2)).max(10).optional(),
+  author: marketplaceAuthorSchema2(strict),
+  source: marketplaceSourceSchema2(strict)
+});
+var marketplaceEntryV1Schema2 = external_exports.object({
+  ...marketplaceEntryIdentityShape2(true),
+  ...marketplaceEntryMetadataShape2(true)
+}).strict();
+var marketplaceEntryV2Schema2 = external_exports.object({
+  ...marketplaceEntryIdentityShape2(false),
+  category: pluginCatalogCategoryIdSchema2.optional(),
+  screenshots: external_exports.array(marketplaceScreenshotSchema2).max(MARKETPLACE_MAX_SCREENSHOTS2).optional(),
+  overview: external_exports.string().min(1).optional(),
+  publishedAt: marketplaceDateTimeSchema2.optional(),
+  updatedAt: marketplaceDateTimeSchema2.optional(),
+  ...marketplaceEntryMetadataShape2(false)
+});
+var PLUGIN_SDK_VERSION2 = "0.4.8";
+var PLUGIN_SDK_MAJOR2 = Number(PLUGIN_SDK_VERSION2.split(".", 1)[0]);
+var projectKindValues2 = ["standard", "personal"];
+var projectKindSchema2 = external_exports.enum(projectKindValues2);
+var projectSchema2 = external_exports.object({
+  id: external_exports.string(),
+  kind: projectKindSchema2,
+  name: external_exports.string(),
+  gitRemoteUrl: external_exports.string().nullable(),
+  createdAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+var projectSourceTypeValues2 = ["local_path"];
+var projectSourceTypeSchema2 = external_exports.enum(projectSourceTypeValues2);
+var baseProjectSourceSchema2 = external_exports.object({
+  id: external_exports.string(),
+  projectId: external_exports.string(),
+  isDefault: external_exports.boolean(),
+  createdAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+var localPathProjectSourceSchema2 = baseProjectSourceSchema2.extend({
+  type: external_exports.literal("local_path"),
+  hostId: external_exports.string(),
+  path: external_exports.string()
+});
+var promptHistoryScopeValues2 = ["project", "thread"];
+var promptHistoryScopeSchema2 = external_exports.enum(promptHistoryScopeValues2);
+var promptHistoryEntrySchema2 = external_exports.object({
+  id: external_exports.string().min(1),
+  createdAt: external_exports.number(),
+  input: external_exports.array(promptInputSchema2).min(1)
+});
+var PROVIDER_FORK_VALUES2 = ["none", "tip", "checkpoint"];
+var providerForkSchema2 = external_exports.enum(PROVIDER_FORK_VALUES2);
+var modelReasoningEffortSchema2 = external_exports.object({
+  reasoningEffort: reasoningLevelSchema2,
+  description: external_exports.string()
+});
+var availableModelSchema2 = external_exports.object({
+  id: external_exports.string(),
+  model: external_exports.string(),
+  displayName: external_exports.string(),
+  /** Provider route used to run this model when it is distinct from the
+   * selected agent provider (for example, a model provider nested under Pi). */
+  routeProviderId: external_exports.string().min(1).optional(),
+  description: external_exports.string(),
+  supportedReasoningEfforts: external_exports.array(modelReasoningEffortSchema2),
+  defaultReasoningEffort: reasoningLevelSchema2,
+  isDefault: external_exports.boolean()
+});
+var providerModelCatalogScopeSchema2 = external_exports.enum(["host", "workspace"]);
+var providerCapabilitiesSchema2 = external_exports.object({
+  supportsThreadArchive: external_exports.boolean(),
+  supportsThreadRename: external_exports.boolean(),
+  supportsServiceTier: external_exports.boolean(),
+  supportsNativeUserQuestion: external_exports.boolean(),
+  supportsFork: external_exports.boolean(),
+  /**
+   * The provider can recreate a session at an earlier point, which is what
+   * edit-past-message rewind needs. Separate from `supportsFork`: ACP clones
+   * whole sessions (tip-only) and cannot stop at a checkpoint.
+   */
+  supportsSessionRewind: external_exports.boolean(),
+  permissionModes: external_exports.array(permissionModeSchema2).min(1),
+  /**
+   * How far one `model/list` answer travels: `"host"` when the bridge answers
+   * from account or agent state and ignores the workspace path, so bb probes
+   * once per machine; `"workspace"` when project configuration can change the
+   * answer. Declared by the provider's plugin — core never infers it from an
+   * id.
+   */
+  modelCatalogScope: providerModelCatalogScopeSchema2
+});
+var providerComposerCommandSchema2 = external_exports.object({
+  trigger: promptMentionCommandTriggerSchema2,
+  name: external_exports.string().min(1).regex(/^[^\s/$]+$/u),
+  trailingText: external_exports.string().regex(/^\s*$/u)
+});
+var providerComposerActionSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("skills"),
+    trigger: promptMentionCommandTriggerSchema2
+  }),
+  external_exports.object({
+    kind: external_exports.literal("plan"),
+    command: providerComposerCommandSchema2
+  }),
+  external_exports.object({
+    kind: external_exports.literal("goal"),
+    command: providerComposerCommandSchema2
+  })
+]);
+var providerStringsSchema2 = external_exports.object({
+  /** How to sign in on the host ("Run `claude` on the machine to sign in."). */
+  signInHint: external_exports.string().min(1),
+  /** Shown when a session's credentials expired. */
+  expiredHint: external_exports.string().min(1),
+  /** Where to install the agent. */
+  installUrl: external_exports.string().min(1),
+  /** Brand prefix stripped from model display names ("Claude "). */
+  brandPrefix: external_exports.string().min(1).optional(),
+  /** Plan-mode banner copy for providers that declare the `plan` action. */
+  planModeCopy: external_exports.string().min(1).optional(),
+  /** Per-theme tint for the provider icon. */
+  iconTint: external_exports.object({ light: external_exports.string().min(1), dark: external_exports.string().min(1) }).optional()
+});
+var providerOptionDescriptorSchema2 = external_exports.object({
+  id: external_exports.string().min(1),
+  label: external_exports.string().min(1),
+  description: external_exports.string().min(1).optional()
+});
+var providerExtensionKindInfoSchema2 = external_exports.object({
+  item: external_exports.boolean(),
+  state: external_exports.boolean()
+});
+var providerExtensionKindsSchema2 = external_exports.record(
+  extensionKindSchema2,
+  providerExtensionKindInfoSchema2
+);
+var providerInfoSchema2 = external_exports.object({
+  id: external_exports.string(),
+  /**
+   * The plugin that registered the provider (`bb.providers.register`). The
+   * owner of the provider's extension-kind namespace, and the bundle the
+   * app loads on the first thread of this provider.
+   */
+  pluginId: external_exports.string().min(1),
+  displayName: external_exports.string(),
+  /**
+   * Declared grouping key shared by related providers (the ACP agents).
+   * Absent when the provider declared none. Grouping only.
+   */
+  family: external_exports.string().min(1).optional(),
+  /**
+   * The declared icon, projected by form. A plugin-relative asset path
+   * (`icon: "./icons/agent.svg"`) is served by the provider-logo route and
+   * arrives here as `logoUrl`; a named host glyph (`icon: "Zap"`) has no
+   * bytes to serve and arrives as `icon.glyph`, the same vocabulary an
+   * item presentation's `icon` uses. A declaration names at most one form,
+   * so at most one of the two is set; `icon` is absent when the declaration
+   * named a path or nothing. Clients draw a vendored brand mark first, then
+   * `logoUrl`, then `icon.glyph`, then the display name's initial.
+   */
+  icon: external_exports.object({ glyph: external_exports.string().min(1) }).optional(),
+  logoUrl: external_exports.string().min(1).nullable(),
+  /** Sessionless maintenance requests the provider's bridge implements. */
+  maintenance: external_exports.object({
+    health: external_exports.boolean(),
+    usage: external_exports.boolean(),
+    installation: external_exports.boolean()
+  }),
+  capabilities: providerCapabilitiesSchema2,
+  composerActions: external_exports.array(providerComposerActionSchema2),
+  available: external_exports.boolean(),
+  // -------------------------------------------------------------------------
+  // Target-state projection (docs/provider-plugin-api.md §1). Optional and
+  // unfilled until WS2a projects them from the plugin declaration; absence
+  // means "the provider declared none", never a default. The
+  // `capabilities.supports*` fields above stay until WS2a stabilizes the
+  // surface as one unit.
+  // -------------------------------------------------------------------------
+  strings: providerStringsSchema2.optional(),
+  serviceTiers: external_exports.array(providerOptionDescriptorSchema2).optional(),
+  reasoningLevels: external_exports.array(providerOptionDescriptorSchema2).optional(),
+  extensionKinds: providerExtensionKindsSchema2.optional()
+});
+var providerRecoveryKindValues2 = [
+  "sessionArchived",
+  "authRequired",
+  "restartRecommended",
+  "staleTurn",
+  "rateLimited"
+];
+var providerRecoveryKindSchema2 = external_exports.enum(providerRecoveryKindValues2);
+var toolCallOutputItemSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("inputText"),
+    text: external_exports.string()
+  }),
+  external_exports.object({
+    type: external_exports.literal("inputImage"),
+    imageUrl: external_exports.string()
+  })
+]);
+var toolCallRequestSchema2 = external_exports.object({
+  requestId: external_exports.union([external_exports.string().min(1), external_exports.number()]),
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  turnId: external_exports.string().min(1),
+  callId: external_exports.string().min(1),
+  tool: external_exports.string().min(1),
+  arguments: external_exports.unknown().optional()
+});
+var toolCallResponseSchema2 = external_exports.object({
+  contentItems: external_exports.array(toolCallOutputItemSchema2),
+  success: external_exports.boolean()
+});
+var dynamicToolSchema2 = external_exports.object({
+  name: external_exports.string(),
+  description: external_exports.string(),
+  inputSchema: external_exports.unknown(),
+  presentation: threadEventItemPresentationSchema2.optional()
+});
+var queuedMessageWaitingOnKindValues2 = [
+  "time",
+  "thread-busy",
+  "turn-starting",
+  "provisioning",
+  "host-offline",
+  "interaction",
+  "plugin"
+];
+var queuedMessageWaitingOnKindSchema2 = external_exports.enum(
+  queuedMessageWaitingOnKindValues2
+);
+var queuedMessageWaitHostNameSchema2 = external_exports.string().min(1).max(200);
+var QUEUED_MESSAGE_WAIT_REASON_MAX_LENGTH2 = 200;
+var queuedMessageWaitReasonSchema2 = external_exports.string().min(1).max(QUEUED_MESSAGE_WAIT_REASON_MAX_LENGTH2);
+var queuedMessageWaitingOnSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("time") }),
+  external_exports.object({ kind: external_exports.literal("thread-busy") }),
+  external_exports.object({ kind: external_exports.literal("turn-starting") }),
+  external_exports.object({ kind: external_exports.literal("provisioning") }),
+  external_exports.object({
+    kind: external_exports.literal("host-offline"),
+    hostName: queuedMessageWaitHostNameSchema2
+  }),
+  external_exports.object({ kind: external_exports.literal("interaction") }),
+  external_exports.object({
+    kind: external_exports.literal("plugin"),
+    pluginId: pluginIdSchema2,
+    reason: queuedMessageWaitReasonSchema2
+  })
+]);
+var QUEUED_MESSAGE_FAILURE_REASON_MAX_LENGTH2 = 200;
+var queuedMessageFailureReasonSchema2 = external_exports.string().min(1).max(QUEUED_MESSAGE_FAILURE_REASON_MAX_LENGTH2);
+var QUEUED_MESSAGE_PLUGIN_WAIT_HOLDER_PREFIX2 = "plugin:";
+var queuedMessageWaitHolderSchema2 = external_exports.templateLiteral([
+  QUEUED_MESSAGE_PLUGIN_WAIT_HOLDER_PREFIX2,
+  pluginIdSchema2
+]);
+var queuedMessagePayloadKindValues2 = ["inline", "retry"];
+var queuedMessagePayloadKindSchema2 = external_exports.enum(
+  queuedMessagePayloadKindValues2
+);
+var queuedMessagePayloadSchema2 = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("inline") }),
+  external_exports.object({
+    kind: external_exports.literal("retry"),
+    /**
+     * The ORIGINAL request, not the attempt that just failed. Retrying a retry
+     * re-submits the same original blocks, so this id is carried forward
+     * unchanged across attempts and `attempt` is what distinguishes them.
+     */
+    retryOfTurnRequestId: clientTurnRequestIdSchema2,
+    /** Which attempt this row will dispatch: 2 is the first retry. */
+    attempt: external_exports.number().int().min(2),
+    /**
+     * Why this turn is being retried, in the retrier's words ("Rate limited"),
+     * as the row's card and `bb thread queue list` render it.
+     *
+     * It lives on the payload rather than on `waitingOn` because a retry can
+     * wait on the clock, on a limiter, or on nothing at all, and the reason
+     * outlives all three: it is a fact about the retry, not about what is
+     * currently holding it. Filled at the boundary, so every row has one.
+     */
+    reason: queuedMessageWaitReasonSchema2
+  })
+]);
+var queuedMessageSystemNoticeSchema2 = external_exports.object({
+  kind: systemMessageKindSchema2,
+  subject: systemMessageSubjectSchema2.nullable()
+});
+var GENERATED_ID_ALPHABET2 = "23456789abcdefghijkmnpqrstuvwxyz";
+var GENERATED_ID_SUFFIX_LENGTH2 = 10;
+var THREAD_ID_PREFIX2 = "thr_";
+var RAW_THREAD_ID_PATTERN_SOURCE2 = `${THREAD_ID_PREFIX2}[${GENERATED_ID_ALPHABET2}]{${GENERATED_ID_SUFFIX_LENGTH2}}`;
+var rawThreadIdPattern2 = new RegExp(`^${RAW_THREAD_ID_PATTERN_SOURCE2}$`, "u");
+var rawThreadIdSchema2 = external_exports.string().regex(rawThreadIdPattern2);
+var threadEventRowInputSchema2 = external_exports.object({
+  id: external_exports.string(),
+  scope: threadEventScopeSchema2,
+  threadId: external_exports.string(),
+  seq: external_exports.number(),
+  type: threadEventTypeSchema2,
+  data: external_exports.record(external_exports.string(), external_exports.unknown()),
+  createdAt: external_exports.number()
+});
+var storedTurnRequestTypeSet2 = /* @__PURE__ */ new Set([
+  "client/turn/requested"
+]);
+var LEGACY_TURN_REQUEST_TARGET2 = {
+  kind: "new-turn"
+};
+var storedTurnRequestEventDataSchema2 = turnRequestEventDataSchema2.extend({
+  senderThreadId: external_exports.string().nullable().default(null),
+  target: turnRequestTargetSchema2.default(LEGACY_TURN_REQUEST_TARGET2),
+  // Family-B taxonomy fields are new, so pre-change rows lack them. Default to
+  // the generic `unlabeled` / no-subject shape here so old rows load without a
+  // backfill migration — same pattern as `senderThreadId`.
+  systemMessageKind: systemMessageKindSchema2.default("unlabeled"),
+  systemMessageSubject: systemMessageSubjectSchema2.nullable().default(null)
+});
+function parseStoredTurnRequestEventData2(args) {
+  return storedTurnRequestEventDataSchema2.parse(args.data);
+}
+function toStoredThreadEventData2(event) {
+  const { scope: _scope, threadId: _threadId, type: _type, ...data } = event;
+  return data;
+}
+function omitStoredScopeFields2(data) {
+  const { scope: _scope, turnId: _turnId, ...rest } = data;
+  return rest;
+}
+function parseStoredThreadEvent2(args) {
+  const scopeResult = threadEventScopeSchema2.safeParse(args.scope);
+  if (!scopeResult.success) {
+    throw new Error("Stored thread event is missing valid scope");
+  }
+  const scope = scopeResult.data;
+  const stored = convertLegacyStoredThreadEvent2(
+    { type: args.type, data: args.data },
+    { turnId: getThreadEventScopeTurnId2(scope) ?? null }
+  );
+  const eventData = storedTurnRequestTypeSet2.has(stored.type) ? parseStoredTurnRequestEventData2({ ...args, data: stored.data }) : stored.data;
+  return threadEventSchema2.parse({
+    ...omitStoredScopeFields2(eventData),
+    ...args.providerThreadId != null ? { providerThreadId: args.providerThreadId } : {},
+    scope,
+    threadId: args.threadId,
+    type: stored.type
+  });
+}
+function buildThreadEventRow2(args) {
+  const { event, ...row } = args;
+  return {
+    ...row,
+    type: event.type,
+    data: toStoredThreadEventData2(event)
+  };
+}
+function parseThreadEventRowInput2(row) {
+  return buildThreadEventRow2({
+    id: row.id,
+    scope: row.scope,
+    threadId: row.threadId,
+    seq: row.seq,
+    createdAt: row.createdAt,
+    event: parseStoredThreadEvent2({
+      type: row.type,
+      data: row.data,
+      threadId: row.threadId,
+      scope: row.scope
+    })
+  });
+}
+var threadEventRowSchema2 = threadEventRowInputSchema2.transform(
+  (row) => parseThreadEventRowInput2(row)
+);
+var TERMINAL_COLS_MAX2 = 500;
+var TERMINAL_ROWS_MAX2 = 200;
+var TERMINAL_DATA_MAX_BYTES2 = 64 * 1024;
+var TERMINAL_DATA_MAX_BASE64_LENGTH2 = Math.ceil(TERMINAL_DATA_MAX_BYTES2 / 3) * 4;
+var terminalBase64DataPattern2 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+var terminalSessionStatusValues2 = [
+  "starting",
+  "running",
+  "disconnected",
+  "exited"
+];
+var terminalSessionStatusSchema2 = external_exports.enum(
+  terminalSessionStatusValues2
+);
+var terminalSessionCloseReasonValues2 = [
+  "user",
+  "process-exit",
+  "daemon-disconnect",
+  "environment-destroyed",
+  "thread-archived",
+  "thread-deleted",
+  "open-timeout"
+];
+var terminalSessionCloseReasonSchema2 = external_exports.enum(
+  terminalSessionCloseReasonValues2
+);
+function getTerminalBase64DecodedByteLength2(value) {
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  return value.length / 4 * 3 - padding;
+}
+var terminalColsSchema2 = external_exports.number().int().positive().max(
+  TERMINAL_COLS_MAX2
+);
+var terminalRowsSchema2 = external_exports.number().int().positive().max(
+  TERMINAL_ROWS_MAX2
+);
+var terminalDataBase64Schema2 = external_exports.string().min(1).max(TERMINAL_DATA_MAX_BASE64_LENGTH2).regex(terminalBase64DataPattern2).refine(
+  (value) => getTerminalBase64DecodedByteLength2(value) <= TERMINAL_DATA_MAX_BYTES2,
+  {
+    message: `Terminal data must decode to ${TERMINAL_DATA_MAX_BYTES2} bytes or less`
+  }
+);
+var workspaceDiffTargetSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("uncommitted")
+  }),
+  external_exports.object({
+    type: external_exports.literal("branch_committed"),
+    mergeBaseBranch: external_exports.string().min(1)
+  }),
+  external_exports.object({
+    type: external_exports.literal("all"),
+    mergeBaseBranch: external_exports.string().min(1)
+  }),
+  external_exports.object({
+    type: external_exports.literal("commit"),
+    sha: external_exports.string().regex(/^[0-9a-f]{4,40}$/iu)
+  })
+]);
+var rawDiffFileStatSchema2 = external_exports.object({
+  path: external_exports.string(),
+  previousPath: external_exports.string().nullable(),
+  statusLetter: external_exports.enum(["A", "M", "D", "R", "C", "T"]),
+  additions: external_exports.number().int().nonnegative(),
+  deletions: external_exports.number().int().nonnegative(),
+  binary: external_exports.boolean(),
+  origin: external_exports.enum(["tracked", "untracked"])
+});
+var threadGitDiffResponseSchema2 = external_exports.object({
+  diff: external_exports.string(),
+  truncated: external_exports.boolean(),
+  shortstat: external_exports.string(),
+  files: external_exports.string(),
+  /**
+   * Resolved merge-base SHA for `branch_committed` / `all` targets — the
+   * exact ref the diff was computed against. `null` for targets that don't
+   * use a merge-base (`uncommitted`, `commit`), and also when no merge-base
+   * exists (e.g. the branch has been removed locally). Callers fetching
+   * per-file content for context expansion must pass this SHA as the
+   * "old side" ref so the file content lines up with the diff's hunk
+   * coordinates — passing the branch name reads from its current tip, which
+   * may have diverged past the merge-base.
+   */
+  mergeBaseRef: external_exports.string().nullable()
+});
+var threadSearchSourceKindValues2 = [
+  "title",
+  "title_fallback",
+  "user_message",
+  "assistant_message",
+  "system_message"
+];
+var threadSearchSourceKindSchema2 = external_exports.enum(
+  threadSearchSourceKindValues2
+);
+var threadTimelineActivePromptModeSchema2 = external_exports.object({
+  mode: external_exports.literal("plan"),
+  /**
+   * Any provider id. Eligibility is not this field's job: it comes from the
+   * provider declaring a `plan` composer action, so a plugin provider that
+   * declares one gets plan mode. This used to be `z.enum(["claude-code",
+   * "codex"])`, which made plan mode structurally unreachable for anyone
+   * else.
+   */
+  providerId: external_exports.string().min(1),
+  prompt: external_exports.string()
+}).strict();
+var threadTimelineModelFallbackSchema2 = external_exports.object({
+  sourceSeq: external_exports.number().int().nonnegative(),
+  detectedAt: external_exports.number(),
+  originalModel: external_exports.string().min(1),
+  fallbackModel: external_exports.string().min(1),
+  reason: external_exports.enum(["refusal", "provider"]),
+  message: external_exports.string()
+});
+var threadTimelinePendingTodoItemStatusSchema2 = external_exports.enum([
+  "pending",
+  "in_progress",
+  "completed"
+]);
+var threadTimelinePendingTodoItemSchema2 = external_exports.object({
+  id: external_exports.string(),
+  text: external_exports.string(),
+  status: threadTimelinePendingTodoItemStatusSchema2
+});
+var threadTimelinePendingTodosSchema2 = external_exports.object({
+  sourceSeq: external_exports.number().int().nonnegative(),
+  updatedAt: external_exports.number(),
+  items: external_exports.array(threadTimelinePendingTodoItemSchema2)
+});
+var threadVisibilityValues2 = ["visible", "hidden"];
+var threadVisibilitySchema2 = external_exports.enum(threadVisibilityValues2);
+var threadStatusValues2 = [
+  "pending",
+  "idle",
+  "starting",
+  "active",
+  "stopping",
+  "error"
+];
+var threadStatusSchema2 = external_exports.enum(threadStatusValues2);
+var threadOriginKindValues2 = ["fork"];
+var threadOriginKindSchema2 = external_exports.enum(threadOriginKindValues2);
+var threadRuntimeDisplayStatusValues2 = [
+  ...threadStatusValues2,
+  "provisioning",
+  "host-reconnecting",
+  "waiting-for-host"
+];
+var threadRuntimeDisplayStatusSchema2 = external_exports.enum(
+  threadRuntimeDisplayStatusValues2
+);
+var threadRuntimeStateSchema2 = external_exports.object({
+  displayStatus: threadRuntimeDisplayStatusSchema2,
+  hostReconnectGraceExpiresAt: external_exports.number().nullable()
+});
+var threadActivityStateSchema2 = external_exports.object({
+  activeWorkflowCount: external_exports.number().int().nonnegative(),
+  activeBackgroundAgentCount: external_exports.number().int().nonnegative(),
+  activeBackgroundCommandCount: external_exports.number().int().nonnegative(),
+  activePlanModeCount: external_exports.number().int().nonnegative(),
+  activeGoalCount: external_exports.number().int().nonnegative()
+});
+var workspaceStateValues2 = [
+  "clean",
+  "untracked",
+  "dirty_uncommitted",
+  "committed_unmerged",
+  "dirty_and_committed_unmerged"
+];
+var workspaceStateSchema2 = external_exports.enum(workspaceStateValues2);
+var workspaceFileStatusKindSchema2 = external_exports.enum([
+  "M",
+  "A",
+  "D",
+  "R",
+  "C",
+  "U",
+  "??",
+  /**
+   * Fallback for git status letters we don't recognize. Kept distinct from
+   * "M" so UI and consumers can surface the ambiguity rather than silently
+   * mislabeling the change.
+   */
+  "?"
+]);
+var workspaceFileStatusSchema2 = external_exports.object({
+  path: external_exports.string(),
+  status: workspaceFileStatusKindSchema2,
+  /**
+   * Per-file line counts from `git diff --numstat`. Null when the count is
+   * unknown — binary files (numstat reports `-`) and untracked files (numstat
+   * does not include them).
+   */
+  insertions: external_exports.number().nullable(),
+  deletions: external_exports.number().nullable()
+});
+var workspaceCommitSummarySchema2 = external_exports.object({
+  sha: external_exports.string(),
+  shortSha: external_exports.string(),
+  subject: external_exports.string(),
+  authorName: external_exports.string(),
+  authoredAt: external_exports.number()
+});
+var workspaceChangeStatsSchema2 = external_exports.object({
+  insertions: external_exports.number(),
+  deletions: external_exports.number(),
+  /** False when line totals omit files whose contents were intentionally not read. */
+  lineStatsComplete: external_exports.boolean(),
+  files: external_exports.array(workspaceFileStatusSchema2)
+});
+var workspaceWorkingTreeSchema2 = workspaceChangeStatsSchema2.extend({
+  hasUncommittedChanges: external_exports.boolean(),
+  state: workspaceStateSchema2
+});
+var workspaceBranchSchema2 = external_exports.object({
+  currentBranch: external_exports.string().nullable(),
+  defaultBranch: external_exports.string()
+});
+var workspaceMergeBaseSchema2 = workspaceChangeStatsSchema2.extend({
+  mergeBaseBranch: external_exports.string(),
+  baseRef: external_exports.string().nullable(),
+  aheadCount: external_exports.number(),
+  behindCount: external_exports.number(),
+  hasCommittedUnmergedChanges: external_exports.boolean(),
+  commits: external_exports.array(workspaceCommitSummarySchema2)
+});
+var workspaceStatusSchema2 = external_exports.object({
+  workingTree: workspaceWorkingTreeSchema2,
+  checkout: gitCheckoutRefSchema2,
+  branch: workspaceBranchSchema2,
+  mergeBase: workspaceMergeBaseSchema2.nullable()
+});
+var gitHostPullRequestCheckStatusSchema2 = external_exports.enum([
+  "queued",
+  "in_progress",
+  "completed",
+  "unknown"
+]);
+var gitHostPullRequestCheckConclusionSchema2 = external_exports.enum([
+  "success",
+  "failure",
+  "cancelled",
+  "skipped",
+  "neutral",
+  "timed_out",
+  "action_required",
+  "startup_failure",
+  "stale",
+  "unknown"
+]);
+var gitHostPullRequestCheckSchema2 = external_exports.object({
+  name: external_exports.string().min(1),
+  status: gitHostPullRequestCheckStatusSchema2,
+  conclusion: gitHostPullRequestCheckConclusionSchema2.nullable(),
+  url: external_exports.string().url().nullable(),
+  startedAt: external_exports.string().datetime().nullable()
+}).strict();
+var gitHostPullRequestReviewDecisionSchema2 = external_exports.enum([
+  "APPROVED",
+  "CHANGES_REQUESTED",
+  "REVIEW_REQUIRED"
+]);
+var gitHostPullRequestMergeStateStatusSchema2 = external_exports.enum([
+  "BEHIND",
+  "BLOCKED",
+  "CLEAN",
+  "DIRTY",
+  "DRAFT",
+  "HAS_HOOKS",
+  "UNKNOWN",
+  "UNSTABLE"
+]);
+var gitHostPullRequestMergeableSchema2 = external_exports.enum([
+  "CONFLICTING",
+  "MERGEABLE",
+  "UNKNOWN"
+]);
+var gitHostPullRequestSchema2 = external_exports.object({
+  number: external_exports.number().int().positive(),
+  title: external_exports.string(),
+  state: external_exports.enum(["OPEN", "CLOSED", "MERGED"]),
+  url: external_exports.string().url(),
+  isDraft: external_exports.boolean(),
+  baseRefName: external_exports.string(),
+  headRefName: external_exports.string(),
+  updatedAt: external_exports.string().datetime(),
+  checks: external_exports.array(gitHostPullRequestCheckSchema2),
+  reviewDecision: gitHostPullRequestReviewDecisionSchema2.nullable(),
+  reviewRequestCount: external_exports.number().int().nonnegative(),
+  mergeStateStatus: gitHostPullRequestMergeStateStatusSchema2.nullable(),
+  mergeable: gitHostPullRequestMergeableSchema2.nullable()
+}).strict();
+var pullRequestStateSchema2 = external_exports.enum([
+  "draft",
+  "open",
+  "merged",
+  "closed"
+]);
+var threadPullRequestChecksStateSchema2 = external_exports.enum([
+  "passing",
+  "failing",
+  "pending",
+  "no_checks",
+  "unknown"
+]);
+var threadPullRequestChecksSchema2 = external_exports.object({
+  state: threadPullRequestChecksStateSchema2,
+  totalCount: external_exports.number().int().nonnegative(),
+  passedCount: external_exports.number().int().nonnegative(),
+  failedCount: external_exports.number().int().nonnegative(),
+  pendingCount: external_exports.number().int().nonnegative()
+}).strict();
+var threadPullRequestReviewStateSchema2 = external_exports.enum([
+  "approved",
+  "changes_requested",
+  "review_required",
+  "review_requested",
+  "none"
+]);
+var threadPullRequestReviewSchema2 = external_exports.object({
+  state: threadPullRequestReviewStateSchema2,
+  reviewRequestCount: external_exports.number().int().nonnegative()
+}).strict();
+var threadPullRequestMergeabilityStateSchema2 = external_exports.enum([
+  "mergeable",
+  "conflicts",
+  "blocked",
+  "draft",
+  "unknown"
+]);
+var threadPullRequestMergeabilitySchema2 = external_exports.object({
+  state: threadPullRequestMergeabilityStateSchema2,
+  mergeStateStatus: gitHostPullRequestMergeStateStatusSchema2.nullable(),
+  mergeable: gitHostPullRequestMergeableSchema2.nullable()
+}).strict();
+var threadPullRequestAttentionStateSchema2 = external_exports.enum([
+  "checks_failed",
+  "checks_pending",
+  "changes_requested",
+  "review_requested",
+  "conflicts",
+  "blocked",
+  "draft",
+  "ready_to_merge",
+  "merged",
+  "closed",
+  "none"
+]);
+var threadPullRequestSchema2 = external_exports.object({
+  number: external_exports.number().int().positive(),
+  title: external_exports.string(),
+  state: pullRequestStateSchema2,
+  url: external_exports.string().url(),
+  baseRefName: external_exports.string(),
+  headRefName: external_exports.string(),
+  updatedAt: external_exports.string().datetime(),
+  checks: threadPullRequestChecksSchema2,
+  review: threadPullRequestReviewSchema2,
+  mergeability: threadPullRequestMergeabilitySchema2,
+  attention: threadPullRequestAttentionStateSchema2
+}).strict();
+var threadQueuedMessageSchema2 = external_exports.object({
+  id: external_exports.string(),
+  threadId: external_exports.string().optional(),
+  content: external_exports.array(promptInputSchema2).min(1),
+  model: external_exports.string().min(1),
+  reasoningLevel: reasoningLevelSchema2,
+  permissionMode: permissionModeSchema2,
+  serviceTier: serviceTierSchema2,
+  groupWithNext: external_exports.boolean(),
+  senderThreadId: external_exports.string().nullable().optional(),
+  sendAt: external_exports.number().int().nonnegative().nullable().default(null),
+  waitingOn: queuedMessageWaitingOnSchema2.nullable().default(null),
+  failureReason: queuedMessageFailureReasonSchema2.nullable().default(null),
+  payload: queuedMessagePayloadSchema2.default({ kind: "inline" }),
+  editable: external_exports.boolean().default(true),
+  createdAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+var threadSchema2 = external_exports.object({
+  id: external_exports.string(),
+  projectId: external_exports.string(),
+  environmentId: external_exports.string().nullable(),
+  providerId: external_exports.string(),
+  title: external_exports.string().nullable(),
+  titleFallback: external_exports.string().nullable(),
+  sectionId: external_exports.string().nullable(),
+  status: threadStatusSchema2,
+  parentThreadId: external_exports.string().nullable(),
+  sourceThreadId: external_exports.string().nullable(),
+  originKind: threadOriginKindSchema2.nullable(),
+  /** Id of the plugin that spawned this thread; null for non-plugin origins. */
+  originPluginId: external_exports.string().nullable(),
+  visibility: threadVisibilitySchema2,
+  archivedAt: external_exports.number().nullable(),
+  pinnedAt: external_exports.number().nullable(),
+  deletedAt: external_exports.number().nullable(),
+  lastReadAt: external_exports.number().nullable(),
+  latestAttentionAt: external_exports.number(),
+  createdAt: external_exports.number(),
+  updatedAt: external_exports.number()
+});
+var threadWithRuntimeSchema2 = threadSchema2.extend({
+  runtime: threadRuntimeStateSchema2
+});
+var threadQueuedWorkValues2 = ["none", "waiting", "failed"];
+var threadQueuedWorkSchema2 = external_exports.enum(threadQueuedWorkValues2);
+var threadListEntrySchema2 = threadWithRuntimeSchema2.extend({
+  activity: threadActivityStateSchema2,
+  queuedWork: threadQueuedWorkSchema2.default("none"),
+  pinSortKey: external_exports.string().nullable(),
+  hasPendingInteraction: external_exports.boolean(),
+  environmentHostId: external_exports.string().nullable(),
+  environmentName: external_exports.string().nullable(),
+  environmentBranchName: external_exports.string().nullable(),
+  environmentWorkspaceDisplayKind: environmentWorkspaceDisplayKindSchema2
+});
+var RUN_STATE_PRESENTATION2 = {
+  "in-progress": { icon: "Loading", label: "In progress", inFlight: true },
+  succeeded: { icon: "CircleCheck", label: "Succeeded", inFlight: false },
+  failed: { icon: "CircleX", label: "Failed", inFlight: false },
+  skipped: { icon: "ArrowTurnForward", label: "Skipped", inFlight: false }
+};
+var UPDATE_ACTION_ICON2 = "Download";
+var UPDATE_STATE_PRESENTATION2 = {
+  "up-to-date": {
+    icon: RUN_STATE_PRESENTATION2.succeeded.icon,
+    label: "Up to date",
+    tone: "muted"
+  },
+  "in-progress": {
+    icon: RUN_STATE_PRESENTATION2["in-progress"].icon,
+    label: "In progress",
+    tone: "muted",
+    inFlight: true
+  },
+  "update-available": {
+    icon: UPDATE_ACTION_ICON2,
+    label: "Update available",
+    tone: "muted"
+  },
+  "restart-required": {
+    icon: "ArrowReloadHorizontal",
+    label: "Downloaded",
+    tone: "muted"
+  },
+  "not-installed": { icon: "Download", label: "Not installed", tone: "muted" },
+  "update-manually": {
+    icon: "Terminal",
+    label: "Update in terminal",
+    tone: "muted"
+  },
+  failed: {
+    icon: RUN_STATE_PRESENTATION2.failed.icon,
+    label: "Failed",
+    tone: "error"
+  },
+  offline: { icon: "CircleX", label: "Offline", tone: "muted" }
+};
+var PROMPT_ATTACHMENT_MAX_BYTES2 = 35 * 1024 * 1024;
+var bashArgsSchema2 = external_exports.object({
+  command: external_exports.string().optional(),
+  cwd: external_exports.string().optional()
+}).passthrough();
+var textBlockSchema2 = external_exports.object({
+  type: external_exports.literal("text"),
+  text: external_exports.string()
+});
+var contentWrapperSchema2 = external_exports.object({
+  content: external_exports.array(external_exports.unknown())
+}).passthrough();
+var shellEnvironmentVariableKeySchema2 = external_exports.string().regex(/^[A-Z_][A-Z0-9_]*$/i);
+var MAX_JSON_RPC_LINE_BYTES2 = 64 * 1024 * 1024;
+var RECORDER_GLOBAL_KEY2 = Symbol.for("zcc.providerBridgeRecorder");
+var providerToolCallResponseSchema2 = external_exports.object({
+  success: external_exports.boolean(),
+  contentItems: external_exports.array(
+    external_exports.discriminatedUnion("type", [
+      external_exports.object({
+        type: external_exports.literal("inputText"),
+        text: external_exports.string()
+      }),
+      external_exports.object({
+        type: external_exports.literal("inputImage"),
+        imageUrl: external_exports.string().min(1)
+      })
+    ])
+  )
+});
+var bridgeRequestEnvelopeSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  id: external_exports.union([external_exports.string(), external_exports.number()]),
+  method: external_exports.string(),
+  params: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
+});
+var jsonRpcErrorSchema2 = external_exports.object({
+  code: external_exports.number(),
+  message: external_exports.string().optional(),
+  data: external_exports.unknown().optional()
+});
+var jsonRpcSuccessResponseSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  id: external_exports.union([external_exports.string(), external_exports.number()]),
+  result: external_exports.unknown()
+});
+var jsonRpcErrorResponseSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  id: external_exports.union([external_exports.string(), external_exports.number()]),
+  error: jsonRpcErrorSchema2
+});
+var recordSchema2 = external_exports.record(external_exports.string(), external_exports.unknown());
+var jsonRpcEnvelopeSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  method: external_exports.string(),
+  params: recordSchema2.optional()
+}).passthrough();
+var sdkMessageEnvelopeSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  method: external_exports.literal("sdk/message"),
+  params: external_exports.object({
+    message: external_exports.unknown(),
+    threadId: external_exports.string().optional(),
+    parent_tool_use_id: external_exports.string().optional()
+  }).passthrough()
+}).passthrough();
+var threadIdentityEnvelopeSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  method: external_exports.literal("thread/identity"),
+  params: external_exports.object({
+    threadId: external_exports.string().optional(),
+    providerThreadId: external_exports.string().optional()
+  }).passthrough()
+}).passthrough();
+var threadContextWindowUsageEnvelopeSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  method: external_exports.literal("thread/contextWindowUsage/updated"),
+  params: external_exports.object({
+    threadId: external_exports.string().optional(),
+    contextWindowUsage: external_exports.object({
+      usedTokens: external_exports.number().nullable(),
+      modelContextWindow: external_exports.number().nullable(),
+      estimated: external_exports.boolean()
+    })
+  }).passthrough()
+}).passthrough();
+var errorEnvelopeSchema2 = external_exports.object({
+  jsonrpc: external_exports.literal("2.0"),
+  method: external_exports.literal("error"),
+  params: external_exports.object({
+    message: external_exports.string().optional()
+  }).passthrough().optional()
+}).passthrough();
+function experimental_defineProviderBridge2(definition) {
+  return { experimental_apiVersion: 1, ...definition };
+}
+var normalizedToolCallRequestSchema2 = external_exports.object({
+  providerThreadId: external_exports.string().min(1),
+  threadId: external_exports.string().min(1).optional(),
+  // Canonical bridge wire form: required string when known, required null when
+  // the provider cannot resolve the ZCC turn id itself.
+  turnId: external_exports.union([external_exports.string().min(1), external_exports.null()]),
+  callId: external_exports.string().min(1),
+  tool: external_exports.string().min(1),
+  arguments: external_exports.unknown()
+});
+var providerRecoveryHintSchema2 = external_exports.object({
+  kind: providerRecoveryKindSchema2,
+  message: external_exports.string().min(1),
+  retryable: external_exports.boolean()
+});
+var bridgeErrorDataSchema2 = external_exports.object({ recovery: providerRecoveryHintSchema2.optional() }).passthrough();
+var ignoredJsonRpcResultSchema2 = external_exports.unknown();
+var PROVIDER_BRIDGE_PROTOCOL_VERSION2 = 2;
+var bridgeGrammarVersionsSchema2 = external_exports.tuple([external_exports.number().int().positive(), external_exports.number().int().positive()]).refine(([min, max]) => min <= max, {
+  message: "grammarVersions must be an ascending [min, max] range"
+});
+var bridgeSteerModeSchema2 = external_exports.enum(["inject", "queue"]);
+var bridgeCapabilitiesSchema2 = external_exports.object({
+  /**
+   * A released session can be re-attached later from its persisted
+   * providerThreadId. The per-session `sessionRestorable` flag on
+   * thread-identity results refines this (an agent update can drop restore
+   * support mid-flight); this handshake value is the default for sessions
+   * that do not say.
+   */
+  sessionRestore: external_exports.boolean().default(false),
+  /**
+   * The bridge mirrors zcc archive state into the provider's own session
+   * list. When false the runtime never sends thread/archive or
+   * thread/unarchive.
+   */
+  threadArchive: external_exports.boolean().default(false),
+  /**
+   * The bridge pushes zcc thread titles to the provider. When false the
+   * runtime never sends thread/name/set.
+   */
+  threadRename: external_exports.boolean().default(false),
+  /** The bridge supports thread/goal/clear. */
+  threadGoalClear: external_exports.boolean().default(false),
+  /**
+   * The bridge supports thread/backgroundTask/stop for one background task
+   * item. When false the runtime never sends it.
+   */
+  backgroundTaskStop: external_exports.boolean().default(false),
+  /**
+   * Session cloning support ({@link providerForkSchema} — the same
+   * vocabulary the provider declaration uses). The declaration is a ceiling
+   * for UI affordances; this is the operative truth, and it may only narrow
+   * the declaration, never widen it.
+   */
+  fork: providerForkSchema2.default("none"),
+  /**
+   * Where the thread's approval policy is enforced. "runtime" bridges
+   * forward every approval request and the runtime applies the thread
+   * policy (including auto-deny). "provider" bridges enforce policy before
+   * forwarding, so every forwarded request is already known to need user
+   * input and the runtime must not reclassify it against mutable thread
+   * settings.
+   */
+  approvalEnforcedBy: external_exports.enum(["runtime", "provider"]).default("runtime"),
+  /**
+   * The `thread/delta` grammar range this bridge speaks. A bridge that says
+   * nothing is read as speaking exactly the protocol version it negotiated,
+   * so the default is `[2, 2]` — never a wider range it never claimed.
+   * Every bridge in this repo emits v3 and reports `[3, 3]`, and the
+   * runtime's assembler speaks `[3, 3]` only (`ASSEMBLER_GRAMMAR_VERSIONS`),
+   * so a bridge that takes the default is refused at startup: the two
+   * ranges must intersect ({@link negotiateGrammarVersion}) and both sides
+   * emit the highest common version.
+   */
+  grammarVersions: bridgeGrammarVersionsSchema2.default([
+    PROVIDER_BRIDGE_PROTOCOL_VERSION2,
+    PROVIDER_BRIDGE_PROTOCOL_VERSION2
+  ]),
+  /**
+   * Mid-turn steer delivery ({@link bridgeSteerModeSchema}). Defaults to
+   * `queue`, the conservative reading: absence is the definite "no" the
+   * rest of this handshake uses, and `inject` is the stronger promise (the
+   * steer reaches the model before the turn ends) a bridge must make
+   * explicitly. Nothing in the runtime, server, or clients reads it today:
+   * `turn/steer` is sent either way, and a steer whose turn is gone is
+   * dropped on the bridge's `staleTurn` recovery hint or `NO_ACTIVE_TURN`
+   * error (`steerTurn` in @zana-ai/zcc-agent-runtime), whatever the mode. claude,
+   * codex, and pi declare `inject`; ACP and the echo example declare
+   * `queue`.
+   */
+  steerMode: bridgeSteerModeSchema2.default("queue"),
+  /**
+   * Which optional requests the bridge handles. `skills.configure`: the
+   * bridge accepts `skills/configure` (zcc's injected skill roots). When
+   * false the runtime never sends it, so a bridge that answers unknown
+   * methods with METHOD_NOT_FOUND — as the protocol instructs — still
+   * starts threads; it simply runs without injected skills. A bridge that
+   * handles the request declares it; the runtime never probes.
+   */
+  skills: external_exports.object({ configure: external_exports.boolean().default(false) }).default({ configure: false })
+}).passthrough();
+var initializeParamsSchema2 = external_exports.object({
+  protocolVersion: external_exports.number().int().positive(),
+  client: external_exports.object({ name: external_exports.string().min(1), version: external_exports.string().min(1) }),
+  /**
+   * The `thread/delta` grammar range the runtime's assembler accepts (see
+   * {@link negotiateGrammarVersion}). A runtime that predates the field
+   * reads as speaking exactly its protocol version.
+   */
+  grammarVersions: bridgeGrammarVersionsSchema2.default([
+    PROVIDER_BRIDGE_PROTOCOL_VERSION2,
+    PROVIDER_BRIDGE_PROTOCOL_VERSION2
+  ])
+}).passthrough();
+var initializeResultSchema2 = external_exports.object({
+  protocolVersion: external_exports.number().int().positive(),
+  // An absent capabilities block reads as "no capabilities" via the inner
+  // per-field defaults, so older bridges parse to explicit values.
+  capabilities: external_exports.preprocess(
+    (value) => value ?? {},
+    bridgeCapabilitiesSchema2
+  )
+}).passthrough();
+var bridgeExecutionOptionsSchema2 = external_exports.object({
+  model: external_exports.string().min(1).optional(),
+  serviceTier: serviceTierSchema2.optional(),
+  reasoningLevel: reasoningLevelSchema2.optional(),
+  /** Frozen for the life of a provider session; applied at construction. */
+  instructions: external_exports.string().optional(),
+  envVars: external_exports.record(external_exports.string(), external_exports.string()).optional(),
+  /** Provider-scoped session options. Opaque outside the owning bridge. */
+  providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
+}).and(runtimePermissionPolicySchema2);
+var BRIDGE_REQUEST_METHODS2 = {
+  initialize: "initialize",
+  modelList: "model/list",
+  providerHealth: "provider/health",
+  providerUsage: "provider/usage",
+  providerInstallationStatus: "provider/installation/status",
+  providerInstallationRun: "provider/installation/run",
+  threadStart: "thread/start",
+  threadResume: "thread/resume",
+  threadFork: "thread/fork",
+  threadStop: "thread/stop",
+  threadDiscard: "thread/discard",
+  threadNameSet: "thread/name/set",
+  threadArchive: "thread/archive",
+  threadUnarchive: "thread/unarchive",
+  threadGoalClear: "thread/goal/clear",
+  threadBackgroundTaskStop: "thread/backgroundTask/stop",
+  turnStart: "turn/start",
+  turnSteer: "turn/steer",
+  skillsConfigure: "skills/configure"
+};
+var bridgeRequestMethodValues2 = Object.values(
+  BRIDGE_REQUEST_METHODS2
+);
+var sessionKindSchema2 = external_exports.enum(["interactive", "automated"]);
+var sessionConstructionFields2 = {
+  sessionKind: sessionKindSchema2.optional().catch(void 0),
+  threadId: external_exports.string().min(1),
+  cwd: external_exports.string().min(1),
+  options: bridgeExecutionOptionsSchema2,
+  dynamicTools: external_exports.array(dynamicToolSchema2).optional(),
+  disallowedTools: external_exports.array(external_exports.string().min(1)).optional(),
+  instructionMode: instructionModeSchema2
+};
+var modelListParamsSchema2 = external_exports.object({ cwd: external_exports.string().min(1).optional() }).passthrough();
+var threadStartParamsSchema2 = external_exports.object({
+  ...sessionConstructionFields2,
+  input: external_exports.array(promptInputSchema2).optional()
+}).passthrough();
+var threadResumeParamsSchema2 = external_exports.object({
+  ...sessionConstructionFields2,
+  providerThreadId: external_exports.string().min(1)
+}).passthrough();
+var threadForkParamsSchema2 = external_exports.object({
+  ...sessionConstructionFields2,
+  sourceProviderThreadId: external_exports.string().min(1),
+  /**
+   * Absent means fork at the tip. Bridges whose handshake advertises
+   * `fork: "tip"` reject a request carrying a checkpoint instead of
+   * silently cloning more history than the zcc timeline shows.
+   */
+  sourceProviderCheckpointId: external_exports.string().min(1).optional()
+}).passthrough();
+var threadStopParamsSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  /**
+   * "interrupt" stops an active turn and settles it as interrupted.
+   * "release" detaches an idle session so its resources can be reclaimed;
+   * it must never fabricate an interruption. One verb serving both intents
+   * is the #1584 incident — the field is required.
+   */
+  intent: external_exports.enum(["interrupt", "release"]),
+  /** Non-null when the stop interrupts an active provider turn. */
+  activeTurnId: external_exports.string().min(1).nullable()
+}).passthrough();
+var threadRefParams2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1)
+}).passthrough();
+var threadBackgroundTaskStopParamsSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  providerItemId: external_exports.string().min(1)
+}).passthrough();
+var threadNameSetParamsSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  title: external_exports.string().min(1)
+}).passthrough();
+var turnInputFields2 = {
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  input: external_exports.array(promptInputSchema2),
+  clientRequestId: clientTurnRequestIdSchema2,
+  options: bridgeExecutionOptionsSchema2
+};
+var turnStartParamsSchema2 = external_exports.object(turnInputFields2).passthrough();
+var turnSteerParamsSchema2 = external_exports.object({
+  ...turnInputFields2,
+  expectedTurnId: external_exports.string().min(1)
+}).passthrough();
+var skillsConfigureRootSchema2 = external_exports.object({
+  id: external_exports.string().min(1),
+  path: external_exports.string().min(1),
+  skills: external_exports.array(
+    external_exports.object({
+      name: external_exports.string().min(1),
+      description: external_exports.string()
+    }).passthrough()
+  )
+}).passthrough();
+var skillsConfigureParamsSchema2 = external_exports.object({
+  roots: external_exports.array(skillsConfigureRootSchema2)
+}).passthrough();
+var threadIdentityResultSchema2 = external_exports.object({
+  providerThreadId: external_exports.string().min(1),
+  /** Refines the handshake's `sessionRestore` for this session. */
+  sessionRestorable: external_exports.boolean().optional()
+}).passthrough();
+var modelListResultSchema2 = external_exports.object({
+  models: external_exports.array(availableModelSchema2),
+  selectedOnlyModels: external_exports.array(availableModelSchema2).default([]),
+  acpMode: external_exports.object({
+    currentValue: external_exports.string().optional(),
+    options: external_exports.array(external_exports.object({ value: external_exports.string(), name: external_exports.string().optional() }))
+  }).optional()
+}).passthrough();
+var threadIdentityNotificationSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  providerThreadId: external_exports.string().min(1),
+  /** Refines the handshake's `sessionRestore` for this session. */
+  sessionRestorable: external_exports.boolean().optional()
+}).passthrough();
+var sessionReplacedNotificationSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  /** Identity of the replacement session (may equal the old identity). */
+  providerThreadId: external_exports.string().min(1).nullable(),
+  /** Human-readable cause, shown in the timeline. */
+  reason: external_exports.string().min(1),
+  /** True when provider-side context did not survive the replacement. */
+  contextLost: external_exports.boolean().default(false)
+}).passthrough();
+var threadOpenWorkNotificationSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  open: external_exports.boolean()
+}).passthrough();
+var providerRawNotificationSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1).optional(),
+  coverage: external_exports.enum(["noise", "unknown"]),
+  payload: external_exports.unknown()
+}).passthrough();
+var providerRecoveryNotificationSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1).optional(),
+  ...providerRecoveryHintSchema2.shape
+}).passthrough();
+var errorNotificationSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1).optional(),
+  message: external_exports.string().min(1)
+}).passthrough();
+var toolCallRequestParamsSchema2 = external_exports.object({
+  providerThreadId: external_exports.string().min(1),
+  threadId: external_exports.string().min(1).optional(),
+  turnId: external_exports.union([external_exports.string().min(1), external_exports.null()]),
+  callId: external_exports.string().min(1),
+  tool: external_exports.string().min(1),
+  arguments: external_exports.unknown()
+}).passthrough();
+var toolCallResultSchema2 = external_exports.object({
+  success: external_exports.boolean(),
+  contentItems: external_exports.array(
+    external_exports.discriminatedUnion("type", [
+      external_exports.object({ type: external_exports.literal("inputText"), text: external_exports.string() }),
+      external_exports.object({
+        type: external_exports.literal("inputImage"),
+        imageUrl: external_exports.string().min(1)
+      })
+    ])
+  )
+}).passthrough();
+var interactionRequestParamsSchema2 = external_exports.object({
+  providerThreadId: external_exports.string().min(1),
+  threadId: external_exports.string().min(1).optional(),
+  turnId: external_exports.union([external_exports.string().min(1), external_exports.null()]),
+  payload: pendingInteractionPayloadSchema2
+}).passthrough();
+var deltaPresentationSchema2 = threadEventItemPresentationSchema2;
+var THREAD_DELTA_KEY_SEPARATOR2 = "";
+var deltaKeyPartSchema2 = external_exports.string().min(1).refine((value) => !value.includes(THREAD_DELTA_KEY_SEPARATOR2), {
+  message: "provider keys must not contain the internal key separator (\\u001f)"
+});
+var deltaItemKeySchema2 = external_exports.object({
+  providerItemId: deltaKeyPartSchema2.optional(),
+  channel: deltaKeyPartSchema2.optional(),
+  parentRef: deltaKeyPartSchema2.optional()
+});
+var providerTurnIdSchema2 = deltaKeyPartSchema2;
+var deltaFileChangeSchema2 = external_exports.object({
+  path: external_exports.string(),
+  /** The bridge states the change kind; the assembler never derives it. */
+  kind: external_exports.enum(["add", "update", "delete"]),
+  movePath: external_exports.string().optional(),
+  /** Provider-supplied unified diff; preferred over old/new text building. */
+  diff: external_exports.string().optional(),
+  oldText: external_exports.string().optional(),
+  /** When present the assembler builds the unified diff from old/new text. */
+  newText: external_exports.string().optional()
+});
+var deltaBackgroundTaskShapeSchema2 = external_exports.object({
+  type: external_exports.literal("backgroundTask"),
+  /**
+   * The provider's stable task id, shared by every generation (restart) of
+   * the same task. Rides through to the canonical item so consumers can
+   * correlate a restarted task with its earlier generations — the assembler
+   * mints fresh item ids per generation, so identity must travel as data,
+   * never as id text.
+   */
+  familyId: external_exports.string().min(1),
+  taskType: external_exports.string(),
+  description: external_exports.string(),
+  status: threadEventItemStatusSchema2,
+  taskStatus: backgroundTaskStatusSchema2,
+  skipTranscript: external_exports.boolean(),
+  workflowName: external_exports.string().optional(),
+  workflow: workflowProgressSnapshotSchema2.optional(),
+  usage: backgroundTaskUsageSchema2.optional(),
+  summary: external_exports.string().optional(),
+  error: external_exports.string().optional(),
+  outputFile: external_exports.string().optional()
+});
+var deltaFileReadShapeSchema2 = external_exports.object({
+  type: external_exports.literal("fileRead"),
+  path: external_exports.string(),
+  cmd: external_exports.string().optional()
+});
+var deltaSearchShapeSchema2 = external_exports.object({
+  type: external_exports.literal("search"),
+  mode: threadEventSearchModeSchema2,
+  query: external_exports.string(),
+  path: external_exports.string().optional(),
+  cmd: external_exports.string().optional()
+});
+var deltaDelegationShapeSchema2 = external_exports.object({
+  type: external_exports.literal("delegation"),
+  childRef: deltaKeyPartSchema2,
+  label: external_exports.string(),
+  background: external_exports.boolean(),
+  summary: external_exports.string().optional()
+});
+var deltaPlanStepsShapeSchema2 = external_exports.object({
+  type: external_exports.literal("planSteps"),
+  steps: external_exports.array(threadEventPlanStepSchema2),
+  explanation: external_exports.string().optional()
+});
+var deltaExtensionShapeSchema2 = external_exports.object({
+  type: external_exports.literal("extension"),
+  kind: extensionKindSchema2,
+  payload: jsonValueSchema2
+});
+var deltaItemShapeSchema2 = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("command"),
+    command: external_exports.string(),
+    cwd: external_exports.string(),
+    aggregatedOutput: external_exports.string().optional(),
+    exitCode: external_exports.number().optional(),
+    durationMs: external_exports.number().optional()
+  }),
+  external_exports.object({
+    type: external_exports.literal("fileChange"),
+    /** Empty while a path is not yet known, including bare close fallbacks. */
+    changes: external_exports.array(deltaFileChangeSchema2)
+  }),
+  /**
+   * The generic tool call: the escape hatch for tools with no core kind. In
+   * grammar v3 the bridge says how the row reads through the delta's
+   * `presentation` (label, icon, suppression) instead of core keeping a
+   * tool-name table. A `tool` item without presentation is read as legacy
+   * data: `@zana-ai/zcc-domain/thread-runtime`'s `upgradeLegacyToolItem` reshapes read/grep/glob/
+   * find/ls by name and suppresses the Task- and Todo-family bookkeeping
+   * calls when the stored row is parsed, and any other name renders with
+   * the generic tool row — until the backfill migration, after which
+   * `presentation` is required.
+   */
+  external_exports.object({
+    type: external_exports.literal("tool"),
+    tool: external_exports.string(),
+    server: external_exports.string().optional(),
+    args: external_exports.unknown().optional(),
+    result: external_exports.unknown().optional(),
+    error: external_exports.string().optional(),
+    durationMs: external_exports.number().optional()
+  }),
+  external_exports.object({ type: external_exports.literal("compaction") }),
+  external_exports.object({ type: external_exports.literal("agentMessage"), text: external_exports.string() }),
+  external_exports.object({
+    type: external_exports.literal("reasoning"),
+    summary: external_exports.array(external_exports.string()),
+    content: external_exports.array(external_exports.string())
+  }),
+  external_exports.object({ type: external_exports.literal("plan"), text: external_exports.string() }),
+  external_exports.object({
+    type: external_exports.literal("webSearch"),
+    queries: external_exports.array(external_exports.string()).min(1)
+  }),
+  external_exports.object({
+    type: external_exports.literal("webFetch"),
+    url: external_exports.string(),
+    prompt: external_exports.string().nullable().optional(),
+    pattern: external_exports.string().nullable()
+  }),
+  external_exports.object({ type: external_exports.literal("imageView"), path: external_exports.string() }),
+  deltaBackgroundTaskShapeSchema2,
+  // Grammar v3 shapes. Every existing shape above is kept unchanged.
+  deltaFileReadShapeSchema2,
+  deltaSearchShapeSchema2,
+  deltaDelegationShapeSchema2,
+  deltaPlanStepsShapeSchema2,
+  deltaExtensionShapeSchema2
+]);
+var deltaProgressSnapshotSchema2 = external_exports.discriminatedUnion("type", [
+  deltaBackgroundTaskShapeSchema2,
+  deltaDelegationShapeSchema2
+]);
+var deltaTextChannelSchema2 = external_exports.enum([
+  "agentMessage",
+  "reasoningSummary",
+  "reasoningText",
+  "plan"
+]);
+var deltaOutputChannelSchema2 = external_exports.enum(["command", "fileChange"]);
+var deltaErrorSchema2 = external_exports.object({ message: external_exports.string() });
+var deltaAttachSchema2 = external_exports.enum(["open", "currentOrLast"]);
+var deltaNoTurnFallbackSchema2 = external_exports.object({
+  raw: providerRawEventSchema2,
+  rawType: external_exports.string()
+});
+function requireExtensionPresentation2(delta, ctx) {
+  if (delta.item.type === "extension" && delta.presentation === void 0) {
+    ctx.addIssue({
+      code: "custom",
+      message: "extension items require a presentation on item.open/item.close",
+      path: ["presentation"]
+    });
+  }
+}
+var threadDeltaSchema2 = external_exports.discriminatedUnion("kind", [
+  /**
+   * The provider consumed an input (immediate or steered). The assembler owns
+   * the queue-until-turn-opens behavior and the terminal-turn invariant.
+   * With `providerTurnId` the acceptance is emitted against that vouched turn
+   * directly (codex correlates acceptance to a named native turn).
+   */
+  external_exports.object({
+    kind: external_exports.literal("input.accepted"),
+    clientRequestId: clientTurnRequestIdSchema2,
+    providerTurnId: providerTurnIdSchema2.optional()
+  }),
+  /**
+   * Input the provider itself injected into the conversation, with no zcc
+   * client request behind it (a pi extension's `sendMessage` custom message
+   * that triggered or steered a turn). The assembler records it as a
+   * `userMessage` item in the open turn so the transcript shows what the
+   * model was answering. Dropped silently when no turn is open: the provider
+   * appended it to its own context without running the agent, so there is no
+   * zcc turn to attach it to.
+   */
+  external_exports.object({
+    kind: external_exports.literal("input.provider"),
+    text: external_exports.string().min(1),
+    parentRef: deltaKeyPartSchema2.optional()
+  }),
+  /**
+   * An explicit provider signal opened work (pi `agent_start`, codex
+   * `turn/started`). With `providerTurnId` the turn lives in the keyed
+   * provider-turn space: several may be open at once (codex multiplexes
+   * subagent child turns onto one thread) and none of the current-turn
+   * machinery is touched.
+   */
+  external_exports.object({
+    kind: external_exports.literal("turn.open"),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    /** Provider-native parent tool-call id for delegated child turns. */
+    parentRef: deltaKeyPartSchema2.optional()
+  }),
+  /**
+   * The bridge's conclusion that the turn settled. `claimIfIdle: true` marks
+   * fallback closers that own a turn only if accepted input is pending
+   * (the old bridge-kit terminal-turn rule, applied centrally); an open turn is
+   * always settled. A keyed boundary (`providerTurnId`) always emits — the
+   * provider named the turn — and settles only that turn.
+   */
+  external_exports.object({
+    kind: external_exports.literal("turn.boundary"),
+    status: threadEventTurnStatusSchema2,
+    error: deltaErrorSchema2.optional(),
+    providerCheckpointId: external_exports.string().min(1).optional(),
+    claimIfIdle: external_exports.boolean().optional(),
+    providerTurnId: providerTurnIdSchema2.optional()
+  }),
+  /**
+   * A parsed item opened. `attach: "currentOrLast"` pins the item to the turn
+   * that is open or just closed without opening a new one (pi threshold
+   * compaction); the default attaches to the open turn only. A known
+   * `providerItemId` reuses its minted zcc id (an explicit open reopens the
+   * same item, codex's settle/reopen rule).
+   */
+  external_exports.object({
+    kind: external_exports.literal("item.open"),
+    key: deltaItemKeySchema2,
+    item: deltaItemShapeSchema2,
+    /**
+     * Grammar v3: how the row reads, persisted with the opened item. The
+     * one place presentation travels. Optional for core shapes while v2
+     * deltas are accepted; REQUIRED for `extension` shapes.
+     */
+    presentation: deltaPresentationSchema2.optional(),
+    attach: deltaAttachSchema2.optional(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }).superRefine(requireExtensionPresentation2),
+  /**
+   * The item settled. `item` is REQUIRED and always carries the full terminal
+   * item shape (Michael's uniform close rule, 2026-08-18): the assembler
+   * builds the completed item from it. With a same-shaped item open under the
+   * key, the terminal shape wins and the opened item contributes only its
+   * minted id; with a different-shaped item open, the assembler closes the
+   * opened shape and then emits the terminal shape (ACP's dual-complete);
+   * with nothing open it builds the bare completed item.
+   *
+   * Provider-identified closes (`key.providerItemId`) dedup: a repeated close
+   * for a settled id is dropped and an explicit `item.open` reopens the id
+   * (codex retries the terminal notification after approvals).
+   */
+  external_exports.object({
+    kind: external_exports.literal("item.close"),
+    key: deltaItemKeySchema2,
+    status: threadEventItemStatusSchema2,
+    resultText: external_exports.string().optional(),
+    exitCode: external_exports.number().optional(),
+    aggregatedOutput: external_exports.string().optional(),
+    /** Terminal approval verdict (codex declined → denied). Default null. */
+    approvalStatus: external_exports.literal("denied").optional(),
+    item: deltaItemShapeSchema2,
+    /**
+     * Grammar v3: the terminal presentation. Like `item`, the close carries
+     * the full terminal form; when absent the opened item's presentation
+     * survives onto the completed item (close-echo). REQUIRED for an
+     * `extension` shape, which has nothing to echo without it.
+     */
+    presentation: deltaPresentationSchema2.optional(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }).superRefine(requireExtensionPresentation2),
+  /**
+   * Free-form progress on an open item (non-command tool updates), or — with
+   * `snapshot` — a re-embedded snapshot of work that outlives its turn: a
+   * background task (`item/backgroundTask/progress`) or, in grammar v3, a
+   * background delegation (`item/delegation/progress`); both thread-scoped,
+   * no turn required.
+   *
+   * Progress is throttled centrally by the assembler (one emission per item
+   * key per policy interval, 500ms default; the newest suppressed snapshot is
+   * flushed trailing-edge on the thread's next traffic once the window
+   * elapses, and an `item.close` supersedes it). `flush: true` bypasses the
+   * throttle and resets the window — status transitions must land immediately.
+   */
+  external_exports.object({
+    kind: external_exports.literal("item.progress"),
+    key: deltaItemKeySchema2,
+    message: external_exports.string().optional(),
+    snapshot: deltaProgressSnapshotSchema2.optional(),
+    flush: external_exports.boolean().optional(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }),
+  /**
+   * Streamed text — the one streaming dialect. Every text stream is keyed
+   * like every other item: by the provider's own item id when the provider
+   * names its message items (codex), or by a bridge-chosen `key.channel`
+   * (`"assistant"`, `"thinking-2"`) plus `key.parentRef` for providers whose
+   * streams are anonymous (claude, pi, acp). The first delta for an unknown
+   * key synthesizes the channel's `item/started`; later deltas (and deltas
+   * for a provider id already opened or settled) reuse the mapped id. The
+   * assembler accumulates the stream text per open item so `item.textClose`
+   * can settle without a provider-final text.
+   */
+  external_exports.object({
+    kind: external_exports.literal("item.textDelta"),
+    key: deltaItemKeySchema2,
+    channel: deltaTextChannelSchema2,
+    text: external_exports.string(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }),
+  /**
+   * Settle a text stream. `text` present: the provider's final text, preferred
+   * over the accumulated stream (and enough on its own — a close for a key
+   * nothing streamed under completes a fresh item). `text` absent: settle
+   * with the accumulated stream text, completing nothing when the stream only
+   * ever received whitespace. Either way the key is released, so later text
+   * mints a fresh item. `channel` says which item to mint for a bare close
+   * and where a provider-final `text` lands on a reasoning item. Providers
+   * that name their message items may instead settle through `item.close`
+   * with the full terminal shape (the uniform close rule) — that is the same
+   * item lifecycle, not a second streaming dialect.
+   */
+  external_exports.object({
+    kind: external_exports.literal("item.textClose"),
+    key: deltaItemKeySchema2,
+    channel: deltaTextChannelSchema2,
+    text: external_exports.string().optional(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }),
+  /**
+   * Item-keyed exact output append (codex command/fileChange output deltas).
+   * Never synthesizes an open and never diffs — the text is already a delta.
+   */
+  external_exports.object({
+    kind: external_exports.literal("item.outputDelta"),
+    key: deltaItemKeySchema2,
+    channel: deltaOutputChannelSchema2,
+    text: external_exports.string(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }),
+  /**
+   * Cumulative command output snapshot (pi bash). The assembler diffs
+   * consecutive snapshots into `outputDelta`/`reset` events.
+   */
+  external_exports.object({
+    kind: external_exports.literal("command.outputSnapshot"),
+    key: deltaItemKeySchema2,
+    text: external_exports.string(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }),
+  /**
+   * Provider-reported usage — the one usage dialect. `total` is the running
+   * session total and `last` the most recent turn's usage; a provider that
+   * reports exact cumulative totals (codex) forwards both verbatim, and a
+   * provider that reports per-turn usage (claude, pi) sums `last` into
+   * `total` itself (`addTokenUsage` in the bridge kit), resetting at every
+   * session construction alongside `session.reset`. Emits
+   * `thread/tokenUsage/updated` only: a provider whose usage also measures
+   * the context window sends the `contextWindow` delta beside it.
+   */
+  external_exports.object({
+    kind: external_exports.literal("usage"),
+    total: threadEventTokenUsageBreakdownSchema2,
+    last: threadEventTokenUsageBreakdownSchema2,
+    modelContextWindow: external_exports.number().nullable(),
+    providerTurnId: providerTurnIdSchema2.optional()
+  }),
+  /**
+   * Context-window meter. `attach: "currentOrLast"` legalizes post-turn
+   * attachment (pi reports after `agent_end` for the turn that just closed);
+   * a `providerTurnId` scopes the reading to that vouched turn instead
+   * (codex measures the window per native turn) and `attach` is then
+   * irrelevant.
+   */
+  external_exports.object({
+    kind: external_exports.literal("contextWindow"),
+    used: external_exports.number().nullable(),
+    size: external_exports.number().nullable().optional(),
+    estimated: external_exports.boolean(),
+    attach: deltaAttachSchema2,
+    providerTurnId: providerTurnIdSchema2.optional()
+  }),
+  external_exports.object({
+    kind: external_exports.literal("context.compacted"),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    noTurnFallback: deltaNoTurnFallbackSchema2.optional()
+  }),
+  external_exports.object({ kind: external_exports.literal("context.cleared") }),
+  /** The aggregate working-tree diff for a turn (codex turn/diff/updated). */
+  external_exports.object({
+    kind: external_exports.literal("turn.diff"),
+    diff: external_exports.string(),
+    providerTurnId: providerTurnIdSchema2.optional()
+  }),
+  // Thread metadata (codex thread lifecycle notifications).
+  external_exports.object({ kind: external_exports.literal("thread.started") }),
+  external_exports.object({
+    kind: external_exports.literal("thread.identity"),
+    providerThreadId: external_exports.string().min(1)
+  }),
+  external_exports.object({ kind: external_exports.literal("thread.name"), name: external_exports.string().min(1) }),
+  /**
+   * Plugin-declared thread state (grammar v3): `"<pluginId>/<name>"` kinds
+   * beside the core thread-state family (usage, context window, rate limits,
+   * model fallback, context cleared). Latest snapshot wins per kind — the
+   * assembler and the timeline keep one value per `kind`, so a bridge re-sends
+   * the whole state, never a diff. Codex goals ride this way (the codex
+   * plugin's `provider-codex/goal`, a null payload once cleared). The payload
+   * is opaque here; the server validates it against the plugin's declared
+   * `state` schema at ingest (the same site as extension items).
+   * The namespaced kind travels as `extensionKind` only because `kind` is
+   * this union's discriminator; the item shape and the persisted item call
+   * the same value `kind`.
+   */
+  external_exports.object({
+    kind: external_exports.literal("extension.state"),
+    extensionKind: extensionKindSchema2,
+    payload: jsonValueSchema2
+  }),
+  /**
+   * Normalized rate-limit snapshot. The provider-dialect merge (codex's
+   * sticky rateLimitReachedType over sparse rolling updates) stays
+   * bridge-side — it is seeded from a per-child post-initialize read the
+   * assembler never sees.
+   */
+  external_exports.object({
+    kind: external_exports.literal("provider.rateLimits"),
+    rateLimits: providerRateLimitStateSchema2
+  }),
+  /**
+   * Provider-reported error. `settlesTurn: true` also closes the turn that
+   * owns the error as failed (an open turn, or one claimed through pending
+   * accepted input). A `providerTurnId` scopes the error to that vouched
+   * turn; `threadScoped: true` pins thread scope (codex errors without a
+   * native turn id never attach to whatever turn happens to be open).
+   */
+  external_exports.object({
+    kind: external_exports.literal("provider.error"),
+    message: external_exports.string(),
+    detail: external_exports.string().optional(),
+    willRetry: external_exports.boolean().optional(),
+    category: providerErrorCategorySchema2.optional(),
+    errorInfo: providerErrorInfoSchema2.optional(),
+    settlesTurn: external_exports.boolean().optional(),
+    providerTurnId: providerTurnIdSchema2.optional(),
+    threadScoped: external_exports.boolean().optional()
+  }),
+  /**
+   * The provider switched models mid-flight (claude model fallback). Scoped to
+   * the open-or-just-closed turn when one exists, thread scope otherwise (the
+   * claude translator's currentOrLast rule). Cross-message dedup of the early
+   * assistant fallback block against the later system duplicate stays
+   * bridge-side — it is keyed by the bridge's own segment tracking.
+   */
+  external_exports.object({
+    kind: external_exports.literal("provider.modelFallback"),
+    originalModel: external_exports.string().min(1),
+    fallbackModel: external_exports.string().min(1),
+    reason: external_exports.enum(["refusal", "provider"]),
+    message: external_exports.string()
+  }),
+  /**
+   * `vouchedTurn: true` scopes the warning to the open turn when one exists
+   * (ACP warnings are turn-scoped mid-turn); default is thread scope.
+   */
+  external_exports.object({
+    kind: external_exports.literal("provider.warning"),
+    summary: external_exports.string().optional(),
+    details: external_exports.string().optional(),
+    category: threadEventWarningCategorySchema2.optional(),
+    vouchedTurn: external_exports.boolean().optional()
+  }),
+  /**
+   * The bridge's visibility classification decided this raw event is unknown.
+   * `vouchedTurn: true` scopes it to the open turn if one exists — the
+   * only-caller-vouched-turn-ids rule — and `providerTurnId` scopes it to
+   * that vouched provider turn. `onlyIfNoTurn: true` inverts the guard: the
+   * event surfaces only when NO turn is open (the old translators'
+   * "known event, no active turn" visibility fallback for events that
+   * otherwise translate to silence) and is dropped entirely mid-turn.
+   */
+  external_exports.object({
+    kind: external_exports.literal("unhandled"),
+    raw: providerRawEventSchema2,
+    rawType: external_exports.string(),
+    vouchedTurn: external_exports.boolean(),
+    onlyIfNoTurn: external_exports.boolean().optional(),
+    parentRef: deltaKeyPartSchema2.optional(),
+    providerTurnId: providerTurnIdSchema2.optional()
+  }),
+  /**
+   * Lifecycle settlement: the session was interrupted. The assembler closes
+   * the open turn and open items as interrupted.
+   */
+  external_exports.object({ kind: external_exports.literal("session.ended") }),
+  /**
+   * Provider-native id-space boundary: a new provider session was constructed
+   * for this thread (start/resume/fork/rebuild), so its native turn/item ids
+   * may repeat. Drops ALL assembly state for the thread — id maps, settled
+   * sets, open items and streams; the bridge settles any open work first
+   * (nothing is in flight at any construction site).
+   */
+  external_exports.object({ kind: external_exports.literal("session.reset") })
+]);
+var threadDeltaNotificationParamsSchema2 = external_exports.object({
+  threadId: external_exports.string().min(1),
+  deltas: external_exports.array(threadDeltaSchema2)
+}).passthrough();
+var providerMaintenanceParamsSchema2 = external_exports.object({
+  providerId: external_exports.string().min(1),
+  cwd: external_exports.string().min(1).optional(),
+  providerOptions: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
+}).passthrough();
+var providerInstallationRequirementSchema2 = external_exports.enum(["thread_rewind"]);
+var providerInstallationStatusParamsSchema2 = providerMaintenanceParamsSchema2.extend({
+  requirement: providerInstallationRequirementSchema2.optional()
+});
+var providerHealthSchema2 = external_exports.object({
+  status: external_exports.enum([
+    "ready",
+    "not_installed",
+    "unauthenticated",
+    "expired",
+    "unsupported_version",
+    "unknown"
+  ]),
+  statusMessage: external_exports.string().min(1).nullable(),
+  accountEmail: external_exports.string().nullable(),
+  planLabel: external_exports.string().min(1).nullable(),
+  installedVersion: external_exports.string().min(1).nullable(),
+  minimumSupportedVersion: external_exports.string().min(1).nullable(),
+  canInstall: external_exports.boolean(),
+  canUpdate: external_exports.boolean(),
+  loginCommand: external_exports.string().min(1).nullable()
+}).passthrough();
+var providerUsageWindowSchema2 = external_exports.object({
+  label: external_exports.string().min(1),
+  usedPercent: external_exports.number().min(0).max(100),
+  resetsAt: external_exports.string().min(1).nullable(),
+  cost: external_exports.object({
+    usedUsdCents: external_exports.number().int().nonnegative(),
+    limitUsdCents: external_exports.number().int().positive()
+  }).optional()
+}).passthrough();
+var providerUsageSchema2 = external_exports.discriminatedUnion("status", [
+  external_exports.object({
+    status: external_exports.literal("ok"),
+    accountEmail: external_exports.string().email().nullable(),
+    planLabel: external_exports.string().min(1).nullable(),
+    windows: external_exports.array(providerUsageWindowSchema2)
+  }).passthrough(),
+  external_exports.object({ status: external_exports.literal("not_installed") }).passthrough(),
+  external_exports.object({ status: external_exports.literal("unauthenticated") }).passthrough(),
+  external_exports.object({ status: external_exports.literal("expired") }).passthrough(),
+  external_exports.object({
+    status: external_exports.literal("error"),
+    message: external_exports.string().min(1),
+    planLabel: external_exports.string().min(1).nullable().default(null),
+    accountEmail: external_exports.string().nullable().default(null)
+  }).passthrough()
+]);
+var providerHealthResultSchema2 = external_exports.discriminatedUnion("supported", [
+  external_exports.object({ supported: external_exports.literal(false) }).passthrough(),
+  external_exports.object({
+    supported: external_exports.literal(true),
+    health: providerHealthSchema2
+  }).passthrough()
+]);
+var providerUsageResultSchema2 = external_exports.discriminatedUnion("supported", [
+  external_exports.object({ supported: external_exports.literal(false) }).passthrough(),
+  external_exports.object({
+    supported: external_exports.literal(true),
+    usage: providerUsageSchema2
+  }).passthrough()
+]);
+var providerInstallationActionKindSchema2 = external_exports.enum([
+  "install",
+  "update"
+]);
+var providerInstallationActionSchema2 = external_exports.object({
+  kind: providerInstallationActionKindSchema2,
+  label: external_exports.enum(["Install", "Update"]),
+  command: external_exports.string().min(1)
+}).passthrough();
+var providerInstallationSourceSchema2 = external_exports.enum([
+  "notInstalled",
+  "npmGlobal",
+  "external"
+]);
+var providerInstallationStatusSchema2 = external_exports.object({
+  executableName: external_exports.string().min(1),
+  executablePath: external_exports.string().min(1).nullable(),
+  installed: external_exports.boolean(),
+  installSource: providerInstallationSourceSchema2,
+  currentVersion: external_exports.string().min(1).nullable(),
+  latestVersion: external_exports.string().min(1).nullable(),
+  minimumSupportedVersion: external_exports.string().min(1).nullable(),
+  npmPackageName: external_exports.string().min(1).nullable(),
+  npmGlobalPackageVersion: external_exports.string().min(1).nullable(),
+  installAction: providerInstallationActionSchema2.nullable(),
+  needsUpdate: external_exports.boolean(),
+  versionUnsupported: external_exports.boolean()
+}).passthrough();
+var providerInstallationRunParamsSchema2 = providerMaintenanceParamsSchema2.extend({
+  action: providerInstallationActionKindSchema2
+});
+var providerInstallationCommandSchema2 = external_exports.object({
+  command: external_exports.string().min(1),
+  args: external_exports.array(external_exports.string()).max(64),
+  displayCommand: external_exports.string().min(1)
+}).passthrough();
+var providerInstallationVerificationSchema2 = external_exports.discriminatedUnion(
+  "kind",
+  [
+    external_exports.object({ kind: external_exports.literal("installed") }).passthrough(),
+    external_exports.object({
+      kind: external_exports.literal("version_changed"),
+      previousVersion: external_exports.string().min(1)
+    }).passthrough(),
+    external_exports.object({
+      kind: external_exports.literal("version_at_least"),
+      version: external_exports.string().min(1)
+    }).passthrough()
+  ]
+);
+var providerInstallationRunResultSchema2 = external_exports.discriminatedUnion(
+  "available",
+  [
+    external_exports.object({
+      available: external_exports.literal(false),
+      message: external_exports.string().min(1)
+    }).passthrough(),
+    external_exports.object({
+      available: external_exports.literal(true),
+      command: providerInstallationCommandSchema2,
+      verification: providerInstallationVerificationSchema2
+    }).passthrough()
+  ]
+);
 var workspaceOpenTargetIdSchema = external_exports.string().trim().min(1).max(200);
 var workspaceOpenTargetCapabilitiesSchema = external_exports.object({
   openDirectory: external_exports.boolean(),
@@ -33271,8 +39251,6 @@ var providerCliInstallEventSchema = external_exports.discriminatedUnion("type", 
   providerCliInstallCompletedEventSchema,
   providerCliInstallErrorEventSchema
 ]);
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/workspace.ts
 var workspaceResolutionFailureCodeSchema = external_exports.enum([
   "path_not_found",
   "not_git_repo",
@@ -33287,15 +39265,11 @@ var workspaceResolutionFailureSchema = external_exports.object({
   workspacePath: external_exports.string().min(1),
   message: external_exports.string().min(1)
 }).strict();
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/protocol.ts
 var HOST_ARTIFACT_MAX_BYTES = 256 * 1024 * 1024;
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/commands.ts
 var INJECTED_SKILL_NAME_PATTERN = /^(?!.*--)[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/u;
 var workspaceContextSchema = external_exports.object({
   workspacePath: external_exports.string().min(1),
-  workspaceProvisionType: workspaceProvisionTypeSchema
+  workspaceProvisionType: workspaceProvisionTypeSchema2
 });
 function isConnectBaseDomain(value) {
   try {
@@ -33353,10 +39327,10 @@ var hostDaemonAcpLaunchSpecSchema = external_exports.object({
   }).strict().transform(
     (modelCli) => modelCli.listArgs.length > 0 ? modelCli : void 0
   ).optional(),
-  reasoningCli: acpReasoningCliSchema.optional(),
-  nativeReasoning: acpNativeReasoningSchema.optional(),
-  nativeSkillRoots: providerNativeSkillRootsSchema.optional(),
-  permissionCli: acpPermissionCliSchema.optional()
+  reasoningCli: acpReasoningCliSchema2.optional(),
+  nativeReasoning: acpNativeReasoningSchema2.optional(),
+  nativeSkillRoots: providerNativeSkillRootsSchema2.optional(),
+  permissionCli: acpPermissionCliSchema2.optional()
 }).strict();
 var hostDaemonBridgeLaunchSchema = external_exports.object({
   // The plugin that ships this bridge. It names the artifact to fetch, and
@@ -33384,10 +39358,10 @@ var hostDaemonBridgeLaunchSchema = external_exports.object({
   // work the server already accepted.
   capabilities: external_exports.object({
     supportsServiceTier: external_exports.boolean(),
-    permissionModes: external_exports.array(permissionModeSchema).min(1),
+    permissionModes: external_exports.array(permissionModeSchema2).min(1),
     supportsThreadArchive: external_exports.boolean(),
     supportsThreadRename: external_exports.boolean(),
-    fork: providerForkSchema
+    fork: providerForkSchema2
   }).strict()
 }).strict();
 var hostDaemonThreadRuntimeContextSchema = external_exports.object({
@@ -33396,13 +39370,13 @@ var hostDaemonThreadRuntimeContextSchema = external_exports.object({
   providerId: external_exports.string().min(1),
   acpLaunchSpec: hostDaemonAcpLaunchSpecSchema.optional(),
   bridgeLaunch: hostDaemonBridgeLaunchSchema,
-  options: runtimeThreadExecutionOptionsSchema,
+  options: runtimeThreadExecutionOptionsSchema2,
   acpMode: external_exports.string().min(1).optional(),
   instructions: external_exports.string().min(1),
-  dynamicTools: external_exports.array(dynamicToolSchema),
+  dynamicTools: external_exports.array(dynamicToolSchema2),
   injectedSkillSources: external_exports.array(hostDaemonInjectedSkillSourceSchema),
   disallowedTools: external_exports.array(external_exports.string()).optional(),
-  instructionMode: instructionModeSchema
+  instructionMode: instructionModeSchema2
 }).strict();
 var hostDaemonExistingThreadRuntimeContextSchema = hostDaemonThreadRuntimeContextSchema.extend({
   providerThreadId: external_exports.string().min(1)
@@ -33437,13 +39411,13 @@ function refineGroupedInputMatchesFlatInput(value, ctx) {
 }
 var threadStartCommandSchema = hostDaemonThreadTargetSchema.merge(hostDaemonThreadRuntimeContextSchema).extend({
   type: external_exports.literal("thread.start"),
-  requestId: clientTurnRequestIdSchema,
+  requestId: clientTurnRequestIdSchema2,
   // A fork start establishes the cloned provider session with an empty
   // timeline (the runtime's no-input-no-turn guard leaves it idle), so it
   // carries no input. A non-fork start always runs a first turn and requires
   // at least one input, enforced by the refinement below.
-  input: external_exports.array(promptInputSchema),
-  inputGroups: external_exports.array(external_exports.array(promptInputSchema).min(1)).min(1).optional(),
+  input: external_exports.array(promptInputSchema2),
+  inputGroups: external_exports.array(external_exports.array(promptInputSchema2).min(1)).min(1).optional(),
   threadStoragePath: external_exports.string().min(1).optional(),
   /** Present means fork the new thread from this source provider session
    *  instead of starting fresh; absent means a normal start. */
@@ -33484,10 +39458,10 @@ var turnSubmitTargetSchema = external_exports.discriminatedUnion("mode", [
 ]);
 var turnSubmitCommandSchema = hostDaemonThreadTargetSchema.extend({
   type: external_exports.literal("turn.submit"),
-  requestId: clientTurnRequestIdSchema,
-  input: external_exports.array(promptInputSchema).min(1),
-  inputGroups: external_exports.array(external_exports.array(promptInputSchema).min(1)).min(1).optional(),
-  options: runtimeThreadExecutionOptionsSchema,
+  requestId: clientTurnRequestIdSchema2,
+  input: external_exports.array(promptInputSchema2).min(1),
+  inputGroups: external_exports.array(external_exports.array(promptInputSchema2).min(1)).min(1).optional(),
+  options: runtimeThreadExecutionOptionsSchema2,
   acpMode: external_exports.string().min(1).optional(),
   acpLaunchSpec: hostDaemonAcpLaunchSpecSchema.optional(),
   bridgeLaunch: hostDaemonBridgeLaunchSchema,
@@ -33501,7 +39475,7 @@ var threadStopCommandSchema = hostDaemonThreadTargetSchema.extend({
 }).strict();
 var threadGoalClearCommandSchema = hostDaemonThreadTargetSchema.extend({
   type: external_exports.literal("thread.goal.clear"),
-  options: runtimeThreadExecutionOptionsSchema,
+  options: runtimeThreadExecutionOptionsSchema2,
   acpLaunchSpec: hostDaemonAcpLaunchSpecSchema.optional(),
   bridgeLaunch: hostDaemonBridgeLaunchSchema,
   resumeContext: turnResumeContextSchema
@@ -33532,14 +39506,14 @@ var interactiveResolveCommandSchema = hostDaemonThreadTargetSchema.extend({
   providerId: external_exports.string().min(1),
   providerThreadId: external_exports.string().min(1),
   providerRequestId: external_exports.string().min(1),
-  resolution: pendingInteractionResolutionSchema
+  resolution: pendingInteractionResolutionSchema2
 }).strict();
 var codexInferenceCompleteCommandSchema = external_exports.object({
   type: external_exports.literal("codex.inference.complete"),
   model: external_exports.string().min(1),
   reasoningEffort: external_exports.literal("none"),
   prompt: external_exports.string().min(1),
-  outputSchema: jsonObjectSchema,
+  outputSchema: jsonObjectSchema2,
   timeoutMs: external_exports.number().int().positive()
 }).strict();
 var codexVoiceTranscribeCommandSchema = external_exports.object({
@@ -33671,7 +39645,7 @@ var pluginHostCallCommandSchema = external_exports.object({
   artifact: pluginHostArtifactSchema,
   callId: external_exports.string().min(1),
   method: external_exports.string().min(1),
-  input: jsonValueSchema,
+  input: jsonValueSchema2,
   timeoutMs: external_exports.number().int().positive().max(MAX_NODE_TIMER_DELAY_MS)
 }).strict();
 var pluginHostCancelCommandSchema = external_exports.object({
@@ -33720,8 +39694,8 @@ var hostListCommandsCommandSchema = external_exports.object({
   type: external_exports.literal("host.list_commands"),
   providerId: external_exports.string().min(1),
   cwd: external_exports.string().min(1).nullable(),
-  nativeSkillRoots: providerNativeSkillRootsSchema.optional(),
-  nativeRoots: providerNativeRootSetSchema.optional()
+  nativeSkillRoots: providerNativeSkillRootsSchema2.optional(),
+  nativeRoots: providerNativeRootSetSchema2.optional()
 }).strict();
 var skillRootKindSchema = external_exports.enum([
   "bb-project",
@@ -33746,7 +39720,7 @@ var hostListSkillsCommandSchema = external_exports.object({
   type: external_exports.literal("host.list_skills"),
   providerId: external_exports.string().min(1),
   cwd: external_exports.string().min(1).nullable(),
-  nativeSkillRoots: providerNativeSkillRootsSchema.optional()
+  nativeSkillRoots: providerNativeSkillRootsSchema2.optional()
 }).strict();
 var deletableSkillScopeSchema = external_exports.enum([
   "bb-user",
@@ -33821,7 +39795,7 @@ var hostListBranchesCommandSchema = external_exports.object({
   type: external_exports.literal("host.list_branches"),
   path: external_exports.string().min(1),
   query: external_exports.string().max(BRANCH_LIST_QUERY_MAX_LENGTH).optional(),
-  selectedBranch: gitBranchNameSchema.optional(),
+  selectedBranch: gitBranchNameSchema2.optional(),
   limit: external_exports.number().int().positive().max(BRANCH_LIST_LIMIT_MAX)
 });
 var providerListModelsCommandSchema = external_exports.object({
@@ -33853,12 +39827,12 @@ var environmentProvisionCommandBaseSchema = hostDaemonEnvironmentTargetSchema.ex
 var unmanagedCheckoutSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({
     kind: external_exports.literal("existing"),
-    name: gitBranchNameSchema
+    name: gitBranchNameSchema2
   }).strict(),
   external_exports.object({
     kind: external_exports.literal("new"),
-    name: gitBranchNameSchema,
-    baseBranch: gitBranchNameSchema
+    name: gitBranchNameSchema2,
+    baseBranch: gitBranchNameSchema2
   }).strict()
 ]);
 var unmanagedEnvironmentProvisionCommandSchema = environmentProvisionCommandBaseSchema.extend({
@@ -33874,12 +39848,12 @@ var managedEnvironmentProvisionFieldsSchema = external_exports.object({
   /** Target path for worktree/clone creation */
   targetPath: external_exports.string().min(1),
   /** Name of the new branch the daemon should create for this environment. */
-  branchName: gitBranchNameSchema,
+  branchName: gitBranchNameSchema2,
   /**
    * Branch on the source repo that the new branch should be based on. Pass
    * `null` to use the source's default branch (resolved by the daemon).
    */
-  baseBranch: gitBranchNameSchema.nullable(),
+  baseBranch: gitBranchNameSchema2.nullable(),
   /** Maximum time in ms to wait for the setup script */
   setupTimeoutMs: external_exports.number().int().positive()
 });
@@ -33905,25 +39879,25 @@ var environmentDestroyCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
 }).strict();
 var workspaceStatusCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
   type: external_exports.literal("workspace.status"),
-  mergeBaseBranch: gitBranchNameSchema.optional(),
+  mergeBaseBranch: gitBranchNameSchema2.optional(),
   maxUntrackedLineStatFiles: external_exports.number().int().positive(),
   maxUntrackedLineStatBytes: external_exports.number().int().positive()
 });
 var workspaceDiffCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
   type: external_exports.literal("workspace.diff"),
-  target: workspaceDiffTargetSchema,
+  target: workspaceDiffTargetSchema2,
   maxDiffBytes: external_exports.number().int().positive(),
   maxFileListBytes: external_exports.number().int().positive(),
   maxUntrackedFiles: external_exports.number().int().positive()
 });
 var workspaceDiffFilesCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
   type: external_exports.literal("workspace.diffFiles"),
-  target: workspaceDiffTargetSchema,
+  target: workspaceDiffTargetSchema2,
   maxFiles: external_exports.number().int().positive()
 });
 var workspaceDiffPatchCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
   type: external_exports.literal("workspace.diffPatch"),
-  target: workspaceDiffTargetSchema,
+  target: workspaceDiffTargetSchema2,
   paths: external_exports.array(external_exports.string()),
   maxBytesPerFile: external_exports.number().int().positive()
 });
@@ -33958,7 +39932,7 @@ var workspaceCommitCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
 }).strict();
 var workspaceSquashMergeCommandSchema = hostDaemonWorkspaceTargetSchema.extend({
   type: external_exports.literal("workspace.squash_merge"),
-  targetBranch: gitBranchNameSchema,
+  targetBranch: gitBranchNameSchema2,
   commitMessage: external_exports.string().min(1)
 }).strict();
 var fileReadResultSchema = external_exports.object({
@@ -33993,7 +39967,7 @@ var fileMetadataResultSchema = external_exports.object({
 var workspaceStatusResultSchema = external_exports.discriminatedUnion("outcome", [
   external_exports.object({
     outcome: external_exports.literal("available"),
-    workspaceStatus: workspaceStatusSchema
+    workspaceStatus: workspaceStatusSchema2
   }).strict(),
   external_exports.object({
     outcome: external_exports.literal("unavailable"),
@@ -34003,7 +39977,7 @@ var workspaceStatusResultSchema = external_exports.discriminatedUnion("outcome",
 var workspaceDiffResultSchema = external_exports.discriminatedUnion("outcome", [
   external_exports.object({
     outcome: external_exports.literal("available"),
-    diff: threadGitDiffResponseSchema
+    diff: threadGitDiffResponseSchema2
   }).strict(),
   external_exports.object({
     outcome: external_exports.literal("unavailable"),
@@ -34013,7 +39987,7 @@ var workspaceDiffResultSchema = external_exports.discriminatedUnion("outcome", [
 var workspaceDiffFilesResultSchema = external_exports.discriminatedUnion("outcome", [
   external_exports.object({
     outcome: external_exports.literal("available"),
-    files: external_exports.array(rawDiffFileStatSchema),
+    files: external_exports.array(rawDiffFileStatSchema2),
     shortstat: external_exports.string(),
     mergeBaseRef: external_exports.string().nullable(),
     truncated: external_exports.boolean()
@@ -34042,7 +40016,7 @@ var workspaceDiffPatchResultSchema = external_exports.discriminatedUnion("outcom
 var workspacePullRequestResultSchema = external_exports.discriminatedUnion("outcome", [
   external_exports.object({
     outcome: external_exports.literal("available"),
-    pullRequest: gitHostPullRequestSchema
+    pullRequest: gitHostPullRequestSchema2
   }).strict(),
   external_exports.object({ outcome: external_exports.literal("absent") }).strict(),
   external_exports.object({
@@ -34059,7 +40033,7 @@ var pathListResultSchema = external_exports.object({
   truncated: external_exports.boolean()
 });
 var hostPathMutationResultSchema = external_exports.object({ ok: external_exports.literal(true) }).strict();
-var pluginHostCallResultSchema = external_exports.object({ output: jsonValueSchema }).strict();
+var pluginHostCallResultSchema = external_exports.object({ output: jsonValueSchema2 }).strict();
 var pluginHostCancelResultSchema = external_exports.object({ cancelled: external_exports.boolean() }).strict();
 var pluginHostDisposeResultSchema = external_exports.object({ disposed: external_exports.boolean() }).strict();
 var commandListResultSchema = external_exports.object({
@@ -34103,8 +40077,8 @@ var writeSkillResultSchema = external_exports.discriminatedUnion("outcome", [
   })
 ]);
 var providerListModelsResultSchema = external_exports.object({
-  models: external_exports.array(availableModelSchema),
-  selectedOnlyModels: external_exports.array(availableModelSchema),
+  models: external_exports.array(availableModelSchema2),
+  selectedOnlyModels: external_exports.array(availableModelSchema2),
   acpMode: external_exports.object({
     currentValue: external_exports.string().optional(),
     options: external_exports.array(external_exports.object({ value: external_exports.string(), name: external_exports.string().optional() }))
@@ -34134,7 +40108,7 @@ var projectInspectResultSchema = projectPathResultSchema.extend({ gitRemoteUrl: 
 var projectCloneResultSchema = projectInspectResultSchema;
 var codexInferenceCompleteResultSchema = external_exports.object({
   model: external_exports.string().min(1),
-  value: jsonObjectSchema
+  value: jsonObjectSchema2
 });
 var codexVoiceTranscribeResultSchema = external_exports.object({
   model: external_exports.string().min(1),
@@ -34143,8 +40117,8 @@ var codexVoiceTranscribeResultSchema = external_exports.object({
 var codexVoiceStatusResultSchema = external_exports.object({
   state: external_exports.enum(["ready", "unverified", "missing"])
 });
-var environmentProvisionResultSchema = discoveredWorkspacePropertiesSchema.extend({
-  transcript: external_exports.array(provisioningTranscriptEntrySchema)
+var environmentProvisionResultSchema = discoveredWorkspacePropertiesSchema2.extend({
+  transcript: external_exports.array(provisioningTranscriptEntrySchema2)
 });
 var environmentProvisionCancelResultSchema = external_exports.object({
   aborted: external_exports.boolean()
@@ -34157,7 +40131,7 @@ var workspaceSquashMergeResultSchema = workspaceCommitResultSchema.extend({
   merged: external_exports.boolean()
 });
 var workspacePullRequestActionResultSchema = external_exports.object({}).strict();
-var providerUsageWindowSchema2 = external_exports.object({
+var providerUsageWindowSchema22 = external_exports.object({
   label: external_exports.string().min(1),
   usedPercent: external_exports.number().min(0).max(100),
   resetsAt: external_exports.string().min(1).nullable(),
@@ -34166,12 +40140,12 @@ var providerUsageWindowSchema2 = external_exports.object({
     limitUsdCents: external_exports.number().int().positive()
   }).optional()
 });
-var providerUsageSchema2 = external_exports.discriminatedUnion("status", [
+var providerUsageSchema22 = external_exports.discriminatedUnion("status", [
   external_exports.object({
     status: external_exports.literal("ok"),
     accountEmail: external_exports.string().email().nullable(),
     planLabel: external_exports.string().min(1).nullable(),
-    windows: external_exports.array(providerUsageWindowSchema2)
+    windows: external_exports.array(providerUsageWindowSchema22)
   }),
   external_exports.object({ status: external_exports.literal("not_installed") }),
   external_exports.object({ status: external_exports.literal("unauthenticated") }),
@@ -34189,9 +40163,9 @@ var providerUsageSchema2 = external_exports.discriminatedUnion("status", [
   })
 ]);
 var providerUsageResponseSchema = external_exports.object({
-  codex: providerUsageSchema2,
-  claudeCode: providerUsageSchema2,
-  cursor: providerUsageSchema2
+  codex: providerUsageSchema22,
+  claudeCode: providerUsageSchema22,
+  cursor: providerUsageSchema22
 });
 var providerUsageCommandSchema = external_exports.object({ type: external_exports.literal("provider.usage") }).strict();
 var discoveredRepoSchema = external_exports.object({
@@ -34613,7 +40587,7 @@ var hostDaemonCommandRegistry = {
   "host.list_branches": defineHostDaemonCommandDescriptor({
     type: "host.list_branches",
     schema: hostListBranchesCommandSchema,
-    resultSchema: projectSourceCheckoutSchema,
+    resultSchema: projectSourceCheckoutSchema2,
     transport: "onlineRpc",
     retryable: true,
     flushEventsBeforeResult: false,
@@ -34817,13 +40791,11 @@ var hostDaemonRpcCommandTypeSchema = external_exports.union([
 ]);
 var hostDaemonCommandResultSchemaByType = hostDaemonResultSchemaByTypeForTransport("settled");
 var hostDaemonOnlineRpcResultSchemaByType = hostDaemonResultSchemaByTypeForTransport("onlineRpc");
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/local-state.ts
 var nonEmptyTrimmedStringSchema = external_exports.string().trim().min(1);
 var hostAuthStateSchema = external_exports.object({
   hostId: external_exports.string().min(1),
   hostKey: nonEmptyTrimmedStringSchema,
-  hostType: hostTypeSchema,
+  hostType: hostTypeSchema2,
   // Legacy auth files included serverUrl. Accept it so old files keep
   // loading, but strip it from the parsed auth state.
   serverUrl: external_exports.unknown().optional()
@@ -34832,8 +40804,6 @@ var hostAuthStateSchema = external_exports.object({
   hostKey,
   hostType
 }));
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/session.ts
 var hostDaemonActiveThreadSchema = external_exports.object({
   threadId: external_exports.string().min(1)
 });
@@ -34868,7 +40838,7 @@ var hostDaemonSessionOpenRequestSchema = external_exports.object({
   hostId: external_exports.string().min(1),
   instanceId: external_exports.string().min(1),
   hostName: external_exports.string().min(1),
-  hostType: hostTypeSchema,
+  hostType: hostTypeSchema2,
   connectMachineId: external_exports.string().min(1).optional(),
   hasMachineCredential: external_exports.boolean(),
   platform: hostPlatformSchema,
@@ -34882,7 +40852,7 @@ var hostDaemonSessionOpenRequestSchema = external_exports.object({
 var hostDaemonEnrollRequestSchema = external_exports.object({
   hostId: external_exports.string().min(1),
   hostName: external_exports.string().min(1),
-  hostType: hostTypeSchema,
+  hostType: hostTypeSchema2,
   connectMachineId: external_exports.string().min(1).optional()
 }).strict();
 var hostDaemonEnrollResponseSchema = external_exports.object({
@@ -34921,7 +40891,7 @@ var hostDaemonProjectAttachmentContentQuerySchema = external_exports.object({
 });
 var hostDaemonEventEnvelopeSchema = external_exports.object({
   threadId: external_exports.string().min(1),
-  event: threadEventSchema
+  event: threadEventSchema2
 }).strict();
 var hostDaemonWireEventSchema = external_exports.unknown().superRefine((value, context) => {
   if (typeof value !== "object" || value === null) return;
@@ -34940,7 +40910,7 @@ var hostDaemonWireEventSchema = external_exports.unknown().superRefine((value, c
       path: ["item", "statusLabels"]
     });
   }
-}).pipe(threadEventSchema);
+}).pipe(threadEventSchema2);
 var hostDaemonEventGroupSchema = external_exports.object({
   threadId: external_exports.string().min(1),
   events: external_exports.array(hostDaemonWireEventSchema).min(1)
@@ -34967,7 +40937,7 @@ var hostDaemonEventBatchResponseSchema = external_exports.object({
   ),
   rejectedEvents: external_exports.array(hostDaemonRejectedEventSchema)
 }).strict();
-var hostDaemonEnvironmentChangeSchema = external_exports.enum(ENVIRONMENT_CHANGE_KINDS).extract([
+var hostDaemonEnvironmentChangeSchema = external_exports.enum(ENVIRONMENT_CHANGE_KINDS2).extract([
   "work-status-changed",
   "git-refs-changed",
   "thread-storage-changed"
@@ -34978,7 +40948,7 @@ var hostDaemonEnvironmentChangePayloadSchema = external_exports.object({
 });
 var hostDaemonEnvironmentMetadataChangePayloadSchema = external_exports.object({
   environmentId: external_exports.string().min(1),
-  workspace: discoveredWorkspacePropertiesSchema
+  workspace: discoveredWorkspacePropertiesSchema2
 }).strict();
 var hostDaemonSessionCloseReasonSchema = external_exports.enum([
   "replaced",
@@ -35101,7 +41071,7 @@ var hostDaemonOnlineRpcResponseMessageSchema = external_exports.union([
 ]);
 var hostDaemonTerminalOutputChunkSchema = external_exports.object({
   seq: external_exports.number().int().nonnegative(),
-  dataBase64: terminalDataBase64Schema
+  dataBase64: terminalDataBase64Schema2
 }).strict();
 var hostDaemonTerminalOpenTargetSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({
@@ -35120,8 +41090,8 @@ var hostDaemonTerminalOpenMessageSchema = external_exports.object({
   terminalId: terminalIdSchema,
   threadId: external_exports.string().min(1).optional(),
   target: hostDaemonTerminalOpenTargetSchema,
-  cols: terminalColsSchema,
-  rows: terminalRowsSchema,
+  cols: terminalColsSchema2,
+  rows: terminalRowsSchema2,
   start: external_exports.discriminatedUnion("mode", [
     external_exports.object({
       mode: external_exports.literal("shell")
@@ -35142,13 +41112,13 @@ var hostDaemonTerminalAttachMessageSchema = external_exports.object({
 var hostDaemonTerminalInputMessageSchema = external_exports.object({
   type: external_exports.literal("terminal.input"),
   terminalId: terminalIdSchema,
-  dataBase64: terminalDataBase64Schema
+  dataBase64: terminalDataBase64Schema2
 }).strict();
 var hostDaemonTerminalResizeMessageSchema = external_exports.object({
   type: external_exports.literal("terminal.resize"),
   terminalId: terminalIdSchema,
-  cols: terminalColsSchema,
-  rows: terminalRowsSchema
+  cols: terminalColsSchema2,
+  rows: terminalRowsSchema2
 }).strict();
 var hostDaemonTerminalCloseMessageSchema = external_exports.object({
   type: external_exports.literal("terminal.close"),
@@ -35192,7 +41162,7 @@ var pluginHostSignalMessageSchema = external_exports.object({
   pluginId: external_exports.string().min(1),
   generation: external_exports.string().min(1),
   signal: external_exports.string().min(1),
-  payload: jsonValueSchema
+  payload: jsonValueSchema2
 }).strict();
 var hostDaemonTerminalOpenedMessageSchema = external_exports.object({
   type: external_exports.literal("terminal.opened"),
@@ -35201,8 +41171,8 @@ var hostDaemonTerminalOpenedMessageSchema = external_exports.object({
   shell: external_exports.string().min(1),
   title: external_exports.string().min(1),
   initialCwd: external_exports.string().min(1),
-  cols: terminalColsSchema,
-  rows: terminalRowsSchema
+  cols: terminalColsSchema2,
+  rows: terminalRowsSchema2
 }).strict();
 var hostDaemonTerminalOutputMessageSchema = external_exports.object({
   type: external_exports.literal("terminal.output"),
@@ -35244,7 +41214,7 @@ var hostDaemonDaemonWsMessageSchema = external_exports.union([
   hostDaemonTerminalErrorMessageSchema,
   hostDaemonOnlineRpcResponseMessageSchema
 ]);
-var hostDaemonToolCallRequestSchema = toolCallRequestSchema.pick({
+var hostDaemonToolCallRequestSchema = toolCallRequestSchema2.pick({
   threadId: true,
   providerThreadId: true,
   turnId: true,
@@ -35256,7 +41226,7 @@ var hostDaemonToolCallRequestSchema = toolCallRequestSchema.pick({
 });
 var hostDaemonInteractiveRequestSchema = external_exports.object({
   sessionId: external_exports.string().min(1),
-  interaction: pendingInteractionCreateSchema
+  interaction: pendingInteractionCreateSchema2
 });
 var hostDaemonInteractiveRequestResponseSchema = external_exports.discriminatedUnion(
   "outcome",
@@ -35264,12 +41234,12 @@ var hostDaemonInteractiveRequestResponseSchema = external_exports.discriminatedU
     external_exports.object({
       outcome: external_exports.literal("created"),
       interactionId: external_exports.string().min(1),
-      status: pendingInteractionStatusSchema
+      status: pendingInteractionStatusSchema2
     }),
     external_exports.object({
       outcome: external_exports.literal("existing"),
       interactionId: external_exports.string().min(1),
-      status: pendingInteractionStatusSchema
+      status: pendingInteractionStatusSchema2
     }),
     external_exports.object({
       outcome: external_exports.literal("rejected"),
@@ -35296,8 +41266,6 @@ var hostDaemonSkillTreeSchema = external_exports.object({
   treeHash: external_exports.string().regex(/^[a-f0-9]{64}$/u),
   entries: external_exports.array(hostDaemonSkillTreeEntrySchema)
 }).strict();
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/desktop-browser-import.ts
 var DESKTOP_BROWSER_IMPORT_SOURCE_IDS = [
   "chrome",
   "chromium",
@@ -35371,8 +41339,6 @@ var DESKTOP_BROWSER_IMPORT_FAILURE_COPY = {
   unknownSourceProfile: "That browser profile no longer exists.",
   readFailed: "The browser's cookie database could not be read."
 };
-
-// D:/Dev/code/zana-plugins/.zana-sdk/packages/host-daemon-contract/src/desktop-browser.ts
 var id = external_exports.string().min(1).max(256);
 var desktopBrowserInstanceSchema = external_exports.object({
   instanceId: id,
@@ -35536,14 +41502,14 @@ var desktopBrowserChangedSchema = external_exports.object({
   tabs: external_exports.array(desktopBrowserTabSchema).max(1e3)
 }).strict();
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/native-auth.ts
+// src/native-auth.ts
 import { existsSync as existsSync6 } from "node:fs";
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/acp-session.ts
+// src/acp-session.ts
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/native-runtime.ts
+// src/native-runtime.ts
 import { execFile as execFile4, execFileSync } from "node:child_process";
 import {
   chmodSync,
@@ -35725,7 +41691,7 @@ function killProcessTree(child) {
   }
 }
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/acp-session.ts
+// src/acp-session.ts
 function describeAcpError(error62) {
   const [message, dataMessage, details] = [error62.message, error62.data?.message, error62.data?.details].map((value) => typeof value === "string" ? value.trim() : "");
   if (!message || message.toLowerCase() === "internal error") {
@@ -35854,7 +41820,6 @@ var NativeAcpSession = class _NativeAcpSession {
       this.later(options.timeoutMs, () => this.close(new Error(`Native ACP ${options.operation} timed out after ${options.timeoutMs}ms`)));
     }
   }
-  options;
   child;
   pending = /* @__PURE__ */ new Map();
   notificationListeners = [];
@@ -36078,11 +42043,11 @@ var NativeAcpSession = class _NativeAcpSession {
   }
 };
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/account-identity.ts
+// src/account-identity.ts
 import { createHash as createHash2 } from "node:crypto";
 import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/gemini-home.ts
+// src/gemini-home.ts
 import {
   copyFileSync,
   existsSync as existsSync3,
@@ -36336,7 +42301,7 @@ function prepareSanitizedGeminiHome(options) {
   };
 }
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/account-identity.ts
+// src/account-identity.ts
 var generation = 0;
 var ownWrites = /* @__PURE__ */ new Map();
 function fingerprintCredentials(env, authMethod) {
@@ -36400,7 +42365,6 @@ var AccountSnapshot = class _AccountSnapshot {
     this.effectiveEnv = withGeminiHome(target2.env, home.geminiHome);
     this.fingerprints = fingerprintAccount(target2.env ?? process.env, target2.authMethod);
   }
-  target;
   home;
   /** The caller's environment pointed at the managed home the runtime uses. */
   effectiveEnv;
@@ -36473,7 +42437,7 @@ function captureAccount(target2) {
   return new AccountSnapshot(target2, prepareSanitizedGeminiHome({ env: target2.env, authMethod: target2.authMethod }));
 }
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/keyed-refresh.ts
+// src/keyed-refresh.ts
 function remember(map2, key, value, maxKeys) {
   map2.delete(key);
   if (map2.size >= maxKeys) map2.delete(map2.keys().next().value);
@@ -36483,7 +42447,6 @@ var KeyedRefresh = class {
   constructor(policy = {}) {
     this.policy = policy;
   }
-  policy;
   running = /* @__PURE__ */ new Map();
   successes = /* @__PURE__ */ new Map();
   retryAfter = /* @__PURE__ */ new Map();
@@ -36524,7 +42487,7 @@ var KeyedRefresh = class {
   }
 };
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/native-usage.ts
+// src/native-usage.ts
 function parseNativeQuotaWindows(text) {
   const windows = [];
   let inQuotas = false;
@@ -36554,7 +42517,7 @@ function parseNativeQuotaWindows(text) {
   return windows;
 }
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/provider-config.ts
+// src/provider-config.ts
 var SIDE_PANEL_RECONNECT_HINT = 'Open the thread side panel \u2192 Antigravity account and click "Reconnect Antigravity".';
 var SIDE_PANEL_CHECK_AGAIN_HINT = 'Open the thread side panel \u2192 Antigravity account and click "Check again".';
 var AUTH_SIGN_IN_REQUIRED_ERROR = `Sign in required. ${SIDE_PANEL_RECONNECT_HINT}`;
@@ -36681,7 +42644,7 @@ function modelListFromReadiness(readiness) {
   } };
 }
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/readiness-store.ts
+// src/readiness-store.ts
 import { randomUUID } from "node:crypto";
 import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync5, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { dirname as dirname5, join as join5 } from "node:path";
@@ -36715,7 +42678,6 @@ var ReadinessStore = class {
   constructor(options = {}) {
     this.options = options;
   }
-  options;
   memory = null;
   now() {
     return this.options.now ? this.options.now() : Date.now();
@@ -36785,7 +42747,7 @@ var ReadinessStore = class {
 };
 var readinessStore = new ReadinessStore();
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/src/native-auth.ts
+// src/native-auth.ts
 var NATIVE_PROBE_TIMEOUT_MS = 2e4;
 var USAGE_CACHE_TTL_MS = 6e4;
 var USAGE_COMMANDS_WAIT_MS = 1e3;
@@ -37005,7 +42967,7 @@ async function probeNativeSession(options, account) {
   }
 }
 
-// D:/Dev/code/zana-plugins/plugins/provider-antigravity/host.ts
+// host.ts
 function getProviderOptionsFromParams(params) {
   if (!params || typeof params !== "object") return void 0;
   if (params.options?.providerOptions && typeof params.options.providerOptions === "object") {
@@ -37208,7 +43170,7 @@ function dispatchBridgeMessage(msg) {
   return { handled: false, rewritten: false };
 }
 var realAcpBridge = experimental_providerBridge;
-var experimental_providerBridge2 = experimental_defineProviderBridge({
+var experimental_providerBridge2 = experimental_defineProviderBridge2({
   handleLine: (line) => {
     try {
       const msg = JSON.parse(line);

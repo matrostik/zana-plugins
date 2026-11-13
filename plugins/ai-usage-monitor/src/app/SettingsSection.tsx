@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRpc, useSettings, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import { RPC_METHODS, type CloudConnectorStatus, type DashboardPayload } from '../shared/types.ts';
 import { formatRelativeTime, formatUsd } from './format.ts';
+import { ReloadSpinner } from './OverviewTab.tsx';
 import { ensureStylesInjected } from './styles.ts';
 
 function connectorBadgeState(conn: CloudConnectorStatus): { cls: string; label: string; detail: string } {
@@ -105,21 +106,38 @@ export function SettingsSection() {
       ? settings.values.subscriptionProviders
       : 'claude-code,codex,cursor,antigravity';
 
+  const isRefreshing = busy !== null || Boolean(data?.isSyncing);
+
   return (
     <div className="aum-root" style={{ height: 'auto', borderRadius: 8, border: '1px solid var(--aum-border)', padding: 14, gap: 12 }}>
       <div className="aum-row-between">
         <div>
-          <strong style={{ fontSize: 13 }}>AI Usage Monitor Status &amp; Sync Controls</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <strong style={{ fontSize: 13 }}>AI Usage Monitor Status &amp; Sync Controls</strong>
+            {isRefreshing && (
+              <span
+                className="aum-refresh-badge"
+                role="status"
+                aria-label="Syncing AI usage telemetry"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <ReloadSpinner />
+                <span>Refreshing</span>
+              </span>
+            )}
+          </div>
           <div className="aum-subtext">
             Last synced {formatRelativeTime(data?.lastSyncedAtMs)} • Subscription providers: <span className="aum-mono">{subProviders}</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className="aum-btn aum-btn-sm" disabled={busy !== null} onClick={() => void handleRefresh()}>
-            {busy === 'refresh' ? 'Syncing...' : 'Sync Now'}
+            {busy === 'refresh' && <ReloadSpinner />}
+            <span>{busy === 'refresh' ? 'Syncing...' : 'Sync Now'}</span>
           </button>
           <button type="button" className="aum-btn aum-btn-sm" disabled={busy !== null} onClick={() => void handleResetSync()}>
-            {busy === 'reset' ? 'Re-indexing...' : 'Re-index All Threads'}
+            {busy === 'reset' && <ReloadSpinner />}
+            <span>{busy === 'reset' ? 'Re-indexing...' : 'Re-index All Threads'}</span>
           </button>
           <button
             type="button"

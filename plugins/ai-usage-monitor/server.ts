@@ -239,6 +239,7 @@ export default async function createAiUsageMonitorPlugin(
   }
 
   let activeRefresh: Promise<void> | null = null;
+  const activeProviderRefreshes = new Map<string, Promise<void>>();
   function scheduleContinuation(): void {
     if (disposed || continuationTimer) return;
     continuationTimer = setTimeout(() => {
@@ -255,10 +256,46 @@ export default async function createAiUsageMonitorPlugin(
     await cloudBilling.collectAll();
   }
 
+  async function refreshProvider(providerId: string): Promise<void> {
+    const key = providerId.toLowerCase();
+    const existing = activeProviderRefreshes.get(key);
+    if (existing) return existing;
+
+    const run = (async () => {
+      try {
+        const vals = await refreshSettingsCache();
+        const [discovered] = await Promise.all([
+          zccQuotas.collectOne(providerId),
+          cloudBilling.collectOne(providerId),
+          key === 'opencode'
+            ? refreshOpenCodeLocalStats(vals).catch((err) => {
+                zcc.log.warn(`ai-usage-monitor: OpenCode local stats sync failed: ${errorMessage(err)}`);
+              })
+            : Promise.resolve()
+        ]);
+        if (discovered) {
+          const idx = discoveredProviders.findIndex((p) => p.providerId === discovered.providerId);
+          discoveredProviders =
+            idx >= 0
+              ? discoveredProviders.map((p, i) => (i === idx ? discovered : p))
+              : [...discoveredProviders, discovered];
+        }
+        await budgets.checkAndNotify();
+        zcc.realtime.publish(REALTIME_CHANNEL, { providerId, lastSyncedAtMs: now() });
+      } finally {
+        activeProviderRefreshes.delete(key);
+      }
+    })();
+
+    activeProviderRefreshes.set(key, run);
+    return run;
+  }
+
   async function refreshNow(opts: { timeBudgetMs?: number; continueBackfill?: boolean } = {}): Promise<void> {
     if (activeRefresh) return activeRefresh;
     activeRefresh = (async () => {
       isSyncing = true;
+      zcc.realtime.publish(REALTIME_CHANNEL, { syncing: true, lastSyncedAtMs });
       try {
         const vals = await refreshSettingsCache();
         const localPromise = refreshOpenCodeLocalStats(vals).catch((err) => {
@@ -353,6 +390,13 @@ export default async function createAiUsageMonitorPlugin(
   zcc.rpc.method(RPC_METHODS.refreshNow, async () => {
     await refreshNow({ timeBudgetMs: defaultBudgetMs, continueBackfill: true });
     return { ok: true, lastSyncedAtMs, isSyncing };
+  });
+
+  zcc.rpc.method(RPC_METHODS.refreshProvider, async (args) => {
+    const providerId = asString(asRecord(args), 'providerId').trim();
+    if (!providerId) throw new Error('providerId is required.');
+    await refreshProvider(providerId);
+    return { ok: true, providerId, lastSyncedAtMs };
   });
 
   zcc.rpc.method(RPC_METHODS.setBudget, async (args) => {

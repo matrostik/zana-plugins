@@ -151,6 +151,47 @@ describe('antigravity provider app slots', () => {
     slot.lifecycle.unmount();
   });
 
+  it('keeps previous subscription usage visible with a spinning indicator while refreshing and on transient error', async () => {
+    let callCount = 0;
+    let resolveSecond!: (value: unknown) => void;
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => makeDoctorStatus({ tierName: 'Google AI Pro' }),
+      'usage:status': () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            supported: true,
+            usage: {
+              status: 'ok',
+              planLabel: 'Google AI Pro',
+              checkedAt: 1793341520797,
+              windows: [{ label: 'Gemini Models — Weekly Limit Remaining', usedPercent: 86, resetsAt: null }]
+            }
+          };
+        }
+        return new Promise((resolve) => { resolveSecond = resolve; });
+      }
+    });
+
+    await slot.findByText('Antigravity Native ACP Connected');
+    ((await slot.findByText('Check subscription usage')) as HTMLElement).click();
+    await slot.findByText(/14% remaining/);
+
+    ((await slot.findByText('Refresh subscription usage')) as HTMLElement).click();
+    await slot.findByText('Checking usage...');
+    expect(document.body.textContent).toContain('14% remaining');
+    expect(document.querySelector('.agy-refresh-badge .agy-spinner')).toBeTruthy();
+
+    resolveSecond({
+      supported: true,
+      usage: { status: 'error', message: 'ACP probe timed out' }
+    });
+    await slot.findByText('ACP probe timed out');
+    expect(document.body.textContent).toContain('14% remaining');
+    expect(document.querySelector('.agy-refresh-badge')).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
   it('discards an in-flight usage response after sign-out', async () => {
     let finish!: (value: unknown) => void;
     const { slot } = await renderSettingsSlot({

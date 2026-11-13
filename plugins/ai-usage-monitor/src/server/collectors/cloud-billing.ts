@@ -287,22 +287,39 @@ export function createCloudBillingCollector(deps: CloudBillingCollectorDeps) {
     });
 
     if (res.configured) {
-      deps.store.upsertQuotaSnapshot({
-        providerId: 'opencode',
-        displayName: 'OpenCode',
-        source: res.source,
-        status: res.providerStatus,
-        accountLabel: res.accountLabel,
-        planLabel: res.planLabel,
-        billingMode: res.goSubscribed ? 'subscription' : 'billed_api',
-        windows: res.windows,
-        creditRemainingUsd: null,
-        creditLimitUsd: null,
-        creditUsedUsd: null,
-        billedCostUsd: res.reportedSpendUsd,
-        errorMessage: res.errorMessage,
-        updatedAtMs: ts
-      });
+      const existing = deps.store.listQuotaSnapshots().find((s) => s.providerId === 'opencode');
+      const preserveExisting =
+        res.status === 'error' &&
+        res.providerStatus === 'error' &&
+        res.qualificationState !== 'permission_required' &&
+        existing !== undefined &&
+        existing.windows.length > 0 &&
+        (existing.status === 'ok' || existing.status === 'warning' || existing.status === 'blocked');
+
+      if (preserveExisting && existing) {
+        deps.store.upsertQuotaSnapshot({
+          ...existing,
+          errorMessage: res.errorMessage,
+          updatedAtMs: ts
+        });
+      } else {
+        deps.store.upsertQuotaSnapshot({
+          providerId: 'opencode',
+          displayName: 'OpenCode',
+          source: res.source,
+          status: res.providerStatus,
+          accountLabel: res.accountLabel,
+          planLabel: res.planLabel,
+          billingMode: res.goSubscribed ? 'subscription' : 'billed_api',
+          windows: res.windows,
+          creditRemainingUsd: null,
+          creditLimitUsd: null,
+          creditUsedUsd: null,
+          billedCostUsd: res.reportedSpendUsd,
+          errorMessage: res.errorMessage,
+          updatedAtMs: ts
+        });
+      }
     }
 
     return {
@@ -333,9 +350,35 @@ export function createCloudBillingCollector(deps: CloudBillingCollectorDeps) {
     return results;
   }
 
+  async function collectOne(providerId: string): Promise<CloudConnectorStatus | null> {
+    const norm = providerId.trim().toLowerCase();
+    let slotIndex = -1;
+    let syncFn: ((keys: CloudBillingKeys, ts: number) => Promise<CloudConnectorStatus>) | null = null;
+
+    if (norm === 'openai' || norm === 'openai-api') {
+      slotIndex = 0;
+      syncFn = (keys, ts) => syncOpenAi(keys.openaiAdminKey ?? '', ts);
+    } else if (norm === 'anthropic' || norm === 'anthropic-api') {
+      slotIndex = 1;
+      syncFn = (keys, ts) => syncAnthropic(keys.anthropicAdminKey ?? '', ts);
+    } else if (norm === 'openrouter') {
+      slotIndex = 2;
+      syncFn = (keys, ts) => syncOpenRouter(keys.openrouterApiKey ?? '', ts);
+    } else if (norm === 'opencode') {
+      slotIndex = 3;
+      syncFn = (keys, ts) => syncOpenCode(keys.opencodeApiKey ?? '', keys.opencodeWorkspaceId ?? '', ts);
+    }
+
+    if (!syncFn || slotIndex < 0) return null;
+    const keys = await deps.getKeys();
+    const result = await syncFn(keys, now());
+    latestStatuses[slotIndex] = result;
+    return result;
+  }
+
   function getStatuses(): CloudConnectorStatus[] {
     return [...latestStatuses];
   }
 
-  return { collectAll, getStatuses };
+  return { collectAll, collectOne, getStatuses };
 }

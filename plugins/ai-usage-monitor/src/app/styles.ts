@@ -92,6 +92,16 @@ export const USAGE_MONITOR_STYLES = `
 .aum-btn-primary:hover:not(:disabled) { filter: brightness(1.1); background: var(--aum-accent); }
 .aum-btn-danger { color: #fb7185; border-color: rgba(244, 63, 94, 0.35); }
 .aum-btn-sm { padding: 3px 8px; font-size: 11px; }
+.aum-icon-btn {
+  appearance: none; background: var(--aum-surface-2); color: var(--aum-muted);
+  border: 1px solid var(--aum-border-strong); width: 22px; height: 22px; padding: 0;
+  border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+.aum-icon-btn:hover:not(:disabled) {
+  color: var(--aum-text); background: var(--aum-surface-3); border-color: #4b5563;
+}
+.aum-icon-btn:disabled { opacity: 0.45; cursor: default; }
 
 .aum-input, .aum-select {
   background: var(--aum-surface-2); color: var(--aum-text);
@@ -112,6 +122,22 @@ export const USAGE_MONITOR_STYLES = `
 .aum-pill-cyan { background: rgba(6, 182, 212, 0.12); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }
 .aum-pill-neutral { background: var(--aum-surface-2); color: var(--aum-muted); border: 1px solid var(--aum-border-strong); }
 
+.aum-spinner {
+  width: 12px; height: 12px; display: inline-block; flex-shrink: 0;
+  animation: aum-spin 0.85s linear infinite;
+}
+.aum-refresh-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500;
+  font-family: var(--aum-mono); color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.28);
+}
+.aum-stale-warn { color: #fbbf24; font-size: 10px; }
+@keyframes aum-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .aum-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .aum-prov-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .aum-split-2 { display: grid; grid-template-columns: 1.55fr 1fr; gap: 10px; }
@@ -128,10 +154,12 @@ export const USAGE_MONITOR_STYLES = `
 .aum-card {
   background: var(--aum-surface); border: 1px solid var(--aum-border); border-radius: 7px;
   padding: 12px 14px; display: flex; flex-direction: column; gap: 9px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .aum-card:hover { border-color: var(--aum-border-strong); }
 .aum-card-amber { border-color: rgba(245, 158, 11, 0.38); }
 .aum-card-rose { border-color: rgba(244, 63, 94, 0.42); }
+.aum-card-refreshing { border-color: rgba(59, 130, 246, 0.42); box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.14); }
 .aum-card-reordering { cursor: grab; border-style: dashed; border-color: rgba(99, 102, 241, 0.45); }
 .aum-card-reordering:hover { border-color: #818cf8; }
 .aum-card-dragging { opacity: 0.48; }
@@ -208,7 +236,13 @@ export const USAGE_MONITOR_STYLES = `
 
 export function ensureStylesInjected(): void {
   if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ELEMENT_ID)) return;
+  const existing = document.getElementById(STYLE_ELEMENT_ID);
+  if (existing) {
+    if (existing.textContent !== USAGE_MONITOR_STYLES) {
+      existing.textContent = USAGE_MONITOR_STYLES;
+    }
+    return;
+  }
   const style = document.createElement('style');
   style.id = STYLE_ELEMENT_ID;
   style.textContent = USAGE_MONITOR_STYLES;

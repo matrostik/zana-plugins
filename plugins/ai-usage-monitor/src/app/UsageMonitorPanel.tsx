@@ -15,25 +15,75 @@ import {
 import { formatRangeBoundarySummary, formatRelativeTime } from './format.ts';
 import { LogsTab } from './LogsTab.tsx';
 import { ModelsSpendTab } from './ModelsSpendTab.tsx';
-import { OverviewTab } from './OverviewTab.tsx';
+import { OverviewTab, ReloadSpinner } from './OverviewTab.tsx';
 import { ensureStylesInjected } from './styles.ts';
 
 type ActiveTab = 'overview' | 'models' | 'logs';
 
+interface AntigravityUsageEnvelope {
+  supported?: boolean;
+  refreshError?: string | null;
+  usage?: {
+    status?: string;
+    message?: string;
+    planLabel?: string | null;
+    windows?: Array<{ label: string; usedPercent: number; resetsAt: string | null }>;
+  };
+}
+
+function hasValidAntigravityWindows(raw: unknown): boolean {
+  const result = raw as AntigravityUsageEnvelope | null;
+  return Boolean(
+    result?.supported &&
+    result.usage?.status === 'ok' &&
+    Array.isArray(result.usage.windows) &&
+    result.usage.windows.length > 0
+  );
+}
+
 function applyAntigravityUsage(provider: ProviderQuotaSnapshot, raw: unknown): ProviderQuotaSnapshot {
-  const result = raw as { supported?: boolean; usage?: { status?: string; message?: string; planLabel?: string | null; windows?: Array<{ label: string; usedPercent: number; resetsAt: string | null }> } };
+  const result = raw as AntigravityUsageEnvelope | null;
   const usage = result?.usage;
-  if (!result?.supported || usage?.status !== 'ok' || !Array.isArray(usage.windows)) {
-    return { ...provider, status: 'error', windows: [], errorMessage: usage?.message ?? 'Could not check Antigravity usage.' };
+  if (usage?.status === 'unauthenticated' || usage?.status === 'not_installed') {
+    return {
+      ...provider,
+      status: usage.status,
+      windows: [],
+      errorMessage: usage.message ?? null
+    };
   }
-  const windows = usage.windows.filter((w) => typeof w.label === 'string' && Number.isFinite(w.usedPercent) && w.usedPercent >= 0 && w.usedPercent <= 100).map((w, i) => ({
-    key: `antigravity-${i}`, label: w.label, usedPercent: w.usedPercent, remainingPercent: Math.round((100 - w.usedPercent) * 10) / 10,
-    status: (w.usedPercent >= 100 ? 'blocked' : w.usedPercent >= 75 ? 'warning' : 'allowed') as 'blocked' | 'warning' | 'allowed',
-    resetsAtIso: w.resetsAt ?? null
-  }));
-  if (!windows.length) return { ...provider, status: 'error', windows: [], errorMessage: 'Antigravity returned no quota windows.' };
-  return { ...provider, status: windows.some((w) => w.status === 'blocked') ? 'blocked' : windows.some((w) => w.status === 'warning') ? 'warning' : 'ok',
-    source: 'native-acp-/usage', planLabel: usage.planLabel ?? provider.planLabel, errorMessage: null, windows };
+  if (!result?.supported || usage?.status !== 'ok' || !Array.isArray(usage.windows)) {
+    const message = usage?.message ?? 'Could not check Antigravity usage.';
+    if (provider.windows.length > 0) {
+      return { ...provider, errorMessage: message };
+    }
+    return { ...provider, status: 'error', windows: [], errorMessage: message };
+  }
+  const windows = usage.windows
+    .filter((w) => typeof w.label === 'string' && Number.isFinite(w.usedPercent) && w.usedPercent >= 0 && w.usedPercent <= 100)
+    .map((w, i) => ({
+      key: `antigravity-${i}`,
+      label: w.label,
+      usedPercent: w.usedPercent,
+      remainingPercent: Math.round((100 - w.usedPercent) * 10) / 10,
+      status: (w.usedPercent >= 100 ? 'blocked' : w.usedPercent >= 75 ? 'warning' : 'allowed') as 'blocked' | 'warning' | 'allowed',
+      resetsAtIso: w.resetsAt ?? null
+    }));
+  if (!windows.length) {
+    const message = 'Antigravity returned no quota windows.';
+    if (provider.windows.length > 0) {
+      return { ...provider, errorMessage: message };
+    }
+    return { ...provider, status: 'error', windows: [], errorMessage: message };
+  }
+  return {
+    ...provider,
+    status: windows.some((w) => w.status === 'blocked') ? 'blocked' : windows.some((w) => w.status === 'warning') ? 'warning' : 'ok',
+    source: 'native-acp-/usage',
+    planLabel: usage.planLabel ?? provider.planLabel,
+    errorMessage: result.refreshError ?? null,
+    windows
+  };
 }
 
 const EMPTY_LOGS: LogsResponse = {
@@ -73,10 +123,13 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
   const [logSearch, setLogSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshingProviders, setRefreshingProviders] = useState<ReadonlySet<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [antigravityUsage, setAntigravityUsage] = useState<unknown>(null);
+  const [antigravityRefreshing, setAntigravityRefreshing] = useState(false);
   const [quotaRefresh, setQuotaRefresh] = useState(0);
   const mountedRef = useRef(true);
+  const antigravitySeqRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -120,18 +173,46 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
     void loadAll();
   }, [loadAll]);
 
+  const probeAntigravityDirect = useCallback(async () => {
+    const seq = ++antigravitySeqRef.current;
+    setAntigravityRefreshing(true);
+    try {
+      const result = await callPluginRpc('provider-antigravity', 'usage:status');
+      if (!mountedRef.current || seq !== antigravitySeqRef.current) return;
+      const next = result as AntigravityUsageEnvelope | null;
+      if (hasValidAntigravityWindows(next) || next?.usage?.status === 'unauthenticated' || next?.usage?.status === 'not_installed') {
+        setAntigravityUsage(next);
+        return;
+      }
+      setAntigravityUsage((prev: unknown) =>
+        hasValidAntigravityWindows(prev)
+          ? { ...(prev as AntigravityUsageEnvelope), refreshError: next?.usage?.message ?? 'Could not refresh Antigravity usage.' }
+          : next
+      );
+    } catch {
+      if (!mountedRef.current || seq !== antigravitySeqRef.current) return;
+      setAntigravityUsage((prev: unknown) =>
+        hasValidAntigravityWindows(prev)
+          ? { ...(prev as AntigravityUsageEnvelope), refreshError: 'Could not refresh Antigravity usage.' }
+          : { supported: false }
+      );
+    } finally {
+      if (mountedRef.current && seq === antigravitySeqRef.current) {
+        setAntigravityRefreshing(false);
+      }
+    }
+  }, []);
+
   const hasAntigravity = dashboard?.providers.some((provider) => provider.providerId === 'antigravity' && provider.available) ?? false;
   useEffect(() => {
-    if (!hasAntigravity) return;
-    let current = true;
-    setAntigravityUsage(null);
-    void callPluginRpc('provider-antigravity', 'usage:status').then((result) => {
-      if (current) setAntigravityUsage(result);
-    }).catch(() => {
-      if (current) setAntigravityUsage({ supported: false });
-    });
-    return () => { current = false; };
-  }, [hasAntigravity, quotaRefresh]);
+    if (!hasAntigravity) {
+      antigravitySeqRef.current += 1;
+      setAntigravityUsage(null);
+      setAntigravityRefreshing(false);
+      return;
+    }
+    void probeAntigravityDirect();
+  }, [hasAntigravity, probeAntigravityDirect, quotaRefresh]);
 
   useRealtime(REALTIME_CHANNEL, () => {
     void loadAll();
@@ -149,6 +230,33 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
       }
     } finally {
       if (mountedRef.current) setRefreshing(false);
+    }
+  }
+
+  async function handleRefreshProvider(providerId: string) {
+    setRefreshingProviders((prev) => {
+      const next = new Set(prev);
+      next.add(providerId);
+      return next;
+    });
+    try {
+      await Promise.all([
+        rpcRef.current.call(RPC_METHODS.refreshProvider, { providerId }),
+        providerId === 'antigravity' ? probeAntigravityDirect() : Promise.resolve()
+      ]);
+      await loadAll();
+    } catch (err) {
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      if (mountedRef.current) {
+        setRefreshingProviders((prev) => {
+          const next = new Set(prev);
+          next.delete(providerId);
+          return next;
+        });
+      }
     }
   }
 
@@ -187,6 +295,20 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
   }
 
   const boundarySummary = formatRangeBoundarySummary(dashboard?.kpis.rangeBounds);
+  const isGlobalRefreshing = refreshing || Boolean(dashboard?.isSyncing);
+  const refreshingProviderIds = new Set<string>(refreshingProviders);
+  if (dashboard) {
+    if (isGlobalRefreshing) {
+      for (const provider of dashboard.providers) {
+        if (provider.available && provider.status !== 'not_installed') {
+          refreshingProviderIds.add(provider.providerId);
+        }
+      }
+    }
+    if (hasAntigravity && antigravityRefreshing) {
+      refreshingProviderIds.add('antigravity');
+    }
+  }
 
   return (
     <div className="aum-root">
@@ -213,8 +335,14 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
             ))}
           </div>
 
-          <span className="aum-subtext aum-mono">
-            {dashboard?.isSyncing ? 'Syncing telemetry...' : `Synced ${formatRelativeTime(dashboard?.lastSyncedAtMs)}`}
+          <span
+            className="aum-subtext aum-mono"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+          >
+            {isGlobalRefreshing && <ReloadSpinner />}
+            <span>
+              {isGlobalRefreshing ? 'Syncing telemetry...' : `Synced ${formatRelativeTime(dashboard?.lastSyncedAtMs)}`}
+            </span>
           </span>
 
           <button
@@ -223,7 +351,8 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
             disabled={refreshing}
             onClick={() => void handleRefreshNow()}
           >
-            {refreshing ? 'Refreshing...' : 'Refresh Quotas'}
+            {refreshing && <ReloadSpinner />}
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Quotas'}</span>
           </button>
         </div>
       </header>
@@ -267,26 +396,32 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
 
         {loading && !dashboard ? (
           <div className="aum-card">
-            <div className="aum-muted">Indexing Zana thread telemetry and probing provider quotas...</div>
+            <div className="aum-muted" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ReloadSpinner />
+              <span>Indexing Zana thread telemetry and probing provider quotas...</span>
+            </div>
           </div>
         ) : dashboard ? (
           <>
-          {tab === 'overview' && (
-            <OverviewTab
-              data={
-                antigravityUsage
-                  ? {
-                      ...dashboard,
-                      providers: dashboard.providers.map((p) =>
-                        p.providerId === 'antigravity' ? applyAntigravityUsage(p, antigravityUsage) : p
-                      )
-                    }
-                  : dashboard
-              }
-              onJumpToTab={setTab}
-              onUpdateProviderOrder={handleUpdateProviderOrder}
-            />
-          )}
+            {tab === 'overview' && (
+              <OverviewTab
+                data={
+                  antigravityUsage
+                    ? {
+                        ...dashboard,
+                        providers: dashboard.providers.map((p) =>
+                          p.providerId === 'antigravity' ? applyAntigravityUsage(p, antigravityUsage) : p
+                        )
+                      }
+                    : dashboard
+                }
+                onJumpToTab={setTab}
+                onUpdateProviderOrder={handleUpdateProviderOrder}
+                onRefreshProvider={handleRefreshProvider}
+                refreshingProviderIds={refreshingProviderIds}
+                isRefreshing={isGlobalRefreshing}
+              />
+            )}
             {tab === 'models' && (
               <ModelsSpendTab
                 data={dashboard}

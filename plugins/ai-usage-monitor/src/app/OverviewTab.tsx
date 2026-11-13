@@ -22,9 +22,34 @@ interface OverviewTabProps {
   data: DashboardPayload;
   onJumpToTab: (tab: 'overview' | 'models' | 'logs') => void;
   onUpdateProviderOrder?: (prefs: ProviderOrderPrefs) => void | Promise<void>;
+  onRefreshProvider?: (providerId: string) => void | Promise<void>;
+  refreshingProviderIds?: ReadonlySet<string>;
+  isRefreshing?: boolean;
 }
 
 type ProviderFilter = 'all' | 'limited' | 'api' | 'historical';
+
+export function ReloadSpinner({ label, spinning = true }: { label?: string; spinning?: boolean }) {
+  return (
+    <svg
+      className={spinning ? 'aum-spinner' : undefined}
+      width="12"
+      height="12"
+      style={{ width: 12, height: 12, flexShrink: 0, display: 'inline-block' }}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      aria-hidden={label ? undefined : true}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+    >
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
+      <path d="M13.5 2.5v2.75H10.75" />
+    </svg>
+  );
+}
 
 function pillClassForQuota(status: ProviderQuotaSnapshot['status'] | QuotaWindowStatus): string {
   if (status === 'blocked' || status === 'error' || status === 'expired') return 'aum-pill aum-pill-rose';
@@ -139,7 +164,13 @@ function defaultOpenCodeRange(snapshot: OpenCodeLocalStatsSnapshot): OpenCodeLoc
   return 'today';
 }
 
-function OpenCodeLocalStatsCard({ snapshot }: { snapshot: OpenCodeLocalStatsSnapshot }) {
+function OpenCodeLocalStatsCard({
+  snapshot,
+  isRefreshing
+}: {
+  snapshot: OpenCodeLocalStatsSnapshot;
+  isRefreshing: boolean;
+}) {
   const [localRange, setLocalRange] = useState<OpenCodeLocalRangeKey>(() => defaultOpenCodeRange(snapshot));
   const [showModels, setShowModels] = useState(true);
   const period = snapshot.periods[localRange];
@@ -149,13 +180,24 @@ function OpenCodeLocalStatsCard({ snapshot }: { snapshot: OpenCodeLocalStatsSnap
       : 'Local CLI session archive';
 
   return (
-    <div className="aum-card">
+    <div className={isRefreshing && snapshot.installed ? 'aum-card aum-card-refreshing' : 'aum-card'}>
       <div className="aum-row-between">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <strong style={{ fontSize: 13 }}>Local OpenCode CLI Stats</strong>
             <span className="aum-pill aum-pill-cyan">Separate Local Scope</span>
             {snapshot.cliVersion && <span className="aum-chip">{snapshot.cliVersion}</span>}
+            {isRefreshing && snapshot.installed && (
+              <span
+                className="aum-refresh-badge"
+                role="status"
+                aria-label="Refreshing OpenCode local stats"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <ReloadSpinner />
+                <span>Refreshing</span>
+              </span>
+            )}
           </div>
           <div className="aum-subtext">
             Imported from <span className="aum-mono">opencode stats --json</span>. Kept separate from Zana thread totals and Cloud Billing so overlapping turns are never double-counted.
@@ -261,7 +303,14 @@ function OpenCodeLocalStatsCard({ snapshot }: { snapshot: OpenCodeLocalStatsSnap
   );
 }
 
-export function OverviewTab({ data, onJumpToTab, onUpdateProviderOrder }: OverviewTabProps) {
+export function OverviewTab({
+  data,
+  onJumpToTab,
+  onUpdateProviderOrder,
+  onRefreshProvider,
+  refreshingProviderIds,
+  isRefreshing
+}: OverviewTabProps) {
   const [filter, setFilter] = useState<ProviderFilter>('all');
   const [orderPrefs, setOrderPrefs] = useState<ProviderOrderPrefs>(() => data.providerOrder ?? DEFAULT_PROVIDER_ORDER);
   const [reordering, setReordering] = useState(false);
@@ -275,6 +324,8 @@ export function OverviewTab({ data, onJumpToTab, onUpdateProviderOrder }: Overvi
   }, [data.providerOrder]);
 
   const { kpis } = data;
+  const globalRefreshing = Boolean(isRefreshing || data.isSyncing);
+  const hasConfiguredConnectors = data.cloudConnectors.some((c) => c.configured);
   const billedPct = kpis.totalValueUsd > 0 ? Math.min(100, (kpis.billedSpendUsd / kpis.totalValueUsd) * 100) : 0;
   const subPct = kpis.totalValueUsd > 0 ? Math.max(0, 100 - billedPct) : 0;
 
@@ -537,6 +588,9 @@ export function OverviewTab({ data, onJumpToTab, onUpdateProviderOrder }: Overvi
           {sortedProviders.map((prov, index) => {
             const color = providerColor(prov.providerId);
             const { visibleModels, windows: visibleWindows, status: visibleStatus } = prov;
+            const isCardRefreshing =
+              (refreshingProviderIds?.has(prov.providerId) ?? false) ||
+              (globalRefreshing && prov.available && prov.status !== 'not_installed');
             const baseCls =
               visibleStatus === 'blocked' || visibleStatus === 'error'
                 ? 'aum-card aum-card-rose'
@@ -545,6 +599,9 @@ export function OverviewTab({ data, onJumpToTab, onUpdateProviderOrder }: Overvi
                   : 'aum-card';
             const cardCls = [
               baseCls,
+              isCardRefreshing && visibleStatus !== 'blocked' && visibleStatus !== 'error' && visibleStatus !== 'warning'
+                ? 'aum-card-refreshing'
+                : '',
               reordering ? 'aum-card-reordering' : '',
               draggedProviderId === prov.providerId ? 'aum-card-dragging' : '',
               dragOverProviderId === prov.providerId && draggedProviderId !== prov.providerId ? 'aum-card-drag-over' : ''
@@ -644,39 +701,70 @@ export function OverviewTab({ data, onJumpToTab, onUpdateProviderOrder }: Overvi
                       </div>
                     </div>
                   </div>
-                  <span className={pillClassForQuota(visibleStatus)}>{renderStatusLabel(prov)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    {isCardRefreshing && (
+                      <span
+                        className="aum-refresh-badge"
+                        role="status"
+                        aria-label={`Refreshing ${prov.displayName} quota`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <ReloadSpinner />
+                        <span>Refreshing</span>
+                      </span>
+                    )}
+                    <span className={pillClassForQuota(visibleStatus)}>{renderStatusLabel(prov)}</span>
+                    {onRefreshProvider && !isCardRefreshing && (
+                      <button
+                        type="button"
+                        className="aum-icon-btn"
+                        aria-label={`Refresh ${prov.displayName}`}
+                        title={`Refresh ${prov.displayName} quota`}
+                        onClick={() => void onRefreshProvider(prov.providerId)}
+                      >
+                        <ReloadSpinner spinning={false} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {visibleWindows.length > 0 ? (
-                  visibleWindows.map((win) => (
-                    <div key={win.key} className="aum-window-box">
-                      <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
-                        <span>{win.label}</span>
-                        <span style={{ color: barColorForPercent(win.usedPercent, win.status) }}>
-                          {win.usedPercent !== null
-                            ? `${win.usedPercent}% used • ${win.remainingPercent}% left`
-                            : win.status}
-                        </span>
-                      </div>
-                      {win.usedPercent !== null && (
-                        <div className="aum-bar-track">
-                          <div
-                            className="aum-bar-fill"
-                            style={{
-                              width: `${Math.min(100, Math.max(0, win.usedPercent))}%`,
-                              background: barColorForPercent(win.usedPercent, win.status)
-                            }}
-                          />
+                  <>
+                    {visibleWindows.map((win) => (
+                      <div key={win.key} className="aum-window-box">
+                        <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
+                          <span>{win.label}</span>
+                          <span style={{ color: barColorForPercent(win.usedPercent, win.status) }}>
+                            {win.usedPercent !== null
+                              ? `${win.usedPercent}% used • ${win.remainingPercent}% left`
+                              : win.status}
+                          </span>
                         </div>
-                      )}
-                      <div className="aum-subtext aum-mono">
-                        {win.limitUsdCents
-                          ? `${formatUsd((win.usedUsdCents ?? 0) / 100)} / ${formatUsd(win.limitUsdCents / 100)} • `
-                          : ''}
-                        {formatCountdown(win.resetsAtIso)}
+                        {win.usedPercent !== null && (
+                          <div className="aum-bar-track">
+                            <div
+                              className="aum-bar-fill"
+                              style={{
+                                width: `${Math.min(100, Math.max(0, win.usedPercent))}%`,
+                                background: barColorForPercent(win.usedPercent, win.status)
+                              }}
+                            />
+                          </div>
+                        )}
+                        <div className="aum-subtext aum-mono">
+                          {win.limitUsdCents
+                            ? `${formatUsd((win.usedUsdCents ?? 0) / 100)} / ${formatUsd(win.limitUsdCents / 100)} • `
+                            : ''}
+                          {formatCountdown(win.resetsAtIso)}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                    {prov.errorMessage && (
+                      <div className="aum-subtext aum-mono aum-stale-warn">
+                        {prov.errorMessage}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="aum-window-box">
                     <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
@@ -725,15 +813,26 @@ export function OverviewTab({ data, onJumpToTab, onUpdateProviderOrder }: Overvi
       )}
 
       {data.opencodeLocal && (data.opencodeLocal.installed || data.opencodeLocal.errorMessage) && (
-        <OpenCodeLocalStatsCard snapshot={data.opencodeLocal} />
+        <OpenCodeLocalStatsCard snapshot={data.opencodeLocal} isRefreshing={globalRefreshing} />
       )}
 
-      <div className="aum-card">
+      <div className={globalRefreshing && hasConfiguredConnectors ? 'aum-card aum-card-refreshing' : 'aum-card'}>
         <div className="aum-row-between">
           <div>
             <strong style={{ fontSize: 13 }}>Cloud Billing &amp; Credits Connectors</strong>
             <div className="aum-subtext">Optional secret-stored keys in ZCC Plugin Settings for exact API billing &amp; prepaid wallets</div>
           </div>
+          {globalRefreshing && hasConfiguredConnectors && (
+            <span
+              className="aum-refresh-badge"
+              role="status"
+              aria-label="Refreshing cloud billing connectors"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            >
+              <ReloadSpinner />
+              <span>Refreshing</span>
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {data.cloudConnectors.map((c) => (

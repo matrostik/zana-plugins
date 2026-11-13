@@ -45,6 +45,12 @@ const PRESERVED_CLOUD_SOURCES = new Set([
   'opencode-go-usage',
   'opencode-console-api'
 ]);
+const CLOUD_BILLING_PROVIDER_IDS = new Set([
+  'openrouter',
+  'openai-api',
+  'anthropic-api',
+  'opencode'
+]);
 
 function mapProviderUsageKey(providerId: string): string {
   const norm = providerId.toLowerCase();
@@ -250,6 +256,33 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
     const observed = deps.getObservedRateLimit(args.providerId);
 
     if (parsedHost) {
+      const preserveExistingWindows =
+        parsedHost.status === 'error' &&
+        args.existingSnapshot !== undefined &&
+        args.existingSnapshot.windows.length > 0 &&
+        (args.existingSnapshot.status === 'ok' ||
+          args.existingSnapshot.status === 'warning' ||
+          args.existingSnapshot.status === 'blocked');
+
+      if (preserveExistingWindows && args.existingSnapshot) {
+        const normalized = expireStaleQuotaWindows(
+          args.existingSnapshot.windows,
+          args.existingSnapshot.status,
+          parsedHost.errorMessage ?? args.existingSnapshot.errorMessage,
+          args.ts
+        );
+        deps.store.upsertQuotaSnapshot({
+          ...args.existingSnapshot,
+          displayName: args.displayName,
+          billingMode: args.billingMode,
+          status: normalized.status,
+          windows: normalized.windows,
+          errorMessage: parsedHost.errorMessage ?? normalized.errorMessage,
+          updatedAtMs: args.ts
+        });
+        return;
+      }
+
       deps.store.upsertQuotaSnapshot({
         providerId: args.providerId,
         displayName: args.displayName,
@@ -383,5 +416,53 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
     });
   }
 
-  return { collectAll };
+  async function collectOne(providerId: string): Promise<DiscoveredProviderModels | null> {
+    const providerList = await withTimeout(deps.providers.list(), PROVIDER_RPC_TIMEOUT_MS, 'providers.list').catch(
+      (err: unknown) => {
+        deps.log.warn(`ai-usage-monitor: providers.list failed: ${errorMessage(err)}`);
+        return [];
+      }
+    );
+    const provider =
+      providerList.find((p) => p.id === providerId) ??
+      providerList.find((p) => p.id.toLowerCase() === providerId.toLowerCase());
+    if (!provider) return null;
+
+    const existingSnapshot = deps.store.listQuotaSnapshots().find((s) => s.providerId === provider.id);
+    const normId = provider.id.toLowerCase();
+    const isAntigravity = normId === 'antigravity';
+    const isCloudOnly =
+      CLOUD_BILLING_PROVIDER_IDS.has(normId) ||
+      (existingSnapshot !== undefined && PRESERVED_CLOUD_SOURCES.has(existingSnapshot.source));
+
+    const [hostUsage, models, antigravityUsage] = await Promise.all([
+      isAntigravity || isCloudOnly ? Promise.resolve(null) : probeHostUsage([provider.id]),
+      fetchProviderModels(provider.id),
+      isAntigravity && provider.available ? probeAntigravityUsage() : Promise.resolve(null)
+    ]);
+
+    const modeOverrides = deps.getProviderModeOverrides();
+    const ts = now();
+    const displayName = provider.displayName ?? provider.id;
+    const billingMode = modeOverrides.get(normId) ?? inferDefaultBillingMode(provider.id, '');
+
+    persistProviderSnapshot({
+      providerId: provider.id,
+      displayName,
+      available: provider.available,
+      billingMode,
+      hostUsage: antigravityUsage ? { antigravity: antigravityUsage } : hostUsage,
+      existingSnapshot,
+      ts
+    });
+
+    return {
+      providerId: provider.id,
+      displayName,
+      available: provider.available,
+      models
+    };
+  }
+
+  return { collectAll, collectOne };
 }
