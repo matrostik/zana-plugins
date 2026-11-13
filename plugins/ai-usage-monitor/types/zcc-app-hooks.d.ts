@@ -9,6 +9,7 @@ declare module '@zana-ai/zcc-plugin-sdk/app' {
   }
 
   export function useRpc(): { call(method: string, args?: unknown): Promise<unknown> };
+  export function callPluginRpc(pluginId: string, method: string, args?: unknown): Promise<unknown>;
   export function useRealtime(event: string, handler: (payload: unknown) => void): void;
   export function useSettings(): {
     values: Record<string, string | number | boolean | undefined> | undefined;

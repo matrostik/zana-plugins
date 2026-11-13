@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRealtime, useRpc, type PluginNavPanelProps } from '@zana-ai/zcc-plugin-sdk/app';
+import { callPluginRpc, useRealtime, useRpc, type PluginNavPanelProps } from '@zana-ai/zcc-plugin-sdk/app';
 import {
   REALTIME_CHANNEL,
   RPC_METHODS,
@@ -8,6 +8,7 @@ import {
   type LogEventKind,
   type LogsResponse,
   type ModelPricingRule,
+  type ProviderQuotaSnapshot,
   type TimeRangeKey
 } from '../shared/types.ts';
 import { formatRelativeTime } from './format.ts';
@@ -17,6 +18,22 @@ import { OverviewTab } from './OverviewTab.tsx';
 import { ensureStylesInjected } from './styles.ts';
 
 type ActiveTab = 'overview' | 'models' | 'logs';
+
+function applyAntigravityUsage(provider: ProviderQuotaSnapshot, raw: unknown): ProviderQuotaSnapshot {
+  const result = raw as { supported?: boolean; usage?: { status?: string; message?: string; planLabel?: string | null; windows?: Array<{ label: string; usedPercent: number; resetsAt: string | null }> } };
+  const usage = result?.usage;
+  if (!result?.supported || usage?.status !== 'ok' || !Array.isArray(usage.windows)) {
+    return { ...provider, status: 'error', windows: [], errorMessage: usage?.message ?? 'Could not check Antigravity usage.' };
+  }
+  const windows = usage.windows.filter((w) => typeof w.label === 'string' && Number.isFinite(w.usedPercent) && w.usedPercent >= 0 && w.usedPercent <= 100).map((w, i) => ({
+    key: `antigravity-${i}`, label: w.label, usedPercent: w.usedPercent, remainingPercent: Math.round((100 - w.usedPercent) * 10) / 10,
+    status: (w.usedPercent >= 100 ? 'blocked' : w.usedPercent >= 75 ? 'warning' : 'allowed') as 'blocked' | 'warning' | 'allowed',
+    resetsAtIso: w.resetsAt ?? null
+  }));
+  if (!windows.length) return { ...provider, status: 'error', windows: [], errorMessage: 'Antigravity returned no quota windows.' };
+  return { ...provider, status: windows.some((w) => w.status === 'blocked') ? 'blocked' : windows.some((w) => w.status === 'warning') ? 'warning' : 'ok',
+    source: 'native-acp-/usage', planLabel: usage.planLabel ?? provider.planLabel, errorMessage: null, windows };
+}
 
 const EMPTY_LOGS: LogsResponse = {
   items: [],
@@ -47,6 +64,8 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [antigravityUsage, setAntigravityUsage] = useState<unknown>(null);
+  const [quotaRefresh, setQuotaRefresh] = useState(0);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -97,6 +116,19 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
     void loadAll();
   }, [loadAll]);
 
+  const hasAntigravity = dashboard?.providers.some((provider) => provider.providerId === 'antigravity' && provider.available) ?? false;
+  useEffect(() => {
+    if (!hasAntigravity) return;
+    let current = true;
+    setAntigravityUsage(null);
+    void callPluginRpc('provider-antigravity', 'usage:status').then((result) => {
+      if (current) setAntigravityUsage(result);
+    }).catch(() => {
+      if (current) setAntigravityUsage({ supported: false });
+    });
+    return () => { current = false; };
+  }, [hasAntigravity, quotaRefresh]);
+
   useRealtime(REALTIME_CHANNEL, () => {
     void loadAll();
   });
@@ -105,6 +137,7 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
     setRefreshing(true);
     try {
       await rpc.call(RPC_METHODS.refreshNow);
+      setQuotaRefresh((value) => value + 1);
       await loadAll();
     } catch (err) {
       if (mountedRef.current) {
@@ -217,7 +250,7 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
           </div>
         ) : dashboard ? (
           <>
-            {tab === 'overview' && <OverviewTab data={dashboard} onJumpToTab={setTab} />}
+          {tab === 'overview' && <OverviewTab data={antigravityUsage ? { ...dashboard, providers: dashboard.providers.map((p) => p.providerId === 'antigravity' ? applyAntigravityUsage(p, antigravityUsage) : p) } : dashboard} onJumpToTab={setTab} />}
             {tab === 'models' && (
               <ModelsSpendTab
                 data={dashboard}

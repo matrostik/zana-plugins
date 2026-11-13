@@ -218,10 +218,23 @@ export function OverviewTab({ data, onJumpToTab }: OverviewTabProps) {
         <div className="aum-prov-grid">
           {filteredProviders.map((prov) => {
             const color = providerColor(prov.providerId);
+            const visibleModels = prov.providerId === 'antigravity'
+              ? prov.configuredModels.filter((model) => /^(?:google\/)?gemini(?:[-/]|$)/i.test(model))
+              : prov.configuredModels;
+            const visibleWindows = prov.providerId === 'antigravity'
+              ? prov.windows.filter((window) => {
+                  const group = window.label.split(' — ')[0].trim();
+                  return /^(?:google|gemini)\b/i.test(group) || (!window.label.includes(' — ') && /^(?:five.hour|5.hour|weekly|week)\b/i.test(group));
+                })
+              : prov.windows;
+            const visibleStatus = prov.providerId === 'antigravity' && visibleWindows.length !== prov.windows.length && (prov.status === 'ok' || prov.status === 'warning' || prov.status === 'blocked')
+              ? visibleWindows.some((window) => window.status === 'blocked') ? 'blocked' : visibleWindows.some((window) => window.status === 'warning') ? 'warning' : 'ok'
+              : prov.status;
+            const visibleProvider = { ...prov, windows: visibleWindows, status: visibleStatus };
             const cardCls =
-              prov.status === 'blocked' || prov.status === 'error'
+              visibleStatus === 'blocked' || visibleStatus === 'error'
                 ? 'aum-card aum-card-rose'
-                : prov.status === 'warning'
+                : visibleStatus === 'warning'
                   ? 'aum-card aum-card-amber'
                   : 'aum-card';
             return (
@@ -244,11 +257,11 @@ export function OverviewTab({ data, onJumpToTab }: OverviewTabProps) {
                       </div>
                     </div>
                   </div>
-                  <span className={pillClassForQuota(prov.status)}>{renderStatusLabel(prov)}</span>
+                  <span className={pillClassForQuota(visibleStatus)}>{renderStatusLabel(visibleProvider)}</span>
                 </div>
 
-                {prov.windows.length > 0 ? (
-                  prov.windows.map((win) => (
+                {visibleWindows.length > 0 ? (
+                  visibleWindows.map((win) => (
                     <div key={win.key} className="aum-window-box">
                       <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
                         <span>{win.label}</span>
@@ -293,15 +306,15 @@ export function OverviewTab({ data, onJumpToTab }: OverviewTabProps) {
                   </div>
                 )}
 
-                {prov.configuredModels.length > 0 && (
+                {visibleModels.length > 0 && (
                   <div className="aum-chip-row">
-                    {prov.configuredModels.slice(0, 4).map((m) => (
+                    {visibleModels.slice(0, 4).map((m) => (
                       <span key={m} className="aum-chip">
                         {m}
                       </span>
                     ))}
-                    {prov.configuredModels.length > 4 && (
-                      <span className="aum-chip">+{prov.configuredModels.length - 4} more</span>
+                    {visibleModels.length > 4 && (
+                      <span className="aum-chip">+{visibleModels.length - 4} more</span>
                     )}
                   </div>
                 )}

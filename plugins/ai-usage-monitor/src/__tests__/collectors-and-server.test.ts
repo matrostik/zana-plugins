@@ -8,6 +8,37 @@ import {
 import { createFakeHost } from './fake-host.ts';
 
 describe('collectors, indexer, RPCs, CLI, and agent tools', () => {
+  it('reads Antigravity five-hour and weekly quota windows from its plugin', async () => {
+    const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
+    const host = createFakeHost({ providers: [{ id: 'antigravity', available: true }] });
+    Object.assign(host.zcc, { server: { loopbackBaseUrl: 'http://127.0.0.1:1234' } });
+    const fetch = async (input: string | URL) => String(input).includes('/plugins/provider-antigravity/rpc/usage:status')
+      ? new Response(JSON.stringify({ ok: true, result: { supported: true, usage: { status: 'ok', source: 'native-acp-/usage', windows: [
+        { label: 'Five Hour', usedPercent: 20, resetsAt: '2026-05-15T21:00:00.000Z' },
+        { label: 'Weekly', usedPercent: 60, resetsAt: '2026-05-22T16:00:00.000Z' }
+      ] } } }), { status: 200 })
+      : new Response('', { status: 404 });
+    await createAiUsageMonitorPlugin(host.zcc, { now: () => fixedNow, skipInitialSync: true, fetch, homeDir: null });
+    await host.callRpc(RPC_METHODS.refreshNow);
+    const dash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(dash.providers.find((p) => p.providerId === 'antigravity')?.windows).toEqual([
+      expect.objectContaining({ label: 'Five Hour', remainingPercent: 80 }),
+      expect.objectContaining({ label: 'Weekly', remainingPercent: 40 })
+    ]);
+  });
+  it('reports an Antigravity usage check failure without fabricating quotas', async () => {
+    const host = createFakeHost({ providers: [{ id: 'antigravity', available: true }] });
+    Object.assign(host.zcc, { server: { loopbackBaseUrl: 'http://127.0.0.1:1234' } });
+    await createAiUsageMonitorPlugin(host.zcc, {
+      skipInitialSync: true, homeDir: null,
+      fetch: async () => new Response('', { status: 503 })
+    });
+    await host.callRpc(RPC_METHODS.refreshNow);
+    const dash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(dash.providers.find((p) => p.providerId === 'antigravity')).toMatchObject({
+      status: 'error', windows: [], errorMessage: expect.stringContaining('Could not check Antigravity usage')
+    });
+  });
   it('does not mark a historical provider missing from the registry as available', async () => {
     const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
     const host = createFakeHost({ providers: [], threads: [{

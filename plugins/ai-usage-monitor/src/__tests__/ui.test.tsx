@@ -9,10 +9,12 @@ const navigateMocks = vi.hoisted(() => ({
 }));
 
 const rpcCallMock = vi.hoisted(() => vi.fn());
+const peerRpcMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
   definePluginApp: (setup: unknown) => ({ __zccPluginApp: true, setup }),
   useRpc: () => ({ call: rpcCallMock }),
+  callPluginRpc: peerRpcMock,
   useRealtime: vi.fn(),
   useSettings: () => ({ values: { subscriptionProviders: 'claude-code,codex' }, isLoading: false }),
   useZccNavigate: () => navigateMocks
@@ -247,6 +249,43 @@ afterEach(() => {
 });
 
 describe('AI Usage Monitor UI & app slot registration', () => {
+  it('shows only Gemini model chips on the Antigravity card', () => {
+    const dash = makeDashboard();
+    dash.providers.push({ ...dash.providers[0], providerId: 'antigravity', displayName: 'Antigravity', configuredModels: ['claude-opus-4', 'gemini-4-argon', 'google/gemini-3-flash', 'gpt-5', 'gemini-4-hydrogen'] });
+    render(<OverviewTab data={dash} onJumpToTab={vi.fn()} />);
+    expect(screen.getByText('gemini-4-argon')).toBeTruthy();
+    expect(screen.getByText('google/gemini-3-flash')).toBeTruthy();
+    expect(screen.queryByText('claude-opus-4')).toBeNull();
+    expect(screen.queryByText('gpt-5')).toBeNull();
+    expect(screen.queryByText('+1 more')).toBeNull();
+  });
+  it('shows Google and shared Antigravity quota windows without Claude or GPT windows', () => {
+    const dash = makeDashboard();
+    const window = dash.providers[0].windows[0];
+    dash.providers.push({ ...dash.providers[0], providerId: 'antigravity', displayName: 'Antigravity', windows: [
+      { ...window, key: 'general', label: 'Five Hour Limit Remaining' },
+      { ...window, key: 'gemini', label: 'Gemini Models — Weekly Limit Remaining' },
+      { ...window, key: 'claude', label: 'Claude — Weekly Limit Remaining' },
+      { ...window, key: 'gpt', label: 'GPT Models — Weekly Limit Remaining' }
+    ] });
+    render(<OverviewTab data={dash} onJumpToTab={vi.fn()} />);
+    expect(screen.getByText('Five Hour Limit Remaining')).toBeTruthy();
+    expect(screen.getByText('Gemini Models — Weekly Limit Remaining')).toBeTruthy();
+    expect(screen.queryByText('Claude — Weekly Limit Remaining')).toBeNull();
+    expect(screen.queryByText('GPT Models — Weekly Limit Remaining')).toBeNull();
+  });
+  it('shows Antigravity quota windows returned by the provider plugin', async () => {
+    const dash = makeDashboard();
+    dash.providers.push({ ...dash.providers[0], providerId: 'antigravity', displayName: 'Antigravity', windows: [], status: 'error' });
+    rpcCallMock.mockImplementation(async (method: string) => method === RPC_METHODS.dashboard ? dash : makeLogs());
+    peerRpcMock.mockResolvedValue({ supported: true, usage: { status: 'ok', windows: [
+      { label: 'Five Hour', usedPercent: 20, resetsAt: null }, { label: 'Weekly', usedPercent: 60, resetsAt: null }
+    ] } });
+    render(<UsageMonitorPanel pluginId="ai-usage-monitor" subPath="" />);
+    expect(await screen.findByText(/20% used • 80% left/)).toBeTruthy();
+    expect(screen.getByText(/60% used • 40% left/)).toBeTruthy();
+    expect(peerRpcMock).toHaveBeenCalledWith('provider-antigravity', 'usage:status');
+  });
   it('defaults to installed providers and exposes historical usage on request', () => {
     const dash = makeDashboard();
     dash.providers.push({ ...dash.providers[0], providerId: 'old', displayName: 'Old Provider', available: false, status: 'not_installed' });

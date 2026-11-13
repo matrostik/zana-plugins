@@ -37,6 +37,7 @@ export interface DiscoveredProviderModels {
 }
 
 const PROVIDER_RPC_TIMEOUT_MS = 4000;
+const ANTIGRAVITY_USAGE_TIMEOUT_MS = 30000;
 
 function mapProviderUsageKey(providerId: string): string {
   const norm = providerId.toLowerCase();
@@ -145,6 +146,28 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
   const now = deps.now ?? Date.now;
   const fetchFn: FetchLike = deps.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const cachedModelsByProvider = new Map<string, string[]>();
+
+  async function probeAntigravityUsage(): Promise<unknown> {
+    const baseUrl = deps.getLoopbackBaseUrl?.();
+    if (!baseUrl) return null;
+    try {
+      const url = new URL('/api/v1/plugins/provider-antigravity/rpc/usage:status', baseUrl);
+      const res = await fetchFn(url, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        signal: AbortSignal.timeout(ANTIGRAVITY_USAGE_TIMEOUT_MS)
+      });
+      if (!res.ok) throw new Error(`Usage service returned HTTP ${res.status}`);
+      const envelope = asRecord(await res.json());
+      const result = asRecord(envelope.result);
+      if (envelope.ok !== true || result.supported !== true || !asOptionalString(asRecord(result.usage), 'status')) {
+        throw new Error('Usage service returned an invalid response');
+      }
+      return result.usage;
+    } catch (err) {
+      deps.log.warn(`ai-usage-monitor: Antigravity usage check failed: ${errorMessage(err)}`);
+      return { status: 'error', source: 'antigravity-plugin', message: 'Could not check Antigravity usage. Try refreshing quotas.' };
+    }
+  }
 
   async function probeHostUsage(providerIds: readonly string[]): Promise<HostUsageProbeResult | null> {
     let hostResult: HostUsageProbeResult | null = null;
@@ -318,9 +341,10 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
       }
     );
 
-    const [hostUsage, modelsList] = await Promise.all([
+    const [hostUsage, modelsList, antigravityUsage] = await Promise.all([
       probeHostUsage(providerList.map((p) => p.id)),
-      Promise.all(providerList.map((p) => fetchProviderModels(p.id)))
+      Promise.all(providerList.map((p) => fetchProviderModels(p.id))),
+      providerList.some((p) => p.id === 'antigravity' && p.available) ? probeAntigravityUsage() : Promise.resolve(null)
     ]);
 
     const existingSnapshots = new Map(deps.store.listQuotaSnapshots().map((s) => [s.providerId, s]));
@@ -335,7 +359,7 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
         displayName,
         available: provider.available,
         billingMode,
-        hostUsage,
+        hostUsage: antigravityUsage ? { ...hostUsage, antigravity: antigravityUsage } : hostUsage,
         existingSnapshot: existingSnapshots.get(provider.id),
         ts
       });
