@@ -21,6 +21,7 @@ vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
 import appPlugin from '../../app.tsx';
 import { SettingsSection } from '../app/SettingsSection.tsx';
 import { UsageMonitorPanel } from '../app/UsageMonitorPanel.tsx';
+import { OverviewTab } from '../app/OverviewTab.tsx';
 
 function makeDashboard(): DashboardPayload {
   return {
@@ -246,6 +247,21 @@ afterEach(() => {
 });
 
 describe('AI Usage Monitor UI & app slot registration', () => {
+  it('defaults to installed providers and exposes historical usage on request', () => {
+    const dash = makeDashboard();
+    dash.providers.push({ ...dash.providers[0], providerId: 'old', displayName: 'Old Provider', available: false, status: 'not_installed' });
+    dash.providers.push({ ...dash.providers[0], providerId: 'unused', displayName: 'Unused Provider', available: false, status: 'not_installed', turnCount: 0, totalTokens: 0 });
+    render(<OverviewTab data={dash} onJumpToTab={vi.fn()} />);
+
+    expect(screen.queryByText('Old Provider')).toBeNull();
+    expect(screen.queryByText('Unused Provider')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Historical/i }));
+    expect(screen.getByText('Old Provider')).toBeTruthy();
+    expect(screen.queryByText('Unused Provider')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Near Limit/i }));
+    expect(screen.queryByText('Old Provider')).toBeNull();
+  });
+
   it('registers navPanel, settingsSection, and commandPaletteAction slots', () => {
     const slots = {
       navPanel: vi.fn(),

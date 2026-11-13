@@ -99,7 +99,7 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       return {
         providerId,
         displayName: snap?.displayName ?? disc?.displayName ?? providerId,
-        available: disc?.available ?? true,
+        available: disc?.available ?? false,
         source: snap?.source ?? 'telemetry',
         status: normalized?.status ?? snap?.status ?? 'ok',
         accountLabel: snap?.accountLabel ?? null,

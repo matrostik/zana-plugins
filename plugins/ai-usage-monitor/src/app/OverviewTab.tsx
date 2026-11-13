@@ -7,7 +7,7 @@ interface OverviewTabProps {
   onJumpToTab: (tab: 'overview' | 'models' | 'logs') => void;
 }
 
-type ProviderFilter = 'all' | 'limited' | 'api';
+type ProviderFilter = 'all' | 'limited' | 'api' | 'historical';
 
 function pillClassForQuota(status: ProviderQuotaSnapshot['status'] | QuotaWindowStatus): string {
   if (status === 'blocked' || status === 'error' || status === 'expired') return 'aum-pill aum-pill-rose';
@@ -77,7 +77,9 @@ export function OverviewTab({ data, onJumpToTab }: OverviewTabProps) {
   const billedPct = kpis.totalValueUsd > 0 ? Math.min(100, (kpis.billedSpendUsd / kpis.totalValueUsd) * 100) : 0;
   const subPct = kpis.totalValueUsd > 0 ? Math.max(0, 100 - billedPct) : 0;
 
-  const filteredProviders = data.providers.filter((p) => {
+  const installedProviders = data.providers.filter((p) => p.available && p.status !== 'not_installed');
+  const historicalProviders = data.providers.filter((p) => p.turnCount > 0 || p.totalTokens > 0);
+  const filteredProviders = (filter === 'historical' ? historicalProviders : installedProviders).filter((p) => {
     if (filter === 'limited') return p.status === 'warning' || p.status === 'blocked' || p.status === 'error';
     if (filter === 'api') return p.billingMode === 'billed_api' || p.creditRemainingUsd !== null;
     return true;
@@ -194,13 +196,16 @@ export function OverviewTab({ data, onJumpToTab }: OverviewTabProps) {
         </div>
         <div className="aum-seg">
           <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
-            All ({data.providers.length})
+            All ({installedProviders.length})
           </button>
           <button type="button" className={filter === 'limited' ? 'active' : ''} onClick={() => setFilter('limited')}>
-            Near Limit ({data.providers.filter((p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error').length})
+            Near Limit ({installedProviders.filter((p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error').length})
           </button>
           <button type="button" className={filter === 'api' ? 'active' : ''} onClick={() => setFilter('api')}>
-            Paid API / Credits ({data.providers.filter((p) => p.billingMode === 'billed_api' || p.creditRemainingUsd !== null).length})
+            Paid API / Credits ({installedProviders.filter((p) => p.billingMode === 'billed_api' || p.creditRemainingUsd !== null).length})
+          </button>
+          <button type="button" className={filter === 'historical' ? 'active' : ''} onClick={() => setFilter('historical')}>
+            Historical ({historicalProviders.length})
           </button>
         </div>
       </div>

@@ -8,6 +8,19 @@ import {
 import { createFakeHost } from './fake-host.ts';
 
 describe('collectors, indexer, RPCs, CLI, and agent tools', () => {
+  it('does not mark a historical provider missing from the registry as available', async () => {
+    const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
+    const host = createFakeHost({ providers: [], threads: [{
+      id: 'old-thread', projectId: 'proj-1', hostId: 'h1', environmentId: null,
+      providerId: 'old-provider', status: 'idle', updatedAt: fixedNow - 1000,
+      events: [{ seq: 1, type: 'thread/tokenUsage/updated', payload: { createdAt: fixedNow - 1000,
+        tokenUsage: { total: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }, last: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } } } }]
+    }] });
+    await createAiUsageMonitorPlugin(host.zcc, { now: () => fixedNow, skipInitialSync: true });
+    await host.callRpc(RPC_METHODS.refreshNow);
+    const dash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(dash.providers.find((p) => p.providerId === 'old-provider')).toMatchObject({ available: false, turnCount: 1 });
+  });
   it('indexes thread telemetry, probes ZCC quotas & cloud APIs, and serves RPC/CLI/tools', async () => {
     const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
     const host = createFakeHost({
