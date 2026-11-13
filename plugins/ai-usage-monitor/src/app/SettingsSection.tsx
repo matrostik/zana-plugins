@@ -1,8 +1,49 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRpc, useSettings, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
-import { RPC_METHODS, type DashboardPayload } from '../shared/types.ts';
+import { RPC_METHODS, type CloudConnectorStatus, type DashboardPayload } from '../shared/types.ts';
 import { formatRelativeTime, formatUsd } from './format.ts';
 import { ensureStylesInjected } from './styles.ts';
+
+function connectorBadgeState(conn: CloudConnectorStatus): { cls: string; label: string; detail: string } {
+  const isUnqualifiedOpenCode =
+    conn.provider === 'opencode' &&
+    conn.status === 'ok' &&
+    conn.qualificationState === 'unqualified' &&
+    conn.creditRemainingUsd === null;
+
+  if (conn.status === 'ok') {
+    if (isUnqualifiedOpenCode) {
+      const spendPrefix = conn.reportedSpendUsd !== null ? `Budget spend: ${formatUsd(conn.reportedSpendUsd)} • ` : '';
+      return {
+        cls: 'aum-pill aum-pill-amber',
+        label: 'Balance Pending',
+        detail: `${spendPrefix}${conn.balanceStatusMessage ?? 'Prepaid balance awaiting key qualification'}`
+      };
+    }
+    return {
+      cls: 'aum-pill aum-pill-emerald',
+      label: 'Connected',
+      detail:
+        conn.creditRemainingUsd !== null
+          ? `Credits left: ${formatUsd(conn.creditRemainingUsd)}`
+          : `Reported MTD: ${formatUsd(conn.reportedSpendUsd)}`
+    };
+  }
+
+  if (conn.status === 'error') {
+    return {
+      cls: 'aum-pill aum-pill-rose',
+      label: conn.qualificationState === 'permission_required' ? '403 Scope Error' : 'Error',
+      detail: conn.errorMessage ?? 'Connector probe failed'
+    };
+  }
+
+  return {
+    cls: 'aum-pill aum-pill-neutral',
+    label: 'Not Configured',
+    detail: conn.balanceStatusMessage ?? 'Set key above to enable exact billing sync'
+  };
+}
 
 export function SettingsSection() {
   const rpc = useRpc();
@@ -95,33 +136,18 @@ export function SettingsSection() {
 
       {data && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {data.cloudConnectors.map((conn) => (
-            <div key={conn.provider} className="aum-window-box" style={{ flex: '1 1 180px' }}>
-              <div className="aum-row-between">
-                <strong style={{ fontSize: 12, textTransform: 'capitalize' }}>{conn.provider}</strong>
-                <span
-                  className={
-                    conn.status === 'ok'
-                      ? 'aum-pill aum-pill-emerald'
-                      : conn.status === 'error'
-                        ? 'aum-pill aum-pill-rose'
-                        : 'aum-pill aum-pill-neutral'
-                  }
-                >
-                  {conn.status === 'ok' ? 'Connected' : conn.status === 'error' ? 'Error' : 'Not Configured'}
-                </span>
+          {data.cloudConnectors.map((conn) => {
+            const badge = connectorBadgeState(conn);
+            return (
+              <div key={conn.provider} className="aum-window-box" style={{ flex: '1 1 180px' }}>
+                <div className="aum-row-between">
+                  <strong style={{ fontSize: 12, textTransform: 'capitalize' }}>{conn.provider}</strong>
+                  <span className={badge.cls}>{badge.label}</span>
+                </div>
+                <div className="aum-subtext aum-mono">{badge.detail}</div>
               </div>
-              <div className="aum-subtext aum-mono">
-                {conn.status === 'ok'
-                  ? conn.creditRemainingUsd !== null
-                    ? `Credits left: ${formatUsd(conn.creditRemainingUsd)}`
-                    : `Reported MTD: ${formatUsd(conn.reportedSpendUsd)}`
-                  : conn.status === 'error'
-                    ? conn.errorMessage
-                    : 'Set key above to enable exact billing sync'}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

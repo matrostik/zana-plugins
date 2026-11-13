@@ -48,6 +48,7 @@ export const USAGE_MONITOR_STYLES = `
 }
 .aum-title { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
 .aum-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.aum-prov-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .aum-subtabs {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -131,6 +132,15 @@ export const USAGE_MONITOR_STYLES = `
 .aum-card:hover { border-color: var(--aum-border-strong); }
 .aum-card-amber { border-color: rgba(245, 158, 11, 0.38); }
 .aum-card-rose { border-color: rgba(244, 63, 94, 0.42); }
+.aum-card-reordering { cursor: grab; border-style: dashed; border-color: rgba(99, 102, 241, 0.45); }
+.aum-card-reordering:hover { border-color: #818cf8; }
+.aum-card-dragging { opacity: 0.48; }
+.aum-card-drag-over { border-color: #a5b4fc; border-style: solid; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25); }
+.aum-reorder-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 4px 8px; border-radius: 5px;
+  background: rgba(99, 102, 241, 0.09); border: 1px solid rgba(99, 102, 241, 0.25);
+}
 .aum-card-label {
   font-size: 10px; font-family: var(--aum-mono); text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--aum-dim); display: flex; justify-content: space-between; align-items: center;

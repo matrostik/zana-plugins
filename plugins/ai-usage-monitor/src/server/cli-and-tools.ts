@@ -1,5 +1,6 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import type { LogEventKind, TimeRangeKey } from '../shared/types.ts';
+import type { OpenCodeQualificationProbeEntry } from './collectors/opencode-usage.ts';
 import type { DashboardService } from './dashboard.ts';
 import type { UsageStore } from './db.ts';
 
@@ -7,6 +8,7 @@ export interface CliAndToolsApp {
   dashboard: DashboardService;
   store: UsageStore;
   refreshNow: () => Promise<void>;
+  qualifyOpenCode?: () => Promise<{ ok: boolean; probes: OpenCodeQualificationProbeEntry[]; error?: string }>;
 }
 
 type ToolRegistration = Parameters<ZccPluginApi['agents']['registerTool']>[0] & {
@@ -16,7 +18,7 @@ type ToolRegistration = Parameters<ZccPluginApi['agents']['registerTool']>[0] & 
   };
 };
 
-const VALID_RANGES = new Set<TimeRangeKey>(['today', '7d', '30d', 'all']);
+const VALID_RANGES = new Set<TimeRangeKey>(['today', '7d', 'last_week', '30d', 'all']);
 
 function parseRange(raw: string | undefined): TimeRangeKey {
   if (raw && VALID_RANGES.has(raw as TimeRangeKey)) return raw as TimeRangeKey;
@@ -37,10 +39,11 @@ export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void
     name: 'ai-usage',
     summary: 'Inspect cross-provider AI consumption, spend, quotas, budgets, and logs.',
     commands: [
-      { name: 'summary', summary: 'Show spend and token KPIs + top models', usage: 'zcc ai-usage summary [--range today|7d|30d|all] [--refresh]' },
+      { name: 'summary', summary: 'Show spend and token KPIs + top models', usage: 'zcc ai-usage summary [--range today|7d|last_week|30d|all] [--refresh]' },
       { name: 'quotas', summary: 'Show configured providers, subscription windows, and remaining credits', usage: 'zcc ai-usage quotas [--refresh]' },
       { name: 'budgets', summary: 'Show budget rules and remaining allowance', usage: 'zcc ai-usage budgets' },
-      { name: 'logs', summary: 'Show recent usage, rate-limit, fallback, and error logs', usage: 'zcc ai-usage logs [--kind all|turn_usage|rate_limit|fallback|error] [--limit 20]' }
+      { name: 'logs', summary: 'Show recent usage, rate-limit, fallback, and error logs', usage: 'zcc ai-usage logs [--kind all|turn_usage|rate_limit|fallback|error] [--limit 20]' },
+      { name: 'qualify-opencode', summary: 'Probe OpenCode Console billing/usage endpoints with configured key (read-only, sanitized)', usage: 'zcc ai-usage qualify-opencode' }
     ],
     async run(argv: string[]) {
       const sub = argv[0] ?? 'summary';
@@ -50,12 +53,34 @@ export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void
       if (sub === 'summary') {
         const range = parseRange(parseFlag(argv, '--range'));
         const data = await app.dashboard.buildDashboard(range);
-        return { exitCode: 0, stdout: JSON.stringify({ kpis: data.kpis, topModels: data.models.slice(0, 15) }, null, 2) + '\n' };
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify(
+            {
+              kpis: data.kpis,
+              topModels: data.models.slice(0, 15),
+              opencodeLocal: data.opencodeLocal ?? null
+            },
+            null,
+            2
+          ) + '\n'
+        };
       }
 
       if (sub === 'quotas') {
         const data = await app.dashboard.buildDashboard('30d');
-        return { exitCode: 0, stdout: JSON.stringify({ providers: data.providers, cloudConnectors: data.cloudConnectors }, null, 2) + '\n' };
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify(
+            {
+              providers: data.providers,
+              cloudConnectors: data.cloudConnectors,
+              opencodeLocal: data.opencodeLocal ?? null
+            },
+            null,
+            2
+          ) + '\n'
+        };
       }
 
       if (sub === 'budgets') {
@@ -72,7 +97,15 @@ export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void
         return { exitCode: 0, stdout: JSON.stringify(logs, null, 2) + '\n' };
       }
 
-      return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs.\n` };
+      if (sub === 'qualify-opencode') {
+        if (!app.qualifyOpenCode) {
+          return { exitCode: 1, stderr: 'OpenCode qualification helper is unavailable.\n' };
+        }
+        const res = await app.qualifyOpenCode();
+        return { exitCode: res.ok ? 0 : 1, stdout: JSON.stringify(res, null, 2) + '\n' };
+      }
+
+      return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs, qualify-opencode.\n` };
     }
   });
 }
@@ -88,7 +121,7 @@ export function registerAgentTools(agents: ZccPluginApi['agents'], app: CliAndTo
     parameters: {
       type: 'object',
       properties: {
-        range: { type: 'string', enum: ['today', '7d', '30d', 'all'] },
+        range: { type: 'string', enum: ['today', '7d', 'last_week', '30d', 'all'] },
         refresh: { type: 'boolean' }
       }
     },
@@ -103,7 +136,8 @@ export function registerAgentTools(agents: ZccPluginApi['agents'], app: CliAndTo
           providers: data.providers,
           budgets: data.budgets,
           topModels: data.models.slice(0, 12),
-          topProjects: data.projects.slice(0, 10)
+          topProjects: data.projects.slice(0, 10),
+          opencodeLocal: data.opencodeLocal ?? null
         },
         null,
         2

@@ -3,7 +3,8 @@ import createAiUsageMonitorPlugin from '../../server.ts';
 import {
   RPC_METHODS,
   type DashboardPayload,
-  type LogsResponse
+  type LogsResponse,
+  type ProviderOrderPrefs
 } from '../shared/types.ts';
 import { createFakeHost } from './fake-host.ts';
 
@@ -461,6 +462,101 @@ describe('collectors, indexer, RPCs, CLI, and agent tools', () => {
     // Second refresh should skip unchanged thread (updatedAt <= cursor.threadUpdatedAtMs)
     await host.callRpc(RPC_METHODS.refreshNow);
     expect(eventsListCalls).toBe(1);
+
+    await host.dispose();
+  });
+
+  it('orders providers by usage by default and persists setProviderOrder preferences', async () => {
+    const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
+    const host = createFakeHost({
+      providers: [
+        { id: 'antigravity', available: true, displayName: 'Antigravity', models: ['gemini-3-flash'] },
+        { id: 'claude-code', available: true, displayName: 'Claude Code', models: ['claude-sonnet-4-5'] },
+        { id: 'codex', available: true, displayName: 'Codex', models: ['gpt-5-codex'] }
+      ],
+      threads: [
+        {
+          id: 'th-codex',
+          projectId: 'proj-1',
+          hostId: 'h1',
+          environmentId: null,
+          providerId: 'codex',
+          status: 'idle',
+          updatedAt: fixedNow - 1000,
+          events: [
+            {
+              seq: 1,
+              type: 'thread/tokenUsage/updated',
+              payload: {
+                createdAt: fixedNow - 1000,
+                tokenUsage: {
+                  total: { inputTokens: 80_000, outputTokens: 20_000, totalTokens: 100_000 },
+                  last: { inputTokens: 80_000, outputTokens: 20_000, totalTokens: 100_000 }
+                }
+              }
+            }
+          ]
+        },
+        {
+          id: 'th-claude',
+          projectId: 'proj-1',
+          hostId: 'h1',
+          environmentId: null,
+          providerId: 'claude-code',
+          status: 'idle',
+          updatedAt: fixedNow - 2000,
+          events: [
+            {
+              seq: 1,
+              type: 'thread/tokenUsage/updated',
+              payload: {
+                createdAt: fixedNow - 2000,
+                tokenUsage: {
+                  total: { inputTokens: 10_000, outputTokens: 5_000, totalTokens: 15_000 },
+                  last: { inputTokens: 10_000, outputTokens: 5_000, totalTokens: 15_000 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    await createAiUsageMonitorPlugin(host.zcc, {
+      now: () => fixedNow,
+      skipInitialSync: true,
+      probeSystemUsageLimits: async () => ({
+        claudeCode: {
+          status: 'ok',
+          windows: [{ label: '5h Window', usedPercent: 90, resetsAt: new Date(fixedNow + 3_600_000).toISOString() }]
+        },
+        codex: {
+          status: 'ok',
+          windows: [{ label: '5h Window', usedPercent: 20, resetsAt: new Date(fixedNow + 3_600_000).toISOString() }]
+        }
+      })
+    });
+
+    await host.callRpc(RPC_METHODS.refreshNow);
+
+    const defaultDash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(defaultDash.providerOrder).toEqual({ sortMode: 'usage', customOrder: [] });
+    expect(defaultDash.providers.map((p) => p.providerId)).toEqual(['codex', 'claude-code', 'antigravity']);
+
+    await expect(host.callRpc(RPC_METHODS.setProviderOrder, { sortMode: 'invalid' })).rejects.toThrow(/sortMode/);
+
+    const quotaOrder = await host.callRpc<ProviderOrderPrefs>(RPC_METHODS.setProviderOrder, { sortMode: 'quota' });
+    expect(quotaOrder).toEqual({ sortMode: 'quota', customOrder: [] });
+    const quotaDash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(quotaDash.providers.map((p) => p.providerId)).toEqual(['claude-code', 'codex', 'antigravity']);
+
+    const customOrder = await host.callRpc<ProviderOrderPrefs>(RPC_METHODS.setProviderOrder, {
+      sortMode: 'custom',
+      customOrder: ['antigravity', 'codex']
+    });
+    expect(customOrder).toEqual({ sortMode: 'custom', customOrder: ['antigravity', 'codex'] });
+    const customDash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(customDash.providers.map((p) => p.providerId)).toEqual(['antigravity', 'codex', 'claude-code']);
 
     await host.dispose();
   });

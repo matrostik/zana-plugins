@@ -1,4 +1,14 @@
-export type TimeRangeKey = 'today' | '7d' | '30d' | 'all';
+export type TimeRangeKey = 'today' | '7d' | 'last_week' | '30d' | 'all';
+
+export interface TimeRangeBounds {
+  range: TimeRangeKey;
+  label: string;
+  timezone: string;
+  startMs: number;
+  endMs: number | null;
+  startIso: string;
+  endIso: string | null;
+}
 
 export type BillingMode = 'billed_api' | 'subscription' | 'free';
 
@@ -46,6 +56,13 @@ export interface ProviderQuotaSnapshot {
   estimatedCostUsd: number;
   billedCostUsd: number | null;
   updatedAtMs: number;
+}
+
+export type ProviderSortMode = 'usage' | 'quota' | 'custom';
+
+export interface ProviderOrderPrefs {
+  sortMode: ProviderSortMode;
+  customOrder: string[];
 }
 
 export interface ModelConsumptionRow {
@@ -160,6 +177,7 @@ export interface ModelPricingRule {
 
 export interface DashboardKpis {
   range: TimeRangeKey;
+  rangeBounds?: TimeRangeBounds;
   totalValueUsd: number;
   billedSpendUsd: number;
   subscriptionEquivUsd: number;
@@ -184,8 +202,15 @@ export interface DashboardKpis {
   logCount: number;
 }
 
+export type CloudConnectorQualificationState =
+  | 'verified'
+  | 'unqualified'
+  | 'permission_required'
+  | 'unconfigured'
+  | 'error';
+
 export interface CloudConnectorStatus {
-  provider: 'openai' | 'anthropic' | 'openrouter';
+  provider: 'openai' | 'anthropic' | 'openrouter' | 'opencode';
   configured: boolean;
   status: 'ok' | 'unconfigured' | 'error';
   lastSyncedAtMs: number | null;
@@ -193,17 +218,69 @@ export interface CloudConnectorStatus {
   creditRemainingUsd: number | null;
   creditLimitUsd: number | null;
   errorMessage: string | null;
+  qualificationState?: CloudConnectorQualificationState;
+  balanceStatusMessage?: string | null;
+  workspaceId?: string | null;
+}
+
+export type OpenCodeLocalRangeKey = 'today' | '7d' | 'all';
+
+export interface OpenCodeModelStat {
+  modelId: string;
+  providerId: string;
+  variant: string | null;
+  steps: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export interface OpenCodeLocalPeriodStats {
+  range: OpenCodeLocalRangeKey;
+  available: boolean;
+  fromMs: number | null;
+  toMs: number | null;
+  sessions: number;
+  subagents: number;
+  prompts: number;
+  steps: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  activeDays: number;
+  streak: number;
+  models: OpenCodeModelStat[];
+  errorMessage: string | null;
+}
+
+export interface OpenCodeLocalStatsSnapshot {
+  installed: boolean;
+  cliVersion: string | null;
+  source: 'opencode-cli-stats';
+  collectedAtMs: number;
+  periods: Record<OpenCodeLocalRangeKey, OpenCodeLocalPeriodStats>;
+  errorMessage: string | null;
 }
 
 export interface DashboardPayload {
   kpis: DashboardKpis;
   providers: ProviderQuotaSnapshot[];
+  providerOrder?: ProviderOrderPrefs;
   models: ModelConsumptionRow[];
   projects: ProjectConsumptionRow[];
   dailyTrend: DailySpendPoint[];
   budgets: BudgetEvaluation[];
   pricingRules: ModelPricingRule[];
   cloudConnectors: CloudConnectorStatus[];
+  opencodeLocal?: OpenCodeLocalStatsSnapshot | null;
   lastSyncedAtMs: number;
   isSyncing?: boolean;
 }
@@ -233,5 +310,6 @@ export const RPC_METHODS = {
   deleteBudget: 'deleteBudget',
   setPricingOverride: 'setPricingOverride',
   deletePricingOverride: 'deletePricingOverride',
+  setProviderOrder: 'setProviderOrder',
   resetSync: 'resetSync'
 } as const;

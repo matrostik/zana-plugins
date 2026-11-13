@@ -1,9 +1,12 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
+import { DEFAULT_PROVIDER_ORDER, sortProviders } from '../shared/provider-order.ts';
 import type {
   BillingMode,
   CloudConnectorStatus,
   DashboardKpis,
   DashboardPayload,
+  OpenCodeLocalStatsSnapshot,
+  ProviderOrderPrefs,
   ProviderQuotaSnapshot,
   QuotaWindow,
   TimeRangeKey
@@ -13,7 +16,7 @@ import { expireStaleQuotaWindows } from './collectors/local-provider-usage.ts';
 import type { DiscoveredProviderModels } from './collectors/zcc-quotas.ts';
 import type { UsageStore } from './db.ts';
 import { listCombinedPricingRules } from './pricing.ts';
-import { computeCacheHitPercent, rangeStartMs, withTimeout } from './util.ts';
+import { computeCacheHitPercent, resolveTimeRangeBounds, withTimeout } from './util.ts';
 
 export interface DashboardServiceDeps {
   store: UsageStore;
@@ -21,6 +24,8 @@ export interface DashboardServiceDeps {
   projects: Pick<ZccPluginApi['sdk']['projects'], 'list'>;
   getDiscoveredProviders: () => DiscoveredProviderModels[];
   getCloudStatuses: () => CloudConnectorStatus[];
+  getOpenCodeLocalStats?: () => OpenCodeLocalStatsSnapshot | null;
+  getProviderOrder?: () => ProviderOrderPrefs;
   getLastSyncedAtMs: () => number;
   getIsSyncing?: () => boolean;
   now?: () => number;
@@ -70,10 +75,10 @@ export function createDashboardService(deps: DashboardServiceDeps) {
 
   async function buildDashboard(range: TimeRangeKey = '30d'): Promise<DashboardPayload> {
     const currentNowMs = now();
-    const sinceMs = rangeStartMs(range, currentNowMs);
+    const bounds = resolveTimeRangeBounds(range, currentNowMs);
     const projectMap = await projectNamesMap();
-    const summary = deps.store.aggregateSummary(sinceMs);
-    const providerUsage = deps.store.aggregateByProvider(sinceMs);
+    const summary = deps.store.aggregateSummary(bounds.startMs, bounds.endMs);
+    const providerUsage = deps.store.aggregateByProvider(bounds.startMs, bounds.endMs);
     const overrides = deps.store.listPricingOverrides();
     const discovered = deps.getDiscoveredProviders();
     const discoveredMap = new Map(discovered.map((d) => [d.providerId, d]));
@@ -95,11 +100,13 @@ export function createDashboardService(deps: DashboardServiceDeps) {
         snap && snap.source === 'thread-events'
           ? expireStaleQuotaWindows(snap.windows, snap.status, snap.errorMessage, currentNowMs)
           : null;
+      const isCloudConfiguredOpenCode =
+        snap?.source === 'opencode-go-usage' || snap?.source === 'opencode-console-api';
 
       return {
         providerId,
         displayName: snap?.displayName ?? disc?.displayName ?? providerId,
-        available: disc?.available ?? false,
+        available: disc?.available ?? isCloudConfiguredOpenCode,
         source: snap?.source ?? 'telemetry',
         status: normalized?.status ?? snap?.status ?? 'ok',
         accountLabel: snap?.accountLabel ?? null,
@@ -120,11 +127,14 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       };
     });
 
+    const providerOrder = deps.getProviderOrder?.() ?? DEFAULT_PROVIDER_ORDER;
+    const sortedProviders = sortProviders(providers, providerOrder);
+
     const cloudStatuses = deps.getCloudStatuses();
     let creditsRemaining = 0;
     let creditsLimit = 0;
     let hasCredits = false;
-    for (const prov of providers) {
+    for (const prov of sortedProviders) {
       if (prov.creditRemainingUsd !== null) {
         creditsRemaining += prov.creditRemainingUsd;
         creditsLimit += prov.creditLimitUsd ?? prov.creditRemainingUsd;
@@ -135,10 +145,11 @@ export function createDashboardService(deps: DashboardServiceDeps) {
     const budgets = deps.budgets.evaluateAll();
     const logsMeta = deps.store.queryLogs({ limit: 1 }, projectMap);
     const budgetAlerts = budgets.filter((b) => b.rule.enabled && b.status !== 'ok').length;
-    const providerAlerts = providers.filter((p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error').length;
+    const providerAlerts = sortedProviders.filter((p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error').length;
 
     const kpis: DashboardKpis = {
       range,
+      rangeBounds: bounds,
       totalValueUsd: Number(summary.totalValueUsd.toFixed(2)),
       billedSpendUsd: Number(summary.billedSpendUsd.toFixed(2)),
       subscriptionEquivUsd: Number(summary.subscriptionEquivUsd.toFixed(2)),
@@ -152,20 +163,22 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       cacheHitPercent: computeCacheHitPercent(summary.inputTokens, summary.cachedInputTokens),
       turnCount: summary.turnCount,
       subagentTurnCount: summary.subagentTurnCount,
-      tightestQuota: findTightestWindow(providers),
+      tightestQuota: findTightestWindow(sortedProviders),
       alertCount: budgetAlerts + providerAlerts,
       logCount: logsMeta.totalCount
     };
 
     return {
       kpis,
-      providers,
-      models: deps.store.listModelBreakdown(sinceMs, overrides),
-      projects: deps.store.listProjectBreakdown(sinceMs, projectMap),
+      providers: sortedProviders,
+      providerOrder,
+      models: deps.store.listModelBreakdown(bounds.startMs, overrides, bounds.endMs),
+      projects: deps.store.listProjectBreakdown(bounds.startMs, projectMap, bounds.endMs),
       dailyTrend: deps.store.listDailyTrend(range),
       budgets,
       pricingRules: listCombinedPricingRules(overrides),
       cloudConnectors: cloudStatuses,
+      opencodeLocal: deps.getOpenCodeLocalStats?.() ?? null,
       lastSyncedAtMs: deps.getLastSyncedAtMs(),
       isSyncing: deps.getIsSyncing?.() ?? false
     };

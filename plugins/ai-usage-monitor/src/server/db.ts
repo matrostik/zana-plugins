@@ -18,7 +18,7 @@ import type {
   TimeRangeKey,
   UsageLogEntry
 } from '../shared/types.ts';
-import { computeCacheHitPercent, rangeStartMs, safeJsonParse, slugId, utcDateKey } from './util.ts';
+import { computeCacheHitPercent, localDateKey, resolveTimeRangeBounds, safeJsonParse, slugId } from './util.ts';
 import { resolveModelPricing } from './pricing.ts';
 
 export const MIGRATIONS: readonly string[] = [
@@ -195,6 +195,23 @@ export interface ThreadCursorRow {
   lastTotalJson: string | null;
   updatedAtMs: number;
   threadUpdatedAtMs?: number;
+}
+
+function buildTimeRangeFilter(
+  sinceMs: number,
+  untilMs?: number | null,
+  column = 'timestamp_ms'
+): { sql: string; params: unknown[] } {
+  if (untilMs !== null && untilMs !== undefined) {
+    return {
+      sql: `${column} >= ? AND ${column} < ?`,
+      params: [sinceMs, untilMs]
+    };
+  }
+  return {
+    sql: `${column} >= ?`,
+    params: [sinceMs]
+  };
 }
 
 export function createUsageStore(db: PluginDatabase, now: () => number = Date.now) {
@@ -438,7 +455,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     }));
   }
 
-  function aggregateSummary(sinceMs: number): {
+  function aggregateSummary(sinceMs: number, untilMs?: number | null): {
     totalValueUsd: number;
     billedSpendUsd: number;
     subscriptionEquivUsd: number;
@@ -450,6 +467,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     turnCount: number;
     subagentTurnCount: number;
   } {
+    const filter = buildTimeRangeFilter(sinceMs, untilMs);
     const row = db
       .prepare(
         `SELECT
@@ -463,9 +481,9 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
           COALESCE(SUM(total_tokens), 0) AS total_tokens,
           COUNT(*) AS turn_count,
           COALESCE(SUM(is_subagent), 0) AS subagent_count
-         FROM usage_turns WHERE timestamp_ms >= ?`
+         FROM usage_turns WHERE ${filter.sql}`
       )
-      .get(sinceMs) as Record<string, unknown>;
+      .get(...filter.params) as Record<string, unknown>;
     return {
       totalValueUsd: Number(row?.total_usd ?? 0),
       billedSpendUsd: Number(row?.billed_usd ?? 0),
@@ -480,13 +498,14 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     };
   }
 
-  function aggregateByProvider(sinceMs: number): Map<string, {
+  function aggregateByProvider(sinceMs: number, untilMs?: number | null): Map<string, {
     totalTokens: number;
     cachedTokens: number;
     turnCount: number;
     estimatedCostUsd: number;
     billedCostUsd: number;
   }> {
+    const filter = buildTimeRangeFilter(sinceMs, untilMs);
     const rows = db
       .prepare(
         `SELECT
@@ -497,10 +516,10 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
           COALESCE(SUM(estimated_cost_usd), 0) AS est_usd,
           COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_usd
          FROM usage_turns
-         WHERE timestamp_ms >= ?
+         WHERE ${filter.sql}
          GROUP BY provider_id`
       )
-      .all(sinceMs) as Record<string, unknown>[];
+      .all(...filter.params) as Record<string, unknown>[];
     const map = new Map<string, { totalTokens: number; cachedTokens: number; turnCount: number; estimatedCostUsd: number; billedCostUsd: number }>();
     for (const row of rows) {
       map.set(String(row.provider_id), {
@@ -514,7 +533,12 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     return map;
   }
 
-  function listModelBreakdown(sinceMs: number, overrides: readonly ModelPricingRule[]): ModelConsumptionRow[] {
+  function listModelBreakdown(
+    sinceMs: number,
+    overrides: readonly ModelPricingRule[],
+    untilMs?: number | null
+  ): ModelConsumptionRow[] {
+    const filter = buildTimeRangeFilter(sinceMs, untilMs);
     const rows = db
       .prepare(
         `SELECT
@@ -530,11 +554,11 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
           COALESCE(SUM(total_tokens), 0) AS total_tokens,
           COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd
          FROM usage_turns
-         WHERE timestamp_ms >= ?
+         WHERE ${filter.sql}
          GROUP BY provider_id, model
          ORDER BY estimated_cost_usd DESC, total_tokens DESC`
       )
-      .all(sinceMs) as Record<string, unknown>[];
+      .all(...filter.params) as Record<string, unknown>[];
 
     return rows.map((row) => {
       const providerId = String(row.provider_id);
@@ -564,8 +588,10 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
 
   function listProjectBreakdown(
     sinceMs: number,
-    projectNames: ReadonlyMap<string, string>
+    projectNames: ReadonlyMap<string, string>,
+    untilMs?: number | null
   ): ProjectConsumptionRow[] {
+    const filter = buildTimeRangeFilter(sinceMs, untilMs);
     const rows = db
       .prepare(
         `SELECT
@@ -580,15 +606,15 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
           COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_cost_usd,
           COALESCE(SUM(CASE WHEN billing_mode = 'subscription' THEN estimated_cost_usd ELSE 0 END), 0) AS sub_equiv_usd
          FROM usage_turns
-         WHERE timestamp_ms >= ?
+         WHERE ${filter.sql}
          GROUP BY project_id
          ORDER BY estimated_cost_usd DESC, total_tokens DESC`
       )
-      .all(sinceMs) as Record<string, unknown>[];
+      .all(...filter.params) as Record<string, unknown>[];
 
     const topStmt = db.prepare(
       `SELECT provider_id, model FROM usage_turns
-       WHERE project_id = ? AND timestamp_ms >= ?
+       WHERE project_id = ? AND ${filter.sql}
        GROUP BY provider_id, model
        ORDER BY SUM(estimated_cost_usd) DESC, SUM(total_tokens) DESC
        LIMIT 1`
@@ -596,7 +622,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
 
     return rows.map((row) => {
       const projectId = String(row.project_id);
-      const top = topStmt.get(projectId, sinceMs) as { provider_id?: string; model?: string } | undefined;
+      const top = topStmt.get(projectId, ...filter.params) as { provider_id?: string; model?: string } | undefined;
       return {
         projectId,
         projectName: projectNames.get(projectId) ?? (projectId || 'Unassigned'),
@@ -617,17 +643,19 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
 
   function listDailyTrend(range: TimeRangeKey): DailySpendPoint[] {
     const nowMs = now();
-    const sinceMs = range === 'today' ? rangeStartMs('7d', nowMs) : rangeStartMs(range, nowMs);
+    const effectiveRange: TimeRangeKey = range === 'today' ? '7d' : range;
+    const bounds = resolveTimeRangeBounds(effectiveRange, nowMs);
+    const filter = buildTimeRangeFilter(bounds.startMs, bounds.endMs);
     const rows = db
       .prepare(
         `SELECT timestamp_ms, provider_id, estimated_cost_usd, total_tokens
-         FROM usage_turns WHERE timestamp_ms >= ? ORDER BY timestamp_ms ASC`
+         FROM usage_turns WHERE ${filter.sql} ORDER BY timestamp_ms ASC`
       )
-      .all(sinceMs) as Record<string, unknown>[];
+      .all(...filter.params) as Record<string, unknown>[];
 
     const buckets = new Map<string, DailySpendPoint>();
     for (const row of rows) {
-      const date = utcDateKey(Number(row.timestamp_ms ?? 0));
+      const date = localDateKey(Number(row.timestamp_ms ?? 0));
       const prov = String(row.provider_id);
       const usd = Number(row.estimated_cost_usd ?? 0);
       const tok = Number(row.total_tokens ?? 0);

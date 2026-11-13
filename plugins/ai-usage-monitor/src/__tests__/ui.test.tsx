@@ -29,6 +29,15 @@ function makeDashboard(): DashboardPayload {
   return {
     kpis: {
       range: '30d',
+      rangeBounds: {
+        range: '30d',
+        label: 'Last 30 calendar days',
+        timezone: 'America/New_York',
+        startMs: new Date(2026, 3, 16, 0, 0, 0).getTime(),
+        endMs: null,
+        startIso: new Date(2026, 3, 16, 0, 0, 0).toISOString(),
+        endIso: null
+      },
       totalValueUsd: 142.5,
       billedSpendUsd: 42.5,
       subscriptionEquivUsd: 100,
@@ -186,8 +195,106 @@ function makeDashboard(): DashboardPayload {
         creditRemainingUsd: 37.5,
         creditLimitUsd: 50,
         errorMessage: null
+      },
+      {
+        provider: 'opencode',
+        configured: true,
+        status: 'ok',
+        lastSyncedAtMs: Date.now(),
+        reportedSpendUsd: null,
+        creditRemainingUsd: null,
+        creditLimitUsd: null,
+        errorMessage: null,
+        qualificationState: 'unqualified',
+        balanceStatusMessage: 'Console prepaid balance pending endpoint qualification'
       }
     ],
+    opencodeLocal: {
+      installed: true,
+      cliVersion: '2.0.29',
+      source: 'opencode-cli-stats',
+      collectedAtMs: Date.now(),
+      errorMessage: null,
+      periods: {
+        today: {
+          range: 'today',
+          available: true,
+          fromMs: new Date(2026, 4, 15, 0, 0, 0).getTime(),
+          toMs: new Date(2026, 4, 15, 16, 0, 0).getTime(),
+          sessions: 0,
+          subagents: 0,
+          prompts: 0,
+          steps: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          reasoningTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          totalTokens: 0,
+          costUsd: 0,
+          activeDays: 0,
+          streak: 0,
+          models: [],
+          errorMessage: null
+        },
+        '7d': {
+          range: '7d',
+          available: true,
+          fromMs: new Date(2026, 4, 9, 0, 0, 0).getTime(),
+          toMs: new Date(2026, 4, 15, 16, 0, 0).getTime(),
+          sessions: 0,
+          subagents: 0,
+          prompts: 0,
+          steps: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          reasoningTokens: 0,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          totalTokens: 0,
+          costUsd: 0,
+          activeDays: 0,
+          streak: 0,
+          models: [],
+          errorMessage: null
+        },
+        all: {
+          range: 'all',
+          available: true,
+          fromMs: new Date(2026, 2, 1, 0, 0, 0).getTime(),
+          toMs: new Date(2026, 4, 15, 16, 0, 0).getTime(),
+          sessions: 188,
+          subagents: 27,
+          prompts: 321,
+          steps: 3465,
+          inputTokens: 2_500_000,
+          outputTokens: 450_000,
+          reasoningTokens: 80_000,
+          cacheReadTokens: 1_200_000,
+          cacheWriteTokens: 150_000,
+          totalTokens: 4_380_000,
+          costUsd: 33.91,
+          activeDays: 19,
+          streak: 4,
+          models: [
+            {
+              modelId: 'anthropic/claude-sonnet-4',
+              providerId: 'openrouter',
+              variant: null,
+              steps: 840,
+              inputTokens: 900_000,
+              outputTokens: 150_000,
+              reasoningTokens: 50_000,
+              cacheReadTokens: 400_000,
+              cacheWriteTokens: 60_000,
+              totalTokens: 1_560_000,
+              costUsd: 21.45
+            }
+          ],
+          errorMessage: null
+        }
+      }
+    },
     lastSyncedAtMs: Date.now()
   };
 }
@@ -301,6 +408,90 @@ describe('AI Usage Monitor UI & app slot registration', () => {
     expect(screen.queryByText('Old Provider')).toBeNull();
   });
 
+  it('orders providers by usage by default, supports Tightest Quota and Custom Reorder mode, and persists via RPC', async () => {
+    const dash = makeDashboard();
+    dash.providers.push({
+      ...dash.providers[0],
+      providerId: 'codex',
+      displayName: 'Codex',
+      status: 'ok',
+      totalTokens: 2_000_000,
+      turnCount: 60,
+      windows: [{ key: '5h', label: '5h Window', usedPercent: 25, remainingPercent: 75, status: 'allowed', resetsAtIso: null }]
+    });
+    dash.providerOrder = { sortMode: 'usage', customOrder: [] };
+
+    rpcCallMock.mockImplementation(async (method: string, args?: unknown) => {
+      if (method === RPC_METHODS.dashboard) return dash;
+      if (method === RPC_METHODS.logs) return makeLogs();
+      if (method === RPC_METHODS.setProviderOrder) return args;
+      return null;
+    });
+
+    const { container } = render(<UsageMonitorPanel pluginId="ai-usage-monitor" subPath="" />);
+    await screen.findByText('Codex');
+
+    const getCardOrder = () =>
+      Array.from(container.querySelectorAll('[data-provider-id]')).map((el) => el.getAttribute('data-provider-id'));
+
+    // Default "By Usage" sorts by totalTokens desc: codex (2M) > claude-code (900k) > openrouter (600k)
+    expect(getCardOrder()).toEqual(['codex', 'claude-code', 'openrouter']);
+
+    // Switch to Tightest Quota: claude-code (82%) > codex (25%) > openrouter (no windows)
+    fireEvent.click(screen.getByRole('button', { name: 'Tightest Quota' }));
+    await waitFor(() =>
+      expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.setProviderOrder, { sortMode: 'quota', customOrder: [] })
+    );
+    expect(getCardOrder()).toEqual(['claude-code', 'codex', 'openrouter']);
+
+    // Filter to Near Limit, then click Reorder: should switch filter back to All and seed customOrder
+    fireEvent.click(screen.getByRole('button', { name: /Near Limit/i }));
+    expect(getCardOrder()).toEqual(['claude-code']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
+    await waitFor(() =>
+      expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.setProviderOrder, {
+        sortMode: 'custom',
+        customOrder: ['claude-code', 'codex', 'openrouter']
+      })
+    );
+    expect(getCardOrder()).toEqual(['claude-code', 'codex', 'openrouter']);
+
+    // Move OpenRouter earlier via button
+    fireEvent.click(screen.getByRole('button', { name: 'Move OpenRouter Credits earlier' }));
+    await waitFor(() =>
+      expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.setProviderOrder, {
+        sortMode: 'custom',
+        customOrder: ['claude-code', 'openrouter', 'codex']
+      })
+    );
+    expect(getCardOrder()).toEqual(['claude-code', 'openrouter', 'codex']);
+
+    // Drag Codex onto Claude Code
+    const codexCard = container.querySelector('[data-provider-id="codex"]')!;
+    const claudeCard = container.querySelector('[data-provider-id="claude-code"]')!;
+    fireEvent.dragStart(codexCard);
+    fireEvent.dragOver(claudeCard);
+    fireEvent.drop(claudeCard);
+    expect(getCardOrder()).toEqual(['codex', 'claude-code', 'openrouter']);
+
+    // Done exits reorder mode while keeping custom order
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('button', { name: 'Reset to Usage' })).toBeNull();
+    expect(getCardOrder()).toEqual(['codex', 'claude-code', 'openrouter']);
+
+    // Re-enter Reorder and click Reset to Usage
+    fireEvent.click(screen.getByRole('button', { name: 'Reorder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to Usage' }));
+    await waitFor(() =>
+      expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.setProviderOrder, {
+        sortMode: 'usage',
+        customOrder: []
+      })
+    );
+    expect(getCardOrder()).toEqual(['codex', 'claude-code', 'openrouter']);
+  });
+
   it('registers navPanel, settingsSection, and commandPaletteAction slots', () => {
     const slots = {
       navPanel: vi.fn(),
@@ -369,8 +560,66 @@ describe('AI Usage Monitor UI & app slot registration', () => {
     expect(navigateMocks.toThread).toHaveBeenCalledWith('th-100');
   });
 
-  it('renders SettingsSection sync controls and surfaces RPC errors gracefully', async () => {
+  it('supports Last Week calendar range, local-timezone boundary chip, OpenCode local card, and Balance Pending connector', async () => {
     const dash = makeDashboard();
+    rpcCallMock.mockImplementation(async (method: string, args?: { range?: string }) => {
+      if (method === RPC_METHODS.dashboard) {
+        if (args?.range === 'last_week') {
+          return {
+            ...dash,
+            kpis: {
+              ...dash.kpis,
+              range: 'last_week',
+              rangeBounds: {
+                range: 'last_week',
+                label: 'Last calendar week (Mon–Sun)',
+                timezone: 'America/New_York',
+                startMs: new Date(2026, 4, 4, 0, 0, 0).getTime(),
+                endMs: new Date(2026, 4, 11, 0, 0, 0).getTime(),
+                startIso: new Date(2026, 4, 4, 0, 0, 0).toISOString(),
+                endIso: new Date(2026, 4, 11, 0, 0, 0).toISOString()
+              }
+            }
+          };
+        }
+        return dash;
+      }
+      return makeLogs();
+    });
+
+    render(<UsageMonitorPanel pluginId="ai-usage-monitor" subPath="" />);
+
+    expect(await screen.findByText('Local OpenCode CLI Stats')).toBeTruthy();
+    expect(screen.getByText('Separate Local Scope')).toBeTruthy();
+    expect(screen.getByText('Balance Pending')).toBeTruthy();
+    expect(screen.getByText('anthropic/claude-sonnet-4')).toBeTruthy();
+    expect(screen.getByText('$33.91')).toBeTruthy();
+
+    // Switch local OpenCode range to Today (0 sessions)
+    fireEvent.click(screen.getByRole('button', { name: /Today \(--days 0\)/i }));
+    expect(screen.getByText(/Zero locally does not mean zero account usage/i)).toBeTruthy();
+
+    // Switch top-bar calendar range to Last Week
+    fireEvent.click(screen.getByRole('button', { name: 'Last Week' }));
+    await waitFor(() =>
+      expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.dashboard, { range: 'last_week' })
+    );
+    expect(await screen.findByText(/America\/New_York/)).toBeTruthy();
+  });
+
+  it('renders SettingsSection sync controls, OpenCode Balance Pending, and 403 Scope Error cleanly', async () => {
+    const dash = makeDashboard();
+    dash.cloudConnectors.push({
+      provider: 'openai',
+      configured: true,
+      status: 'error',
+      lastSyncedAtMs: Date.now(),
+      reportedSpendUsd: null,
+      creditRemainingUsd: null,
+      creditLimitUsd: null,
+      errorMessage: 'HTTP 403: insufficient scope',
+      qualificationState: 'permission_required'
+    });
     rpcCallMock.mockImplementation(async (method: string) => {
       if (method === RPC_METHODS.dashboard) return dash;
       if (method === RPC_METHODS.resetSync) return { ok: true };
@@ -379,6 +628,10 @@ describe('AI Usage Monitor UI & app slot registration', () => {
 
     render(<SettingsSection />);
     expect(await screen.findByText('AI Usage Monitor Status & Sync Controls')).toBeTruthy();
+    expect(screen.getByText('Balance Pending')).toBeTruthy();
+    expect(screen.queryByText(/Reported MTD: —/)).toBeNull();
+    expect(screen.getByText('403 Scope Error')).toBeTruthy();
+
     fireEvent.click(screen.getByRole('button', { name: 'Re-index All Threads' }));
     await waitFor(() => expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.resetSync));
 

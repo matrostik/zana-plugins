@@ -2,12 +2,15 @@ import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import type { CloudConnectorStatus } from '../../shared/types.ts';
 import type { UsageStore } from '../db.ts';
 import { asNumber, asOptionalNumber, asRecord, errorMessage } from '../util.ts';
+import { probeOpenCodeCloud } from './opencode-usage.ts';
 import type { FetchLike } from './zcc-quotas.ts';
 
 export interface CloudBillingKeys {
   openaiAdminKey?: string;
   anthropicAdminKey?: string;
   openrouterApiKey?: string;
+  opencodeApiKey?: string;
+  opencodeWorkspaceId?: string;
 }
 
 export interface CloudBillingCollectorDeps {
@@ -66,7 +69,19 @@ export function createCloudBillingCollector(deps: CloudBillingCollectorDeps) {
   const latestStatuses: CloudConnectorStatus[] = [
     { provider: 'openai', configured: false, status: 'unconfigured', lastSyncedAtMs: null, reportedSpendUsd: null, creditRemainingUsd: null, creditLimitUsd: null, errorMessage: null },
     { provider: 'anthropic', configured: false, status: 'unconfigured', lastSyncedAtMs: null, reportedSpendUsd: null, creditRemainingUsd: null, creditLimitUsd: null, errorMessage: null },
-    { provider: 'openrouter', configured: false, status: 'unconfigured', lastSyncedAtMs: null, reportedSpendUsd: null, creditRemainingUsd: null, creditLimitUsd: null, errorMessage: null }
+    { provider: 'openrouter', configured: false, status: 'unconfigured', lastSyncedAtMs: null, reportedSpendUsd: null, creditRemainingUsd: null, creditLimitUsd: null, errorMessage: null },
+    {
+      provider: 'opencode',
+      configured: false,
+      status: 'unconfigured',
+      lastSyncedAtMs: null,
+      reportedSpendUsd: null,
+      creditRemainingUsd: null,
+      creditLimitUsd: null,
+      errorMessage: null,
+      qualificationState: 'unconfigured',
+      balanceStatusMessage: 'Console prepaid balance requires key qualification'
+    }
   ];
 
   async function syncOpenAi(apiKey: string, ts: number): Promise<CloudConnectorStatus> {
@@ -262,13 +277,57 @@ export function createCloudBillingCollector(deps: CloudBillingCollectorDeps) {
     }
   }
 
+  async function syncOpenCode(apiKey: string, workspaceId: string, ts: number): Promise<CloudConnectorStatus> {
+    const res = await probeOpenCodeCloud({
+      apiKey,
+      workspaceId,
+      fetch: fetchFn,
+      now,
+      onWarn: (msg) => deps.log.warn(msg)
+    });
+
+    if (res.configured) {
+      deps.store.upsertQuotaSnapshot({
+        providerId: 'opencode',
+        displayName: 'OpenCode',
+        source: res.source,
+        status: res.providerStatus,
+        accountLabel: res.accountLabel,
+        planLabel: res.planLabel,
+        billingMode: res.goSubscribed ? 'subscription' : 'billed_api',
+        windows: res.windows,
+        creditRemainingUsd: null,
+        creditLimitUsd: null,
+        creditUsedUsd: null,
+        billedCostUsd: res.reportedSpendUsd,
+        errorMessage: res.errorMessage,
+        updatedAtMs: ts
+      });
+    }
+
+    return {
+      provider: 'opencode',
+      configured: res.configured,
+      status: res.status,
+      lastSyncedAtMs: res.configured ? ts : null,
+      reportedSpendUsd: res.reportedSpendUsd,
+      creditRemainingUsd: null,
+      creditLimitUsd: null,
+      errorMessage: res.errorMessage,
+      qualificationState: res.qualificationState,
+      balanceStatusMessage: res.balanceStatusMessage,
+      workspaceId: res.workspaceId
+    };
+  }
+
   async function collectAll(): Promise<CloudConnectorStatus[]> {
     const keys = await deps.getKeys();
     const ts = now();
     const results = await Promise.all([
       syncOpenAi(keys.openaiAdminKey ?? '', ts),
       syncAnthropic(keys.anthropicAdminKey ?? '', ts),
-      syncOpenRouter(keys.openrouterApiKey ?? '', ts)
+      syncOpenRouter(keys.openrouterApiKey ?? '', ts),
+      syncOpenCode(keys.opencodeApiKey ?? '', keys.opencodeWorkspaceId ?? '', ts)
     ]);
     latestStatuses.splice(0, latestStatuses.length, ...results);
     return results;

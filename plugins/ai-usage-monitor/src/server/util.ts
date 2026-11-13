@@ -1,4 +1,4 @@
-import type { TimeRangeKey } from '../shared/types.ts';
+import type { TimeRangeBounds, TimeRangeKey } from '../shared/types.ts';
 
 export function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -39,15 +39,100 @@ export function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T
   }
 }
 
-export function rangeStartMs(range: TimeRangeKey, nowMs: number): number {
-  if (range === 'all') return 0;
-  if (range === 'today') {
-    const dt = new Date(nowMs);
-    dt.setUTCHours(0, 0, 0, 0);
-    return dt.getTime();
+export function localMidnightMs(ms: number, dayOffset = 0): number {
+  const dt = new Date(ms);
+  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + dayOffset, 0, 0, 0, 0).getTime();
+}
+
+export function resolveLocalTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+  } catch {
+    return 'Local';
   }
-  const days = range === '7d' ? 7 : 30;
-  return nowMs - days * 86_400_000;
+}
+
+export function resolveTimeRangeBounds(
+  range: TimeRangeKey,
+  nowMs: number,
+  timezone: string = resolveLocalTimezone()
+): TimeRangeBounds {
+  if (range === 'all') {
+    return {
+      range,
+      label: 'All time',
+      timezone,
+      startMs: 0,
+      endMs: null,
+      startIso: new Date(0).toISOString(),
+      endIso: null
+    };
+  }
+
+  if (range === 'today') {
+    const startMs = localMidnightMs(nowMs, 0);
+    return {
+      range,
+      label: 'Today (local midnight)',
+      timezone,
+      startMs,
+      endMs: null,
+      startIso: new Date(startMs).toISOString(),
+      endIso: null
+    };
+  }
+
+  if (range === '7d') {
+    const startMs = localMidnightMs(nowMs, -6);
+    return {
+      range,
+      label: 'Last 7 calendar days',
+      timezone,
+      startMs,
+      endMs: null,
+      startIso: new Date(startMs).toISOString(),
+      endIso: null
+    };
+  }
+
+  if (range === 'last_week') {
+    const dt = new Date(nowMs);
+    const daysSinceMonday = (dt.getDay() + 6) % 7;
+    const thisMondayMs = localMidnightMs(nowMs, -daysSinceMonday);
+    const lastMondayMs = localMidnightMs(nowMs, -daysSinceMonday - 7);
+    return {
+      range,
+      label: 'Last calendar week (Mon–Sun)',
+      timezone,
+      startMs: lastMondayMs,
+      endMs: thisMondayMs,
+      startIso: new Date(lastMondayMs).toISOString(),
+      endIso: new Date(thisMondayMs).toISOString()
+    };
+  }
+
+  const startMs = localMidnightMs(nowMs, -29);
+  return {
+    range: '30d',
+    label: 'Last 30 calendar days',
+    timezone,
+    startMs,
+    endMs: null,
+    startIso: new Date(startMs).toISOString(),
+    endIso: null
+  };
+}
+
+export function rangeStartMs(range: TimeRangeKey, nowMs: number): number {
+  return resolveTimeRangeBounds(range, nowMs).startMs;
+}
+
+export function localDateKey(ms: number): string {
+  const dt = new Date(ms);
+  const year = dt.getFullYear();
+  const month = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function utcDateKey(ms: number): string {

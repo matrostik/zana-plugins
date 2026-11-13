@@ -8,10 +8,11 @@ import {
   type LogEventKind,
   type LogsResponse,
   type ModelPricingRule,
+  type ProviderOrderPrefs,
   type ProviderQuotaSnapshot,
   type TimeRangeKey
 } from '../shared/types.ts';
-import { formatRelativeTime } from './format.ts';
+import { formatRangeBoundarySummary, formatRelativeTime } from './format.ts';
 import { LogsTab } from './LogsTab.tsx';
 import { ModelsSpendTab } from './ModelsSpendTab.tsx';
 import { OverviewTab } from './OverviewTab.tsx';
@@ -53,8 +54,17 @@ function initialTabFromSubPath(subPath: string | undefined): ActiveTab {
   return 'overview';
 }
 
+function rangeLabel(range: TimeRangeKey): string {
+  if (range === 'today') return 'Today';
+  if (range === 'last_week') return 'Last Week';
+  if (range === 'all') return 'All';
+  return range.toUpperCase();
+}
+
 export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
   const rpc = useRpc();
+  const rpcRef = useRef(rpc);
+  rpcRef.current = rpc;
   const [tab, setTab] = useState<ActiveTab>(() => initialTabFromSubPath(subPath));
   const [range, setRange] = useState<TimeRangeKey>('30d');
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
@@ -76,26 +86,20 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
     };
   }, []);
 
-  const fetchDashboard = useCallback(
-    async (targetRange: TimeRangeKey) => {
-      const payload = (await rpc.call(RPC_METHODS.dashboard, { range: targetRange })) as DashboardPayload;
-      if (mountedRef.current) setDashboard(payload);
-    },
-    [rpc]
-  );
+  const fetchDashboard = useCallback(async (targetRange: TimeRangeKey) => {
+    const payload = (await rpcRef.current.call(RPC_METHODS.dashboard, { range: targetRange })) as DashboardPayload;
+    if (mountedRef.current) setDashboard(payload);
+  }, []);
 
-  const fetchLogs = useCallback(
-    async (kind: LogEventKind | 'all', search: string) => {
-      const payload = (await rpc.call(RPC_METHODS.logs, {
-        kind,
-        search: search.trim() || undefined,
-        limit: 80,
-        offset: 0
-      })) as LogsResponse;
-      if (mountedRef.current) setLogs(payload);
-    },
-    [rpc]
-  );
+  const fetchLogs = useCallback(async (kind: LogEventKind | 'all', search: string) => {
+    const payload = (await rpcRef.current.call(RPC_METHODS.logs, {
+      kind,
+      search: search.trim() || undefined,
+      limit: 80,
+      offset: 0
+    })) as LogsResponse;
+    if (mountedRef.current) setLogs(payload);
+  }, []);
 
   const loadAll = useCallback(async () => {
     try {
@@ -136,7 +140,7 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
   async function handleRefreshNow() {
     setRefreshing(true);
     try {
-      await rpc.call(RPC_METHODS.refreshNow);
+      await rpcRef.current.call(RPC_METHODS.refreshNow);
       setQuotaRefresh((value) => value + 1);
       await loadAll();
     } catch (err) {
@@ -149,24 +153,40 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
   }
 
   async function handleSaveBudget(input: BudgetRuleInput) {
-    await rpc.call(RPC_METHODS.setBudget, input);
+    await rpcRef.current.call(RPC_METHODS.setBudget, input);
     await loadAll();
   }
 
   async function handleDeleteBudget(id: string) {
-    await rpc.call(RPC_METHODS.deleteBudget, { id });
+    await rpcRef.current.call(RPC_METHODS.deleteBudget, { id });
     await loadAll();
   }
 
   async function handleSavePricing(rule: Omit<ModelPricingRule, 'isOverride'>) {
-    await rpc.call(RPC_METHODS.setPricingOverride, rule);
+    await rpcRef.current.call(RPC_METHODS.setPricingOverride, rule);
     await loadAll();
   }
 
   async function handleDeletePricing(pattern: string) {
-    await rpc.call(RPC_METHODS.deletePricingOverride, { pattern });
+    await rpcRef.current.call(RPC_METHODS.deletePricingOverride, { pattern });
     await loadAll();
   }
+
+  async function handleUpdateProviderOrder(prefs: ProviderOrderPrefs) {
+    setDashboard((prev) => (prev ? { ...prev, providerOrder: prefs } : prev));
+    try {
+      const saved = (await rpcRef.current.call(RPC_METHODS.setProviderOrder, prefs)) as ProviderOrderPrefs | undefined;
+      if (mountedRef.current && saved) {
+        setDashboard((prev) => (prev ? { ...prev, providerOrder: saved } : prev));
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  const boundarySummary = formatRangeBoundarySummary(dashboard?.kpis.rangeBounds);
 
   return (
     <div className="aum-root">
@@ -181,14 +201,14 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
 
         <div className="aum-controls">
           <div className="aum-seg" role="group" aria-label="Time range">
-            {(['today', '7d', '30d', 'all'] as const).map((r) => (
+            {(['today', '7d', 'last_week', '30d', 'all'] as const).map((r) => (
               <button
                 key={r}
                 type="button"
                 className={range === r ? 'active' : ''}
                 onClick={() => setRange(r)}
               >
-                {r === 'today' ? 'Today' : r === 'all' ? 'All' : r.toUpperCase()}
+                {rangeLabel(r)}
               </button>
             ))}
           </div>
@@ -239,6 +259,7 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
             <span className="aum-pill aum-pill-neutral">{logs.totalCount}</span>
           </button>
         </div>
+        {boundarySummary && <span className="aum-chip">{boundarySummary}</span>}
       </nav>
 
       <main className="aum-scroll">
@@ -250,7 +271,22 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
           </div>
         ) : dashboard ? (
           <>
-          {tab === 'overview' && <OverviewTab data={antigravityUsage ? { ...dashboard, providers: dashboard.providers.map((p) => p.providerId === 'antigravity' ? applyAntigravityUsage(p, antigravityUsage) : p) } : dashboard} onJumpToTab={setTab} />}
+          {tab === 'overview' && (
+            <OverviewTab
+              data={
+                antigravityUsage
+                  ? {
+                      ...dashboard,
+                      providers: dashboard.providers.map((p) =>
+                        p.providerId === 'antigravity' ? applyAntigravityUsage(p, antigravityUsage) : p
+                      )
+                    }
+                  : dashboard
+              }
+              onJumpToTab={setTab}
+              onUpdateProviderOrder={handleUpdateProviderOrder}
+            />
+          )}
             {tab === 'models' && (
               <ModelsSpendTab
                 data={dashboard}

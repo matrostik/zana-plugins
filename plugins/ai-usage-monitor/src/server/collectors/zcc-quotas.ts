@@ -38,6 +38,13 @@ export interface DiscoveredProviderModels {
 
 const PROVIDER_RPC_TIMEOUT_MS = 4000;
 const ANTIGRAVITY_USAGE_TIMEOUT_MS = 30000;
+const PRESERVED_CLOUD_SOURCES = new Set([
+  'openrouter-api',
+  'openai-admin-api',
+  'anthropic-admin-api',
+  'opencode-go-usage',
+  'opencode-console-api'
+]);
 
 function mapProviderUsageKey(providerId: string): string {
   const norm = providerId.toLowerCase();
@@ -259,6 +266,10 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
         errorMessage: parsedHost.errorMessage,
         updatedAtMs: args.ts
       });
+      return;
+    }
+
+    if (args.existingSnapshot && PRESERVED_CLOUD_SOURCES.has(args.existingSnapshot.source)) {
       return;
     }
 

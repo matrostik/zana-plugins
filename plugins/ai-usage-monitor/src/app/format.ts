@@ -1,3 +1,5 @@
+import type { TimeRangeBounds } from '../shared/types.ts';
+
 export function formatUsd(amount: number | null | undefined, digits = 2): string {
   if (amount === null || amount === undefined || !Number.isFinite(amount)) return '—';
   return `$${amount.toFixed(digits)}`;
@@ -40,13 +42,31 @@ export function formatCountdown(isoOrMs: string | number | null | undefined, now
   return `Resets in ${Math.max(1, remMins)}m`;
 }
 
+export function formatShortLocalDateTime(msOrIso: string | number): string {
+  const dt = new Date(msOrIso);
+  if (Number.isNaN(dt.getTime())) return String(msOrIso);
+  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+    ' ' +
+    dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+export function formatRangeBoundarySummary(bounds: TimeRangeBounds | undefined): string | null {
+  if (!bounds) return null;
+  if (bounds.range === 'all') return `Local TZ (${bounds.timezone}) · All indexed history`;
+  const startText = formatShortLocalDateTime(bounds.startMs);
+  const endText = bounds.endMs !== null ? formatShortLocalDateTime(bounds.endMs) : 'Now';
+  return `Local TZ (${bounds.timezone}) · ${startText} → ${endText}`;
+}
+
 export function providerBadgeCode(providerId: string): string {
+  const lower = providerId.toLowerCase();
   const clean = providerId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (providerId.toLowerCase().includes('claude')) return 'CC';
-  if (providerId.toLowerCase().includes('codex') || providerId.toLowerCase().includes('openai')) return 'OX';
-  if (providerId.toLowerCase().includes('cursor')) return 'CU';
-  if (providerId.toLowerCase().includes('antigravity') || providerId.toLowerCase().includes('gemini')) return 'AG';
-  if (providerId.toLowerCase().includes('openrouter') || providerId.toLowerCase().includes('opencode')) return 'OR';
+  if (lower.includes('claude')) return 'CC';
+  if (lower.includes('codex') || lower.includes('openai')) return 'OX';
+  if (lower.includes('cursor')) return 'CU';
+  if (lower.includes('antigravity') || lower.includes('gemini')) return 'AG';
+  if (lower.includes('opencode')) return 'OC';
+  if (lower.includes('openrouter')) return 'OR';
   return (clean.slice(0, 2) || 'AI').padEnd(2, '·');
 }
 
@@ -58,7 +78,7 @@ const PROVIDER_COLOR_MAP: Record<string, string> = {
   cursor: '#06b6d4',
   antigravity: '#8b5cf6',
   openrouter: '#f59e0b',
-  opencode: '#f59e0b',
+  opencode: '#06b6d4',
   local: '#64748b'
 };
 

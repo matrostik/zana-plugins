@@ -1,5 +1,10 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import {
+  normalizeProviderOrderPrefs,
+  sanitizeCustomOrder,
+  VALID_PROVIDER_SORT_MODES
+} from './src/shared/provider-order.ts';
+import {
   REALTIME_CHANNEL,
   RPC_METHODS,
   type BillingMode,
@@ -7,11 +12,19 @@ import {
   type BudgetPeriod,
   type BudgetScopeType,
   type LogEventKind,
+  type OpenCodeLocalStatsSnapshot,
+  type ProviderOrderPrefs,
+  type ProviderSortMode,
   type TimeRangeKey
 } from './src/shared/types.ts';
 import { createBudgetEvaluator } from './src/server/budgets.ts';
 import { registerAgentTools, registerCli } from './src/server/cli-and-tools.ts';
 import { createCloudBillingCollector } from './src/server/collectors/cloud-billing.ts';
+import {
+  collectOpenCodeLocalStats,
+  qualifyOpenCodeConsole,
+  type CommandRunner
+} from './src/server/collectors/opencode-usage.ts';
 import {
   createZccQuotaCollector,
   type DiscoveredProviderModels,
@@ -27,13 +40,14 @@ export interface AiUsageMonitorDeps {
   fetch?: FetchLike;
   now?: () => number;
   probeSystemUsageLimits?: () => Promise<HostUsageProbeResult | null>;
+  runOpenCodeCommand?: CommandRunner | null;
   homeDir?: string | null;
   env?: NodeJS.ProcessEnv;
   skipInitialSync?: boolean;
   syncTimeBudgetMs?: number;
 }
 
-const VALID_RANGES = new Set<TimeRangeKey>(['today', '7d', '30d', 'all']);
+const VALID_RANGES = new Set<TimeRangeKey>(['today', '7d', 'last_week', '30d', 'all']);
 const VALID_SCOPES = new Set<BudgetScopeType>(['global', 'provider', 'model', 'project']);
 const VALID_PERIODS = new Set<BudgetPeriod>(['5h', 'daily', 'weekly', 'monthly']);
 const VALID_METRICS = new Set<BudgetMetric>(['billed_usd', 'total_usd', 'tokens']);
@@ -83,6 +97,23 @@ export default async function createAiUsageMonitorPlugin(
       description: 'Secret key to query prepaid credit balance and usage limits.',
       secret: true
     },
+    opencodeApiKey: {
+      type: 'string',
+      label: 'OpenCode Console / Go API Key (Optional)',
+      description: 'Personal key (oc_sk_...) for OpenCode Go quota windows and Console usage/billing read endpoints.',
+      secret: true
+    },
+    opencodeWorkspaceId: {
+      type: 'string',
+      label: 'OpenCode Workspace / Org ID (Optional)',
+      description: 'Optional workspace ID sent via x-opencode-org-id / x-org-id for Go and Console requests.'
+    },
+    enableOpenCodeLocalStats: {
+      type: 'boolean',
+      label: 'Import Local OpenCode CLI Stats',
+      description: 'Reads today, 7-day, and all-time local statistics from the installed opencode CLI (kept separate from Zana totals).',
+      default: true
+    },
     subscriptionProviders: {
       type: 'string',
       label: 'Subscription Provider IDs',
@@ -108,6 +139,11 @@ export default async function createAiUsageMonitorPlugin(
   const db = zcc.storage.database();
   const store = createUsageStore(db, now);
   let discoveredProviders: DiscoveredProviderModels[] = [];
+  let cachedOpenCodeLocalStats: OpenCodeLocalStatsSnapshot | null =
+    (await zcc.storage.kv.get<OpenCodeLocalStatsSnapshot>('opencodeLocalStats').catch(() => undefined)) ?? null;
+  let cachedProviderOrder: ProviderOrderPrefs = normalizeProviderOrderPrefs(
+    await zcc.storage.kv.get<ProviderOrderPrefs>('providerOrder').catch(() => undefined)
+  );
   let lastSyncedAtMs = (await zcc.storage.kv.get<number>('lastSyncedAtMs').catch(() => undefined)) ?? 0;
   let isSyncing = false;
   let disposed = false;
@@ -150,7 +186,9 @@ export default async function createAiUsageMonitorPlugin(
       return {
         openaiAdminKey: typeof vals.openaiAdminKey === 'string' ? vals.openaiAdminKey : '',
         anthropicAdminKey: typeof vals.anthropicAdminKey === 'string' ? vals.anthropicAdminKey : '',
-        openrouterApiKey: typeof vals.openrouterApiKey === 'string' ? vals.openrouterApiKey : ''
+        openrouterApiKey: typeof vals.openrouterApiKey === 'string' ? vals.openrouterApiKey : '',
+        opencodeApiKey: typeof vals.opencodeApiKey === 'string' ? vals.opencodeApiKey : '',
+        opencodeWorkspaceId: typeof vals.opencodeWorkspaceId === 'string' ? vals.opencodeWorkspaceId : ''
       };
     },
     fetch: deps.fetch,
@@ -176,10 +214,29 @@ export default async function createAiUsageMonitorPlugin(
     projects: zcc.sdk.projects,
     getDiscoveredProviders: () => discoveredProviders,
     getCloudStatuses: () => cloudBilling.getStatuses(),
+    getOpenCodeLocalStats: () => cachedOpenCodeLocalStats,
+    getProviderOrder: () => cachedProviderOrder,
     getLastSyncedAtMs: () => lastSyncedAtMs,
     getIsSyncing: () => isSyncing,
     now
   });
+
+  async function refreshOpenCodeLocalStats(vals: SettingsMap): Promise<void> {
+    if (deps.runOpenCodeCommand === null) return;
+    const isTestEnv = Boolean(process.env.VITEST);
+    if (isTestEnv && deps.runOpenCodeCommand === undefined) return;
+
+    const enabled = vals.enableOpenCodeLocalStats !== false;
+    const snapshot = await collectOpenCodeLocalStats({
+      enabled,
+      runCommand: deps.runOpenCodeCommand,
+      previousSnapshot: cachedOpenCodeLocalStats,
+      now,
+      onWarn: (msg) => zcc.log.warn(msg)
+    });
+    cachedOpenCodeLocalStats = snapshot;
+    await zcc.storage.kv.set('opencodeLocalStats', snapshot).catch(() => undefined);
+  }
 
   let activeRefresh: Promise<void> | null = null;
   function scheduleContinuation(): void {
@@ -193,18 +250,23 @@ export default async function createAiUsageMonitorPlugin(
     }, 150);
   }
 
+  async function syncQuotasAndCloud(): Promise<void> {
+    discoveredProviders = await zccQuotas.collectAll();
+    await cloudBilling.collectAll();
+  }
+
   async function refreshNow(opts: { timeBudgetMs?: number; continueBackfill?: boolean } = {}): Promise<void> {
     if (activeRefresh) return activeRefresh;
     activeRefresh = (async () => {
       isSyncing = true;
       try {
-        await refreshSettingsCache();
+        const vals = await refreshSettingsCache();
+        const localPromise = refreshOpenCodeLocalStats(vals).catch((err) => {
+          zcc.log.warn(`ai-usage-monitor: OpenCode local stats sync failed: ${errorMessage(err)}`);
+        });
+
         if (lastSyncedAtMs === 0) {
-          const [providersResult] = await Promise.all([
-            zccQuotas.collectAll(),
-            cloudBilling.collectAll()
-          ]);
-          discoveredProviders = providersResult;
+          await syncQuotasAndCloud();
           zcc.realtime.publish(REALTIME_CHANNEL, { syncing: true, lastSyncedAtMs });
         }
 
@@ -214,15 +276,12 @@ export default async function createAiUsageMonitorPlugin(
         });
 
         if (lastSyncedAtMs > 0) {
-          const [providersResult] = await Promise.all([
-            zccQuotas.collectAll(),
-            cloudBilling.collectAll()
-          ]);
-          discoveredProviders = providersResult;
+          await syncQuotasAndCloud();
         } else if (syncRes.eventsIndexed > 0) {
-          discoveredProviders = await zccQuotas.collectAll();
+          await syncQuotasAndCloud();
         }
 
+        await localPromise;
         await budgets.checkAndNotify();
         lastSyncedAtMs = now();
         await zcc.storage.kv.set('lastSyncedAtMs', lastSyncedAtMs).catch(() => undefined);
@@ -360,13 +419,44 @@ export default async function createAiUsageMonitorPlugin(
     return { deleted };
   });
 
+  zcc.rpc.method(RPC_METHODS.setProviderOrder, async (args) => {
+    const rec = asRecord(args);
+    const rawSortMode = asOptionalString(rec, 'sortMode');
+    let sortMode: ProviderSortMode = cachedProviderOrder.sortMode;
+    if (rawSortMode !== null) {
+      if (!VALID_PROVIDER_SORT_MODES.has(rawSortMode as ProviderSortMode)) {
+        throw new Error(`Invalid sortMode: ${rawSortMode}`);
+      }
+      sortMode = rawSortMode as ProviderSortMode;
+    }
+    const customOrder =
+      rec.customOrder !== undefined ? sanitizeCustomOrder(rec.customOrder) : cachedProviderOrder.customOrder;
+    const nextPrefs: ProviderOrderPrefs = { sortMode, customOrder };
+    cachedProviderOrder = nextPrefs;
+    await zcc.storage.kv.set('providerOrder', nextPrefs);
+    zcc.realtime.publish(REALTIME_CHANNEL, { providerOrder: nextPrefs });
+    return nextPrefs;
+  });
+
   zcc.rpc.method(RPC_METHODS.resetSync, async () => {
     store.resetSyncCursors();
     await refreshNow({ timeBudgetMs: defaultBudgetMs, continueBackfill: true });
     return { ok: true, lastSyncedAtMs, isSyncing };
   });
 
-  registerCli(zcc.cli, { dashboard, store, refreshNow });
+  registerCli(zcc.cli, {
+    dashboard,
+    store,
+    refreshNow,
+    qualifyOpenCode: async () => {
+      const vals = await refreshSettingsCache();
+      return qualifyOpenCodeConsole({
+        apiKey: typeof vals.opencodeApiKey === 'string' ? vals.opencodeApiKey : '',
+        workspaceId: typeof vals.opencodeWorkspaceId === 'string' ? vals.opencodeWorkspaceId : '',
+        fetch: deps.fetch
+      });
+    }
+  });
   registerAgentTools(zcc.agents, { dashboard, store, refreshNow });
 
   if (!deps.skipInitialSync) {
