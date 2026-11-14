@@ -20,6 +20,7 @@ export interface ZccQuotaCollectorDeps {
   store: UsageStore;
   getObservedRateLimit: (providerId: string) => ObservedRateLimitState | undefined;
   getProviderModeOverrides: () => ReadonlyMap<string, BillingMode>;
+  isLocalCredentialProbingEnabled?: () => boolean;
   getLoopbackBaseUrl?: () => string | null;
   probeSystemUsageLimits?: () => Promise<HostUsageProbeResult | null>;
   homeDir?: string | null;
@@ -203,13 +204,15 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
           const res = await fetchFn(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(3500) });
           if (res.ok) hostResult = (await res.json()) as HostUsageProbeResult;
         } catch {
-          // Host endpoint is absent on current ZCC builds; fall back to local credential probes.
+          // Host endpoint is absent on current ZCC builds; fall back to local credential probes if opted in.
         }
       }
     }
 
     const shouldProbeLocal =
-      deps.homeDir !== null && (!deps.probeSystemUsageLimits || deps.homeDir !== undefined);
+      deps.isLocalCredentialProbingEnabled?.() === true &&
+      deps.homeDir !== null &&
+      (!deps.probeSystemUsageLimits || deps.homeDir !== undefined);
     if (!shouldProbeLocal) return hostResult;
 
     const localResult = await probeLocalProviderUsage({

@@ -20,10 +20,10 @@ const NATIVE_STEPS: NativeSetupState[] = [
   'session_ready'
 ];
 
-function ReloadSpinner() {
+function ReloadSpinner({ label, spinning = true }: { label?: string; spinning?: boolean }) {
   return (
     <svg
-      className="agy-spinner"
+      className={spinning ? 'agy-spinner' : undefined}
       width="12"
       height="12"
       style={{ width: 12, height: 12, flexShrink: 0, display: 'inline-block' }}
@@ -32,7 +32,9 @@ function ReloadSpinner() {
       stroke="currentColor"
       strokeWidth="1.75"
       strokeLinecap="round"
-      aria-hidden="true"
+      aria-hidden={label ? undefined : true}
+      role={label ? 'img' : undefined}
+      aria-label={label}
     >
       <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
       <path d="M13.5 2.5v2.75H10.75" />

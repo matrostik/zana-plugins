@@ -668,6 +668,21 @@ describe('AI Usage Monitor UI & app slot registration', () => {
     expect(navigateMocks.toThread).toHaveBeenCalledWith('th-100');
   });
 
+  it('displays an error banner when budget or pricing RPC mutations fail', async () => {
+    const dash = makeDashboard();
+    rpcCallMock.mockImplementation(async (method: string) => {
+      if (method === RPC_METHODS.dashboard) return dash;
+      if (method === RPC_METHODS.logs) return makeLogs();
+      if (method === RPC_METHODS.deleteBudget) throw new Error('Failed to delete budget rule');
+      return null;
+    });
+
+    render(<UsageMonitorPanel pluginId="ai-usage-monitor" subPath="models" />);
+    expect(await screen.findByText('Monthly Spend Cap')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('Failed to delete budget rule')).toBeTruthy();
+  });
+
   it('supports Last Week calendar range, local-timezone boundary chip, OpenCode local card, and Balance Pending connector', async () => {
     const dash = makeDashboard();
     rpcCallMock.mockImplementation(async (method: string, args?: { range?: string }) => {
@@ -715,7 +730,7 @@ describe('AI Usage Monitor UI & app slot registration', () => {
     expect(await screen.findByText(/America\/New_York/)).toBeTruthy();
   });
 
-  it('renders SettingsSection sync controls, OpenCode Balance Pending, and 403 Scope Error cleanly', async () => {
+  it('renders SettingsSection sync controls, local probe disclosure, OpenCode Balance Pending, and 403 Scope Error cleanly', async () => {
     const dash = makeDashboard();
     dash.cloudConnectors.push({
       provider: 'openai',
@@ -736,6 +751,9 @@ describe('AI Usage Monitor UI & app slot registration', () => {
 
     render(<SettingsSection />);
     expect(await screen.findByText('AI Usage Monitor Status & Sync Controls')).toBeTruthy();
+    expect(screen.getByText('Local CLI Credential Probing (Opt-In)')).toBeTruthy();
+    expect(screen.getByText('Disabled (Default)')).toBeTruthy();
+    expect(screen.getByText(/wham\/usage/)).toBeTruthy();
     expect(screen.getByText('Balance Pending')).toBeTruthy();
     expect(screen.queryByText(/Reported MTD: —/)).toBeNull();
     expect(screen.getByText('403 Scope Error')).toBeTruthy();

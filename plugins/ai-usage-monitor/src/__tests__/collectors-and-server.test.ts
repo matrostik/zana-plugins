@@ -40,19 +40,84 @@ describe('collectors, indexer, RPCs, CLI, and agent tools', () => {
       status: 'error', windows: [], errorMessage: expect.stringContaining('Could not check Antigravity usage')
     });
   });
-  it('does not mark a historical provider missing from the registry as available', async () => {
+  it('does not mark a historical provider missing from the registry as available and infers its billingMode', async () => {
     const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
-    const host = createFakeHost({ providers: [], threads: [{
-      id: 'old-thread', projectId: 'proj-1', hostId: 'h1', environmentId: null,
-      providerId: 'old-provider', status: 'idle', updatedAt: fixedNow - 1000,
-      events: [{ seq: 1, type: 'thread/tokenUsage/updated', payload: { createdAt: fixedNow - 1000,
-        tokenUsage: { total: { inputTokens: 10, outputTokens: 5, totalTokens: 15 }, last: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } } } }]
-    }] });
+    const host = createFakeHost({
+      providers: [],
+      threads: [
+        {
+          id: 'old-billed-thread',
+          projectId: 'proj-1',
+          hostId: 'h1',
+          environmentId: null,
+          providerId: 'openai-api',
+          status: 'idle',
+          updatedAt: fixedNow - 1000,
+          events: [
+            {
+              seq: 1,
+              type: 'thread/tokenUsage/updated',
+              payload: {
+                createdAt: fixedNow - 1000,
+                tokenUsage: {
+                  total: { inputTokens: 100_000, outputTokens: 10_000, totalTokens: 110_000 },
+                  last: { inputTokens: 100_000, outputTokens: 10_000, totalTokens: 110_000 }
+                }
+              }
+            }
+          ]
+        },
+        {
+          id: 'old-free-thread',
+          projectId: 'proj-1',
+          hostId: 'h1',
+          environmentId: null,
+          providerId: 'ollama',
+          status: 'idle',
+          updatedAt: fixedNow - 500,
+          events: [
+            {
+              seq: 1,
+              type: 'thread/tokenUsage/updated',
+              payload: {
+                createdAt: fixedNow - 500,
+                tokenUsage: {
+                  total: { inputTokens: 10_000, outputTokens: 2_000, totalTokens: 12_000 },
+                  last: { inputTokens: 10_000, outputTokens: 2_000, totalTokens: 12_000 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    });
     await createAiUsageMonitorPlugin(host.zcc, { now: () => fixedNow, skipInitialSync: true });
     await host.callRpc(RPC_METHODS.refreshNow);
     const dash = await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
-    expect(dash.providers.find((p) => p.providerId === 'old-provider')).toMatchObject({ available: false, turnCount: 1 });
+    expect(dash.providers.find((p) => p.providerId === 'openai-api')).toMatchObject({
+      available: false,
+      turnCount: 1,
+      billingMode: 'billed_api'
+    });
+    expect(dash.providers.find((p) => p.providerId === 'ollama')).toMatchObject({
+      available: false,
+      turnCount: 1,
+      billingMode: 'free'
+    });
   });
+
+  it('logs a warning when projects.list fails during dashboard build instead of silently swallowing', async () => {
+    const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
+    const host = createFakeHost({ providers: [] });
+    host.zcc.sdk.projects.list = async () => {
+      throw new Error('projects endpoint unreachable');
+    };
+    await createAiUsageMonitorPlugin(host.zcc, { now: () => fixedNow, skipInitialSync: true });
+    await host.callRpc<DashboardPayload>(RPC_METHODS.dashboard, { range: '30d' });
+    expect(host.logs.some((l) => l.level === 'warn' && l.message.includes('projects endpoint unreachable'))).toBe(true);
+    await host.dispose();
+  });
+
   it('indexes thread telemetry, probes ZCC quotas & cloud APIs, and serves RPC/CLI/tools', async () => {
     const fixedNow = Date.UTC(2026, 4, 15, 16, 0, 0);
     const host = createFakeHost({
@@ -233,7 +298,7 @@ describe('collectors, indexer, RPCs, CLI, and agent tools', () => {
       billingMode: 'subscription'
     });
 
-    // CLI + Agent Tools
+    // CLI + Agent Tools (including NaN / fractional limit handling)
     const cliSummary = await host.runCli(['summary', '--range=today']);
     expect(cliSummary.exitCode).toBe(0);
     expect(JSON.parse(cliSummary.stdout ?? '{}').kpis.turnCount).toBe(2);
@@ -241,12 +306,17 @@ describe('collectors, indexer, RPCs, CLI, and agent tools', () => {
     expect((await host.runCli(['quotas'])).exitCode).toBe(0);
     expect((await host.runCli(['budgets'])).exitCode).toBe(0);
     expect((await host.runCli(['logs', '--kind=error', '--limit=5'])).exitCode).toBe(0);
+    expect((await host.runCli(['logs', '--limit=not-a-number'])).exitCode).toBe(0);
     expect((await host.runCli(['bogus'])).exitCode).toBe(1);
 
     const toolSummary = JSON.parse(String(await host.callTool('ai_usage_summary', { range: 'all', refresh: true })));
     expect(toolSummary.kpis.turnCount).toBe(2); // no double-counting after refresh!
     const toolLogs = JSON.parse(String(await host.callTool('ai_usage_logs', { kind: 'fallback', limit: 10 })));
     expect(toolLogs.items).toHaveLength(1);
+    const nanLimitLogs = JSON.parse(String(await host.callTool('ai_usage_logs', { kind: 'all', limit: Number.NaN })));
+    expect(nanLimitLogs.items.length).toBeGreaterThan(0);
+    const fractionalLogs = JSON.parse(String(await host.callTool('ai_usage_logs', { kind: 'all', limit: 2.9 })));
+    expect(fractionalLogs.items).toHaveLength(2);
 
     // Live thread lifecycle event updates incremental cursor
     const th1 = host.threads.get('th-1')!;

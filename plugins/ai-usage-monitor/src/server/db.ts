@@ -214,6 +214,31 @@ function buildTimeRangeFilter(
   };
 }
 
+function buildMetricFilter(args: {
+  sinceMs: number;
+  scopeType: BudgetScopeType;
+  scopeId: string;
+  metric: BudgetMetric;
+}): { clauses: string[]; params: unknown[]; col: string } {
+  const clauses: string[] = ['timestamp_ms >= ?'];
+  const params: unknown[] = [args.sinceMs];
+  if (args.scopeType === 'provider' && args.scopeId) {
+    clauses.push('provider_id = ?');
+    params.push(args.scopeId);
+  } else if (args.scopeType === 'model' && args.scopeId) {
+    clauses.push('model = ?');
+    params.push(args.scopeId);
+  } else if (args.scopeType === 'project' && args.scopeId) {
+    clauses.push('project_id = ?');
+    params.push(args.scopeId);
+  }
+  if (args.metric === 'billed_usd') {
+    clauses.push("billing_mode = 'billed_api'");
+  }
+  const col = args.metric === 'tokens' ? 'total_tokens' : 'estimated_cost_usd';
+  return { clauses, params, col };
+}
+
 export function createUsageStore(db: PluginDatabase, now: () => number = Date.now) {
   db.migrate(MIGRATIONS);
 
@@ -612,17 +637,36 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
       )
       .all(...filter.params) as Record<string, unknown>[];
 
-    const topStmt = db.prepare(
-      `SELECT provider_id, model FROM usage_turns
-       WHERE project_id = ? AND ${filter.sql}
-       GROUP BY provider_id, model
-       ORDER BY SUM(estimated_cost_usd) DESC, SUM(total_tokens) DESC
-       LIMIT 1`
-    );
+    const topRows = db
+      .prepare(
+        `WITH ranked AS (
+          SELECT
+            project_id,
+            provider_id,
+            model,
+            ROW_NUMBER() OVER (
+              PARTITION BY project_id
+              ORDER BY SUM(estimated_cost_usd) DESC, SUM(total_tokens) DESC
+            ) AS rn
+          FROM usage_turns
+          WHERE ${filter.sql}
+          GROUP BY project_id, provider_id, model
+        )
+        SELECT project_id, provider_id, model FROM ranked WHERE rn = 1`
+      )
+      .all(...filter.params) as Array<{ project_id?: string; provider_id?: string; model?: string }>;
+
+    const topByProject = new Map<string, { providerId: string | null; model: string | null }>();
+    for (const topRow of topRows) {
+      topByProject.set(String(topRow.project_id ?? ''), {
+        providerId: topRow.provider_id ?? null,
+        model: topRow.model ?? null
+      });
+    }
 
     return rows.map((row) => {
       const projectId = String(row.project_id);
-      const top = topStmt.get(projectId, ...filter.params) as { provider_id?: string; model?: string } | undefined;
+      const top = topByProject.get(projectId);
       return {
         projectId,
         projectName: projectNames.get(projectId) ?? (projectId || 'Unassigned'),
@@ -635,7 +679,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
         estimatedCostUsd: Number(Number(row.estimated_cost_usd ?? 0).toFixed(4)),
         billedCostUsd: Number(Number(row.billed_cost_usd ?? 0).toFixed(4)),
         subscriptionEquivUsd: Number(Number(row.sub_equiv_usd ?? 0).toFixed(4)),
-        topProviderId: top?.provider_id ?? null,
+        topProviderId: top?.providerId ?? null,
         topModel: top?.model ?? null
       };
     });
@@ -678,26 +722,41 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     scopeId: string;
     metric: BudgetMetric;
   }): number {
-    const clauses: string[] = ['timestamp_ms >= ?'];
-    const params: unknown[] = [args.sinceMs];
-    if (args.scopeType === 'provider' && args.scopeId) {
-      clauses.push('provider_id = ?');
-      params.push(args.scopeId);
-    } else if (args.scopeType === 'model' && args.scopeId) {
-      clauses.push('model = ?');
-      params.push(args.scopeId);
-    } else if (args.scopeType === 'project' && args.scopeId) {
-      clauses.push('project_id = ?');
-      params.push(args.scopeId);
-    }
-    if (args.metric === 'billed_usd') {
-      clauses.push("billing_mode = 'billed_api'");
-    }
-    const col = args.metric === 'tokens' ? 'total_tokens' : 'estimated_cost_usd';
+    const { clauses, params, col } = buildMetricFilter(args);
     const row = db
       .prepare(`SELECT COALESCE(SUM(${col}), 0) AS total FROM usage_turns WHERE ${clauses.join(' AND ')}`)
       .get(...params) as { total?: number } | undefined;
     return Number(row?.total ?? 0);
+  }
+
+  function findTopProjectInWindow(args: {
+    sinceMs: number;
+    scopeType: BudgetScopeType;
+    scopeId: string;
+    metric: BudgetMetric;
+  }): string | null {
+    const { clauses, params, col } = buildMetricFilter(args);
+    const scopedRow = db
+      .prepare(
+        `SELECT project_id FROM usage_turns
+         WHERE ${clauses.join(' AND ')} AND project_id <> ''
+         GROUP BY project_id
+         ORDER BY COALESCE(SUM(${col}), 0) DESC, COALESCE(SUM(total_tokens), 0) DESC
+         LIMIT 1`
+      )
+      .get(...params) as { project_id?: string } | undefined;
+    if (scopedRow?.project_id) return scopedRow.project_id;
+
+    const anyRow = db
+      .prepare(
+        `SELECT project_id FROM usage_turns
+         WHERE timestamp_ms >= ? AND project_id <> ''
+         GROUP BY project_id
+         ORDER BY COALESCE(SUM(estimated_cost_usd), 0) DESC, COALESCE(SUM(total_tokens), 0) DESC
+         LIMIT 1`
+      )
+      .get(args.sinceMs) as { project_id?: string } | undefined;
+    return anyRow?.project_id ?? null;
   }
 
   function listBudgets(): BudgetRule[] {
@@ -844,8 +903,10 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
       params.push(term, term, term, term);
     }
     const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-    const limit = Math.max(1, Math.min(200, query.limit ?? 50));
-    const offset = Math.max(0, query.offset ?? 0);
+    const rawLimit = typeof query.limit === 'number' && Number.isFinite(query.limit) ? Math.floor(query.limit) : 50;
+    const rawOffset = typeof query.offset === 'number' && Number.isFinite(query.offset) ? Math.floor(query.offset) : 0;
+    const limit = Math.max(1, Math.min(200, rawLimit));
+    const offset = Math.max(0, rawOffset);
 
     const rows = db
       .prepare(`SELECT * FROM usage_events_log ${whereSql} ORDER BY timestamp_ms DESC LIMIT ? OFFSET ?`)
@@ -915,6 +976,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     listProjectBreakdown,
     listDailyTrend,
     computeMetricInWindow,
+    findTopProjectInWindow,
     listBudgets,
     upsertBudget,
     deleteBudget,

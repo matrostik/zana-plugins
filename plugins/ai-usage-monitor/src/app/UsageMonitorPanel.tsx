@@ -260,24 +260,32 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
     }
   }
 
-  async function handleSaveBudget(input: BudgetRuleInput) {
-    await rpcRef.current.call(RPC_METHODS.setBudget, input);
-    await loadAll();
+  async function runMutation(method: string, args: unknown) {
+    try {
+      await rpcRef.current.call(method, args);
+      if (mountedRef.current) setError(null);
+      await loadAll();
+    } catch (err) {
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }
   }
 
-  async function handleDeleteBudget(id: string) {
-    await rpcRef.current.call(RPC_METHODS.deleteBudget, { id });
-    await loadAll();
+  function handleSaveBudget(input: BudgetRuleInput) {
+    return runMutation(RPC_METHODS.setBudget, input);
   }
 
-  async function handleSavePricing(rule: Omit<ModelPricingRule, 'isOverride'>) {
-    await rpcRef.current.call(RPC_METHODS.setPricingOverride, rule);
-    await loadAll();
+  function handleDeleteBudget(id: string) {
+    return runMutation(RPC_METHODS.deleteBudget, { id });
   }
 
-  async function handleDeletePricing(pattern: string) {
-    await rpcRef.current.call(RPC_METHODS.deletePricingOverride, { pattern });
-    await loadAll();
+  function handleSavePricing(rule: Omit<ModelPricingRule, 'isOverride'>) {
+    return runMutation(RPC_METHODS.setPricingOverride, rule);
+  }
+
+  function handleDeletePricing(pattern: string) {
+    return runMutation(RPC_METHODS.deletePricingOverride, { pattern });
   }
 
   async function handleUpdateProviderOrder(prefs: ProviderOrderPrefs) {

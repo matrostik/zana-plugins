@@ -18,11 +18,44 @@ describe('pricing engine', () => {
     expect(inferDefaultBillingMode('local-models', 'qwen3')).toBe('free');
     expect(inferDefaultBillingMode('ollama', 'qwen2.5-coder:32b')).toBe('free');
     expect(inferDefaultBillingMode('openrouter', 'anthropic/claude-sonnet-4')).toBe('billed_api');
+    expect(inferDefaultBillingMode('openrouter', 'qwen/qwen-2.5-coder-32b')).toBe('billed_api');
+    expect(inferDefaultBillingMode('openrouter', 'meta-llama/llama-3.3-70b')).toBe('billed_api');
+    expect(inferDefaultBillingMode('openrouter', 'qwen/qwen3-coder:free')).toBe('free');
     expect(inferDefaultBillingMode('openai-api', 'gpt-4.1')).toBe('billed_api');
 
     const customOverrides = new Map([['custom-sub', 'subscription' as const]]);
     expect(resolveModelPricing('custom-sub', 'gpt-4o', [], customOverrides).billingMode).toBe('subscription');
     expect(resolveModelPricing('acp-opencode', 'opencode/glm-5.3-flash-free', []).billingMode).toBe('free');
+  });
+
+  it('retains paid billing and non-zero estimated cost for hosted Qwen and Llama models', () => {
+    const hostedQwen = computeTurnCost(
+      {
+        providerId: 'openrouter',
+        model: 'qwen-2.5-coder',
+        inputTokens: 1_000_000,
+        cachedInputTokens: 0,
+        outputTokens: 1_000_000,
+        reasoningOutputTokens: 0
+      },
+      []
+    );
+    expect(hostedQwen.pricing.billingMode).toBe('billed_api');
+    expect(hostedQwen.estimatedCostUsd).toBeGreaterThan(0);
+
+    const hostedLlama = computeTurnCost(
+      {
+        providerId: 'openrouter',
+        model: 'llama-3.3-70b',
+        inputTokens: 1_000_000,
+        cachedInputTokens: 0,
+        outputTokens: 1_000_000,
+        reasoningOutputTokens: 0
+      },
+      []
+    );
+    expect(hostedLlama.pricing.billingMode).toBe('billed_api');
+    expect(hostedLlama.estimatedCostUsd).toBeGreaterThan(0);
   });
 
   it('matches catalog patterns with wildcards and honors custom overrides first', () => {
@@ -84,6 +117,56 @@ describe('pricing engine', () => {
     );
     // 100k uncached ($0.30) + 2M cached ($0.60) + 50k out ($0.75) = $1.65
     expect(separate.estimatedCostUsd).toBeCloseTo(1.65, 4);
+  });
+
+  it('charges separately reported reasoning tokens even when outputTokens is nonzero without double-charging inclusive reasoning', () => {
+    // Separate reasoning verified by explicit totalTokens (antigravity/opencode/anthropic convention)
+    const separateWithTotal = computeTurnCost(
+      {
+        providerId: 'antigravity',
+        model: 'claude-sonnet-4',
+        inputTokens: 100_000,
+        cachedInputTokens: 0,
+        outputTokens: 50_000,
+        reasoningOutputTokens: 100_000,
+        totalTokens: 250_000
+      },
+      []
+    );
+    // 100k in ($0.30) + 50k out ($0.75) + 100k reason ($1.50) = $2.55
+    expect(separateWithTotal.estimatedCostUsd).toBeCloseTo(2.55, 4);
+    expect(separateWithTotal.formula).toContain('reason');
+
+    // Separate reasoning without explicit totalTokens for a separate-reasoning provider
+    const separateByProvider = computeTurnCost(
+      {
+        providerId: 'anthropic-api',
+        model: 'claude-sonnet-4',
+        inputTokens: 100_000,
+        cachedInputTokens: 0,
+        outputTokens: 80_000,
+        reasoningOutputTokens: 40_000
+      },
+      []
+    );
+    // 100k in ($0.30) + 80k out ($1.20) + 40k reason ($0.60) = $2.10
+    expect(separateByProvider.estimatedCostUsd).toBeCloseTo(2.1, 4);
+
+    // Inclusive reasoning (OpenAI/Codex style: totalTokens == input + output) must NOT double-charge reasoning
+    const inclusiveReasoning = computeTurnCost(
+      {
+        providerId: 'openai-api',
+        model: 'o3',
+        inputTokens: 100_000,
+        cachedInputTokens: 0,
+        outputTokens: 80_000,
+        reasoningOutputTokens: 50_000,
+        totalTokens: 180_000
+      },
+      []
+    );
+    // o3: 100k * $2/1M ($0.20) + 80k * $8/1M ($0.64) = $0.84
+    expect(inclusiveReasoning.estimatedCostUsd).toBeCloseTo(0.84, 4);
   });
 
   it('forces zero USD spend when model or provider resolves to free billing mode', () => {

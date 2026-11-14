@@ -197,7 +197,52 @@ describe('local provider live usage probes & stale quota expiration', () => {
     expect(String(throttled?.message)).toContain('429');
   });
 
-  it('expires stale blocked thread-events windows and prefers live Codex wham/usage over old thread events', async () => {
+  it('does not read local CLI credentials or contact third-party usage endpoints when opt-in setting is disabled (default)', async () => {
+    const fixedNow = Date.UTC(2026, 10, 13, 6, 30, 0);
+    const homeDir = await makeTempHome();
+    const codexDir = path.join(homeDir, '.codex');
+    const claudeDir = path.join(homeDir, '.claude');
+    await fs.mkdir(codexDir, { recursive: true });
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.writeFile(
+      path.join(codexDir, 'auth.json'),
+      JSON.stringify({
+        auth_mode: 'chatgpt',
+        tokens: { access_token: makeJwt({ exp: Math.floor((fixedNow + 3_600_000) / 1000) }), account_id: 'acct_secret' }
+      }),
+      'utf8'
+    );
+    await fs.writeFile(
+      path.join(claudeDir, '.credentials.json'),
+      JSON.stringify({ claudeAiOauth: { accessToken: 'claude-secret-tok', expiresAt: fixedNow + 3_600_000 } }),
+      'utf8'
+    );
+
+    const fetchedUrls: string[] = [];
+    const host = createFakeHost({
+      providers: [
+        { id: 'codex', available: true, displayName: 'Codex', models: ['gpt-5-codex'] },
+        { id: 'claude-code', available: true, displayName: 'Claude Code', models: ['claude-sonnet-4-5'] }
+      ]
+    });
+
+    await createAiUsageMonitorPlugin(host.zcc, {
+      homeDir,
+      env: {},
+      now: () => fixedNow,
+      skipInitialSync: true,
+      fetch: async (input) => {
+        fetchedUrls.push(String(input));
+        return new Response('should not be called for local credentials', { status: 500 });
+      }
+    });
+
+    await host.callRpc(RPC_METHODS.refreshNow);
+    expect(fetchedUrls.some((u) => u.includes('wham/usage') || u.includes('api/oauth/usage'))).toBe(false);
+    await host.dispose();
+  });
+
+  it('expires stale blocked thread-events windows and prefers live Codex wham/usage over old thread events when opted in', async () => {
     const fixedNow = Date.UTC(2026, 10, 13, 6, 30, 0);
     const homeDir = await makeTempHome();
     const codexDir = path.join(homeDir, '.codex');
@@ -215,6 +260,7 @@ describe('local provider live usage probes & stale quota expiration', () => {
     );
 
     const host = createFakeHost({
+      settings: { enableLocalCredentialProbing: true },
       providers: [
         { id: 'codex', available: true, displayName: 'Codex', models: ['gpt-5-codex'] },
         { id: 'cursor', available: true, displayName: 'Cursor', models: ['cursor-fast'] }

@@ -12,6 +12,27 @@ export interface TimeRangeBounds {
 
 export type BillingMode = 'billed_api' | 'subscription' | 'free';
 
+export const DEFAULT_SUBSCRIPTION_PROVIDERS = [
+  'claude-code',
+  'codex',
+  'cursor',
+  'acp-cursor',
+  'antigravity'
+] as const;
+
+export const DEFAULT_SUBSCRIPTION_PROVIDERS_CSV = DEFAULT_SUBSCRIPTION_PROVIDERS.join(',');
+
+export const LOCAL_CREDENTIAL_PROBE_FILES = [
+  '~/.codex/auth.json (or $CODEX_HOME/auth.json)',
+  '~/.claude/.credentials.json',
+  '~/.claude.json'
+] as const;
+
+export const LOCAL_CREDENTIAL_PROBE_ENDPOINTS = [
+  'https://chatgpt.com/backend-api/wham/usage',
+  'https://api.anthropic.com/api/oauth/usage'
+] as const;
+
 export type QuotaWindowStatus = 'allowed' | 'warning' | 'blocked' | 'unknown';
 
 export type ProviderQuotaStatus =

@@ -1,4 +1,4 @@
-import type { BillingMode, ModelPricingRule } from '../shared/types.ts';
+import { DEFAULT_SUBSCRIPTION_PROVIDERS, type BillingMode, type ModelPricingRule } from '../shared/types.ts';
 
 export interface TokenUsageInput {
   providerId: string;
@@ -25,8 +25,18 @@ export interface CostBreakdown {
   pricing: PricingResolution;
 }
 
-const SUBSCRIPTION_PROVIDERS = new Set(['claude-code', 'codex', 'cursor', 'acp-cursor', 'antigravity']);
+const SUBSCRIPTION_PROVIDERS = new Set<string>(DEFAULT_SUBSCRIPTION_PROVIDERS);
 const FREE_LOCAL_PROVIDERS = new Set(['local', 'local-models', 'ollama', 'lmstudio', 'lm-studio']);
+const SEPARATE_REASONING_PROVIDERS = new Set([
+  'antigravity',
+  'opencode',
+  'acp-opencode',
+  'google',
+  'gemini',
+  'anthropic',
+  'anthropic-api',
+  'claude-code'
+]);
 
 export const DEFAULT_MODEL_PRICING: readonly Omit<ModelPricingRule, 'isOverride'>[] = [
   { pattern: '*-free', inputPer1M: 0, cachedInputPer1M: 0, outputPer1M: 0, reasoningPer1M: 0, billingMode: 'free' },
@@ -54,8 +64,8 @@ export const DEFAULT_MODEL_PRICING: readonly Omit<ModelPricingRule, 'isOverride'
   { pattern: 'deepseek-v3*', inputPer1M: 0.27, cachedInputPer1M: 0.07, outputPer1M: 1.1, reasoningPer1M: 1.1, billingMode: null },
   { pattern: 'deepseek*', inputPer1M: 0.3, cachedInputPer1M: 0.08, outputPer1M: 1.2, reasoningPer1M: 1.2, billingMode: null },
   { pattern: 'kimi*', inputPer1M: 0.6, cachedInputPer1M: 0.15, outputPer1M: 2.5, reasoningPer1M: 2.5, billingMode: null },
-  { pattern: 'qwen*', inputPer1M: 0, cachedInputPer1M: 0, outputPer1M: 0, reasoningPer1M: 0, billingMode: 'free' },
-  { pattern: 'llama*', inputPer1M: 0, cachedInputPer1M: 0, outputPer1M: 0, reasoningPer1M: 0, billingMode: 'free' }
+  { pattern: 'qwen*', inputPer1M: 0.4, cachedInputPer1M: 0.1, outputPer1M: 1.2, reasoningPer1M: 1.2, billingMode: null },
+  { pattern: 'llama*', inputPer1M: 0.2, cachedInputPer1M: 0.05, outputPer1M: 0.8, reasoningPer1M: 0.8, billingMode: null }
 ];
 
 const FALLBACK_PRICING: Omit<ModelPricingRule, 'isOverride'> = {
@@ -69,8 +79,14 @@ const FALLBACK_PRICING: Omit<ModelPricingRule, 'isOverride'> = {
 
 export function inferDefaultBillingMode(providerId: string, model: string): BillingMode {
   const normProvider = providerId.toLowerCase();
-  const normModel = model.toLowerCase();
-  if (FREE_LOCAL_PROVIDERS.has(normProvider) || normModel.includes('ollama') || normModel.includes(':local')) {
+  const normModel = model.trim().toLowerCase();
+  if (
+    FREE_LOCAL_PROVIDERS.has(normProvider) ||
+    normModel.includes('ollama') ||
+    normModel.includes(':local') ||
+    normModel.endsWith(':free') ||
+    normModel.endsWith('-free')
+  ) {
     return 'free';
   }
   if (SUBSCRIPTION_PROVIDERS.has(normProvider)) {
@@ -139,18 +155,46 @@ function splitInputAndCached(usage: TokenUsageInput): { uncachedInput: number; s
   const safeInput = Math.max(0, usage.inputTokens);
   const rawCached = Math.max(0, usage.cachedInputTokens);
   const safeOutput = Math.max(0, usage.outputTokens);
+  const safeReasoning = Math.max(0, usage.reasoningOutputTokens);
   const total = Math.max(0, usage.totalTokens ?? 0);
 
-  const separateLooksCloser =
-    total > 0 &&
-    rawCached > 0 &&
-    Math.abs(safeInput + rawCached + safeOutput - total) < Math.abs(safeInput + safeOutput - total);
+  const inclusiveDiff = Math.min(
+    Math.abs(safeInput + safeOutput - total),
+    Math.abs(safeInput + safeOutput + safeReasoning - total)
+  );
+  const separateDiff = Math.min(
+    Math.abs(safeInput + rawCached + safeOutput - total),
+    Math.abs(safeInput + rawCached + safeOutput + safeReasoning - total)
+  );
+  const separateLooksCloser = total > 0 && rawCached > 0 && separateDiff < inclusiveDiff;
 
   if (rawCached > safeInput || separateLooksCloser) {
     return { uncachedInput: safeInput, safeCached: rawCached, safeOutput };
   }
   const safeCached = Math.min(safeInput, rawCached);
   return { uncachedInput: Math.max(0, safeInput - safeCached), safeCached, safeOutput };
+}
+
+function resolveExtraReasoningTokens(
+  usage: TokenUsageInput,
+  uncachedInput: number,
+  safeCached: number,
+  safeOutput: number
+): number {
+  const safeReasoning = Math.max(0, usage.reasoningOutputTokens);
+  if (safeReasoning === 0) return 0;
+  if (safeOutput === 0 || safeReasoning > safeOutput) return safeReasoning;
+
+  const total = Math.max(0, usage.totalTokens ?? 0);
+  if (total > 0) {
+    const baseTotal = uncachedInput + safeCached + safeOutput;
+    const withReasoningDiff = Math.abs(baseTotal + safeReasoning - total);
+    const withoutReasoningDiff = Math.abs(baseTotal - total);
+    if (withReasoningDiff < withoutReasoningDiff) return safeReasoning;
+    if (withoutReasoningDiff < withReasoningDiff) return 0;
+  }
+
+  return SEPARATE_REASONING_PROVIDERS.has(usage.providerId.toLowerCase()) ? safeReasoning : 0;
 }
 
 export function computeTurnCost(
@@ -160,10 +204,7 @@ export function computeTurnCost(
 ): CostBreakdown {
   const pricing = resolveModelPricing(usage.providerId, usage.model, overrides, providerModeOverrides);
   const { uncachedInput, safeCached, safeOutput } = splitInputAndCached(usage);
-  const safeReasoning = Math.max(0, usage.reasoningOutputTokens);
-
-  // ZCC bridges may include reasoning tokens inside outputTokens or separately; price extra reasoning only when not double-counted.
-  const extraReasoning = safeReasoning > 0 && safeOutput === 0 ? safeReasoning : 0;
+  const extraReasoning = resolveExtraReasoningTokens(usage, uncachedInput, safeCached, safeOutput);
 
   const uncachedUsd = (uncachedInput / 1_000_000) * pricing.inputPer1M;
   const cachedUsd = (safeCached / 1_000_000) * pricing.cachedInputPer1M;
@@ -176,7 +217,9 @@ export function computeTurnCost(
       ? `Local/free model (${pricing.pattern}): $0.00`
       : `(${fmtTokensK(uncachedInput)} * $${pricing.inputPer1M}/1M) + ` +
         `(${fmtTokensK(safeCached)} * $${pricing.cachedInputPer1M}/1M) + ` +
-        `(${fmtTokensK(safeOutput)} * $${pricing.outputPer1M}/1M) = $${estimatedCostUsd.toFixed(4)}`;
+        `(${fmtTokensK(safeOutput)} * $${pricing.outputPer1M}/1M)` +
+        (extraReasoning > 0 ? ` + (${fmtTokensK(extraReasoning)} reason * $${pricing.reasoningPer1M}/1M)` : '') +
+        ` = $${estimatedCostUsd.toFixed(4)}`;
 
   return { estimatedCostUsd, formula, pricing };
 }

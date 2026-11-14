@@ -2,6 +2,7 @@ import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import { DEFAULT_PROVIDER_ORDER, sortProviders } from '../shared/provider-order.ts';
 import type {
   BillingMode,
+  BudgetEvaluation,
   CloudConnectorStatus,
   DashboardKpis,
   DashboardPayload,
@@ -9,14 +10,15 @@ import type {
   ProviderOrderPrefs,
   ProviderQuotaSnapshot,
   QuotaWindow,
+  TimeRangeBounds,
   TimeRangeKey
 } from '../shared/types.ts';
 import type { BudgetEvaluator } from './budgets.ts';
 import { expireStaleQuotaWindows } from './collectors/local-provider-usage.ts';
 import type { DiscoveredProviderModels } from './collectors/zcc-quotas.ts';
-import type { UsageStore } from './db.ts';
-import { listCombinedPricingRules } from './pricing.ts';
-import { computeCacheHitPercent, resolveTimeRangeBounds, withTimeout } from './util.ts';
+import type { UpsertQuotaRecord, UsageStore } from './db.ts';
+import { inferDefaultBillingMode, listCombinedPricingRules } from './pricing.ts';
+import { computeCacheHitPercent, errorMessage, resolveTimeRangeBounds, withTimeout } from './util.ts';
 
 export interface DashboardServiceDeps {
   store: UsageStore;
@@ -26,9 +28,19 @@ export interface DashboardServiceDeps {
   getCloudStatuses: () => CloudConnectorStatus[];
   getOpenCodeLocalStats?: () => OpenCodeLocalStatsSnapshot | null;
   getProviderOrder?: () => ProviderOrderPrefs;
+  getProviderModeOverrides?: () => ReadonlyMap<string, BillingMode>;
   getLastSyncedAtMs: () => number;
   getIsSyncing?: () => boolean;
+  log?: Pick<ZccPluginApi['log'], 'warn'>;
   now?: () => number;
+}
+
+interface ProviderUsageAggregate {
+  totalTokens: number;
+  cachedTokens: number;
+  turnCount: number;
+  estimatedCostUsd: number;
+  billedCostUsd: number;
 }
 
 function findTightestWindow(providers: readonly ProviderQuotaSnapshot[]): DashboardKpis['tightestQuota'] {
@@ -57,6 +69,103 @@ function findTightestWindow(providers: readonly ProviderQuotaSnapshot[]): Dashbo
   };
 }
 
+function buildProviderSnapshot(args: {
+  providerId: string;
+  snap: UpsertQuotaRecord | undefined;
+  disc: DiscoveredProviderModels | undefined;
+  agg: ProviderUsageAggregate | undefined;
+  modeOverrides: ReadonlyMap<string, BillingMode> | undefined;
+  currentNowMs: number;
+}): ProviderQuotaSnapshot {
+  const { providerId, snap, disc, agg, modeOverrides, currentNowMs } = args;
+  const billingMode: BillingMode =
+    snap?.billingMode ??
+    modeOverrides?.get(providerId.toLowerCase()) ??
+    inferDefaultBillingMode(providerId, '');
+  const normalized =
+    snap && snap.source === 'thread-events'
+      ? expireStaleQuotaWindows(snap.windows, snap.status, snap.errorMessage, currentNowMs)
+      : null;
+  const isCloudConfiguredOpenCode =
+    snap?.source === 'opencode-go-usage' || snap?.source === 'opencode-console-api';
+
+  return {
+    providerId,
+    displayName: snap?.displayName ?? disc?.displayName ?? providerId,
+    available: disc?.available ?? isCloudConfiguredOpenCode,
+    source: snap?.source ?? 'telemetry',
+    status: normalized?.status ?? snap?.status ?? 'ok',
+    accountLabel: snap?.accountLabel ?? null,
+    planLabel: snap?.planLabel ?? null,
+    billingMode,
+    windows: normalized?.windows ?? snap?.windows ?? [],
+    creditRemainingUsd: snap?.creditRemainingUsd ?? null,
+    creditLimitUsd: snap?.creditLimitUsd ?? null,
+    creditUsedUsd: snap?.creditUsedUsd ?? null,
+    errorMessage: normalized ? normalized.errorMessage : (snap?.errorMessage ?? null),
+    configuredModels: disc?.models ?? [],
+    totalTokens: agg?.totalTokens ?? 0,
+    cachedTokens: agg?.cachedTokens ?? 0,
+    turnCount: agg?.turnCount ?? 0,
+    estimatedCostUsd: Number((agg?.estimatedCostUsd ?? 0).toFixed(4)),
+    billedCostUsd: snap?.billedCostUsd ?? (agg && billingMode === 'billed_api' ? Number(agg.billedCostUsd.toFixed(4)) : null),
+    updatedAtMs: snap?.updatedAtMs ?? 0
+  };
+}
+
+function sumCloudCredits(providers: readonly ProviderQuotaSnapshot[]): { remaining: number | null; limit: number | null } {
+  let remaining = 0;
+  let limit = 0;
+  let hasCredits = false;
+  for (const prov of providers) {
+    if (prov.creditRemainingUsd !== null) {
+      remaining += prov.creditRemainingUsd;
+      limit += prov.creditLimitUsd ?? prov.creditRemainingUsd;
+      hasCredits = true;
+    }
+  }
+  return {
+    remaining: hasCredits ? Number(remaining.toFixed(2)) : null,
+    limit: hasCredits ? Number(limit.toFixed(2)) : null
+  };
+}
+
+function buildDashboardKpis(args: {
+  range: TimeRangeKey;
+  bounds: TimeRangeBounds;
+  summary: ReturnType<UsageStore['aggregateSummary']>;
+  providers: readonly ProviderQuotaSnapshot[];
+  budgets: readonly BudgetEvaluation[];
+  logCount: number;
+}): DashboardKpis {
+  const credits = sumCloudCredits(args.providers);
+  const budgetAlerts = args.budgets.filter((b) => b.rule.enabled && b.status !== 'ok').length;
+  const providerAlerts = args.providers.filter(
+    (p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error'
+  ).length;
+
+  return {
+    range: args.range,
+    rangeBounds: args.bounds,
+    totalValueUsd: Number(args.summary.totalValueUsd.toFixed(2)),
+    billedSpendUsd: Number(args.summary.billedSpendUsd.toFixed(2)),
+    subscriptionEquivUsd: Number(args.summary.subscriptionEquivUsd.toFixed(2)),
+    cloudCreditsRemainingUsd: credits.remaining,
+    cloudCreditsTotalLimitUsd: credits.limit,
+    totalTokens: args.summary.totalTokens,
+    cachedInputTokens: args.summary.cachedInputTokens,
+    inputTokens: args.summary.inputTokens,
+    outputTokens: args.summary.outputTokens,
+    reasoningOutputTokens: args.summary.reasoningOutputTokens,
+    cacheHitPercent: computeCacheHitPercent(args.summary.inputTokens, args.summary.cachedInputTokens),
+    turnCount: args.summary.turnCount,
+    subagentTurnCount: args.summary.subagentTurnCount,
+    tightestQuota: findTightestWindow(args.providers),
+    alertCount: budgetAlerts + providerAlerts,
+    logCount: args.logCount
+  };
+}
+
 export function createDashboardService(deps: DashboardServiceDeps) {
   const now = deps.now ?? Date.now;
 
@@ -67,8 +176,8 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       for (const proj of list) {
         map.set(proj.id, proj.name);
       }
-    } catch {
-      // Non-fatal: falls back to projectId strings.
+    } catch (err) {
+      deps.log?.warn(`ai-usage-monitor: failed loading project names: ${errorMessage(err)}`);
     }
     return map;
   }
@@ -84,6 +193,7 @@ export function createDashboardService(deps: DashboardServiceDeps) {
     const discoveredMap = new Map(discovered.map((d) => [d.providerId, d]));
     const snapshots = deps.store.listQuotaSnapshots();
     const snapMap = new Map(snapshots.map((s) => [s.providerId, s]));
+    const modeOverrides = deps.getProviderModeOverrides?.();
 
     const allProviderIds = new Set<string>([
       ...snapshots.map((s) => s.providerId),
@@ -91,85 +201,31 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       ...providerUsage.keys()
     ]);
 
-    const providers: ProviderQuotaSnapshot[] = [...allProviderIds].map((providerId) => {
-      const snap = snapMap.get(providerId);
-      const disc = discoveredMap.get(providerId);
-      const agg = providerUsage.get(providerId);
-      const billingMode: BillingMode = snap?.billingMode ?? 'subscription';
-      const normalized =
-        snap && snap.source === 'thread-events'
-          ? expireStaleQuotaWindows(snap.windows, snap.status, snap.errorMessage, currentNowMs)
-          : null;
-      const isCloudConfiguredOpenCode =
-        snap?.source === 'opencode-go-usage' || snap?.source === 'opencode-console-api';
-
-      return {
+    const providers = [...allProviderIds].map((providerId) =>
+      buildProviderSnapshot({
         providerId,
-        displayName: snap?.displayName ?? disc?.displayName ?? providerId,
-        available: disc?.available ?? isCloudConfiguredOpenCode,
-        source: snap?.source ?? 'telemetry',
-        status: normalized?.status ?? snap?.status ?? 'ok',
-        accountLabel: snap?.accountLabel ?? null,
-        planLabel: snap?.planLabel ?? null,
-        billingMode,
-        windows: normalized?.windows ?? snap?.windows ?? [],
-        creditRemainingUsd: snap?.creditRemainingUsd ?? null,
-        creditLimitUsd: snap?.creditLimitUsd ?? null,
-        creditUsedUsd: snap?.creditUsedUsd ?? null,
-        errorMessage: normalized ? normalized.errorMessage : (snap?.errorMessage ?? null),
-        configuredModels: disc?.models ?? [],
-        totalTokens: agg?.totalTokens ?? 0,
-        cachedTokens: agg?.cachedTokens ?? 0,
-        turnCount: agg?.turnCount ?? 0,
-        estimatedCostUsd: Number((agg?.estimatedCostUsd ?? 0).toFixed(4)),
-        billedCostUsd: snap?.billedCostUsd ?? (agg && billingMode === 'billed_api' ? Number(agg.billedCostUsd.toFixed(4)) : null),
-        updatedAtMs: snap?.updatedAtMs ?? 0
-      };
-    });
+        snap: snapMap.get(providerId),
+        disc: discoveredMap.get(providerId),
+        agg: providerUsage.get(providerId),
+        modeOverrides,
+        currentNowMs
+      })
+    );
 
     const providerOrder = deps.getProviderOrder?.() ?? DEFAULT_PROVIDER_ORDER;
     const sortedProviders = sortProviders(providers, providerOrder);
-
-    const cloudStatuses = deps.getCloudStatuses();
-    let creditsRemaining = 0;
-    let creditsLimit = 0;
-    let hasCredits = false;
-    for (const prov of sortedProviders) {
-      if (prov.creditRemainingUsd !== null) {
-        creditsRemaining += prov.creditRemainingUsd;
-        creditsLimit += prov.creditLimitUsd ?? prov.creditRemainingUsd;
-        hasCredits = true;
-      }
-    }
-
     const budgets = deps.budgets.evaluateAll();
     const logsMeta = deps.store.queryLogs({ limit: 1 }, projectMap);
-    const budgetAlerts = budgets.filter((b) => b.rule.enabled && b.status !== 'ok').length;
-    const providerAlerts = sortedProviders.filter((p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error').length;
-
-    const kpis: DashboardKpis = {
-      range,
-      rangeBounds: bounds,
-      totalValueUsd: Number(summary.totalValueUsd.toFixed(2)),
-      billedSpendUsd: Number(summary.billedSpendUsd.toFixed(2)),
-      subscriptionEquivUsd: Number(summary.subscriptionEquivUsd.toFixed(2)),
-      cloudCreditsRemainingUsd: hasCredits ? Number(creditsRemaining.toFixed(2)) : null,
-      cloudCreditsTotalLimitUsd: hasCredits ? Number(creditsLimit.toFixed(2)) : null,
-      totalTokens: summary.totalTokens,
-      cachedInputTokens: summary.cachedInputTokens,
-      inputTokens: summary.inputTokens,
-      outputTokens: summary.outputTokens,
-      reasoningOutputTokens: summary.reasoningOutputTokens,
-      cacheHitPercent: computeCacheHitPercent(summary.inputTokens, summary.cachedInputTokens),
-      turnCount: summary.turnCount,
-      subagentTurnCount: summary.subagentTurnCount,
-      tightestQuota: findTightestWindow(sortedProviders),
-      alertCount: budgetAlerts + providerAlerts,
-      logCount: logsMeta.totalCount
-    };
 
     return {
-      kpis,
+      kpis: buildDashboardKpis({
+        range,
+        bounds,
+        summary,
+        providers: sortedProviders,
+        budgets,
+        logCount: logsMeta.totalCount
+      }),
       providers: sortedProviders,
       providerOrder,
       models: deps.store.listModelBreakdown(bounds.startMs, overrides, bounds.endMs),
@@ -177,7 +233,7 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       dailyTrend: deps.store.listDailyTrend(range),
       budgets,
       pricingRules: listCombinedPricingRules(overrides),
-      cloudConnectors: cloudStatuses,
+      cloudConnectors: deps.getCloudStatuses(),
       opencodeLocal: deps.getOpenCodeLocalStats?.() ?? null,
       lastSyncedAtMs: deps.getLastSyncedAtMs(),
       isSyncing: deps.getIsSyncing?.() ?? false

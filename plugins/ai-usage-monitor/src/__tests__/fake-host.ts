@@ -4,7 +4,6 @@ import type { ThreadSummaryLike } from '../server/indexer.ts';
 
 export function createSqliteDatabase(): PluginDatabase {
   const sqlite = new DatabaseSync(':memory:');
-  const applied = new Set<string>();
   const runScript = (sql: string) => sqlite.exec(sql);
   return {
     runScript,
@@ -17,10 +16,17 @@ export function createSqliteDatabase(): PluginDatabase {
       };
     },
     migrate(statements: readonly string[]) {
+      sqlite.exec(
+        'CREATE TABLE IF NOT EXISTS _migrations (statement TEXT PRIMARY KEY, applied_at_ms INTEGER NOT NULL)'
+      );
+      const hasMigration = sqlite.prepare('SELECT 1 FROM _migrations WHERE statement = ?');
+      const recordMigration = sqlite.prepare(
+        'INSERT INTO _migrations (statement, applied_at_ms) VALUES (?, ?)'
+      );
       for (const statement of statements) {
-        if (applied.has(statement)) continue;
+        if (hasMigration.get(statement)) continue;
         sqlite.prepare(statement).run();
-        applied.add(statement);
+        recordMigration.run(statement, Date.now());
       }
     },
     transaction<T>(fn: () => T): T {

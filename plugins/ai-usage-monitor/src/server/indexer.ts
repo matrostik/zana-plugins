@@ -71,6 +71,7 @@ interface TokenTotals {
   outputTokens: number;
   reasoningOutputTokens: number;
   totalTokens: number;
+  hasExplicitTotal?: boolean;
 }
 
 type ThreadEventRow = { seq: number; type: string; payload: unknown; createdAt?: number };
@@ -98,8 +99,9 @@ function parseBreakdown(obj: Record<string, unknown>): TokenTotals {
   const outputTokens = asNumber(obj, 'outputTokens', 0);
   const reasoningOutputTokens = asNumber(obj, 'reasoningOutputTokens', 0);
   const rawTotal = asNumber(obj, 'totalTokens', 0);
-  const totalTokens = rawTotal > 0 ? rawTotal : inputTokens + outputTokens;
-  return { inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens, totalTokens };
+  const hasExplicitTotal = rawTotal > 0;
+  const totalTokens = hasExplicitTotal ? rawTotal : inputTokens + outputTokens;
+  return { inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens, totalTokens, hasExplicitTotal };
 }
 
 function positiveDelta(next: TokenTotals, prev: TokenTotals | null): TokenTotals {
@@ -109,7 +111,14 @@ function positiveDelta(next: TokenTotals, prev: TokenTotals | null): TokenTotals
   const outputTokens = Math.max(0, next.outputTokens - prev.outputTokens);
   const reasoningOutputTokens = Math.max(0, next.reasoningOutputTokens - prev.reasoningOutputTokens);
   const totalTokens = Math.max(0, next.totalTokens - prev.totalTokens);
-  return { inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens, totalTokens };
+  return {
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningOutputTokens,
+    totalTokens,
+    hasExplicitTotal: Boolean(next.hasExplicitTotal && prev.hasExplicitTotal)
+  };
 }
 
 function eventTimestampMs(row: ThreadEventRow, payload: Record<string, unknown>, fallbackMs: number): number {
@@ -200,7 +209,11 @@ export function createTelemetryIndexer(deps: TelemetryIndexerDeps) {
     const usageInput: TokenUsageInput = {
       providerId: args.providerId,
       model: args.model,
-      ...turnCounts
+      inputTokens: turnCounts.inputTokens,
+      cachedInputTokens: turnCounts.cachedInputTokens,
+      outputTokens: turnCounts.outputTokens,
+      reasoningOutputTokens: turnCounts.reasoningOutputTokens,
+      totalTokens: turnCounts.hasExplicitTotal ? turnCounts.totalTokens : undefined
     };
     const breakdown = computeTurnCost(usageInput, overrides, deps.getProviderModeOverrides());
     const turnId = extractTurnId(args.payload);

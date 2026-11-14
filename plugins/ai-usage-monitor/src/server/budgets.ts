@@ -1,7 +1,7 @@
 import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import type { BudgetEvaluation, BudgetMetric, BudgetPeriod, BudgetRule } from '../shared/types.ts';
 import type { UsageStore } from './db.ts';
-import { errorMessage } from './util.ts';
+import { errorMessage, localDateKey, localMidnightMs } from './util.ts';
 
 export interface BudgetEvaluatorDeps {
   store: UsageStore;
@@ -23,18 +23,23 @@ export function resolveBudgetWindow(
     return { sinceMs, resetsAtMs: sinceMs + bucketMs, periodKey: `5h:${sinceMs}` };
   }
   if (period === 'daily') {
-    const start = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), 0, 0, 0, 0);
-    return { sinceMs: start, resetsAtMs: start + 86_400_000, periodKey: `d:${new Date(start).toISOString().slice(0, 10)}` };
+    const start = localMidnightMs(nowMs, 0);
+    const resetsAtMs = localMidnightMs(nowMs, 1);
+    return { sinceMs: start, resetsAtMs, periodKey: `d:${localDateKey(start)}` };
   }
   if (period === 'weekly') {
-    const day = dt.getUTCDay();
-    const diffToMon = (day + 6) % 7;
-    const start = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() - diffToMon, 0, 0, 0, 0);
-    return { sinceMs: start, resetsAtMs: start + 7 * 86_400_000, periodKey: `w:${new Date(start).toISOString().slice(0, 10)}` };
+    const daysSinceMonday = (dt.getDay() + 6) % 7;
+    const start = localMidnightMs(nowMs, -daysSinceMonday);
+    const resetsAtMs = localMidnightMs(nowMs, -daysSinceMonday + 7);
+    return { sinceMs: start, resetsAtMs, periodKey: `w:${localDateKey(start)}` };
   }
-  const start = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1, 0, 0, 0, 0);
-  const nextMonth = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1, 0, 0, 0, 0);
-  return { sinceMs: start, resetsAtMs: nextMonth, periodKey: `m:${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}` };
+  const start = new Date(dt.getFullYear(), dt.getMonth(), 1, 0, 0, 0, 0).getTime();
+  const nextMonth = new Date(dt.getFullYear(), dt.getMonth() + 1, 1, 0, 0, 0, 0).getTime();
+  return {
+    sinceMs: start,
+    resetsAtMs: nextMonth,
+    periodKey: `m:${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+  };
 }
 
 function formatMetricValue(value: number, metric: BudgetMetric): string {
@@ -80,18 +85,39 @@ export function createBudgetEvaluator(deps: BudgetEvaluatorDeps) {
     return deps.store.listBudgets().map((rule) => evaluateRule(rule, currentMs));
   }
 
-  async function resolveAlertProjectId(rule: BudgetRule): Promise<string | null> {
+  async function resolveAlertProjectId(rule: BudgetRule, sinceMs: number): Promise<string | null> {
     if (rule.scopeType === 'project' && rule.scopeId) return rule.scopeId;
+    const topProjectId = deps.store.findTopProjectInWindow({
+      sinceMs,
+      scopeType: rule.scopeType,
+      scopeId: rule.scopeId,
+      metric: rule.metric
+    });
+
+    let listedProjects: Array<{ id: string }> | null = null;
     try {
-      const list = await deps.projects.list();
-      return list[0]?.id ?? null;
-    } catch {
-      return null;
+      listedProjects = await deps.projects.list();
+    } catch (err) {
+      deps.log.warn(
+        `ai-usage-monitor: failed listing projects for budget alert "${rule.name}": ${errorMessage(err)}`
+      );
     }
+
+    if (listedProjects && listedProjects.length > 0) {
+      if (topProjectId && listedProjects.some((p) => p.id === topProjectId)) {
+        return topProjectId;
+      }
+      return listedProjects[0]?.id ?? null;
+    }
+
+    if (topProjectId) return topProjectId;
+    deps.log.warn(`ai-usage-monitor: skipping budget alert "${rule.name}" because no target project could be resolved.`);
+    return null;
   }
 
   async function checkAndNotify(): Promise<BudgetEvaluation[]> {
-    const evaluations = evaluateAll();
+    const currentMs = now();
+    const evaluations = deps.store.listBudgets().map((rule) => evaluateRule(rule, currentMs));
     const alertsEnabled = await deps.areAlertsEnabled();
     if (!alertsEnabled) return evaluations;
 
@@ -100,7 +126,8 @@ export function createBudgetEvaluator(deps: BudgetEvaluatorDeps) {
       const level = item.status === 'exceeded' ? 'exceeded' : 'warning';
       if (deps.store.hasAlertBeenSent(item.rule.id, item.periodKey, level)) continue;
 
-      const projectId = await resolveAlertProjectId(item.rule);
+      const { sinceMs } = resolveBudgetWindow(item.rule.period, currentMs);
+      const projectId = await resolveAlertProjectId(item.rule, sinceMs);
       if (!projectId) continue;
 
       const label = level === 'exceeded' ? 'Budget Exceeded' : 'Budget Warning';

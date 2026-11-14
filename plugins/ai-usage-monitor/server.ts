@@ -5,6 +5,9 @@ import {
   VALID_PROVIDER_SORT_MODES
 } from './src/shared/provider-order.ts';
 import {
+  DEFAULT_SUBSCRIPTION_PROVIDERS_CSV,
+  LOCAL_CREDENTIAL_PROBE_ENDPOINTS,
+  LOCAL_CREDENTIAL_PROBE_FILES,
   REALTIME_CHANNEL,
   RPC_METHODS,
   type BillingMode,
@@ -114,11 +117,19 @@ export default async function createAiUsageMonitorPlugin(
       description: 'Reads today, 7-day, and all-time local statistics from the installed opencode CLI (kept separate from Zana totals).',
       default: true
     },
+    enableLocalCredentialProbing: {
+      type: 'boolean',
+      label: 'Probe Local Codex & Claude OAuth Quotas (Opt-In)',
+      description:
+        `Off by default. When enabled, reads OAuth tokens from ${LOCAL_CREDENTIAL_PROBE_FILES.join(', ')} ` +
+        `and sends them on refresh to ${LOCAL_CREDENTIAL_PROBE_ENDPOINTS.join(' and ')} to display live subscription quotas.`,
+      default: false
+    },
     subscriptionProviders: {
       type: 'string',
       label: 'Subscription Provider IDs',
       description: 'Comma-separated provider IDs treated as flat-rate subscriptions instead of pay-as-you-go API spend.',
-      default: 'claude-code,codex,cursor,acp-cursor,antigravity'
+      default: DEFAULT_SUBSCRIPTION_PROVIDERS_CSV
     },
     enableBudgetInboxAlerts: {
       type: 'boolean',
@@ -128,10 +139,12 @@ export default async function createAiUsageMonitorPlugin(
     }
   });
 
-  let cachedModeOverrides = parseSubscriptionOverrides('claude-code,codex,cursor,acp-cursor,antigravity');
+  let cachedModeOverrides = parseSubscriptionOverrides(DEFAULT_SUBSCRIPTION_PROVIDERS_CSV);
+  let cachedLocalProbeEnabled = false;
   const refreshSettingsCache = async (): Promise<SettingsMap> => {
     const vals = await settings.get().catch((): SettingsMap => ({}));
     cachedModeOverrides = parseSubscriptionOverrides(vals.subscriptionProviders);
+    cachedLocalProbeEnabled = vals.enableLocalCredentialProbing === true;
     return vals;
   };
   await refreshSettingsCache();
@@ -163,6 +176,7 @@ export default async function createAiUsageMonitorPlugin(
     store,
     getObservedRateLimit: (id) => indexer.getObservedRateLimit(id),
     getProviderModeOverrides: () => cachedModeOverrides,
+    isLocalCredentialProbingEnabled: () => cachedLocalProbeEnabled,
     getLoopbackBaseUrl: () => {
       const serverApi = (zcc as unknown as { server?: { loopbackBaseUrl?: string } }).server;
       try {
@@ -216,8 +230,10 @@ export default async function createAiUsageMonitorPlugin(
     getCloudStatuses: () => cloudBilling.getStatuses(),
     getOpenCodeLocalStats: () => cachedOpenCodeLocalStats,
     getProviderOrder: () => cachedProviderOrder,
+    getProviderModeOverrides: () => cachedModeOverrides,
     getLastSyncedAtMs: () => lastSyncedAtMs,
     getIsSyncing: () => isSyncing,
+    log: zcc.log,
     now
   });
 

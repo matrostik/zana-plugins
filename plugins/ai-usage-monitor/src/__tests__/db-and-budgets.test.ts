@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { createBudgetEvaluator, resolveBudgetWindow } from '../server/budgets.ts';
 import { createUsageStore } from '../server/db.ts';
+import { resolveTimeRangeBounds } from '../server/util.ts';
 import { createFakeHost, createSqliteDatabase } from './fake-host.ts';
 
 describe('UsageStore SQLite persistence & aggregations', () => {
-  it('applies migrations idempotently, upserts turns & logs, and computes summaries', () => {
-    const nowMs = Date.UTC(2026, 4, 10, 14, 0, 0);
+  it('applies migrations idempotently with SQLite tracking, upserts turns & logs, and computes summaries without N+1', () => {
+    const nowMs = new Date(2026, 4, 10, 14, 0, 0).getTime();
     const db = createSqliteDatabase();
     const store = createUsageStore(db, () => nowMs);
-    // Second instantiation on the same DB verifies idempotent migrations
+    // Second instantiation on the same DB verifies SQLite-backed idempotent migrations
     const store2 = createUsageStore(db, () => nowMs);
+    const appliedRows = db.prepare('SELECT statement FROM _migrations').all() as Array<{ statement: string }>;
+    expect(appliedRows.length).toBeGreaterThan(0);
 
     store.upsertTurn({
       turnKey: 'th-1:t1',
@@ -113,7 +116,18 @@ describe('UsageStore SQLite persistence & aggregations', () => {
     expect(modelRows[0].model).toBe('gpt-4.1');
 
     const projRows = store2.listProjectBreakdown(0, projects);
-    expect(projRows[0]).toMatchObject({ projectName: 'Alpha App', billedCostUsd: 0.75 });
+    expect(projRows).toHaveLength(2);
+    expect(projRows[0]).toMatchObject({
+      projectName: 'Alpha App',
+      billedCostUsd: 0.75,
+      topProviderId: 'openai-api',
+      topModel: 'gpt-4.1'
+    });
+    expect(projRows[1]).toMatchObject({
+      projectName: 'Beta Service',
+      topProviderId: 'claude-code',
+      topModel: 'claude-sonnet-4'
+    });
 
     const trend = store2.listDailyTrend('7d');
     expect(trend).toHaveLength(1);
@@ -125,10 +139,13 @@ describe('UsageStore SQLite persistence & aggregations', () => {
     expect(logs.items[0].projectName).toBe('Alpha App');
   });
 
-  it('evaluates 5h/daily/weekly/monthly budgets and sends deduplicated Inbox alerts', async () => {
-    const nowMs = Date.UTC(2026, 4, 10, 14, 0, 0);
+  it('evaluates 5h/daily/weekly/monthly local-calendar budgets and targets top-usage project for Inbox alerts', async () => {
+    const nowMs = new Date(2026, 4, 10, 14, 0, 0).getTime();
     const host = createFakeHost({
-      projects: [{ id: 'proj-1', name: 'Main Project' }]
+      projects: [
+        { id: 'proj-1', name: 'Unused First Project' },
+        { id: 'proj-2', name: 'Active Spend Project' }
+      ]
     });
     const store = createUsageStore(host.db, () => nowMs);
     const evaluator = createBudgetEvaluator({
@@ -141,6 +158,7 @@ describe('UsageStore SQLite persistence & aggregations', () => {
     });
 
     expect(resolveBudgetWindow('5h', nowMs).periodKey).toContain('5h:');
+    expect(resolveBudgetWindow('daily', nowMs).sinceMs).toBe(resolveTimeRangeBounds('today', nowMs).startMs);
     expect(resolveBudgetWindow('daily', nowMs).periodKey).toBe('d:2026-05-10');
     expect(resolveBudgetWindow('weekly', nowMs).periodKey).toMatch(/^w:2026-05-/);
     expect(resolveBudgetWindow('monthly', nowMs).periodKey).toBe('m:2026-05');
@@ -150,7 +168,7 @@ describe('UsageStore SQLite persistence & aggregations', () => {
       threadId: 'th-1',
       providerId: 'openai-api',
       model: 'gpt-4.1',
-      projectId: 'proj-1',
+      projectId: 'proj-2',
       timestampMs: nowMs - 60_000,
       billingMode: 'billed_api',
       inputTokens: 1000,
@@ -181,6 +199,7 @@ describe('UsageStore SQLite persistence & aggregations', () => {
     expect(first[0].status).toBe('warning');
     expect(first[0].remainingValue).toBeCloseTo(1.5, 4);
     expect(host.inbox).toHaveLength(1);
+    expect(host.inbox[0].projectId).toBe('proj-2');
     expect(host.inbox[0].comments).toContain('Budget Warning');
 
     // Repeating check in the same period and level must NOT duplicate Inbox notifications
@@ -193,7 +212,7 @@ describe('UsageStore SQLite persistence & aggregations', () => {
       threadId: 'th-1',
       providerId: 'openai-api',
       model: 'gpt-4.1',
-      projectId: 'proj-1',
+      projectId: 'proj-2',
       timestampMs: nowMs - 10_000,
       billingMode: 'billed_api',
       inputTokens: 500,
@@ -217,8 +236,8 @@ describe('UsageStore SQLite persistence & aggregations', () => {
     expect(store.listBudgets()).toHaveLength(0);
   });
 
-  it('logs warning instead of throwing when Inbox alert push fails', async () => {
-    const nowMs = Date.UTC(2026, 4, 10, 14, 0, 0);
+  it('logs warnings when Inbox push fails, projects.list fails, or no target project exists', async () => {
+    const nowMs = new Date(2026, 4, 10, 14, 0, 0).getTime();
     const host = createFakeHost({
       projects: [{ id: 'proj-1', name: 'Main Project' }],
       inboxShouldThrow: true
@@ -266,5 +285,34 @@ describe('UsageStore SQLite persistence & aggregations', () => {
     const res = await evaluator.checkAndNotify();
     expect(res[0].status).toBe('warning');
     expect(host.logs.some((l) => l.level === 'warn' && l.message.includes('Inbox unavailable'))).toBe(true);
+
+    // When projects.list fails and no project exists on matching turns, logs both warnings cleanly
+    const emptyHost = createFakeHost();
+    const emptyStore = createUsageStore(emptyHost.db, () => nowMs);
+    emptyStore.upsertBudget({
+      name: 'Empty Cap',
+      scopeType: 'provider',
+      scopeId: 'missing-provider',
+      period: 'daily',
+      metric: 'tokens',
+      limitValue: 1,
+      alertThresholdPct: 0,
+      enabled: true
+    });
+    const failingEvaluator = createBudgetEvaluator({
+      store: emptyStore,
+      inbox: emptyHost.zcc.sdk.inbox,
+      projects: {
+        list: async () => {
+          throw new Error('projects RPC timeout');
+        }
+      },
+      areAlertsEnabled: async () => true,
+      log: emptyHost.zcc.log,
+      now: () => nowMs
+    });
+    await failingEvaluator.checkAndNotify();
+    expect(emptyHost.logs.some((l) => l.level === 'warn' && l.message.includes('projects RPC timeout'))).toBe(true);
+    expect(emptyHost.logs.some((l) => l.level === 'warn' && l.message.includes('no target project'))).toBe(true);
   });
 });
