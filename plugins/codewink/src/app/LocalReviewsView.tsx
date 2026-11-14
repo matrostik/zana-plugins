@@ -25,6 +25,7 @@ function isLocalChange(payload: unknown): boolean {
 
 function LocationRow({ location, selected, onSelect }: { location: LocalLocationSummary; selected: boolean; onSelect(): void }) {
   const latest = location.latest;
+  const fixing = location.latestFix?.status === 'running';
   const tone = scoreTone(latest?.riskScore ?? null, 'risk');
   const folder = location.worktreePath.split(/[\\/]/).filter(Boolean).pop() ?? location.worktreePath;
   return (
@@ -41,6 +42,7 @@ function LocationRow({ location, selected, onSelect }: { location: LocalLocation
           ) : (
             <span className="cn-badge cn-badge-muted">{location.changedFiles === 0 ? 'Clean' : `${location.changedFiles} changed`}</span>
           )}
+          {fixing ? <span className="cn-badge cn-badge-warn">Fixing…</span> : null}
           {latest && (latest.status === 'queued' || latest.status === 'running') ? <span className="cn-badge cn-badge-warn">Reviewing…</span> : null}
           {latest?.status === 'completed' && latest.riskScore !== null ? <span className={`cn-badge cn-badge-${tone}`}>Risk {latest.riskScore}/10</span> : null}
           {latest?.status === 'failed' ? <span className="cn-badge cn-badge-danger">Review failed</span> : null}
@@ -98,7 +100,9 @@ export function LocalReviewsView(props: { rpc: Rpc; defaultModels: ModelChoice[]
   };
 
   const locations = overview?.locations ?? [];
-  const visible = locations.filter((location) => showClean || location.changedFiles !== 0 || location.targetId === selectedId);
+  const visible = locations.filter(
+    (location) => showClean || location.changedFiles !== 0 || location.targetId === selectedId || location.latestFix?.status === 'running'
+  );
   const hiddenClean = locations.length - visible.length;
   const groups = new Map<string, LocalLocationSummary[]>();
   for (const location of visible) groups.set(location.projectName, [...(groups.get(location.projectName) ?? []), location]);

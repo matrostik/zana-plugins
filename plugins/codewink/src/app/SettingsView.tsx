@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useRealtime, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
+import type { ModelChoice } from '../server/types.ts';
 import { errorText } from './format.ts';
 import { ModelTab } from './ModelTab.tsx';
 import { ProfileTab } from './ProfileTab.tsx';
 import { ReposTab } from './ReposTab.tsx';
-import type { ConfigSnapshot, Rpc } from './types.ts';
+import type { AvailableProvider, ConfigSnapshot, Rpc } from './types.ts';
 
-type SettingsTab = 'profile' | 'repos' | 'models';
+export type SettingsTab = 'profile' | 'repos' | 'models';
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'profile', label: 'Profile' },
@@ -14,19 +15,20 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'models', label: 'AI Model' }
 ];
 
-/** All panels stay mounted so unsaved edits survive switching tabs. */
-const PANELS: Record<SettingsTab, typeof ProfileTab> = { profile: ProfileTab, repos: ReposTab, models: ModelTab };
-
 const tabId = (tab: SettingsTab) => `cn-settings-tab-${tab}`;
 const panelId = (tab: SettingsTab) => `cn-settings-panel-${tab}`;
 
-export function SettingsView({ rpc }: { rpc: Rpc }) {
+export function SettingsView({ rpc, initialTab = 'profile', initialModels }: { rpc: Rpc; initialTab?: SettingsTab; initialModels?: ModelChoice[] }) {
   const [config, setConfig] = useState<ConfigSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<SettingsTab>('profile');
+  const [providers, setProviders] = useState<AvailableProvider[] | null>(null);
+  const [providersError, setProvidersError] = useState<string | null>(null);
+  const [refreshingProviders, setRefreshingProviders] = useState(false);
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
   const tabRefs = useRef(new Map<SettingsTab, HTMLButtonElement>());
+  const providersSeq = useRef(0);
 
-  const load = useCallback(() => {
+  const loadConfig = useCallback(() => {
     rpc
       .call('config')
       .then((value) => {
@@ -35,8 +37,34 @@ export function SettingsView({ rpc }: { rpc: Rpc }) {
       })
       .catch((cause) => setError(errorText(cause)));
   }, [rpc]);
-  useEffect(load, [load]);
-  useRealtime('codewink:changed', load);
+
+  const loadProviders = useCallback((refresh = false) => {
+    const seq = ++providersSeq.current;
+    setRefreshingProviders(refresh);
+    setProvidersError(null);
+    (refresh ? rpc.call('availableModels', { refresh: true }) : rpc.call('availableModels'))
+      .then((value) => {
+        if (providersSeq.current !== seq) return;
+        setProviders(value as AvailableProvider[]);
+        setProvidersError(null);
+      })
+      .catch((cause) => {
+        if (providersSeq.current !== seq) return;
+        setProvidersError(errorText(cause));
+      })
+      .finally(() => {
+        if (providersSeq.current === seq) setRefreshingProviders(false);
+      });
+  }, [rpc]);
+
+  useEffect(loadConfig, [loadConfig]);
+  useEffect(() => {
+    loadProviders(false);
+    return () => {
+      providersSeq.current++;
+    };
+  }, [loadProviders]);
+  useRealtime('codewink:changed', loadConfig);
 
   const focusTab = (next: SettingsTab) => {
     setTab(next);
@@ -51,8 +79,9 @@ export function SettingsView({ rpc }: { rpc: Rpc }) {
     focusTab(TABS[(moves[event.key] + TABS.length) % TABS.length].id);
   };
 
-  if (error && !config) return <p className="cn-banner cn-banner-error">{error}</p>;
-  if (!config) return <p className="cn-muted">Loading settings…</p>;
+  const canRenderModelsEarly = initialTab === 'models' && initialModels !== undefined;
+  if (error && !config && !canRenderModelsEarly) return <p className="cn-banner cn-banner-error">{error}</p>;
+  if (!config && !canRenderModelsEarly) return <p className="cn-muted">Loading settings…</p>;
 
   return (
     <div>
@@ -79,14 +108,24 @@ export function SettingsView({ rpc }: { rpc: Rpc }) {
         ))}
       </div>
       {error ? <p className="cn-banner cn-banner-error">{error}</p> : null}
-      {TABS.map((item) => {
-        const Panel = PANELS[item.id];
-        return (
-          <div key={item.id} role="tabpanel" id={panelId(item.id)} aria-labelledby={tabId(item.id)} className="cn-settings-panel" hidden={tab !== item.id}>
-            <Panel rpc={rpc} config={config} onChanged={load} />
-          </div>
-        );
-      })}
+      <div role="tabpanel" id={panelId('profile')} aria-labelledby={tabId('profile')} className="cn-settings-panel" hidden={tab !== 'profile'}>
+        {config ? <ProfileTab rpc={rpc} config={config} onChanged={loadConfig} /> : <p className="cn-muted">Loading settings…</p>}
+      </div>
+      <div role="tabpanel" id={panelId('repos')} aria-labelledby={tabId('repos')} className="cn-settings-panel" hidden={tab !== 'repos'}>
+        {config ? <ReposTab rpc={rpc} config={config} onChanged={loadConfig} /> : <p className="cn-muted">Loading settings…</p>}
+      </div>
+      <div role="tabpanel" id={panelId('models')} aria-labelledby={tabId('models')} className="cn-settings-panel" hidden={tab !== 'models'}>
+        <ModelTab
+          rpc={rpc}
+          config={config}
+          initialModels={initialModels}
+          onChanged={loadConfig}
+          providers={providers}
+          providersError={providersError}
+          refreshingProviders={refreshingProviders}
+          onRefreshProviders={() => loadProviders(true)}
+        />
+      </div>
     </div>
   );
 }

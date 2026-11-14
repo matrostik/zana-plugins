@@ -2,6 +2,8 @@ import type {
   ChangedFile,
   CiState,
   FindingRow,
+  LocalFixRunRow,
+  LocalFixStatus,
   LocalReviewSource,
   LocalScope,
   LocalSnapshotRow,
@@ -171,7 +173,28 @@ export const MIGRATIONS: readonly string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS local_snapshots_target ON local_snapshots(target_id, created_at)`,
   `ALTER TABLE reviews ADD COLUMN prompt_name TEXT`,
-  `ALTER TABLE reviews ADD COLUMN prompt_instructions TEXT`
+  `ALTER TABLE reviews ADD COLUMN prompt_instructions TEXT`,
+  `ALTER TABLE local_snapshots ADD COLUMN head_ref TEXT`,
+  `ALTER TABLE local_snapshots ADD COLUMN commit_shas_json TEXT NOT NULL DEFAULT '[]'`,
+  `CREATE TABLE IF NOT EXISTS local_fix_runs (
+    id TEXT PRIMARY KEY,
+    review_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    model TEXT NOT NULL,
+    reasoning_level TEXT,
+    permission_mode TEXT NOT NULL,
+    finding_ids_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL,
+    summary TEXT,
+    error TEXT,
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`,
+  `CREATE INDEX IF NOT EXISTS local_fix_runs_target ON local_fix_runs(target_id, started_at)`,
+  `CREATE INDEX IF NOT EXISTS local_fix_runs_review ON local_fix_runs(review_id, started_at)`,
+  `CREATE INDEX IF NOT EXISTS local_fix_runs_thread ON local_fix_runs(thread_id)`
 ];
 
 type Row = Record<string, unknown>;
@@ -297,8 +320,9 @@ function toRun(row: Row): ReviewRunRow {
   };
 }
 
-const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch'];
+const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch', 'commits'];
 const LOCAL_SOURCES: readonly LocalReviewSource[] = ['ui', 'cli', 'agent'];
+const LOCAL_FIX_STATUSES: readonly LocalFixStatus[] = ['running', 'completed', 'failed', 'stopped'];
 
 function localScope(value: unknown): LocalScope | null {
   return LOCAL_SCOPES.includes(value as LocalScope) ? (value as LocalScope) : null;
@@ -331,6 +355,8 @@ function toLocalSnapshot(row: Row): LocalSnapshotRow {
     reviewId: String(row.review_id),
     targetId: String(row.target_id),
     scope: localScope(row.scope) ?? 'uncommitted',
+    headRef: str(row.head_ref),
+    commitShas: jsonArray(row.commit_shas_json),
     baseRef: str(row.base_ref),
     baseSha: String(row.base_sha),
     headSha: String(row.head_sha),
@@ -341,6 +367,26 @@ function toLocalSnapshot(row: Row): LocalSnapshotRow {
     files: jsonList<ChangedFile>(row.files_json),
     skipped: jsonList<SkippedFile>(row.skipped_json),
     createdAt: Number(row.created_at)
+  };
+}
+
+function toLocalFixRun(row: Row): LocalFixRunRow {
+  const status = LOCAL_FIX_STATUSES.includes(row.status as LocalFixStatus) ? (row.status as LocalFixStatus) : 'failed';
+  return {
+    id: String(row.id),
+    reviewId: String(row.review_id),
+    targetId: String(row.target_id),
+    threadId: String(row.thread_id),
+    providerId: String(row.provider_id),
+    model: String(row.model),
+    reasoningLevel: str(row.reasoning_level),
+    permissionMode: String(row.permission_mode),
+    findingIds: jsonArray(row.finding_ids_json),
+    status,
+    summary: str(row.summary),
+    error: str(row.error),
+    startedAt: Number(row.started_at),
+    completedAt: num(row.completed_at)
   };
 }
 
@@ -465,12 +511,13 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return this.getReview(id)!;
     },
 
-    /** Removes a review with its runs, findings, posted records, and local snapshot. */
+    /** Removes a review with its runs, findings, posted records, fix runs, and local snapshot. */
     deleteReview(id: string): void {
       db.transaction(() => {
         db.prepare('DELETE FROM findings WHERE review_id = ?').run(id);
         db.prepare('DELETE FROM review_runs WHERE review_id = ?').run(id);
         db.prepare('DELETE FROM posted_reviews WHERE review_id = ?').run(id);
+        db.prepare('DELETE FROM local_fix_runs WHERE review_id = ?').run(id);
         db.prepare('DELETE FROM local_snapshots WHERE review_id = ?').run(id);
         db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
       });
@@ -501,14 +548,16 @@ export function createStore(db: Database, now: () => number = Date.now) {
       db.prepare('DELETE FROM local_targets WHERE id = ?').run(id);
     },
 
-    recordLocalSnapshot(snapshot: Omit<LocalSnapshotRow, 'createdAt'>): void {
+    recordLocalSnapshot(snapshot: Omit<LocalSnapshotRow, 'createdAt' | 'headRef' | 'commitShas'> & { headRef?: string | null; commitShas?: string[] }): void {
       db.prepare(
-        `INSERT INTO local_snapshots (review_id, target_id, scope, base_ref, base_sha, head_sha, snapshot_sha, tree_sha, intent, source, files_json, skipped_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO local_snapshots (review_id, target_id, scope, head_ref, commit_shas_json, base_ref, base_sha, head_sha, snapshot_sha, tree_sha, intent, source, files_json, skipped_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         snapshot.reviewId,
         snapshot.targetId,
         snapshot.scope,
+        snapshot.headRef ?? null,
+        JSON.stringify(snapshot.commitShas ?? []),
         snapshot.baseRef,
         snapshot.baseSha,
         snapshot.headSha,
@@ -531,6 +580,77 @@ export function createStore(db: Database, now: () => number = Date.now) {
     listLocalReviews(targetId: string): Array<{ review: ReviewRow; snapshot: LocalSnapshotRow | null }> {
       const rows = db.prepare("SELECT * FROM reviews WHERE pr_id = ? AND target_kind = 'local' ORDER BY created_at DESC, rowid DESC").all(targetId) as Row[];
       return rows.map((row) => ({ review: toReview(row), snapshot: this.getLocalSnapshot(String(row.id)) }));
+    },
+
+    createLocalFixRun(input: {
+      reviewId: string;
+      targetId: string;
+      threadId: string;
+      providerId: string;
+      model: string;
+      reasoningLevel?: string | null;
+      permissionMode: string;
+      findingIds: string[];
+    }): LocalFixRunRow {
+      const id = newId();
+      db.prepare(
+        `INSERT INTO local_fix_runs (id, review_id, target_id, thread_id, provider_id, model, reasoning_level, permission_mode, finding_ids_json, status, started_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', ?)`
+      ).run(
+        id,
+        input.reviewId,
+        input.targetId,
+        input.threadId,
+        input.providerId,
+        input.model,
+        input.reasoningLevel ?? null,
+        input.permissionMode,
+        JSON.stringify(input.findingIds),
+        now()
+      );
+      return this.getLocalFixRun(id)!;
+    },
+
+    getLocalFixRun(id: string): LocalFixRunRow | null {
+      const row = db.prepare('SELECT * FROM local_fix_runs WHERE id = ?').get(id) as Row | undefined;
+      return row ? toLocalFixRun(row) : null;
+    },
+
+    getLocalFixRunByThread(threadId: string): LocalFixRunRow | null {
+      const row = db.prepare('SELECT * FROM local_fix_runs WHERE thread_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1').get(threadId) as Row | undefined;
+      return row ? toLocalFixRun(row) : null;
+    },
+
+    listLocalFixRuns(reviewId: string): LocalFixRunRow[] {
+      return (db.prepare('SELECT * FROM local_fix_runs WHERE review_id = ? ORDER BY started_at DESC, rowid DESC').all(reviewId) as Row[]).map(toLocalFixRun);
+    },
+
+    latestLocalFixRunForTarget(targetId: string): LocalFixRunRow | null {
+      const row = db
+        .prepare(
+          `SELECT * FROM local_fix_runs WHERE target_id = ?
+           ORDER BY CASE WHEN status = 'running' THEN 0 ELSE 1 END, started_at DESC, rowid DESC LIMIT 1`
+        )
+        .get(targetId) as Row | undefined;
+      return row ? toLocalFixRun(row) : null;
+    },
+
+    /** Running fix runs, optionally limited to those whose local target belongs to `projectId`. */
+    listActiveLocalFixRuns(projectId?: string): LocalFixRunRow[] {
+      if (!projectId) {
+        return (db.prepare("SELECT * FROM local_fix_runs WHERE status = 'running' ORDER BY started_at DESC, rowid DESC").all() as Row[]).map(toLocalFixRun);
+      }
+      const sql = `SELECT f.* FROM local_fix_runs f JOIN local_targets t ON t.id = f.target_id
+        WHERE f.status = 'running' AND t.project_id = ? ORDER BY f.started_at DESC, f.rowid DESC`;
+      return (db.prepare(sql).all(projectId) as Row[]).map(toLocalFixRun);
+    },
+
+    /** Transitions a running fix run to a terminal status once; returns false if already settled. */
+    completeLocalFixRun(id: string, input: { status: Exclude<LocalFixStatus, 'running'>; summary?: string | null; error?: string | null }): boolean {
+      const result = db
+        .prepare("UPDATE local_fix_runs SET status = ?, summary = ?, error = ?, completed_at = ? WHERE id = ? AND status = 'running'")
+        .run(input.status, input.summary ?? null, input.error ?? null, now(), id);
+      return result.changes > 0;
     },
 
     getReview(id: string): ReviewRow | null {

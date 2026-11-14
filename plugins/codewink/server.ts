@@ -10,13 +10,13 @@ import { createOutdatedNotifier } from './src/server/outdated.ts';
 import { createPoster, StaleReviewError } from './src/server/post.ts';
 import { createProjectMatcher } from './src/server/projects.ts';
 import { DEFAULT_REVIEW_INSTRUCTIONS, getDeepReviewPrompt, getSystemPrompt, MAX_CUSTOM_INSTRUCTIONS_CHARS } from './src/server/review/prompts.ts';
-import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, spawnVisibleWithPriorityFallback, type ThreadsApi } from './src/server/review/runner.ts';
+import { createThreadWaiter, FULL_ACCESS_PERMISSION_MODE, pickReviewPermissionMode, spawnVisibleWithPriorityFallback, type ThreadEvent, type ThreadsApi } from './src/server/review/runner.ts';
 import { fetchPullRequestHead } from './src/server/review/workspace.ts';
 import { CHANGED_EVENT, createReviewService, parsePromptSelection, resolveRerunSnapshot, type ReviewConfig } from './src/server/review/service.ts';
 import { createSettingsStore, SETTING_LIMITS, WORKSPACE_MODES } from './src/server/settings.ts';
 import { createSyncService } from './src/server/sync.ts';
 import { FIX_PERMISSION_MODES, type FixProvider, type ModelChoice, type PrBucket, type ReviewEvent, type ReviewRow } from './src/server/types.ts';
-import { mergeCatalogModels } from './src/server/models-catalog.ts';
+import { createProviderCatalogLoader } from './src/server/models-catalog.ts';
 import { asRecord, asString, asStringArray, errorMessage, sleep } from './src/server/util.ts';
 import { getLocalDetail, getPrDetail, listPullRequests } from './src/server/views.ts';
 
@@ -31,6 +31,7 @@ export interface CodewinkPluginDeps {
 const MODELS_KEY = 'reviewModels';
 const SYNC_TICK_CRON = '* * * * *';
 const LOCAL_SWEEP_CRON = '17 3 * * *';
+const FIX_RECONCILE_THROTTLE_MS = 15_000;
 const REVIEW_EVENTS: ReviewEvent[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES'];
 const BUCKETS: PrBucket[] = ['needs-review', 'mine', 'watched'];
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
@@ -83,17 +84,21 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
   const projects = createProjectMatcher({ listProjects: () => zcc.sdk.projects.list(), run, now });
   const threads = zcc.sdk.threads as unknown as ThreadsApi;
   const waiter = createThreadWaiter(threads, { pollMs: deps.pollMs });
-  zcc.events.on('thread.idle', (event) => waiter.onEvent(event as Parameters<typeof waiter.onEvent>[0]));
-  zcc.events.on('thread.failed', (event) => waiter.onEvent(event as Parameters<typeof waiter.onEvent>[0]));
+
+  const providerCatalog = createProviderCatalogLoader({
+    listProviders: () => zcc.sdk.providers.list(),
+    loadProviderModels: (providerId) => zcc.sdk.providers.models({ providerId }),
+    now
+  });
 
   const publish = (event: string, payload: unknown) => zcc.realtime.publish(event, payload);
   const sync = createSyncService({ store, github, tokens, hosts: configuredHosts, now });
   const poster = createPoster({ store, github });
 
   const reviewConfig = async (): Promise<ReviewConfig> => {
-    const values = await codewinkSettings.load();
+    const [values, rawModels] = await Promise.all([codewinkSettings.load(), zcc.storage.kv.get(MODELS_KEY)]);
     return {
-      models: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)),
+      models: sanitizeModels(rawModels),
       customInstructions: values.customInstructions || null,
       prompts: values.prompts,
       defaultPromptId: values.defaultPromptId,
@@ -159,6 +164,22 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     log: zcc.log,
     now
   });
+
+  const reportFixEvent = (event: ThreadEvent) => {
+    void local.onFixThreadEvent(event).catch((error) => zcc.log.warn(`codewink: fix thread event failed: ${errorMessage(error)}`));
+  };
+  zcc.events.on('thread.idle', (event) => {
+    const typed = event as ThreadEvent;
+    waiter.onEvent(typed);
+    reportFixEvent(typed);
+  });
+  zcc.events.on('thread.failed', (event) => {
+    const typed = event as ThreadEvent;
+    waiter.onEvent(typed);
+    reportFixEvent(typed);
+  });
+  zcc.events.on('thread.archived', (event) => reportFixEvent(event as ThreadEvent));
+  zcc.events.on('thread.deleted', (event) => reportFixEvent(event as ThreadEvent));
 
   const reviews = createReviewService({
     store,
@@ -232,6 +253,27 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     await sweepLocalReviews();
   });
   void sweepLocalReviews();
+  void providerCatalog.warm();
+
+  let lastFixReconcileAt = 0;
+  let fixReconcileInFlight: Promise<void> | null = null;
+  function reconcileFixRuns(force = false): Promise<void> {
+    if (store.listActiveLocalFixRuns().length === 0) return Promise.resolve();
+    if (fixReconcileInFlight) return fixReconcileInFlight;
+    const currentNow = now();
+    if (!force && currentNow - lastFixReconcileAt < FIX_RECONCILE_THROTTLE_MS) return Promise.resolve();
+    lastFixReconcileAt = currentNow;
+    fixReconcileInFlight = local
+      .reconcileFixRuns()
+      .catch((error) => {
+        zcc.log.warn(`codewink: fix run reconciliation failed: ${errorMessage(error)}`);
+      })
+      .finally(() => {
+        fixReconcileInFlight = null;
+      });
+    return fixReconcileInFlight;
+  }
+  void reconcileFixRuns(true);
 
   async function threadWorkspacePath(threadId: string): Promise<string | null> {
     const thread = await zcc.sdk.threads.get({ threadId }).catch(() => null);
@@ -320,19 +362,29 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
   // ── RPC for the panel ────────────────────────────────────────────────
   zcc.rpc.method('overview', async (args) => {
     const projectId = asString(asRecord(args), 'projectId');
+    const [hosts, lastSyncAt, loadedSettings, rawModels] = await Promise.all([
+      sync.hostStatuses(),
+      zcc.storage.kv.get<number>('lastSyncAt'),
+      codewinkSettings.load(),
+      zcc.storage.kv.get(MODELS_KEY)
+    ]);
+    const models = sanitizeModels(rawModels);
     const base = {
-      hosts: await sync.hostStatuses(),
+      hosts,
       syncing: sync.isSyncing(),
-      lastSyncAt: (await zcc.storage.kv.get<number>('lastSyncAt')) ?? null,
-      autoSyncEnabled: (await codewinkSettings.load()).autoSyncEnabled,
+      lastSyncAt: lastSyncAt ?? null,
+      autoSyncEnabled: loadedSettings.autoSyncEnabled,
       activeReviews: reviews.activeCount(),
-      hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
+      // A project-scoped overview counts only fixes running in that project's local targets.
+      activeFixes: store.listActiveLocalFixRuns(projectId).length,
+      hasModels: models.length > 0,
+      models
     };
     if (!projectId) return { ...base, prs: listPullRequests(store), hasWatchedRepos: store.listRepos().length > 0 };
     // A project view lists only pull requests of the repositories its git remotes point at.
     const watched = new Set(store.listRepos().map((repo) => repo.id.toLowerCase()));
-    const hosts = new Set(base.hosts.map((host) => host.host.toLowerCase()));
-    const projectRepos = (await projects.reposForProject(projectId)).filter((repo) => hosts.has(repo.host.toLowerCase())).map((repo) => {
+    const hostSet = new Set(base.hosts.map((host) => host.host.toLowerCase()));
+    const projectRepos = (await projects.reposForProject(projectId)).filter((repo) => hostSet.has(repo.host.toLowerCase())).map((repo) => {
       const id = repoId(repo);
       return { id, host: repo.host, owner: repo.owner, name: repo.name, watched: watched.has(id.toLowerCase()) };
     });
@@ -498,12 +550,29 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
   // ── Local reviews ────────────────────────────────────────────────────
   zcc.rpc.method('localTargets', async (args) => {
     const projectId = asString(asRecord(args), 'projectId');
-    const locations = await local.listLocations(projectId);
+    await reconcileFixRuns();
+    const [locations, rawModels] = await Promise.all([
+      local.listLocations(projectId),
+      zcc.storage.kv.get(MODELS_KEY)
+    ]);
     return {
       locations,
       scopes: LOCAL_SCOPES,
-      hasModels: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)).length > 0
+      hasModels: sanitizeModels(rawModels).length > 0
     };
+  });
+
+  zcc.rpc.method('localBranches', (args) => local.listBranches(asString(asRecord(args), 'targetId')));
+
+  zcc.rpc.method('localCommits', (args) => {
+    const record = asRecord(args);
+    const limit = typeof record.limit === 'number' && Number.isInteger(record.limit) ? record.limit : undefined;
+    const skip = typeof record.skip === 'number' && Number.isInteger(record.skip) ? record.skip : undefined;
+    return local.listCommits(asString(record, 'targetId'), {
+      limit,
+      skip,
+      ref: asString(record, 'ref') || undefined
+    });
   });
 
   zcc.rpc.method('startLocalReview', async (args) => {
@@ -511,10 +580,13 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     const scope = asString(record, 'scope') || 'uncommitted';
     if (!isLocalScope(scope)) throw new Error(`Unknown scope ${scope}`);
     const models = sanitizeModels(record.models);
+    const commits = asStringArray(record, 'commits');
     return local.startLocalReview({
       projectId: asString(record, 'projectId'),
       worktreePath: asString(record, 'worktreePath'),
       scope,
+      headRef: asString(record, 'headRef') || null,
+      commits: commits.length > 0 ? commits : undefined,
       base: asString(record, 'base') || null,
       intent: asString(record, 'intent') || null,
       promptId: parsePromptSelection(record.promptId),
@@ -524,9 +596,10 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     });
   });
 
-  zcc.rpc.method('localDetail', (args) => {
+  zcc.rpc.method('localDetail', async (args) => {
     const record = asRecord(args);
     const targetId = asString(record, 'targetId');
+    await reconcileFixRuns();
     const detail = getLocalDetail(store, targetId, asString(record, 'reviewId') || undefined);
     if (!detail) throw new Error(`Local review target ${targetId} not found`);
     return detail;
@@ -562,24 +635,35 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     });
   });
 
+  zcc.rpc.method('stopLocalFix', (args) => local.stopFix(asString(asRecord(args), 'fixRunId')));
+
   zcc.rpc.method('deleteLocalReview', async (args) => {
     await local.deleteReview(asString(asRecord(args), 'reviewId'));
     return { ok: true };
   });
 
-  zcc.rpc.method('config', async () => ({
-    models: sanitizeModels(await zcc.storage.kv.get(MODELS_KEY)),
-    repos: store.listRepos(),
-    hosts: await sync.hostStatuses(),
-    profiles: await sync.viewerProfiles(),
-    settings: await codewinkSettings.load(),
-    defaultInstructions: DEFAULT_REVIEW_INSTRUCTIONS,
-    builtInPrompt: getSystemPrompt(true),
-    maxInstructionsChars: MAX_CUSTOM_INSTRUCTIONS_CHARS,
-    limits: SETTING_LIMITS,
-    workspaceModes: WORKSPACE_MODES,
-    projects: (await zcc.sdk.projects.list().catch(() => [])).map((project) => ({ id: project.id, name: project.name }))
-  }));
+  zcc.rpc.method('config', async () => {
+    const [rawModels, hosts, profiles, loadedSettings, projectList] = await Promise.all([
+      zcc.storage.kv.get(MODELS_KEY),
+      sync.hostStatuses(),
+      sync.viewerProfiles(),
+      codewinkSettings.load(),
+      zcc.sdk.projects.list().catch(() => [])
+    ]);
+    return {
+      models: sanitizeModels(rawModels),
+      repos: store.listRepos(),
+      hosts,
+      profiles,
+      settings: loadedSettings,
+      defaultInstructions: DEFAULT_REVIEW_INSTRUCTIONS,
+      builtInPrompt: getSystemPrompt(true),
+      maxInstructionsChars: MAX_CUSTOM_INSTRUCTIONS_CHARS,
+      limits: SETTING_LIMITS,
+      workspaceModes: WORKSPACE_MODES,
+      projects: projectList.map((project) => ({ id: project.id, name: project.name }))
+    };
+  });
 
   zcc.rpc.method('setSettings', async (args) => {
     const next = await codewinkSettings.update(args);
@@ -587,50 +671,47 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     return next;
   });
 
-  zcc.rpc.method('availableModels', availableModels);
-  zcc.rpc.method('availableFixModels', () => availableFixModels());
+  zcc.rpc.method('availableModels', (args) => availableModels({ refresh: asRecord(args).refresh === true }));
+  zcc.rpc.method('availableFixModels', (args) => {
+    const record = asRecord(args);
+    return availableFixModels(asString(record, 'providerId') || undefined, { refresh: record.refresh === true });
+  });
 
-  async function availableFixModels(providerId?: string): Promise<FixProvider[]> {
-    const providers = (await zcc.sdk.providers.list()).filter((provider) => provider.available && (!providerId || provider.id === providerId));
-    return Promise.all(providers.map(async (provider) => {
-      const permissionModes = (provider.capabilities?.permissionModes ?? []).filter((mode) => FIX_PERMISSION_MODES.some((allowed) => allowed === mode));
-      if (!permissionModes.length) return { providerId: provider.id, displayName: provider.displayName ?? provider.id, permissionModes, models: [], error: 'No supported fix mode.' };
-      const catalog = await zcc.sdk.providers.models({ providerId: provider.id }).catch((error) => {
-        zcc.log.warn(`codewink: fix models for ${provider.id} failed: ${errorMessage(error)}`);
-        return { models: [], modelLoadError: { detail: errorMessage(error), code: 'error' } };
-      });
+  async function availableFixModels(providerId?: string, options: { refresh?: boolean } = {}): Promise<FixProvider[]> {
+    const entries = (await providerCatalog.load(options)).filter((entry) => !providerId || entry.providerId === providerId);
+    return entries.map((entry) => {
+      const permissionModes = entry.permissionModes.filter((mode) => FIX_PERMISSION_MODES.some((allowed) => allowed === mode));
+      if (!permissionModes.length) {
+        return { providerId: entry.providerId, displayName: entry.displayName, permissionModes, models: [], error: 'No supported fix mode.' };
+      }
       return {
-        providerId: provider.id, displayName: provider.displayName ?? provider.id, permissionModes,
-        models: mergeCatalogModels(catalog), error: catalog.modelLoadError?.detail ?? catalog.modelLoadError?.code ?? null
+        providerId: entry.providerId,
+        displayName: entry.displayName,
+        permissionModes,
+        models: entry.models,
+        error: entry.error
       };
-    }));
+    });
   }
 
-  async function availableModels(): Promise<AvailableProvider[]> {
-    const providers = (await zcc.sdk.providers.list()).filter((provider) => provider.available);
-    return Promise.all(
-      providers.map(async (provider) => {
-        if (!pickReviewPermissionMode(provider.capabilities?.permissionModes)) {
-          return {
-            providerId: provider.id,
-            displayName: provider.displayName ?? provider.id,
-            error: 'Unavailable for reviews: this provider has no full-access permission mode.',
-            models: []
-          };
-        }
-        const catalog = await zcc.sdk.providers.models({ providerId: provider.id }).catch((error) => ({
-          models: [],
-          selectedOnlyModels: [],
-          modelLoadError: { providerId: provider.id, code: 'error', detail: errorMessage(error) }
-        }));
+  async function availableModels(options: { refresh?: boolean } = {}): Promise<AvailableProvider[]> {
+    const entries = await providerCatalog.load(options);
+    return entries.map((entry) => {
+      if (!pickReviewPermissionMode(entry.permissionModes)) {
         return {
-          providerId: provider.id,
-          displayName: provider.displayName ?? provider.id,
-          error: catalog.modelLoadError?.detail ?? catalog.modelLoadError?.code ?? null,
-          models: mergeCatalogModels(catalog)
+          providerId: entry.providerId,
+          displayName: entry.displayName,
+          error: 'Unavailable for reviews: this provider has no full-access permission mode.',
+          models: []
         };
-      })
-    );
+      }
+      return {
+        providerId: entry.providerId,
+        displayName: entry.displayName,
+        error: entry.error,
+        models: entry.models
+      };
+    });
   }
 
   zcc.rpc.method('setModels', async (args) => {
@@ -668,6 +749,9 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
   registerCli(zcc.cli as unknown as Parameters<typeof registerCli>[0], app);
   registerTools(zcc.agents as unknown as Parameters<typeof registerTools>[0], app);
 
-  zcc.onDispose(() => reviews.dispose());
+  zcc.onDispose(() => {
+    reviews.dispose();
+    providerCatalog.dispose();
+  });
   zcc.log.info('codewink plugin initialized');
 }

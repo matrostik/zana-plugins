@@ -15,7 +15,9 @@ export interface Overview {
   lastSyncAt: number | null;
   autoSyncEnabled: boolean;
   activeReviews: number;
+  activeFixes?: number;
   hasModels: boolean;
+  models?: ModelChoice[];
   hasWatchedRepos: boolean;
   /** Present when the overview is scoped to a project: the GitHub repositories its remotes point at. */
   projectRepos?: ProjectRepoStatus[];

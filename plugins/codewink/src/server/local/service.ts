@@ -10,12 +10,14 @@ import {
   type SpecFileContext
 } from '../review/prompts.ts';
 import { globMatcher, MAX_SPEC_FILES } from '../review/requirements.ts';
-import { FULL_ACCESS_PERMISSION_MODE, spawnVisibleWithPriorityFallback, type SpawnEnvironment, type ThreadsApi, type ThreadWaiter } from '../review/runner.ts';
+import { FULL_ACCESS_PERMISSION_MODE, spawnVisibleWithPriorityFallback, type SpawnEnvironment, type ThreadEvent, type ThreadsApi, type ThreadWaiter } from '../review/runner.ts';
 import { resolvePrompt, resolveRerunSnapshot, samePromptSnapshot, type ReviewConfig, type ReviewService, type ReviewTarget } from '../review/service.ts';
 import type {
   ChangedFile,
   FixAgentChoice,
   FixProvider,
+  LocalFixRunRow,
+  LocalFixStatus,
   LocalReviewSource,
   LocalScope,
   LocalSnapshotRow,
@@ -28,17 +30,24 @@ import { errorMessage } from '../util.ts';
 import {
   commitExists,
   commitMessages,
+  commitMessagesForShas,
   commitSnapshot,
   deleteSnapshotRef,
   diffFiles,
   headCommit,
   isSecretLike,
+  listBranches as gitListBranches,
+  listCommits as gitListCommits,
   listTreeFiles,
   mergeBase,
   readFileAt,
   resolveBase,
+  resolveBranchRef,
+  snapshotBranchTree,
+  snapshotCommitsTree,
   snapshotTree,
-  type GitRunner
+  type GitRunner,
+  type SnapshotTree
 } from './git.ts';
 import { createLocationResolver, type LocalLocation, type LocalLocationSummary } from './locations.ts';
 import { isLocalScope, localLabel, localTargetId, SCOPE_TITLES } from './target.ts';
@@ -49,12 +58,19 @@ export type { LocalLocation, LocalLocationSummary } from './locations.ts';
 export const MAX_REVIEWS_PER_LOCATION = 10;
 export const LOCAL_REVIEW_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const MAX_INTENT_CHARS = 2_000;
+const FIX_SUMMARY_MAX_CHARS = 400;
+
+const DONE_FIX_STATUSES = new Set(['idle', 'completed', 'done', 'finished']);
+const FAILED_FIX_STATUSES = new Set(['failed', 'error', 'errored', 'crashed']);
+const STOPPED_FIX_STATUSES = new Set(['stopped', 'cancelled', 'canceled', 'archived', 'deleted']);
 
 export interface StartLocalReviewInput {
   projectId: string;
   worktreePath: string;
   scope: LocalScope;
   base?: string | null;
+  headRef?: string | null;
+  commits?: string[];
   intent?: string | null;
   models?: ModelChoice[];
   promptId?: string | null;
@@ -109,6 +125,13 @@ function isWithin(child: string, parent: string): boolean {
   return child === parent || child.startsWith(parent.endsWith(sep) ? parent : `${parent}${sep}`);
 }
 
+function summarizeFixOutput(text: string | undefined): string | null {
+  const trimmed = text?.trim();
+  if (!trimmed) return null;
+  const compact = trimmed.replace(/\s+/g, ' ');
+  return compact.length > FIX_SUMMARY_MAX_CHARS ? `${compact.slice(0, FIX_SUMMARY_MAX_CHARS - 1)}…` : compact;
+}
+
 export function createLocalReviews(deps: LocalReviewDeps) {
   const now = deps.now ?? Date.now;
   const changed = (payload: Record<string, unknown>) => deps.publish('codewink:changed', { local: true, ...payload });
@@ -116,11 +139,25 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   const { canonicalPath, projectsWithPath, worktreesByProject, listLocations, resolveLocation, locationForPath, projectFor } = locations;
 
   /** Diff base of a scope: HEAD for uncommitted and staged, the merge base with the base branch for branch reviews. */
-  async function diffBase(path: string, scope: LocalScope, baseRef: string | null): Promise<{ headSha: string; base: { ref: string; sha: string } | null; baseSha: string }> {
-    const headSha = await headCommit(deps.git, path);
-    if (scope !== 'branch') return { headSha, base: null, baseSha: headSha };
+  async function diffBase(
+    path: string,
+    scope: LocalScope,
+    baseRef: string | null,
+    headRef: string | null = null
+  ): Promise<{ headSha: string; headRef: string | null; base: { ref: string; sha: string } | null; baseSha: string }> {
+    if (scope !== 'branch') {
+      const headSha = await headCommit(deps.git, path);
+      return { headSha, headRef: null, base: null, baseSha: headSha };
+    }
+    const resolvedHead = headRef ? await resolveBranchRef(deps.git, path, headRef) : null;
+    const headSha = resolvedHead ? resolvedHead.sha : await headCommit(deps.git, path);
     const base = await resolveBase(deps.git, path, baseRef);
-    return { headSha, base, baseSha: await mergeBase(deps.git, path, base.sha, headSha) };
+    return {
+      headSha,
+      headRef: resolvedHead?.ref ?? null,
+      base,
+      baseSha: await mergeBase(deps.git, path, base.sha, headSha)
+    };
   }
 
   /** Models requested for in-flight reviews, keyed by review id. Runs are only created once a review starts executing. */
@@ -139,18 +176,37 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return inflightModelsKey.get(reviewId) ?? modelsKey(deps.store.listRuns(reviewId));
   }
 
+  function sameCommitShas(a: readonly string[], b: readonly string[]): boolean {
+    if (a.length !== b.length) return false;
+    return a.every((sha, index) => sha === b[index]);
+  }
+
   /**
    * Same reviewed content and request: a branch review ignores new commits that leave its diff unchanged,
-   * the other scopes diff against HEAD. Intent and the resolved models are part of the identity so a second
-   * request with different reviewers or requirements starts its own review rather than reusing the first.
+   * the other scopes diff against HEAD or exact commit SHAs. Intent and the resolved models are part of the identity
+   * so a second request with different reviewers or requirements starts its own review rather than reusing the first.
    */
   function sameFingerprint(
     snapshot: LocalSnapshotRow,
-    current: { scope: LocalScope; baseRef: string | null; baseSha: string; headSha: string; treeSha: string; intent?: string | null; modelsKey?: string; promptSnapshot?: { name: string; instructions: string }; explicitPrompt?: boolean }
+    current: {
+      scope: LocalScope;
+      headRef?: string | null;
+      commitShas?: string[];
+      baseRef: string | null;
+      baseSha: string;
+      headSha: string;
+      treeSha: string;
+      intent?: string | null;
+      modelsKey?: string;
+      promptSnapshot?: { name: string; instructions: string };
+      explicitPrompt?: boolean;
+    }
   ): boolean {
     const savedPrompt = deps.store.getReview(snapshot.reviewId)?.promptSnapshot;
     return (
       snapshot.scope === current.scope &&
+      (snapshot.headRef ?? null) === (current.headRef ?? null) &&
+      (current.commitShas === undefined || sameCommitShas(snapshot.commitShas, current.commitShas)) &&
       snapshot.baseRef === current.baseRef &&
       snapshot.baseSha === current.baseSha &&
       snapshot.treeSha === current.treeSha &&
@@ -183,8 +239,27 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     });
   }
 
+  async function resolveScopeSnapshot(
+    path: string,
+    input: StartLocalReviewInput
+  ): Promise<{ headSha: string; baseSha: string; baseRef: string | null; headRef: string | null; commitShas: string[]; tree: SnapshotTree }> {
+    if (input.scope === 'commits') {
+      const tree = await snapshotCommitsTree(deps.git, path, input.commits ?? []);
+      return { headSha: tree.headSha, baseSha: tree.baseSha, baseRef: null, headRef: null, commitShas: tree.orderedShas, tree };
+    }
+    const requestedHead = input.scope === 'branch' ? input.headRef?.trim() || null : null;
+    const resolved = await diffBase(path, input.scope, input.base?.trim() || null, requestedHead);
+    if (input.scope === 'branch' && resolved.headRef) {
+      const tree = await snapshotBranchTree(deps.git, path, resolved.headSha, resolved.baseSha);
+      return { headSha: resolved.headSha, baseSha: resolved.baseSha, baseRef: resolved.base?.ref ?? null, headRef: resolved.headRef, commitShas: [], tree };
+    }
+    const tree = await snapshotTree(deps.git, path, input.scope, { baseSha: resolved.baseSha });
+    if (tree.headSha !== resolved.headSha) throw new Error('HEAD moved while taking the snapshot. Try again.');
+    return { headSha: resolved.headSha, baseSha: resolved.baseSha, baseRef: resolved.base?.ref ?? null, headRef: resolved.headRef, commitShas: [], tree };
+  }
+
   async function startLocalReview(input: StartLocalReviewInput): Promise<ReviewRow> {
-    if (!isLocalScope(input.scope)) throw new Error(`Unknown scope ${String(input.scope)}. Use uncommitted, staged, or branch.`);
+    if (!isLocalScope(input.scope)) throw new Error(`Unknown scope ${String(input.scope)}. Use uncommitted, staged, branch, or commits.`);
     const location = await resolveLocation(input.projectId, input.worktreePath);
     return serializedPerTarget(location.target.id, () => startAt(location, input));
   }
@@ -194,12 +269,12 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const promptSnapshot = resolveRerunSnapshot(deps.store, input.rerunReviewId, location.target.id) ?? resolvePrompt(await deps.config(), input.promptId);
     const models = await deps.reviews().resolveModels(input.models);
     const path = location.worktree.path;
-    const { headSha, base, baseSha } = await diffBase(path, input.scope, input.base?.trim() || null);
-    const tree = await snapshotTree(deps.git, path, input.scope, { baseSha });
-    if (tree.headSha !== headSha) throw new Error('HEAD moved while taking the snapshot. Try again.');
+    const { headSha, baseSha, baseRef, headRef, commitShas, tree } = await resolveScopeSnapshot(path, input);
     const existing = activeReviewFor(location.target.id, {
       scope: input.scope,
-      baseRef: base?.ref ?? null,
+      headRef,
+      commitShas,
+      baseRef,
       baseSha,
       headSha,
       treeSha: tree.treeSha,
@@ -225,7 +300,9 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         reviewId: review.id,
         targetId: location.target.id,
         scope: input.scope,
-        baseRef: base?.ref ?? null,
+        headRef,
+        commitShas,
+        baseRef,
         baseSha,
         headSha: tree.headSha,
         snapshotSha,
@@ -288,13 +365,20 @@ export function createLocalReviews(deps: LocalReviewDeps) {
           config.workspaceMode === 'diff-only'
             ? { projectId: project.id, hasWorkspace: false }
             : { projectId: project.id, environment: { kind: 'worktree', baseBranch: snapshot.snapshotSha, branchSlug: `codewink-local-${current.id.slice(0, 8)}` }, hasWorkspace: true };
+        const msgs =
+          snapshot.scope === 'branch'
+            ? await commitMessages(deps.git, target.worktreePath, snapshot.baseSha, snapshot.headSha)
+            : snapshot.scope === 'commits'
+              ? await commitMessagesForShas(deps.git, target.worktreePath, snapshot.commitShas)
+              : [];
         const context = {
           projectName: project.name,
-          branch: target.branch,
+          branch: snapshot.headRef ?? target.branch,
           scope: snapshot.scope,
           baseRef: snapshot.baseRef,
+          commitShas: snapshot.commitShas,
           intent: snapshot.intent,
-          commitMessages: snapshot.scope === 'branch' ? await commitMessages(deps.git, target.worktreePath, snapshot.baseSha, snapshot.headSha) : [],
+          commitMessages: msgs,
           files: snapshot.files,
           skippedFiles: snapshot.skipped.map((file) => file.path),
           specFiles: await specFiles(project.id, snapshot, target.worktreePath),
@@ -319,12 +403,36 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const { snapshot, target } = snapshotFor(reviewId);
     const head = await headCommit(deps.git, target.worktreePath).catch(() => null);
     if (head === null) return { reviewId, stale: true, missing: true, reviewedTree: snapshot.treeSha, currentTree: null };
-    const base = await diffBase(target.worktreePath, snapshot.scope, snapshot.baseRef).catch(() => null);
-    const current = base ? await snapshotTree(deps.git, target.worktreePath, snapshot.scope, { baseSha: base.baseSha }).catch(() => null) : null;
+
+    if (snapshot.scope === 'commits') {
+      const checks = await Promise.all(snapshot.commitShas.map((sha) => commitExists(deps.git, target.worktreePath, sha)));
+      const allPresent = snapshot.commitShas.length > 0 && checks.every(Boolean);
+      return {
+        reviewId,
+        stale: !allPresent,
+        missing: false,
+        reviewedTree: snapshot.treeSha,
+        currentTree: allPresent ? snapshot.treeSha : null
+      };
+    }
+
+    const base = await diffBase(target.worktreePath, snapshot.scope, snapshot.baseRef, snapshot.headRef).catch(() => null);
+    const current = base
+      ? (snapshot.scope === 'branch' && snapshot.headRef
+          ? await snapshotBranchTree(deps.git, target.worktreePath, base.headSha, base.baseSha).catch(() => null)
+          : await snapshotTree(deps.git, target.worktreePath, snapshot.scope, { baseSha: base.baseSha }).catch(() => null))
+      : null;
     const fresh =
       base !== null &&
       current !== null &&
-      sameFingerprint(snapshot, { scope: snapshot.scope, baseRef: base.base?.ref ?? null, baseSha: base.baseSha, headSha: current.headSha, treeSha: current.treeSha });
+      sameFingerprint(snapshot, {
+        scope: snapshot.scope,
+        headRef: base.headRef,
+        baseRef: base.base?.ref ?? null,
+        baseSha: base.baseSha,
+        headSha: current.headSha,
+        treeSha: current.treeSha
+      });
     return {
       reviewId,
       stale: !fresh,
@@ -332,6 +440,12 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       reviewedTree: snapshot.treeSha,
       currentTree: current?.treeSha ?? null
     };
+  }
+
+  async function checkoutDiffersFromSnapshot(snapshot: LocalSnapshotRow, worktreePath: string): Promise<boolean> {
+    const live = await snapshotTree(deps.git, worktreePath, 'uncommitted', { baseSha: snapshot.baseSha }).catch(() => null);
+    if (!live || live.treeSha !== snapshot.treeSha) return true;
+    return snapshot.scope === 'commits' && live.headSha !== snapshot.headSha;
   }
 
   /** Reviewed text of a changed file, read from the immutable snapshot. */
@@ -432,9 +546,99 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return { threadId: spawned.id, projectId: project.id, priority: spawned.priority, model: spawned.model, usedFallback: spawned.usedFallback };
   }
 
+  function finishFixRun(run: LocalFixRunRow, input: { status: Exclude<LocalFixStatus, 'running'>; summary?: string | null; error?: string | null }): boolean {
+    if (!deps.store.completeLocalFixRun(run.id, input)) return false;
+    changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
+    return true;
+  }
+
+  async function settleFixRunFromThread(run: LocalFixRunRow, thread: { status: string } | null, options: { allowDone?: boolean } = {}): Promise<boolean> {
+    const latest = deps.store.getLocalFixRun(run.id);
+    if (!latest || latest.status !== 'running') return false;
+    if (!thread) return finishFixRun(run, { status: 'stopped', error: 'Fix thread no longer exists' });
+    const statusText = thread.status?.toLowerCase() ?? '';
+    if (FAILED_FIX_STATUSES.has(statusText)) {
+      return finishFixRun(run, { status: 'failed', error: `Fix thread ended with status "${statusText}"` });
+    }
+    if (STOPPED_FIX_STATUSES.has(statusText)) {
+      return finishFixRun(run, { status: 'stopped', error: 'Fix thread was stopped' });
+    }
+    if (options.allowDone !== false && DONE_FIX_STATUSES.has(statusText)) {
+      const output = await deps.threads.output({ threadId: run.threadId }).catch(() => ({ output: '' }));
+      return finishFixRun(run, { status: 'completed', summary: summarizeFixOutput(output.output) });
+    }
+    return false;
+  }
+
+  async function onFixThreadEvent(event: ThreadEvent): Promise<void> {
+    const run = deps.store.getLocalFixRunByThread(event.threadId);
+    if (!run || run.status !== 'running') return;
+    if (event.name === 'thread.failed') {
+      finishFixRun(run, { status: 'failed', error: `Fix thread failed: ${errorMessage(event.error ?? 'unknown error')}` });
+      return;
+    }
+    if (event.name === 'thread.archived' || event.name === 'thread.deleted') {
+      finishFixRun(run, { status: 'stopped', error: 'Fix thread was closed' });
+      return;
+    }
+    if (event.name === 'thread.idle') {
+      const output = await deps.threads.output({ threadId: event.threadId }).catch(() => ({ output: '' }));
+      const summary = summarizeFixOutput(output.output?.trim() ? output.output : event.lastAssistantText);
+      finishFixRun(run, { status: 'completed', summary });
+    }
+  }
+
+  async function reconcileFixRuns(): Promise<void> {
+    const active = deps.store.listActiveLocalFixRuns();
+    if (active.length === 0) return;
+    for (const run of active) {
+      const thread = await deps.threads.get({ threadId: run.threadId }).catch(() => undefined);
+      if (thread === undefined) continue;
+      await settleFixRunFromThread(run, thread);
+    }
+  }
+
+  async function validateFixAgent(agent: FixAgentChoice): Promise<void> {
+    const provider = (await deps.fixProviders(agent.providerId)).find((item) => item.providerId === agent.providerId);
+    if (!provider || !provider.models.some((model) => model.id === agent.model)) {
+      throw new Error('The selected fix model is unavailable. Choose another provider or model.');
+    }
+    if (!provider.permissionModes.includes(agent.permissionMode)) {
+      throw new Error('The selected mode is unavailable for this provider. Choose a supported mode.');
+    }
+    const model = provider.models.find((item) => item.id === agent.model)!;
+    if (agent.reasoningLevel && !model.reasoningLevels.includes(agent.reasoningLevel)) {
+      throw new Error('The selected reasoning level is unavailable for this model.');
+    }
+  }
+
+  async function recordAndSettleFixRun(
+    reviewId: string,
+    targetId: string,
+    threadId: string,
+    agent: FixAgentChoice,
+    findingIds: string[]
+  ): Promise<LocalFixRunRow> {
+    const fixRun = deps.store.createLocalFixRun({
+      reviewId,
+      targetId,
+      threadId,
+      providerId: agent.providerId,
+      model: agent.model,
+      reasoningLevel: agent.reasoningLevel ?? null,
+      permissionMode: agent.permissionMode,
+      findingIds
+    });
+    changed({ targetId, reviewId, fix: fixRun.id });
+    const thread = await deps.threads.get({ threadId }).catch(() => null);
+    if (thread) await settleFixRunFromThread(fixRun, thread, { allowDone: false });
+    return deps.store.getLocalFixRun(fixRun.id) ?? fixRun;
+  }
+
   /**
    * Starts a visible fix thread in the reviewed checkout with the user's chosen provider, model, and supported mode.
-   * Returns `needsConfirmation` instead when files changed since the review and `force` is not set.
+   * Returns `needsConfirmation` instead when files changed since the review (or the live checkout differs from a
+   * commit/branch-ref review) and `force` is not set.
    */
   async function fix(reviewId: string, findingIds: string[], force: boolean, agent: FixAgentChoice) {
     const { snapshot, target } = snapshotFor(reviewId);
@@ -442,12 +646,18 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     if (findings.length === 0) throw new Error('This review has no active findings to fix');
     const current = await status(reviewId);
     if (current.missing) throw new Error(`${target.worktreePath} no longer exists`);
-    if (current.stale && !force) return { needsConfirmation: true as const, reason: 'Files changed since this review.' };
-    const provider = (await deps.fixProviders(agent.providerId)).find((item) => item.providerId === agent.providerId);
-    if (!provider || !provider.models.some((model) => model.id === agent.model)) throw new Error('The selected fix model is unavailable. Choose another provider or model.');
-    if (!provider.permissionModes.includes(agent.permissionMode)) throw new Error('The selected mode is unavailable for this provider. Choose a supported mode.');
-    const model = provider.models.find((item) => item.id === agent.model)!;
-    if (agent.reasoningLevel && !model.reasoningLevels.includes(agent.reasoningLevel)) throw new Error('The selected reasoning level is unavailable for this model.');
+    const snapshotNotInCheckout =
+      !current.stale &&
+      (snapshot.scope === 'commits' || (snapshot.scope === 'branch' && snapshot.headRef !== null)) &&
+      (await checkoutDiffersFromSnapshot(snapshot, target.worktreePath));
+    const changedSinceReview = current.stale || snapshotNotInCheckout;
+    if (changedSinceReview && !force) {
+      return {
+        needsConfirmation: true as const,
+        reason: current.stale ? 'Files changed since this review.' : 'The live checkout differs from the reviewed selection.'
+      };
+    }
+    await validateFixAgent(agent);
     const project = await projectFor(target);
     const separateWorktree = !isWithin(await canonicalPath(project.path), await canonicalPath(target.worktreePath));
     // A single explicit choice prevents priority fallback from changing permissions or providers.
@@ -459,14 +669,46 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         worktreePath: target.worktreePath,
         separateWorktree,
         snapshotSha: snapshot.snapshotSha,
-        changedSinceReview: current.stale,
+        changedSinceReview,
         findings
       }),
       visibility: 'visible',
       permissionMode: agent.permissionMode,
       environment: { kind: 'unmanaged' }
     });
-    return { needsConfirmation: false as const, threadId: spawned.id, projectId: project.id };
+    const fixRun = await recordAndSettleFixRun(reviewId, target.id, spawned.id, agent, findings.map((f) => f.id));
+    return { needsConfirmation: false as const, threadId: spawned.id, projectId: project.id, fixRun };
+  }
+
+  async function stopFix(fixRunId: string): Promise<{ ok: true }> {
+    const run = deps.store.getLocalFixRun(fixRunId);
+    if (!run) throw new Error('Fix run not found');
+    if (run.status === 'running') {
+      try {
+        await deps.threads.stop({ threadId: run.threadId });
+      } catch (error) {
+        const thread = await deps.threads.get({ threadId: run.threadId }).catch(() => undefined);
+        if (thread !== undefined && (await settleFixRunFromThread(run, thread))) {
+          return { ok: true };
+        }
+        deps.log.warn(`codewink: failed to stop fix thread ${run.threadId}: ${errorMessage(error)}`);
+        throw error;
+      }
+      finishFixRun(run, { status: 'stopped', error: 'Stopped by user' });
+    }
+    return { ok: true };
+  }
+
+  async function listBranches(targetId: string) {
+    const target = deps.store.getLocalTarget(targetId);
+    if (!target) throw new Error(`Local review target ${targetId} not found`);
+    return gitListBranches(deps.git, target.worktreePath);
+  }
+
+  async function listCommits(targetId: string, options: { limit?: number; skip?: number; ref?: string } = {}) {
+    const target = deps.store.getLocalTarget(targetId);
+    if (!target) throw new Error(`Local review target ${targetId} not found`);
+    return gitListCommits(deps.git, target.worktreePath, options);
   }
 
   return {
@@ -480,6 +722,11 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     deleteReview,
     deepReview,
     fix,
+    stopFix,
+    onFixThreadEvent,
+    reconcileFixRuns,
+    listBranches,
+    listCommits,
     sweep
   };
 }

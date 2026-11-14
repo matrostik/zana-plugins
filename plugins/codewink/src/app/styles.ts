@@ -425,6 +425,21 @@ export const CODEWINK_STYLES = `
 .cn-local-form { margin-top: 12px; }
 .cn-field-wide { align-items: stretch; }
 .cn-field .cn-input { max-width: 420px; width: 100%; }
+.cn-branch-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: start; }
+.cn-branch-fields .cn-select { max-width: none; width: 100%; }
+.cn-commit-list {
+  list-style: none; margin: 0; padding: 0; width: 100%; max-height: 260px; overflow: auto;
+  border: 1px solid var(--cn-border); border-radius: 6px; background: var(--cn-bg);
+}
+.cn-commit-list li + li { border-top: 1px solid var(--cn-border); }
+.cn-commit-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; font-size: 12.5px;
+}
+.cn-commit-item:hover { background: var(--cn-hover); }
+.cn-commit-item input[type="checkbox"] { width: 15px; height: 15px; flex: none; accent-color: var(--cn-accent); margin: 0; }
+.cn-commit-sha { flex: none; font-size: 11.5px; padding: 1px 5px; border-radius: 4px; background: var(--cn-hover); border: 1px solid var(--cn-border); color: var(--cn-muted); }
+.cn-commit-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-commit-meta { flex: none; white-space: nowrap; }
 .cn-local-summary-badge { margin-left: 8px; }
 .cn-skipped-list { list-style: none; margin: 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--cn-border); }
 .cn-skipped-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; overflow-wrap: anywhere; }

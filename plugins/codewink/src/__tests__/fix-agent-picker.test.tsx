@@ -7,6 +7,7 @@ import type { FixProvider } from '../server/types.ts';
 const providers: FixProvider[] = [
   { providerId: 'codex', displayName: 'Codex', error: null, permissionModes: ['edit', 'full'], models: [{ id: 'a', label: 'Model A', reasoningLevels: [] }] },
   { providerId: 'claude', displayName: 'Claude', error: null, permissionModes: ['accept-edits'], models: [{ id: 'b', label: 'Model B', reasoningLevels: [] }] },
+  { providerId: 'edit-only', displayName: 'Edit only', error: null, permissionModes: ['edit'], models: [{ id: 'e', label: 'Model E', reasoningLevels: [] }] },
   { providerId: 'full-only', displayName: 'Full only', error: null, permissionModes: ['full'], models: [{ id: 'c', label: 'Model C', reasoningLevels: [] }] }
 ];
 
@@ -26,7 +27,8 @@ function mount(catalog: FixProvider[] | Error = providers, onRun = vi.fn(async (
 describe('FixAgentPicker', () => {
   it('labels each permission mode distinctly and launches the selected mode', async () => {
     const view = mount([{ ...providers[0], permissionModes: ['edit', 'accept-edits', 'full'] }]);
-    const mode = await screen.findByLabelText('Mode');
+    const mode = await screen.findByLabelText('Mode') as HTMLSelectElement;
+    expect(mode.value).toBe('full');
     expect(within(mode).getByRole('option', { name: 'Edit' }).getAttribute('value')).toBe('edit');
     expect(within(mode).getByRole('option', { name: 'Accept edits' }).getAttribute('value')).toBe('accept-edits');
     expect(within(mode).getByRole('option', { name: 'Full' }).getAttribute('value')).toBe('full');
@@ -35,13 +37,14 @@ describe('FixAgentPicker', () => {
     await waitFor(() => expect(view.onRun).toHaveBeenCalledWith({ providerId: 'codex', model: 'a', permissionMode: 'accept-edits' }));
   });
 
-  it('starts with Edit, offers other providers, and remembers the explicit launch choice', async () => {
+  it('defaults to Full, offers other providers, and remembers the explicit launch choice', async () => {
     const view = mount();
     const mode = await screen.findByLabelText('Mode') as HTMLSelectElement;
-    expect(mode.value).toBe('edit');
+    expect(mode.value).toBe('full');
     expect(view.call).toHaveBeenCalledWith('availableFixModels');
     fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'claude' } });
     expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('b');
+    expect(mode.value).toBe('accept-edits');
     expect(within(mode).queryByRole('option', { name: 'Full' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Start fix' }));
     await waitFor(() => expect(view.onRun).toHaveBeenCalledWith({ providerId: 'claude', model: 'b', permissionMode: 'accept-edits' }));
@@ -51,9 +54,18 @@ describe('FixAgentPicker', () => {
     expect((screen.getByLabelText('Mode') as HTMLSelectElement).value).toBe('accept-edits');
   });
 
-  it('requires an explicit Full choice when Edit is unsupported', async () => {
+  it('downgrades Full safely when only Edit is available and never auto-escalates Edit to Full', async () => {
+    const view = mount();
+    const mode = await screen.findByLabelText('Mode') as HTMLSelectElement;
+    expect(mode.value).toBe('full');
+    fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'edit-only' } });
+    expect(mode.value).toBe('edit');
+    expect((screen.getByRole('button', { name: 'Start fix' }) as HTMLButtonElement).disabled).toBe(false);
+    view.unmount();
+
+    localStorage.setItem('codewink.fixAgent', JSON.stringify({ providerId: 'full-only', model: 'c', permissionMode: 'edit' }));
     mount();
-    fireEvent.change(await screen.findByLabelText('Provider'), { target: { value: 'full-only' } });
+    await screen.findByLabelText('Mode');
     expect((screen.getByRole('button', { name: 'Start fix' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'full' } });
     expect((screen.getByRole('button', { name: 'Start fix' }) as HTMLButtonElement).disabled).toBe(false);

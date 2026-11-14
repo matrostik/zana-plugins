@@ -166,6 +166,29 @@ describe('SettingsView loading and errors', () => {
     expect(screen.getByText('Loading settings…')).toBeTruthy();
   });
 
+  it('renders AI Model immediately with initialModels while config is still loading and preserves early draft edits', async () => {
+    let resolveConfig!: (value: ConfigSnapshot) => void;
+    const { rpc, callsTo } = createRpc(snapshot(), {
+      config: () => new Promise((resolve) => {
+        resolveConfig = resolve;
+      }),
+      availableModels: () => [cursor]
+    });
+    render(<SettingsView rpc={rpc} initialTab="models" initialModels={[{ providerId: 'cursor', model: 'grok-4.6' }]} />);
+    expect(screen.getByRole('tab', { name: 'AI Model' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('heading', { name: 'Review models' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save models (1)' })).toBeTruthy();
+    expect(screen.getByText('Loading execution settings…')).toBeTruthy();
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Model for priority 1' }), { target: { value: 'gpt-5.6-sol' } });
+    expect(callsTo('availableModels')).toHaveLength(1);
+
+    resolveConfig(snapshot({ models: [] }));
+    await screen.findByLabelText('Review workspace');
+    expect((screen.getByRole('combobox', { name: 'Model for priority 1' }) as HTMLSelectElement).value).toBe('gpt-5.6-sol');
+    expect(screen.getByRole('button', { name: 'Save models (1)' })).toBeTruthy();
+  });
+
   it('shows only the error when the configuration cannot be loaded', async () => {
     const { rpc } = createRpc(snapshot(), {
       config: () => {
@@ -378,6 +401,59 @@ describe('AI Model tab', () => {
     await renderView(snapshot(), { availableModels: () => new Promise(() => {}) });
     await openTab('AI Model');
     expect(screen.getByText('Loading providers…')).toBeTruthy();
+  });
+
+  it('refreshes the provider model catalog with refresh: true when Refresh models is clicked', async () => {
+    const { callsTo } = await renderView(snapshot(), { availableModels: () => [cursor] });
+    await openTab('AI Model');
+    await screen.findByRole('combobox', { name: 'Provider for priority 1' });
+    expect(callsTo('availableModels')).toEqual([undefined]);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }));
+    await waitFor(() => expect(callsTo('availableModels')).toEqual([undefined, { refresh: true }]));
+  });
+
+  it('ignores stale initial availableModels responses and errors after Refresh models completes', async () => {
+    let resolveInitial!: (value: AvailableProvider[]) => void;
+    let rejectSecondInitial!: (error: Error) => void;
+    const staleProvider: AvailableProvider = {
+      providerId: 'claude',
+      displayName: 'Claude',
+      error: null,
+      models: [{ id: 'stale-model', label: 'Stale Model', reasoningLevels: [] }]
+    };
+
+    await renderView(snapshot(), {
+      availableModels: (args) => {
+        if ((args as { refresh?: boolean } | undefined)?.refresh) return [cursor];
+        return new Promise((resolve) => {
+          resolveInitial = resolve;
+        });
+      }
+    });
+    await openTab('AI Model');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }));
+    expect(await screen.findByRole('option', { name: 'Cursor' })).toBeTruthy();
+
+    resolveInitial([staleProvider]);
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Cursor' })).toBeTruthy());
+    expect(screen.queryByRole('option', { name: 'Claude' })).toBeNull();
+
+    cleanup();
+    await renderView(snapshot(), {
+      availableModels: (args) => {
+        if ((args as { refresh?: boolean } | undefined)?.refresh) return [cursor];
+        return new Promise((_, reject) => {
+          rejectSecondInitial = reject;
+        });
+      }
+    });
+    await openTab('AI Model');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }));
+    expect(await screen.findByRole('option', { name: 'Cursor' })).toBeTruthy();
+
+    rejectSecondInitial(new Error('Stale initial error'));
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Cursor' })).toBeTruthy());
+    expect(screen.queryByText('Stale initial error')).toBeNull();
   });
 
   it('shows the provider error when the model list cannot be fetched', async () => {

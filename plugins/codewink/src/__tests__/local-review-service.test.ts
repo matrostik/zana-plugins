@@ -140,8 +140,8 @@ function createHarness(options: HarnessOptions = {}) {
     coordinatorRetryDelayMs: 0,
     log
   });
-  const start = (scope: LocalScope = 'uncommitted', extra: { source?: LocalReviewSource; intent?: string; base?: string; worktreePath?: string } = {}) =>
-    local.startLocalReview({ projectId: project.id, worktreePath: extra.worktreePath ?? repo, scope, source: extra.source ?? 'ui', intent: extra.intent, base: extra.base });
+  const start = (scope: LocalScope = 'uncommitted', extra: { source?: LocalReviewSource; intent?: string; base?: string; headRef?: string; commits?: string[]; worktreePath?: string } = {}) =>
+    local.startLocalReview({ projectId: project.id, worktreePath: extra.worktreePath ?? repo, scope, source: extra.source ?? 'ui', intent: extra.intent, base: extra.base, headRef: extra.headRef, commits: extra.commits });
   return {
     repo,
     project,
@@ -276,9 +276,96 @@ describe('local reviews', () => {
     const review = await harness.start('branch', { base: 'main' });
     await harness.settled();
 
-    expect(harness.store.getLocalSnapshot(review.id)).toMatchObject({ scope: 'branch', baseRef: 'main', files: [expect.objectContaining({ path: 'c.ts', status: 'added' })] });
+    expect(harness.store.getLocalSnapshot(review.id)).toMatchObject({ scope: 'branch', baseRef: 'main', headRef: null, files: [expect.objectContaining({ path: 'c.ts', status: 'added' })] });
     expect(String(harness.spawned[0].args.prompt)).toContain('Needed for the c feature');
     await expect(harness.start('branch', { base: 'main;rm -rf' })).rejects.toThrow();
+  });
+
+  it('reviews a specific branch without checking it out and detects staleness when that branch advances', async () => {
+    const harness = createHarness();
+    sh(harness.repo, 'checkout', '-q', '-b', 'feat/other');
+    writeFileSync(join(harness.repo, 'other.ts'), 'export const o = 1;\n');
+    sh(harness.repo, 'add', 'other.ts');
+    sh(harness.repo, 'commit', '-q', '-m', 'Add other');
+    sh(harness.repo, 'checkout', '-q', 'main');
+
+    const review = await harness.start('branch', { headRef: 'feat/other', base: 'main' });
+    await harness.settled();
+
+    expect(sh(harness.repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('main');
+    expect(harness.store.getLocalSnapshot(review.id)).toMatchObject({
+      scope: 'branch',
+      headRef: 'feat/other',
+      baseRef: 'main',
+      files: [expect.objectContaining({ path: 'other.ts', status: 'added' })]
+    });
+    expect(await harness.local.status(review.id)).toMatchObject({ stale: false, missing: false });
+
+    sh(harness.repo, 'checkout', '-q', 'feat/other');
+    writeFileSync(join(harness.repo, 'other2.ts'), 'export const o2 = 2;\n');
+    sh(harness.repo, 'add', 'other2.ts');
+    sh(harness.repo, 'commit', '-q', '-m', 'Advance feat/other');
+    sh(harness.repo, 'checkout', '-q', 'main');
+    expect(await harness.local.status(review.id)).toMatchObject({ stale: true, missing: false });
+  });
+
+  it('reviews selected commits and lists commit metadata in detail views', async () => {
+    const harness = createHarness();
+    writeFileSync(join(harness.repo, 'b.ts'), 'export const b = 1;\n');
+    sh(harness.repo, 'add', 'b.ts');
+    sh(harness.repo, 'commit', '-q', '-m', 'Add b commit');
+    const c1 = sh(harness.repo, 'rev-parse', 'HEAD').trim();
+
+    writeFileSync(join(harness.repo, 'c.ts'), 'export const c = 1;\n');
+    sh(harness.repo, 'add', 'c.ts');
+    sh(harness.repo, 'commit', '-q', '-m', 'Add c commit');
+    const c2 = sh(harness.repo, 'rev-parse', 'HEAD').trim();
+
+    await harness.local.listLocations();
+    const page = await harness.local.listCommits(harness.targetId, { limit: 10, skip: 0 });
+    expect(page.commits.map((c) => c.subject)).toEqual(['Add c commit', 'Add b commit', 'init']);
+
+    const review = await harness.start('commits', { commits: [c2, c1] });
+    await harness.settled();
+
+    const snapshot = harness.store.getLocalSnapshot(review.id)!;
+    expect(snapshot).toMatchObject({ scope: 'commits', commitShas: [c1, c2] });
+    expect(snapshot.files.map((f) => f.path).sort()).toEqual(['b.ts', 'c.ts']);
+    expect(String(harness.spawned[0].args.prompt)).toContain('Add b commit');
+    expect(String(harness.spawned[0].args.prompt)).toContain('Add c commit');
+    expect(await harness.local.status(review.id)).toMatchObject({ stale: false, missing: false });
+    expect(getLocalDetail(harness.store, harness.targetId)?.snapshot).toMatchObject({ scope: 'commits', commitShas: [c1, c2] });
+    expect(getLocalDetail(harness.store, harness.targetId)?.history[0]).toMatchObject({ scope: 'commits', commitCount: 2 });
+  });
+
+  it('requires confirmation before fixing a commit review when the live checkout differs', async () => {
+    const harness = createHarness();
+    writeFileSync(join(harness.repo, 'b.ts'), 'export const b = 1;\n');
+    sh(harness.repo, 'add', 'b.ts');
+    sh(harness.repo, 'commit', '-q', '-m', 'Add b commit');
+    const c1 = sh(harness.repo, 'rev-parse', 'HEAD').trim();
+
+    const review = await harness.start('commits', { commits: [c1] });
+    await harness.settled();
+
+    const agent = { providerId: 'cursor', model: 'fix-model', permissionMode: 'full' };
+
+    // Dirty live working tree differs from the reviewed commit even though c1 exists
+    writeFileSync(join(harness.repo, 'b.ts'), 'export const b = 999;\n');
+    const dirtyConfirm = await harness.local.fix(review.id, [], false, agent);
+    expect(dirtyConfirm).toEqual({ needsConfirmation: true, reason: 'The live checkout differs from the reviewed selection.' });
+
+    // Clean checkout at a newer commit c2 also differs from reviewed c1
+    sh(harness.repo, 'checkout', '--', 'b.ts');
+    writeFileSync(join(harness.repo, 'c.ts'), 'export const c = 1;\n');
+    sh(harness.repo, 'add', 'c.ts');
+    sh(harness.repo, 'commit', '-q', '-m', 'Advance HEAD past reviewed commit');
+    const advancedConfirm = await harness.local.fix(review.id, [], false, agent);
+    expect(advancedConfirm).toEqual({ needsConfirmation: true, reason: 'The live checkout differs from the reviewed selection.' });
+
+    // Force still allows starting the fix
+    const forced = await harness.local.fix(review.id, [], true, agent);
+    expect(forced).toMatchObject({ needsConfirmation: false });
   });
 
   it('reviews the snapshot rather than the live checkout in project mode and uses no workspace in diff-only mode', async () => {
@@ -400,6 +487,77 @@ describe('local reviews', () => {
     expect(harness.threads.spawn).toHaveBeenCalledTimes(spawnCount + 1);
     await harness.local.fix(review.id, [], true, { ...agent, permissionMode: 'full' });
     expect(harness.spawned.at(-1)?.args.permissionMode).toBe('full');
+  });
+
+  it('persists fix runs, ignores initial idle on spawn, handles stop failures safely, reconciles, and deletes with review', async () => {
+    const harness = createHarness();
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
+    const review = await harness.start();
+    await harness.settled();
+
+    // Even if threads.get reports 'idle' right after spawn, the run stays running until thread.idle fires
+    harness.threads.get.mockResolvedValue({ status: 'idle' });
+    const agent = { providerId: 'cursor', model: 'fix-model', permissionMode: 'full' };
+    const started = await harness.local.fix(review.id, [], false, agent);
+    if (started.needsConfirmation) throw new Error('unexpected confirmation');
+    expect(started.fixRun).toMatchObject({ status: 'running', threadId: started.threadId, permissionMode: 'full' });
+
+    const activeDetail = getLocalDetail(harness.store, harness.targetId)!;
+    expect(activeDetail.activeFix?.id).toBe(started.fixRun!.id);
+    expect(activeDetail.latestFix?.id).toBe(started.fixRun!.id);
+    expect((await harness.local.listLocations())[0].latestFix?.status).toBe('running');
+
+    // Complete via thread.idle event
+    harness.threads.output.mockResolvedValue({ output: 'Exported `a` cleanly.' });
+    await harness.local.onFixThreadEvent({ name: 'thread.idle', threadId: started.threadId });
+    expect(harness.store.getLocalFixRun(started.fixRun!.id)).toMatchObject({ status: 'completed', summary: 'Exported `a` cleanly.' });
+    expect(harness.store.completeLocalFixRun(started.fixRun!.id, { status: 'stopped', error: 'late' })).toBe(false);
+    expect(getLocalDetail(harness.store, harness.targetId)?.activeFix).toBeNull();
+    expect(getLocalDetail(harness.store, harness.targetId)?.latestFix?.status).toBe('completed');
+
+    // Failed stop retains running status, logs a warning, and rethrows
+    harness.threads.get.mockResolvedValue({ status: 'running' });
+    const second = await harness.local.fix(review.id, [], true, agent);
+    if (second.needsConfirmation) throw new Error('unexpected confirmation');
+    harness.threads.stop.mockRejectedValueOnce(new Error('IPC failed'));
+    await expect(harness.local.stopFix(second.fixRun!.id)).rejects.toThrow(/IPC failed/);
+    expect(harness.store.getLocalFixRun(second.fixRun!.id)?.status).toBe('running');
+    expect(harness.log.warn).toHaveBeenCalledWith(expect.stringContaining(`failed to stop fix thread ${second.threadId}`));
+
+    // Stop fix explicitly when stop succeeds
+    const stopped = await harness.local.stopFix(second.fixRun!.id);
+    expect(stopped).toEqual({ ok: true });
+    expect(harness.store.getLocalFixRun(second.fixRun!.id)?.status).toBe('stopped');
+    expect(harness.threads.stop).toHaveBeenCalledWith({ threadId: second.threadId });
+
+    // If thread.idle settles the run while threads.stop is in flight, completed status and summary are preserved
+    const racing = await harness.local.fix(review.id, [], true, agent);
+    if (racing.needsConfirmation) throw new Error('unexpected confirmation');
+    harness.threads.output.mockResolvedValue({ output: 'Finished before stop settled.' });
+    harness.threads.stop.mockImplementationOnce(async () => {
+      await harness.local.onFixThreadEvent({ name: 'thread.idle', threadId: racing.threadId });
+      return { ok: true as const };
+    });
+    const publishedCountBeforeRaceStop = harness.published.length;
+    await expect(harness.local.stopFix(racing.fixRun!.id)).resolves.toEqual({ ok: true });
+    expect(harness.store.getLocalFixRun(racing.fixRun!.id)).toMatchObject({
+      status: 'completed',
+      summary: 'Finished before stop settled.',
+      error: null
+    });
+    // Only the thread.idle completion published a change event; stopFix did not emit a second overwrite event.
+    expect(harness.published.slice(publishedCountBeforeRaceStop)).toHaveLength(1);
+
+    // Reconcile stale running run after restart
+    const third = await harness.local.fix(review.id, [], true, agent);
+    if (third.needsConfirmation) throw new Error('unexpected confirmation');
+    harness.threads.get.mockResolvedValue({ status: 'failed' });
+    await harness.local.reconcileFixRuns();
+    expect(harness.store.getLocalFixRun(third.fixRun!.id)?.status).toBe('failed');
+
+    // Cascade delete with review
+    await harness.local.deleteReview(review.id);
+    expect(harness.store.getLocalFixRun(started.fixRun!.id)).toBeNull();
   });
 
   it('starts Deep Review with full access in a worktree of the snapshot', async () => {

@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ModelChoice } from '../server/types.ts';
-import { errorText } from './format.ts';
 import { ModelPriorityPicker } from './ModelSearchPicker.tsx';
 import { NumberSetting } from './SettingFields.tsx';
 import { useSettingsAction } from './settings-action.ts';
@@ -12,25 +11,49 @@ const WORKSPACE_LABELS: Record<string, string> = {
   'diff-only': 'Diff only, never read local code'
 };
 
-function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice[]; onSaved(): void }) {
-  const [providers, setProviders] = useState<AvailableProvider[] | null>(null);
+interface ModelsSectionProps {
+  rpc: Rpc;
+  models: ModelChoice[];
+  onSaved(): void;
+  providers: AvailableProvider[] | null;
+  providersError: string | null;
+  refreshingProviders: boolean;
+  onRefreshProviders: () => void;
+}
+
+function ModelsSection({
+  rpc,
+  models,
+  onSaved,
+  providers,
+  providersError,
+  refreshingProviders,
+  onRefreshProviders
+}: ModelsSectionProps) {
   const [draft, setDraft] = useState<ModelChoice[]>(models);
-  const [error, setError] = useState<string | null>(null);
+  const dirtyRef = useRef(false);
   const action = useSettingsAction(onSaved);
 
   const savedKey = JSON.stringify(models);
-  useEffect(() => setDraft(models), [savedKey]);
   useEffect(() => {
-    rpc
-      .call('availableModels')
-      .then((value) => setProviders(value as AvailableProvider[]))
-      .catch((cause) => setError(errorText(cause)));
-  }, [rpc]);
+    if (!dirtyRef.current) setDraft(models);
+  }, [savedKey]);
 
-  const shownError = action.error ?? error;
+  const updateDraft = (next: ModelChoice[]) => {
+    dirtyRef.current = true;
+    setDraft(next);
+  };
+
+  const shownError = action.error ?? providersError;
   return (
     <section className="cn-section" aria-labelledby="cn-models-heading">
-      <h3 id="cn-models-heading">Review models</h3>
+      <div className="cn-inline">
+        <h3 id="cn-models-heading">Review models</h3>
+        <span className="cn-spacer" />
+        <button type="button" className="cn-btn cn-small" disabled={refreshingProviders} onClick={onRefreshProviders}>
+          {refreshingProviders ? 'Refreshing…' : 'Refresh models'}
+        </button>
+      </div>
       <p className="cn-muted cn-small">
         Choose a provider and model for each priority. Reviews use every selected model together for consensus (up to 5).
       </p>
@@ -40,22 +63,37 @@ function ModelsSection({ rpc, models, onSaved }: { rpc: Rpc; models: ModelChoice
       ) : providers.length === 0 ? (
         <p className="cn-muted">No AI provider is available in Zana. Sign in to one under Settings → Providers.</p>
       ) : (
-        <ModelPriorityPicker value={draft} providers={providers} onChange={setDraft} />
+        <ModelPriorityPicker value={draft} providers={providers} onChange={updateDraft} />
       )}
-      <div className="cn-inline" style={{ marginTop: 16 }}>
-        <button type="button" className="cn-btn cn-btn-primary" onClick={() => void action.run(() => rpc.call('setModels', { models: draft }))}>
-          Save models ({draft.length})
-        </button>
-        {action.saved ? (
-          <span className="cn-status-saved" role="status">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Saved
-          </span>
-        ) : null}
-      </div>
+      <SaveModelsBar
+        count={draft.length}
+        saved={action.saved}
+        onSave={() =>
+          void action.run(async () => {
+            await rpc.call('setModels', { models: draft });
+            dirtyRef.current = false;
+          })
+        }
+      />
     </section>
+  );
+}
+
+function SaveModelsBar({ count, saved, onSave }: { count: number; saved: boolean; onSave(): void }) {
+  return (
+    <div className="cn-inline" style={{ marginTop: 16 }}>
+      <button type="button" className="cn-btn cn-btn-primary" onClick={onSave}>
+        Save models ({count})
+      </button>
+      {saved ? (
+        <span className="cn-status-saved" role="status">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Saved
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -141,11 +179,44 @@ function ExecutionSection({ rpc, config, onChanged }: { rpc: Rpc; config: Config
   );
 }
 
-export function ModelTab({ rpc, config, onChanged }: { rpc: Rpc; config: ConfigSnapshot; onChanged(): void }) {
+export function ModelTab({
+  rpc,
+  config,
+  initialModels,
+  onChanged,
+  providers,
+  providersError,
+  refreshingProviders,
+  onRefreshProviders
+}: {
+  rpc: Rpc;
+  config: ConfigSnapshot | null;
+  initialModels?: ModelChoice[];
+  onChanged(): void;
+  providers: AvailableProvider[] | null;
+  providersError: string | null;
+  refreshingProviders: boolean;
+  onRefreshProviders: () => void;
+}) {
   return (
     <>
-      <ModelsSection rpc={rpc} models={config.models} onSaved={onChanged} />
-      <ExecutionSection rpc={rpc} config={config} onChanged={onChanged} />
+      <ModelsSection
+        rpc={rpc}
+        models={config?.models ?? initialModels ?? []}
+        onSaved={onChanged}
+        providers={providers}
+        providersError={providersError}
+        refreshingProviders={refreshingProviders}
+        onRefreshProviders={onRefreshProviders}
+      />
+      {config ? (
+        <ExecutionSection rpc={rpc} config={config} onChanged={onChanged} />
+      ) : (
+        <section className="cn-section" aria-labelledby="cn-execution-heading">
+          <h3 id="cn-execution-heading">Review execution</h3>
+          <p className="cn-muted">Loading execution settings…</p>
+        </section>
+      )}
     </>
   );
 }
