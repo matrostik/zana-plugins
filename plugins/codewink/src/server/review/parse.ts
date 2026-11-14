@@ -88,8 +88,9 @@ function normalizeSeverity(value: unknown): Severity {
 
 export function normalizeIssuePath(rawPath: string): string | null {
   const slashed = rawPath.replace(/\\/g, '/');
-  if (slashed.startsWith('/')) return null;
-  const normalized = slashed.replace(/^(?:\.\/)+/, '');
+  if (slashed.startsWith('//')) return null;
+  const stripped = slashed.startsWith('/') ? slashed.slice(1) : slashed;
+  const normalized = stripped.replace(/^(?:\.\/)+/, '');
   if (!normalized || normalized.includes('\0') || /^[A-Za-z]:/.test(normalized)) return null;
   const segments = normalized.split('/');
   if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) return null;

@@ -411,17 +411,19 @@ async function sendReviewNotification(
   await deps.notify({ projectId, text }).catch((error) => deps.log.warn(`codewink: inbox push failed: ${errorMessage(error)}`));
 }
 
-async function finalizeReview(
-  deps: ReviewServiceDeps,
-  target: ReviewTarget,
-  subject: ReviewSubject,
-  review: ReviewRow,
-  prepared: PreparedReview,
-  models: ModelChoice[],
-  succeeded: ReviewModelOutcome[],
-  coordinatorThreadId: string | null,
-  signal: AbortSignal
-): Promise<void> {
+interface FinalizeReviewContext {
+  target: ReviewTarget;
+  subject: ReviewSubject;
+  review: ReviewRow;
+  prepared: PreparedReview;
+  models: ModelChoice[];
+  succeeded: ReviewModelOutcome[];
+  coordinatorThreadId: string | null;
+  signal: AbortSignal;
+}
+
+async function finalizeReview(deps: ReviewServiceDeps, context: FinalizeReviewContext): Promise<void> {
+  const { target, subject, review, prepared, models, succeeded, coordinatorThreadId, signal } = context;
   const clusters = clusterReviewIssues(succeeded);
   const consensusSummary = await buildConsensusSummary(deps, clusters, succeeded);
   if (signal.aborted) {
@@ -512,8 +514,8 @@ export function createReviewService(deps: ReviewServiceDeps) {
     try {
       const review = deps.store.getReview(reviewId);
       if (review) targetFor(review, item).onCleanup?.();
-    } catch {
-      // Best-effort cleanup when a queued review leaves the queue without running.
+    } catch (error) {
+      deps.log.warn(`codewink: cleanup for review ${reviewId} failed: ${errorMessage(error)}`);
     }
   }
 
@@ -549,7 +551,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
         queueCoordinatorNotification(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
         return;
       }
-      await finalizeReview(deps, target, subject, review, prepared, item.models, succeeded, coordinatorThreadId, signal);
+      await finalizeReview(deps, { target, subject, review, prepared, models: item.models, succeeded, coordinatorThreadId, signal });
     } finally {
       target.onCleanup?.();
     }

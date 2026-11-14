@@ -503,7 +503,7 @@ describe('parse analysis', () => {
           'text',
           { description: '   ', file: 'src/a.ts' },
           { description: 'No file given' },
-          { comment: 'Uses comment field', path: './src/b.ts', severity: ' CRITICAL ', line: 2.5, suggestion: 42 },
+          { comment: 'Uses comment field', path: '/src/b.ts', severity: ' CRITICAL ', line: 2.5, suggestion: 42 },
           { message: 'Uses message field', file: 'src/c.ts', severity: 'blocker', line: 0 },
           { description: 'Retracted', file: 'src/d.ts', line: 4, suggestion: 'False positive, ignore' },
           { description: 'Unknown severity', file: 'src/e.ts', severity: 'urgent', line: '3' },
@@ -530,9 +530,10 @@ describe('parse analysis', () => {
   });
 
   it('normalizes safe relative paths and rejects absolute, traversal, drive-letter, and NUL paths', () => {
+    expect(normalizeIssuePath('/src/a.ts')).toBe('src/a.ts');
     expect(normalizeIssuePath('./src\\a.ts')).toBe('src/a.ts');
     expect(normalizeIssuePath('././src/a.ts')).toBe('src/a.ts');
-    for (const bad of ['/src/a.ts', '///src/a.ts', '/etc/passwd', '\\\\server\\share\\a.ts', '../secret.ts', 'src/../secret.ts', 'a//b.ts', 'a/./b.ts', 'C:/secret.ts', 'src/a\0.ts', '', '/']) {
+    for (const bad of ['//src/a.ts', '///src/a.ts', '\\\\server\\share\\a.ts', '../secret.ts', 'src/../secret.ts', 'a//b.ts', 'a/./b.ts', 'C:/secret.ts', 'src/a\0.ts', '', '/', '/..', '/../secret.ts']) {
       expect(normalizeIssuePath(bad)).toBeNull();
     }
   });
