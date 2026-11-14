@@ -35,6 +35,7 @@ import {
   type FetchLike,
   type HostUsageProbeResult
 } from './src/server/collectors/zcc-quotas.ts';
+import { createComparisonService } from './src/server/comparison.ts';
 import { createComparisonSetup } from './src/server/comparison-setup.ts';
 import { createDashboardService, type DashboardService } from './src/server/dashboard.ts';
 import { createUsageStore, type UsageStore } from './src/server/db.ts';
@@ -476,9 +477,10 @@ function attachRuntimeHooks(args: {
   settings: ReturnType<typeof definePluginSettings>;
   collectors: ReturnType<typeof createCollectors>;
   refreshNow: RefreshNowFn;
+  onDisposeExtra?: () => void;
   now: () => number;
 }) {
-  const { zcc, deps, state, defaultBudgetMs, settings, collectors, refreshNow, now } = args;
+  const { zcc, deps, state, defaultBudgetMs, settings, collectors, refreshNow, onDisposeExtra, now } = args;
   for (const eventName of LIFECYCLE_EVENTS) {
     zcc.events.on(eventName, async (event) => {
       const count = await collectors.indexer.onThreadLifecycleEvent(event);
@@ -508,6 +510,7 @@ function attachRuntimeHooks(args: {
   }
   zcc.onDispose(() => {
     state.disposed = true;
+    onDisposeExtra?.();
     if (state.initialTimer) clearTimeout(state.initialTimer);
     if (state.continuationTimer) clearTimeout(state.continuationTimer);
   });
@@ -545,9 +548,24 @@ export default async function createAiUsageMonitorPlugin(
   await refreshSettingsCache();
 
   const collectors = createCollectors({ zcc, deps, store, state, refreshSettingsCache, getSettingValues, now });
-  const comparisonSetup = createComparisonSetup(zcc, { fetch: deps.fetch, now });
+  const comparison = createComparisonService(zcc, { fetch: deps.fetch, now });
+  const comparisonSetup = createComparisonSetup(zcc, {
+    fetch: deps.fetch,
+    now,
+    onConnected: () => { void comparison.onKeyConfigured(); },
+    onRemoved: () => { void comparison.onKeyRemoved(); }
+  });
   const { refreshNow, refreshProvider } = createSyncCoordinator({ zcc, deps, state, defaultBudgetMs, refreshSettingsCache, collectors, now });
-  attachRuntimeHooks({ zcc, deps, state, defaultBudgetMs, settings, collectors, refreshNow, now });
+  attachRuntimeHooks({
+    zcc, deps, state, defaultBudgetMs, settings, collectors, refreshNow,
+    onDisposeExtra: () => comparison.dispose(),
+    now
+  });
+  if (!deps.skipInitialSync) {
+    void comparison.maybeRefreshOnStartup().catch((err) => {
+      zcc.log.warn(`ai-usage-monitor: comparison startup check failed: ${errorMessage(err)}`);
+    });
+  }
   registerReadAndSyncRpcs({ zcc, deps, state, defaultBudgetMs, store, dashboard: collectors.dashboard, refreshNow, refreshProvider });
   registerBudgetRpcs(zcc, store, collectors.budgets);
   registerPricingAndOrderRpcs(zcc, state, store);

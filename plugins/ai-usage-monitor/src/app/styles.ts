@@ -261,7 +261,34 @@ export const USAGE_MONITOR_STYLES = `
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
 .aum-banner-error { background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); color: #fda4af; }
+.aum-banner-warn { background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fde68a; }
 .aum-banner-info { background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); color: #c7d2fe; }
+
+.aum-comp-filters {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+}
+.aum-comp-field {
+  display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--aum-muted);
+}
+.aum-comp-sort-btn {
+  appearance: none; background: transparent; border: none; padding: 0; margin: 0;
+  color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.aum-comp-sort-btn:hover { color: var(--aum-text); }
+.aum-table th[aria-sort="ascending"] .aum-comp-sort-btn,
+.aum-table th[aria-sort="descending"] .aum-comp-sort-btn {
+  color: #a5b4fc;
+}
+.aum-comp-score {
+  display: inline-block; border-radius: 4px; padding: 2px 7px; font-weight: 600;
+  background: rgba(99, 102, 241, 0.16); color: #c7d2fe;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+.aum-comp-footer {
+  display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--aum-muted);
+}
+.aum-comp-footer a { color: #a5b4fc; text-decoration: underline; }
 `;
 
 export function ensureStylesInjected(): void {
