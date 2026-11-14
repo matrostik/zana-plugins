@@ -44,12 +44,7 @@ interface ProviderUsageAggregate {
 }
 
 function findTightestWindow(providers: readonly ProviderQuotaSnapshot[]): DashboardKpis['tightestQuota'] {
-  let tightest: {
-    providerId: string;
-    displayName: string;
-    window: QuotaWindow;
-  } | null = null;
-
+  let tightest: { providerId: string; displayName: string; window: QuotaWindow } | null = null;
   for (const prov of providers) {
     if (!prov.available || prov.billingMode !== 'subscription' || prov.status === 'not_installed') continue;
     for (const win of prov.windows) {
@@ -59,7 +54,6 @@ function findTightestWindow(providers: readonly ProviderQuotaSnapshot[]): Dashbo
       }
     }
   }
-
   if (!tightest || tightest.window.remainingPercent === null) return null;
   return {
     providerId: tightest.providerId,
@@ -80,16 +74,13 @@ function buildProviderSnapshot(args: {
 }): ProviderQuotaSnapshot {
   const { providerId, snap, disc, agg, modeOverrides, currentNowMs } = args;
   const billingMode: BillingMode =
-    snap?.billingMode ??
-    modeOverrides?.get(providerId.toLowerCase()) ??
-    inferDefaultBillingMode(providerId, '');
+    snap?.billingMode ?? modeOverrides?.get(providerId.toLowerCase()) ?? inferDefaultBillingMode(providerId, '');
   const normalized =
     snap && snap.source === 'thread-events'
       ? expireStaleQuotaWindows(snap.windows, snap.status, snap.errorMessage, currentNowMs)
       : null;
   const isCloudConfiguredOpenCode =
     snap?.source === 'opencode-go-usage' || snap?.source === 'opencode-console-api';
-
   return {
     providerId,
     displayName: snap?.displayName ?? disc?.displayName ?? providerId,
@@ -144,7 +135,6 @@ function buildDashboardKpis(args: {
   const providerAlerts = args.providers.filter(
     (p) => ['warning', 'blocked', 'error', 'unauthenticated', 'expired'].includes(p.status)
   ).length;
-
   return {
     range: args.range,
     rangeBounds: args.bounds,
@@ -168,7 +158,9 @@ function buildDashboardKpis(args: {
 }
 
 function reconcileProviders(
-  deps: DashboardServiceDeps, bounds: TimeRangeBounds, currentNowMs: number,
+  deps: DashboardServiceDeps,
+  bounds: TimeRangeBounds,
+  currentNowMs: number,
   modeOverrides: ReadonlyMap<string, BillingMode> | undefined
 ): ProviderQuotaSnapshot[] {
   const providerUsage = deps.store.aggregateByProvider(bounds.startMs, bounds.endMs);
@@ -176,13 +168,11 @@ function reconcileProviders(
   const discoveredMap = new Map(discovered.map((d) => [d.providerId, d]));
   const snapshots = deps.store.listQuotaSnapshots();
   const snapMap = new Map(snapshots.map((s) => [s.providerId, s]));
-
   const allProviderIds = new Set<string>([
     ...snapshots.map((s) => s.providerId),
     ...discovered.map((d) => d.providerId),
     ...providerUsage.keys()
   ]);
-
   return [...allProviderIds].map((providerId) =>
     buildProviderSnapshot({
       providerId,
@@ -195,59 +185,54 @@ function reconcileProviders(
   );
 }
 
+async function loadProjectNamesMap(deps: DashboardServiceDeps): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const list = await withTimeout(deps.projects.list(), 3000, 'projects.list');
+    for (const proj of list) map.set(proj.id, proj.name);
+  } catch (err) {
+    deps.log?.warn(`ai-usage-monitor: failed loading project names: ${errorMessage(err)}`);
+  }
+  return map;
+}
+
+function assembleDashboardPayload(
+  deps: DashboardServiceDeps,
+  range: TimeRangeKey,
+  currentNowMs: number,
+  projectMap: ReadonlyMap<string, string>
+): DashboardPayload {
+  const bounds = resolveTimeRangeBounds(range, currentNowMs);
+  const summary = deps.store.aggregateSummary(bounds.startMs, bounds.endMs);
+  const overrides = deps.store.listPricingOverrides();
+  const modeOverrides = deps.getProviderModeOverrides?.();
+  const providerOrder = deps.getProviderOrder?.() ?? DEFAULT_PROVIDER_ORDER;
+  const sortedProviders = sortProviders(reconcileProviders(deps, bounds, currentNowMs, modeOverrides), providerOrder);
+  const budgets = deps.budgets.evaluateAll();
+  const logsMeta = deps.store.queryLogs({ limit: 1 }, projectMap);
+  return {
+    kpis: buildDashboardKpis({ range, bounds, summary, providers: sortedProviders, budgets, logCount: logsMeta.totalCount }),
+    providers: sortedProviders,
+    providerOrder,
+    models: deps.store.listModelBreakdown(bounds.startMs, overrides, bounds.endMs, modeOverrides),
+    projects: deps.store.listProjectBreakdown(bounds.startMs, projectMap, bounds.endMs),
+    dailyTrend: deps.store.listDailyTrend(range),
+    budgets,
+    pricingRules: listCombinedPricingRules(overrides),
+    cloudConnectors: deps.getCloudStatuses(),
+    opencodeLocal: deps.getOpenCodeLocalStats?.() ?? null,
+    lastSyncedAtMs: deps.getLastSyncedAtMs(),
+    isSyncing: deps.getIsSyncing?.() ?? false
+  };
+}
+
 export function createDashboardService(deps: DashboardServiceDeps) {
   const now = deps.now ?? Date.now;
-
-  async function projectNamesMap(): Promise<Map<string, string>> {
-    const map = new Map<string, string>();
-    try {
-      const list = await withTimeout(deps.projects.list(), 3000, 'projects.list');
-      for (const proj of list) {
-        map.set(proj.id, proj.name);
-      }
-    } catch (err) {
-      deps.log?.warn(`ai-usage-monitor: failed loading project names: ${errorMessage(err)}`);
-    }
-    return map;
-  }
-
+  const projectNamesMap = () => loadProjectNamesMap(deps);
   async function buildDashboard(range: TimeRangeKey = '30d'): Promise<DashboardPayload> {
-    const currentNowMs = now();
-    const bounds = resolveTimeRangeBounds(range, currentNowMs);
     const projectMap = await projectNamesMap();
-    const summary = deps.store.aggregateSummary(bounds.startMs, bounds.endMs);
-    const overrides = deps.store.listPricingOverrides();
-    const modeOverrides = deps.getProviderModeOverrides?.();
-    const providers = reconcileProviders(deps, bounds, currentNowMs, modeOverrides);
-
-    const providerOrder = deps.getProviderOrder?.() ?? DEFAULT_PROVIDER_ORDER;
-    const sortedProviders = sortProviders(providers, providerOrder);
-    const budgets = deps.budgets.evaluateAll();
-    const logsMeta = deps.store.queryLogs({ limit: 1 }, projectMap);
-
-    return {
-      kpis: buildDashboardKpis({
-        range,
-        bounds,
-        summary,
-        providers: sortedProviders,
-        budgets,
-        logCount: logsMeta.totalCount
-      }),
-      providers: sortedProviders,
-      providerOrder,
-      models: deps.store.listModelBreakdown(bounds.startMs, overrides, bounds.endMs, modeOverrides),
-      projects: deps.store.listProjectBreakdown(bounds.startMs, projectMap, bounds.endMs),
-      dailyTrend: deps.store.listDailyTrend(range),
-      budgets,
-      pricingRules: listCombinedPricingRules(overrides),
-      cloudConnectors: deps.getCloudStatuses(),
-      opencodeLocal: deps.getOpenCodeLocalStats?.() ?? null,
-      lastSyncedAtMs: deps.getLastSyncedAtMs(),
-      isSyncing: deps.getIsSyncing?.() ?? false
-    };
+    return assembleDashboardPayload(deps, range, now(), projectMap);
   }
-
   return { buildDashboard, projectNamesMap };
 }
 

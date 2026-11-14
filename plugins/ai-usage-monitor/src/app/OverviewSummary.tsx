@@ -119,6 +119,22 @@ function RecordedActivity({ kpis }: { kpis: DashboardKpis }) {
   );
 }
 
+function BudgetProgress({ top, hasAlerts }: { top: DashboardPayload['budgets'][number]; hasAlerts: boolean }) {
+  const clampedPct = Math.min(100, Math.max(0, top.percentUsed));
+  return (
+    <>
+      <div
+        className="aum-bar-track" role="progressbar" aria-label="Budget threshold used"
+        aria-valuenow={clampedPct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${top.percentUsed}% used`}
+      >
+        <div className="aum-bar-fill" style={{ width: `${clampedPct}%`, background: hasAlerts ? 'var(--aum-amber)' : 'var(--aum-accent)' }} />
+      </div>
+      <p className="aum-muted">{top.rule.name}: {top.percentUsed}% used</p>
+      <p className="aum-subtext">{formatCountdown(top.resetsAtMs)}</p>
+    </>
+  );
+}
+
 function BudgetStatus({ data, onJumpToTab }: Pick<OverviewSummaryProps, 'data' | 'onJumpToTab'>) {
   const active = data.budgets.filter((b) => b.rule.enabled);
   const alerts = active.filter((b) => b.status !== 'ok');
@@ -134,44 +150,14 @@ function BudgetStatus({ data, onJumpToTab }: Pick<OverviewSummaryProps, 'data' |
     <article className={alerts.length ? 'aum-card aum-card-amber' : 'aum-card'} aria-label="Budget alerts">
       <div className="aum-row-between">
         <h3>Budget alerts</h3>
-        <span className={alerts.length ? 'aum-pill aum-pill-amber' : 'aum-pill aum-pill-neutral'}>
-          {active.length} active
-        </span>
+        <span className={alerts.length ? 'aum-pill aum-pill-amber' : 'aum-pill aum-pill-neutral'}>{active.length} active</span>
       </div>
       <div className="aum-summary-status">{label}</div>
       <p className="aum-muted">
-        {active.length
-          ? `${active.length} active rule${active.length === 1 ? '' : 's'} · Each rule uses its own period.`
-          : 'Set a threshold for spending estimates or token usage.'}
+        {active.length ? `${active.length} active rule${active.length === 1 ? '' : 's'} · Each rule uses its own period.` : 'Set a threshold for spending estimates or token usage.'}
       </p>
-      {top && (
-        <>
-          <div
-            className="aum-bar-track"
-            role="progressbar"
-            aria-label="Budget threshold used"
-            aria-valuenow={Math.min(100, Math.max(0, top.percentUsed))}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuetext={`${top.percentUsed}% used`}
-          >
-            <div
-              className="aum-bar-fill"
-              style={{
-                width: `${Math.min(100, Math.max(0, top.percentUsed))}%`,
-                background: alerts.length ? 'var(--aum-amber)' : 'var(--aum-accent)'
-              }}
-            />
-          </div>
-          <p className="aum-muted">
-            {top.rule.name}: {top.percentUsed}% used
-          </p>
-          <p className="aum-subtext">{formatCountdown(top.resetsAtMs)}</p>
-        </>
-      )}
-      <button className="aum-btn" type="button" onClick={() => onJumpToTab('models')}>
-        {active.length ? 'Manage budgets' : 'Set a budget'}
-      </button>
+      {top && <BudgetProgress top={top} hasAlerts={alerts.length > 0} />}
+      <button className="aum-btn" type="button" onClick={() => onJumpToTab('models')}>{active.length ? 'Manage budgets' : 'Set a budget'}</button>
       <p className="aum-subtext">Alerts do not stop provider spending.</p>
     </article>
   );
@@ -183,15 +169,61 @@ interface SubscriptionWindowCandidate {
 }
 
 function listSubscriptionWindows(providers: ProviderQuotaSnapshot[]): SubscriptionWindowCandidate[] {
-  // Use the visible snapshots so direct provider refreshes and model filtering also update the summary.
   return providers
     .filter((p) => p.available && p.billingMode === 'subscription' && p.status !== 'not_installed')
     .flatMap((provider) => provider.windows.map((window) => ({ provider, window })))
-    .filter(
-      ({ window }) =>
-        window.remainingPercent !== null && Number.isFinite(window.remainingPercent) && window.status !== 'unknown'
-    )
+    .filter(({ window }) => window.remainingPercent !== null && Number.isFinite(window.remainingPercent) && window.status !== 'unknown')
     .sort((a, b) => a.window.remainingPercent! - b.window.remainingPercent!);
+}
+
+function ClosestLimitDetails({
+  closest,
+  secondary,
+  remaining,
+  low
+}: {
+  closest: SubscriptionWindowCandidate;
+  secondary: SubscriptionWindowCandidate[];
+  remaining: number;
+  low: boolean;
+}) {
+  const used = Number((100 - remaining).toFixed(2));
+  const color = providerColor(closest.provider.providerId);
+  return (
+    <>
+      <div className="aum-summary-provider">
+        <div className="aum-prov-avatar" style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}>
+          {providerBadgeCode(closest.provider.providerId)}
+        </div>
+        <div>
+          <strong>{closest.provider.displayName} · {closest.window.label}</strong>
+          <div className="aum-subtext aum-mono">
+            {closest.provider.planLabel ?? closest.provider.source}
+            {closest.provider.accountLabel ? ` · ${closest.provider.accountLabel}` : ''}
+          </div>
+        </div>
+      </div>
+      <div className="aum-row-between">
+        <strong>{used}% used</strong>
+        <strong className={low ? 'aum-summary-warning' : 'aum-summary-remaining'}>{remaining}% remaining</strong>
+      </div>
+      <div className="aum-bar-track" role="progressbar" aria-label="Subscription quota used" aria-valuenow={used} aria-valuemin={0} aria-valuemax={100}>
+        <div className="aum-bar-fill" style={{ width: `${used}%`, background: low ? 'var(--aum-amber)' : 'var(--aum-emerald)' }} />
+      </div>
+      <p>{formatCountdown(closest.window.resetsAtIso)}</p>
+      {secondary.length > 0 && (
+        <div className="aum-summary-other-windows">
+          {secondary.map(({ provider, window }) => (
+            <span key={`${provider.providerId}:${window.key}`} className="aum-chip">{provider.displayName} · {window.label}: {window.remainingPercent}% left</span>
+          ))}
+        </div>
+      )}
+      <p className="aum-subtext">
+        {closest.provider.updatedAtMs ? `Updated ${formatRelativeTime(closest.provider.updatedAtMs)}` : 'Update time unavailable'} · Source: {closest.provider.source}
+      </p>
+      {closest.provider.errorMessage && <p className="aum-summary-warning">Latest refresh has an issue. Showing the last reported quota.</p>}
+    </>
+  );
 }
 
 function SubscriptionLimit({
@@ -200,117 +232,36 @@ function SubscriptionLimit({
 }: Pick<OverviewSummaryProps, 'providers' | 'onRefreshProvider'>) {
   const candidates = listSubscriptionWindows(providers);
   const closest = candidates[0];
-  const secondary = candidates.slice(1, 3);
   const unavailableSubIssues = providers.filter(
-    (p) =>
-      p.available &&
-      p.billingMode === 'subscription' &&
-      p.windows.length === 0 &&
-      isProviderIssueStatus(p.status)
+    (p) => p.available && p.billingMode === 'subscription' && p.windows.length === 0 && isProviderIssueStatus(p.status)
   );
   const remaining = closest ? Math.max(0, Math.min(100, closest.window.remainingPercent!)) : null;
-  const used = remaining === null ? null : Number((100 - remaining).toFixed(2));
   const low = remaining !== null && remaining <= LOW_QUOTA_REMAINING_PERCENT;
-  const color = closest ? providerColor(closest.provider.providerId) : '#6366f1';
 
   return (
-    <article
-      className={`aum-card aum-summary-quota${low || (!closest && unavailableSubIssues.length > 0) ? ' aum-card-amber' : ''}`}
-      aria-label="Closest subscription limit"
-    >
+    <article className={`aum-card aum-summary-quota${low || (!closest && unavailableSubIssues.length > 0) ? ' aum-card-amber' : ''}`} aria-label="Closest subscription limit">
       <div className="aum-row-between">
         <h3>Closest subscription limit</h3>
         {closest && onRefreshProvider && (
-          <button
-            type="button"
-            className="aum-btn aum-btn-sm"
-            onClick={() => void onRefreshProvider(closest.provider.providerId)}
-          >
-            Check limit now
-          </button>
+          <button type="button" className="aum-btn aum-btn-sm" onClick={() => void onRefreshProvider(closest.provider.providerId)}>Check limit now</button>
         )}
       </div>
-
-      {closest ? (
-        <>
-          <div className="aum-summary-provider">
-            <div
-              className="aum-prov-avatar"
-              style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}
-            >
-              {providerBadgeCode(closest.provider.providerId)}
-            </div>
-            <div>
-              <strong>
-                {closest.provider.displayName} · {closest.window.label}
-              </strong>
-              <div className="aum-subtext aum-mono">
-                {closest.provider.planLabel ?? closest.provider.source}
-                {closest.provider.accountLabel ? ` · ${closest.provider.accountLabel}` : ''}
-              </div>
-            </div>
-          </div>
-
-          <div className="aum-row-between">
-            <strong>{used}% used</strong>
-            <strong className={low ? 'aum-summary-warning' : 'aum-summary-remaining'}>{remaining}% remaining</strong>
-          </div>
-          <div
-            className="aum-bar-track"
-            role="progressbar"
-            aria-label="Subscription quota used"
-            aria-valuenow={used!}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div
-              className="aum-bar-fill"
-              style={{ width: `${used}%`, background: low ? 'var(--aum-amber)' : 'var(--aum-emerald)' }}
-            />
-          </div>
-          <p>{formatCountdown(closest.window.resetsAtIso)}</p>
-
-          {secondary.length > 0 && (
-            <div className="aum-summary-other-windows">
-              {secondary.map(({ provider, window }) => (
-                <span key={`${provider.providerId}:${window.key}`} className="aum-chip">
-                  {provider.displayName} · {window.label}: {window.remainingPercent}% left
-                </span>
-              ))}
-            </div>
-          )}
-
-          <p className="aum-subtext">
-            {closest.provider.updatedAtMs
-              ? `Updated ${formatRelativeTime(closest.provider.updatedAtMs)}`
-              : 'Update time unavailable'}{' '}
-            · Source: {closest.provider.source}
-          </p>
-          {closest.provider.errorMessage && (
-            <p className="aum-summary-warning">Latest refresh has an issue. Showing the last reported quota.</p>
-          )}
-        </>
+      {closest && remaining !== null ? (
+        <ClosestLimitDetails closest={closest} secondary={candidates.slice(1, 3)} remaining={remaining} low={low} />
       ) : (
         <>
           <div className="aum-summary-status">Quota unavailable</div>
           <p className="aum-muted">No usable subscription quota was reported. Remaining capacity is unknown.</p>
           {unavailableSubIssues.length > 0 && (
             <p className="aum-summary-warning">
-              {unavailableSubIssues
-                .map((p) => `${p.displayName} (${p.status === 'unauthenticated' ? 'sign-in needed' : p.status})`)
-                .join(', ')}{' '}
-              could not report a quota window.
+              {unavailableSubIssues.map((p) => `${p.displayName} (${p.status === 'unauthenticated' ? 'sign-in needed' : p.status})`).join(', ')} could not report a quota window.
             </p>
           )}
         </>
       )}
-
       <details className="aum-explanation">
         <summary>Why is this limit shown?</summary>
-        <p>
-          The available subscription window with the least reported capacity remaining. The bar shows the percentage
-          used. Provider reset windows are independent of the selected usage period.
-        </p>
+        <p>The available subscription window with the least reported capacity remaining. The bar shows the percentage used. Provider reset windows are independent of the selected usage period.</p>
       </details>
     </article>
   );
@@ -323,6 +274,30 @@ function balanceSourceStatus(connector: CloudConnectorStatus): string {
   return connector.balanceStatusMessage || 'No balance reported by this source';
 }
 
+function BalanceSourcesDetails({ sources, connectors }: { sources: ProviderQuotaSnapshot[]; connectors: CloudConnectorStatus[] }) {
+  return (
+    <details className="aum-explanation">
+      <summary>View balance sources</summary>
+      {sources.map((p) => (
+        <p key={p.providerId}>
+          {p.displayName}: {formatUsd(p.creditRemainingUsd)} ·{' '}
+          {p.updatedAtMs ? `Updated ${formatRelativeTime(p.updatedAtMs)}` : 'Update time unavailable'}
+        </p>
+      ))}
+      {connectors.map((c) => (
+        <div key={c.provider} className="aum-summary-source">
+          <strong>{c.provider}</strong>
+          <p>{balanceSourceStatus(c)}</p>
+          <p className="aum-subtext">{c.lastSyncedAtMs ? `Last synced ${formatRelativeTime(c.lastSyncedAtMs)}` : 'Not synced yet'}</p>
+        </div>
+      ))}
+      {!sources.length && !connectors.length && (
+        <p>No balance sources are available. Configure a supported billing connection in Plugin Settings.</p>
+      )}
+    </details>
+  );
+}
+
 function CreditBalance({ data }: Pick<OverviewSummaryProps, 'data'>) {
   const balance = data.kpis.cloudCreditsRemainingUsd;
   const limit = data.kpis.cloudCreditsTotalLimitUsd;
@@ -333,11 +308,7 @@ function CreditBalance({ data }: Pick<OverviewSummaryProps, 'data'>) {
     <article className={failures > 0 ? 'aum-card aum-card-amber' : 'aum-card'} aria-label="Credits & prepaid balance">
       <div className="aum-row-between">
         <h3>Credits &amp; prepaid balance</h3>
-        {sources.length > 0 && (
-          <span className="aum-pill aum-pill-cyan">
-            {sources.length} {sources.length === 1 ? 'wallet' : 'wallets'}
-          </span>
-        )}
+        {sources.length > 0 && <span className="aum-pill aum-pill-cyan">{sources.length} {sources.length === 1 ? 'wallet' : 'wallets'}</span>}
       </div>
       <div className={balance === null ? 'aum-summary-status' : 'aum-kpi-val'}>
         {balance === null ? 'Balance unavailable' : formatUsd(balance)}
@@ -346,41 +317,11 @@ function CreditBalance({ data }: Pick<OverviewSummaryProps, 'data'>) {
         <div className="aum-subtext aum-mono">of {formatUsd(limit)} reported credit limit</div>
       )}
       <p className="aum-muted">
-        {balance === null
-          ? 'No remaining credit balance was reported. This does not mean your balance is zero.'
-          : 'Sum of reported balances. Providers without a balance are not included.'}
+        {balance === null ? 'No remaining credit balance was reported. This does not mean your balance is zero.' : 'Sum of reported balances. Providers without a balance are not included.'}
       </p>
-      {failures > 0 && (
-        <p className="aum-summary-warning">
-          {failures} balance source{failures === 1 ? ' needs' : 's need'} attention.
-        </p>
-      )}
-      {data.isSyncing && (
-        <p className="aum-muted" role="status">
-          Refreshing balance sources…
-        </p>
-      )}
-      <details className="aum-explanation">
-        <summary>View balance sources</summary>
-        {sources.map((p) => (
-          <p key={p.providerId}>
-            {p.displayName}: {formatUsd(p.creditRemainingUsd)} ·{' '}
-            {p.updatedAtMs ? `Updated ${formatRelativeTime(p.updatedAtMs)}` : 'Update time unavailable'}
-          </p>
-        ))}
-        {data.cloudConnectors.map((c) => (
-          <div key={c.provider} className="aum-summary-source">
-            <strong>{c.provider}</strong>
-            <p>{balanceSourceStatus(c)}</p>
-            <p className="aum-subtext">
-              {c.lastSyncedAtMs ? `Last synced ${formatRelativeTime(c.lastSyncedAtMs)}` : 'Not synced yet'}
-            </p>
-          </div>
-        ))}
-        {!sources.length && !data.cloudConnectors.length && (
-          <p>No balance sources are available. Configure a supported billing connection in Plugin Settings.</p>
-        )}
-      </details>
+      {failures > 0 && <p className="aum-summary-warning">{failures} balance source{failures === 1 ? ' needs' : 's need'} attention.</p>}
+      {data.isSyncing && <p className="aum-muted" role="status">Refreshing balance sources…</p>}
+      <BalanceSourcesDetails sources={sources} connectors={data.cloudConnectors} />
     </article>
   );
 }
@@ -391,21 +332,15 @@ function DiagnosticsStatus({ data, providers, onJumpToTab, onFocusIssueProviders
     <div className="aum-summary-diagnostics aum-row-between">
       <div>
         <strong>
-          {issues.length
-            ? `${issues.length} provider${issues.length === 1 ? ' needs' : 's need'} attention`
-            : 'No provider alerts reported'}
+          {issues.length ? `${issues.length} provider${issues.length === 1 ? ' needs' : 's need'} attention` : 'No provider alerts reported'}
         </strong>
         <p className="aum-subtext">
-          {issues.length
-            ? issues.map((p) => p.displayName).join(', ')
-            : 'Provider issues are separate from budget alerts. Missing readings may still need checking.'}
+          {issues.length ? issues.map((p) => p.displayName).join(', ') : 'Provider issues are separate from budget alerts. Missing readings may still need checking.'}
         </p>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {issues.length > 0 && onFocusIssueProviders && (
-          <button className="aum-btn" type="button" onClick={onFocusIssueProviders}>
-            Show affected providers ({issues.length})
-          </button>
+          <button className="aum-btn" type="button" onClick={onFocusIssueProviders}>Show affected providers ({issues.length})</button>
         )}
         <button className="aum-btn" type="button" onClick={() => onJumpToTab('logs')}>
           Activity &amp; diagnostics · {data.kpis.logCount} events · All recorded history

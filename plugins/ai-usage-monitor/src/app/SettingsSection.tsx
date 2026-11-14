@@ -31,13 +31,9 @@ function connectorBadgeState(conn: CloudConnectorStatus): { cls: string; label: 
     return {
       cls: 'aum-pill aum-pill-emerald',
       label: 'Connected',
-      detail:
-        conn.creditRemainingUsd !== null
-          ? `Credits left: ${formatUsd(conn.creditRemainingUsd)}`
-          : `Reported MTD: ${formatUsd(conn.reportedSpendUsd)}`
+      detail: conn.creditRemainingUsd !== null ? `Credits left: ${formatUsd(conn.creditRemainingUsd)}` : `Reported MTD: ${formatUsd(conn.reportedSpendUsd)}`
     };
   }
-
   if (conn.status === 'error') {
     return {
       cls: 'aum-pill aum-pill-rose',
@@ -45,7 +41,6 @@ function connectorBadgeState(conn: CloudConnectorStatus): { cls: string; label: 
       detail: conn.errorMessage ?? 'Connector probe failed'
     };
   }
-
   return {
     cls: 'aum-pill aum-pill-neutral',
     label: 'Not Configured',
@@ -62,8 +57,7 @@ function useSettingsSync() {
 
   const loadSnapshot = useCallback(async () => {
     try {
-      const res = (await rpc.call(RPC_METHODS.dashboard, { range: '30d' })) as DashboardPayload;
-      setData(res);
+      setData((await rpc.call(RPC_METHODS.dashboard, { range: '30d' })) as DashboardPayload);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -74,30 +68,23 @@ function useSettingsSync() {
     void loadSnapshot();
   }, [loadSnapshot]);
 
-  const runAction = useCallback(
-    async (action: 'refresh' | 'reset', method: string, successText: string) => {
-      setBusy(action);
-      setMessage(null);
-      try {
-        await rpc.call(method);
-        await loadSnapshot();
-        setMessage(successText);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [loadSnapshot, rpc]
-  );
+  const runAction = useCallback(async (action: 'refresh' | 'reset', method: string, successText: string) => {
+    setBusy(action);
+    setMessage(null);
+    try {
+      await rpc.call(method);
+      await loadSnapshot();
+      setMessage(successText);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }, [loadSnapshot, rpc]);
 
   return {
-    data,
-    busy,
-    message,
-    error,
-    handleRefresh: () =>
-      runAction('refresh', RPC_METHODS.refreshNow, 'Synced thread telemetry, provider quotas, and cloud billing connectors.'),
+    data, busy, message, error,
+    handleRefresh: () => runAction('refresh', RPC_METHODS.refreshNow, 'Synced thread telemetry, provider quotas, and cloud billing connectors.'),
     handleResetSync: () => runAction('reset', RPC_METHODS.resetSync, 'Re-indexed all thread telemetry from scratch.')
   };
 }
@@ -139,6 +126,56 @@ function ConnectorStatusList({ connectors }: { connectors: CloudConnectorStatus[
   );
 }
 
+function SettingsHeader({
+  lastSyncedAtMs,
+  subProviders,
+  isRefreshing,
+  busy,
+  onRefresh,
+  onResetSync,
+  onOpenDashboard
+}: {
+  lastSyncedAtMs?: number;
+  subProviders: string;
+  isRefreshing: boolean;
+  busy: string | null;
+  onRefresh: () => void;
+  onResetSync: () => void;
+  onOpenDashboard: () => void;
+}) {
+  return (
+    <div className="aum-row-between">
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: 13 }}>AI Usage Monitor Status &amp; Sync Controls</strong>
+          {isRefreshing && (
+            <span className="aum-refresh-badge" role="status" aria-label="Syncing AI usage telemetry" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <ReloadSpinner />
+              <span>Refreshing</span>
+            </span>
+          )}
+        </div>
+        <div className="aum-subtext">
+          Last synced {formatRelativeTime(lastSyncedAtMs)} • Subscription providers: <span className="aum-mono">{subProviders}</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="aum-btn aum-btn-sm" disabled={busy !== null} onClick={onRefresh}>
+          {busy === 'refresh' && <ReloadSpinner />}
+          <span>{busy === 'refresh' ? 'Syncing...' : 'Sync Now'}</span>
+        </button>
+        <button type="button" className="aum-btn aum-btn-sm" disabled={busy !== null} onClick={onResetSync}>
+          {busy === 'reset' && <ReloadSpinner />}
+          <span>{busy === 'reset' ? 'Re-indexing...' : 'Re-index All Threads'}</span>
+        </button>
+        <button type="button" className="aum-btn aum-btn-primary aum-btn-sm" onClick={onOpenDashboard}>
+          Open Dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsSection() {
   const settings = useSettings();
   const navigate = useZccNavigate();
@@ -148,53 +185,24 @@ export function SettingsSection() {
     ensureStylesInjected();
   }, []);
 
-  const subProviders =
-    typeof settings.values?.subscriptionProviders === 'string'
-      ? settings.values.subscriptionProviders
-      : DEFAULT_SUBSCRIPTION_PROVIDERS_CSV;
-  const localProbingEnabled = settings.values?.enableLocalCredentialProbing === true;
-  const isRefreshing = busy !== null || Boolean(data?.isSyncing);
+  const subProviders = typeof settings.values?.subscriptionProviders === 'string'
+    ? settings.values.subscriptionProviders
+    : DEFAULT_SUBSCRIPTION_PROVIDERS_CSV;
 
   return (
     <div className="aum-root" style={{ height: 'auto', borderRadius: 8, border: '1px solid var(--aum-border)', padding: 14, gap: 12 }}>
-      <div className="aum-row-between">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <strong style={{ fontSize: 13 }}>AI Usage Monitor Status &amp; Sync Controls</strong>
-            {isRefreshing && (
-              <span
-                className="aum-refresh-badge"
-                role="status"
-                aria-label="Syncing AI usage telemetry"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              >
-                <ReloadSpinner />
-                <span>Refreshing</span>
-              </span>
-            )}
-          </div>
-          <div className="aum-subtext">
-            Last synced {formatRelativeTime(data?.lastSyncedAtMs)} • Subscription providers: <span className="aum-mono">{subProviders}</span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="aum-btn aum-btn-sm" disabled={busy !== null} onClick={() => void handleRefresh()}>
-            {busy === 'refresh' && <ReloadSpinner />}
-            <span>{busy === 'refresh' ? 'Syncing...' : 'Sync Now'}</span>
-          </button>
-          <button type="button" className="aum-btn aum-btn-sm" disabled={busy !== null} onClick={() => void handleResetSync()}>
-            {busy === 'reset' && <ReloadSpinner />}
-            <span>{busy === 'reset' ? 'Re-indexing...' : 'Re-index All Threads'}</span>
-          </button>
-          <button type="button" className="aum-btn aum-btn-primary aum-btn-sm" onClick={() => navigate.toPluginPanel?.('ai-usage-monitor')}>
-            Open Dashboard
-          </button>
-        </div>
-      </div>
-
+      <SettingsHeader
+        lastSyncedAtMs={data?.lastSyncedAtMs}
+        subProviders={subProviders}
+        isRefreshing={busy !== null || Boolean(data?.isSyncing)}
+        busy={busy}
+        onRefresh={() => void handleRefresh()}
+        onResetSync={() => void handleResetSync()}
+        onOpenDashboard={() => navigate.toPluginPanel?.('ai-usage-monitor')}
+      />
       {error && <div className="aum-banner aum-banner-error">{error}</div>}
       {message && <div className="aum-banner aum-banner-info">{message}</div>}
-      <LocalProbeNotice enabled={localProbingEnabled} />
+      <LocalProbeNotice enabled={settings.values?.enableLocalCredentialProbing === true} />
       {data && <ConnectorStatusList connectors={data.cloudConnectors} />}
     </div>
   );

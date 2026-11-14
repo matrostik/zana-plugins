@@ -1,5 +1,7 @@
 import type { TimeRangeBounds, TimeRangeKey } from '../shared/types.ts';
 
+export type CachedInputConvention = 'inclusive' | 'separate';
+
 export function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -67,7 +69,7 @@ export function resolveTimeRangeBounds(
   if (range === '7d') return timeRangeBounds(range, 'Last 7 calendar days', timezone, localMidnightMs(nowMs, -6));
   if (range === 'last_week') {
     const daysSinceMonday = (new Date(nowMs).getDay() + 6) % 7;
-    return timeRangeBounds(range, 'Last calendar week (Mon–Sun)', timezone,
+    return timeRangeBounds(range, 'Last calendar week (Mon\u2013Sun)', timezone,
       localMidnightMs(nowMs, -daysSinceMonday - 7), localMidnightMs(nowMs, -daysSinceMonday));
   }
   return timeRangeBounds('30d', 'Last 30 calendar days', timezone, localMidnightMs(nowMs, -29));
@@ -110,9 +112,16 @@ export async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, lab
   }
 }
 
-export function computeCacheHitPercent(inputTokens: number, cachedInputTokens: number): number {
+export function computeCacheHitPercent(
+  inputTokens: number,
+  cachedInputTokens: number,
+  convention: CachedInputConvention = 'inclusive'
+): number {
   if (cachedInputTokens <= 0) return 0;
-  const denominator = cachedInputTokens > inputTokens ? inputTokens + cachedInputTokens : inputTokens;
+  const denominator =
+    convention === 'separate' || cachedInputTokens > inputTokens
+      ? inputTokens + cachedInputTokens
+      : inputTokens;
   if (denominator <= 0) return 0;
   return Math.min(100, Math.round((cachedInputTokens / denominator) * 1000) / 10);
 }

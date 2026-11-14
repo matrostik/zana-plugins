@@ -162,7 +162,9 @@ export function createFakeHost(options: FakeHostOptions = {}) {
         events: {
           list: async ({
             threadId,
-            types
+            limit,
+            types,
+            order
           }: {
             threadId: string;
             limit?: number;
@@ -172,9 +174,10 @@ export function createFakeHost(options: FakeHostOptions = {}) {
             const t = threads.get(threadId);
             if (!t) return [];
             const typeSet = types ? new Set(types) : null;
-            return t.events
+            const filtered = t.events
               .filter((ev) => !typeSet || typeSet.has(ev.type))
-              .sort((a, b) => a.seq - b.seq);
+              .sort((a, b) => (order === 'desc' ? b.seq - a.seq : a.seq - b.seq));
+            return typeof limit === 'number' && limit > 0 ? filtered.slice(0, limit) : filtered;
           }
         },
         defaultExecutionOptions: async ({ threadId }: { threadId: string }) => {

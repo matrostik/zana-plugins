@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import type { LogEventKind, LogsResponse, UsageLogEntry } from '../shared/types.ts';
-import { formatTokens, formatUsd } from './format.ts';
+import { formatShortLocalDateTime, formatTokens, formatUsd } from './format.ts';
 
 interface LogsTabProps {
   logs: LogsResponse;
@@ -18,15 +18,10 @@ function kindBadge(kind: LogEventKind): { cls: string; label: string } {
   return { cls: 'aum-pill aum-pill-emerald', label: 'TURN_USAGE' };
 }
 
-function LogFiltersBar({
-  logs,
-  kindFilter,
-  searchQuery,
-  onKindChange,
-  onSearchChange
-}: LogsTabProps) {
+function LogFiltersBar({ logs, kindFilter, searchQuery, onKindChange, onSearchChange }: LogsTabProps) {
+  const allFilteredCount = Object.values(logs.countsByKind).reduce((sum, count) => sum + count, 0);
   const filters: Array<{ kind: LogEventKind | 'all'; label: string }> = [
-    { kind: 'all', label: `All (${Object.values(logs.countsByKind).reduce((sum, count) => sum + count, 0)})` },
+    { kind: 'all', label: `All (${allFilteredCount})` },
     { kind: 'turn_usage', label: `Turns (${logs.countsByKind.turn_usage})` },
     { kind: 'rate_limit', label: `Rate Limits (${logs.countsByKind.rate_limit})` },
     { kind: 'fallback', label: `Fallbacks (${logs.countsByKind.fallback})` },
@@ -37,12 +32,7 @@ function LogFiltersBar({
     <div className="aum-row-between">
       <div className="aum-seg">
         {filters.map((f) => (
-          <button
-            key={f.kind}
-            type="button"
-            className={kindFilter === f.kind ? 'active' : ''}
-            onClick={() => onKindChange(f.kind)}
-          >
+          <button key={f.kind} type="button" className={kindFilter === f.kind ? 'active' : ''} onClick={() => onKindChange(f.kind)}>
             {f.label}
           </button>
         ))}
@@ -58,11 +48,36 @@ function LogFiltersBar({
   );
 }
 
-function LogsTable({
-  items,
-  selectedId,
+function LogEventRow({
+  item,
+  selected,
   onSelect
 }: {
+  item: UsageLogEntry;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const badge = kindBadge(item.kind);
+  return (
+    <tr className={selected ? 'selected' : ''} onClick={() => onSelect(item.id)}>
+      <td className="aum-mono aum-subtext" style={{ whiteSpace: 'nowrap' }}>
+        {formatShortLocalDateTime(item.timestampMs)}
+      </td>
+      <td><span className={badge.cls}>{badge.label}</span></td>
+      <td>
+        <div className="aum-mono" style={{ fontWeight: 500 }}>{item.providerId}</div>
+        <div className="aum-subtext aum-mono">{item.model ?? '—'}</div>
+      </td>
+      <td className="aum-subtext">{item.projectName ?? item.projectId ?? '—'}</td>
+      <td>{item.summary}</td>
+      <td className="aum-mono" style={{ textAlign: 'right' }}>
+        {item.costUsd !== null ? formatUsd(item.costUsd, 4) : '—'}
+      </td>
+    </tr>
+  );
+}
+
+function LogsTable({ items, selectedId, onSelect }: {
   items: UsageLogEntry[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -83,31 +98,12 @@ function LogsTable({
         <tbody>
           {items.length === 0 ? (
             <tr>
-              <td colSpan={6} className="aum-muted">
-                No usage or error logs match the current filter.
-              </td>
+              <td colSpan={6} className="aum-muted">No usage or error logs match the current filter.</td>
             </tr>
           ) : (
-            items.map((item) => {
-              const badge = kindBadge(item.kind);
-              return (
-                <tr key={item.id} className={selectedId === item.id ? 'selected' : ''} onClick={() => onSelect(item.id)}>
-                  <td className="aum-mono aum-subtext" style={{ whiteSpace: 'nowrap' }}>
-                    {new Date(item.timestampMs).toLocaleTimeString()}
-                  </td>
-                  <td><span className={badge.cls}>{badge.label}</span></td>
-                  <td>
-                    <div className="aum-mono" style={{ fontWeight: 500 }}>{item.providerId}</div>
-                    <div className="aum-subtext aum-mono">{item.model ?? '—'}</div>
-                  </td>
-                  <td className="aum-subtext">{item.projectName ?? item.projectId ?? '—'}</td>
-                  <td>{item.summary}</td>
-                  <td className="aum-mono" style={{ textAlign: 'right' }}>
-                    {item.costUsd !== null ? formatUsd(item.costUsd, 4) : '—'}
-                  </td>
-                </tr>
-              );
-            })
+            items.map((item) => (
+              <LogEventRow key={item.id} item={item} selected={selectedId === item.id} onSelect={onSelect} />
+            ))
           )}
         </tbody>
       </table>
@@ -121,7 +117,6 @@ function LogContextDetails({ selected }: { selected: UsageLogEntry }) {
     selected.contextUsedTokens && selected.contextWindowTokens && selected.contextWindowTokens > 0
       ? Math.min(100, Math.round((selected.contextUsedTokens / selected.contextWindowTokens) * 100))
       : null;
-
   return (
     <div className="aum-window-box">
       <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
@@ -143,10 +138,17 @@ function LogContextDetails({ selected }: { selected: UsageLogEntry }) {
   );
 }
 
-function LogEventInspector({
-  selected,
-  onOpenThread
-}: {
+function LogCostFormulaBox({ costFormula }: { costFormula: string | null }) {
+  if (!costFormula) return null;
+  return (
+    <div className="aum-window-box">
+      <div className="aum-card-label">Cost Formula</div>
+      <div className="aum-mono" style={{ fontSize: 11, color: '#a5b4fc' }}>{costFormula}</div>
+    </div>
+  );
+}
+
+function LogEventInspector({ selected, onOpenThread }: {
   selected: UsageLogEntry | null;
   onOpenThread?: (threadId: string) => void;
 }) {
@@ -158,7 +160,6 @@ function LogEventInspector({
     );
   }
   const badge = kindBadge(selected.kind);
-
   return (
     <div className="aum-card">
       <div className="aum-row-between">
@@ -168,21 +169,12 @@ function LogEventInspector({
         </div>
         <span className={badge.cls}>{badge.label}</span>
       </div>
-
       <LogContextDetails selected={selected} />
-
-      {selected.costFormula && (
-        <div className="aum-window-box">
-          <div className="aum-card-label">Cost Formula</div>
-          <div className="aum-mono" style={{ fontSize: 11, color: '#a5b4fc' }}>{selected.costFormula}</div>
-        </div>
-      )}
-
+      <LogCostFormulaBox costFormula={selected.costFormula} />
       <div>
         <div className="aum-card-label" style={{ marginBottom: 4 }}>Raw Provider Event JSON</div>
         <pre className="aum-pre">{JSON.stringify(selected.payload, null, 2)}</pre>
       </div>
-
       {selected.threadId && (
         <button type="button" className="aum-btn aum-btn-primary" onClick={() => onOpenThread?.(selected.threadId!)}>
           Open Thread in Zana →

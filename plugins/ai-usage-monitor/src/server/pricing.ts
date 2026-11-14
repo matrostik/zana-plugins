@@ -1,4 +1,7 @@
 import { DEFAULT_SUBSCRIPTION_PROVIDERS, type BillingMode, type ModelPricingRule } from '../shared/types.ts';
+import type { CachedInputConvention } from './util.ts';
+
+export type TokenReasoningConvention = 'inclusive' | 'separate';
 
 export interface TokenUsageInput {
   providerId: string;
@@ -8,6 +11,20 @@ export interface TokenUsageInput {
   outputTokens: number;
   reasoningOutputTokens: number;
   totalTokens?: number;
+  cachedInputMode?: CachedInputConvention;
+  reasoningMode?: TokenReasoningConvention;
+}
+
+export interface NormalizedTokenUsage {
+  inputTokens: number;
+  uncachedInputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+  extraReasoningTokens: number;
+  totalTokens: number;
+  cachedInputMode: CachedInputConvention;
+  reasoningMode: TokenReasoningConvention;
 }
 
 export interface PricingResolution {
@@ -23,6 +40,7 @@ export interface CostBreakdown {
   estimatedCostUsd: number;
   formula: string;
   pricing: PricingResolution;
+  normalized: NormalizedTokenUsage;
 }
 
 const SUBSCRIPTION_PROVIDERS = new Set<string>(DEFAULT_SUBSCRIPTION_PROVIDERS);
@@ -159,50 +177,73 @@ function fmtTokensK(tokens: number): string {
   return String(tokens);
 }
 
-function splitInputAndCached(usage: TokenUsageInput): { uncachedInput: number; safeCached: number; safeOutput: number } {
+function inferConventions(usage: TokenUsageInput): {
+  cachedInputMode: CachedInputConvention;
+  reasoningMode: TokenReasoningConvention;
+} {
   const safeInput = Math.max(0, usage.inputTokens);
   const rawCached = Math.max(0, usage.cachedInputTokens);
   const safeOutput = Math.max(0, usage.outputTokens);
   const safeReasoning = Math.max(0, usage.reasoningOutputTokens);
   const total = Math.max(0, usage.totalTokens ?? 0);
+  const defaultReasoning: TokenReasoningConvention =
+    safeReasoning > 0 && (safeOutput === 0 || safeReasoning > safeOutput || SEPARATE_REASONING_PROVIDERS.has(usage.providerId.toLowerCase()))
+      ? 'separate'
+      : 'inclusive';
 
-  const inclusiveDiff = Math.min(
-    Math.abs(safeInput + safeOutput - total),
-    Math.abs(safeInput + safeOutput + safeReasoning - total)
-  );
-  const separateDiff = Math.min(
-    Math.abs(safeInput + rawCached + safeOutput - total),
-    Math.abs(safeInput + rawCached + safeOutput + safeReasoning - total)
-  );
-  const separateLooksCloser = total > 0 && rawCached > 0 && separateDiff < inclusiveDiff;
-
-  if (rawCached > safeInput || separateLooksCloser) {
-    return { uncachedInput: safeInput, safeCached: rawCached, safeOutput };
+  if (usage.cachedInputMode && usage.reasoningMode) {
+    return { cachedInputMode: usage.cachedInputMode, reasoningMode: usage.reasoningMode };
   }
-  const safeCached = Math.min(safeInput, rawCached);
-  return { uncachedInput: Math.max(0, safeInput - safeCached), safeCached, safeOutput };
+  const fixedCached = usage.cachedInputMode ?? (rawCached > safeInput ? 'separate' : rawCached === 0 ? 'inclusive' : null);
+  const fixedReasoning = usage.reasoningMode ?? (safeReasoning === 0 ? 'inclusive' : safeOutput === 0 || safeReasoning > safeOutput ? 'separate' : null);
+  if ((fixedCached && fixedReasoning) || total <= 0) {
+    return { cachedInputMode: fixedCached ?? 'inclusive', reasoningMode: fixedReasoning ?? defaultReasoning };
+  }
+
+  const cachedOpts: CachedInputConvention[] = fixedCached ? [fixedCached] : ['inclusive', 'separate'];
+  const reasoningOpts: TokenReasoningConvention[] = fixedReasoning ? [fixedReasoning] : ['inclusive', 'separate'];
+  let best = { cachedInputMode: cachedOpts[0], reasoningMode: reasoningOpts[0], diff: Infinity, penalty: Infinity };
+  for (const cMode of cachedOpts) {
+    for (const rMode of reasoningOpts) {
+      const totalIn = cMode === 'separate' ? safeInput + rawCached : safeInput;
+      const extraR = rMode === 'separate' ? safeReasoning : 0;
+      const diff = Math.abs(totalIn + safeOutput + extraR - total);
+      const penalty = (cMode === 'inclusive' ? 0 : 1) + (rMode === defaultReasoning ? 0 : 1);
+      if (diff < best.diff || (diff === best.diff && penalty < best.penalty)) {
+        best = { cachedInputMode: cMode, reasoningMode: rMode, diff, penalty };
+      }
+    }
+  }
+  return { cachedInputMode: best.cachedInputMode, reasoningMode: best.reasoningMode };
 }
 
-function resolveExtraReasoningTokens(
-  usage: TokenUsageInput,
-  uncachedInput: number,
-  safeCached: number,
-  safeOutput: number
-): number {
+export function normalizeTokenUsage(usage: TokenUsageInput): NormalizedTokenUsage {
+  const safeInput = Math.max(0, usage.inputTokens);
+  const rawCached = Math.max(0, usage.cachedInputTokens);
+  const safeOutput = Math.max(0, usage.outputTokens);
   const safeReasoning = Math.max(0, usage.reasoningOutputTokens);
-  if (safeReasoning === 0) return 0;
-  if (safeOutput === 0 || safeReasoning > safeOutput) return safeReasoning;
+  const { cachedInputMode, reasoningMode } = inferConventions(usage);
 
-  const total = Math.max(0, usage.totalTokens ?? 0);
-  if (total > 0) {
-    const baseTotal = uncachedInput + safeCached + safeOutput;
-    const withReasoningDiff = Math.abs(baseTotal + safeReasoning - total);
-    const withoutReasoningDiff = Math.abs(baseTotal - total);
-    if (withReasoningDiff < withoutReasoningDiff) return safeReasoning;
-    if (withoutReasoningDiff < withReasoningDiff) return 0;
-  }
+  const cachedInputTokens = cachedInputMode === 'separate' ? rawCached : Math.min(safeInput, rawCached);
+  const uncachedInputTokens = cachedInputMode === 'separate' ? safeInput : Math.max(0, safeInput - cachedInputTokens);
+  const totalInputTokens = uncachedInputTokens + cachedInputTokens;
+  const extraReasoningTokens = reasoningMode === 'separate' ? safeReasoning : 0;
+  const totalTokens =
+    typeof usage.totalTokens === 'number' && Number.isFinite(usage.totalTokens) && usage.totalTokens > 0
+      ? usage.totalTokens
+      : totalInputTokens + safeOutput + extraReasoningTokens;
 
-  return SEPARATE_REASONING_PROVIDERS.has(usage.providerId.toLowerCase()) ? safeReasoning : 0;
+  return {
+    inputTokens: totalInputTokens,
+    uncachedInputTokens,
+    cachedInputTokens,
+    outputTokens: safeOutput,
+    reasoningOutputTokens: safeReasoning,
+    extraReasoningTokens,
+    totalTokens,
+    cachedInputMode,
+    reasoningMode
+  };
 }
 
 export function computeTurnCost(
@@ -211,25 +252,26 @@ export function computeTurnCost(
   providerModeOverrides: ReadonlyMap<string, BillingMode> = new Map()
 ): CostBreakdown {
   const pricing = resolveModelPricing(usage.providerId, usage.model, overrides, providerModeOverrides);
-  const { uncachedInput, safeCached, safeOutput } = splitInputAndCached(usage);
-  const extraReasoning = resolveExtraReasoningTokens(usage, uncachedInput, safeCached, safeOutput);
+  const normalized = normalizeTokenUsage(usage);
 
-  const uncachedUsd = (uncachedInput / 1_000_000) * pricing.inputPer1M;
-  const cachedUsd = (safeCached / 1_000_000) * pricing.cachedInputPer1M;
-  const outputUsd = (safeOutput / 1_000_000) * pricing.outputPer1M;
-  const reasoningUsd = (extraReasoning / 1_000_000) * pricing.reasoningPer1M;
+  const uncachedUsd = (normalized.uncachedInputTokens / 1_000_000) * pricing.inputPer1M;
+  const cachedUsd = (normalized.cachedInputTokens / 1_000_000) * pricing.cachedInputPer1M;
+  const outputUsd = (normalized.outputTokens / 1_000_000) * pricing.outputPer1M;
+  const reasoningUsd = (normalized.extraReasoningTokens / 1_000_000) * pricing.reasoningPer1M;
   const estimatedCostUsd = Number((uncachedUsd + cachedUsd + outputUsd + reasoningUsd).toFixed(6));
 
   const formula =
     pricing.billingMode === 'free'
       ? `Local/free model (${pricing.pattern}): $0.00`
-      : `(${fmtTokensK(uncachedInput)} * $${pricing.inputPer1M}/1M) + ` +
-        `(${fmtTokensK(safeCached)} * $${pricing.cachedInputPer1M}/1M) + ` +
-        `(${fmtTokensK(safeOutput)} * $${pricing.outputPer1M}/1M)` +
-        (extraReasoning > 0 ? ` + (${fmtTokensK(extraReasoning)} reason * $${pricing.reasoningPer1M}/1M)` : '') +
+      : `(${fmtTokensK(normalized.uncachedInputTokens)} * $${pricing.inputPer1M}/1M) + ` +
+        `(${fmtTokensK(normalized.cachedInputTokens)} * $${pricing.cachedInputPer1M}/1M) + ` +
+        `(${fmtTokensK(normalized.outputTokens)} * $${pricing.outputPer1M}/1M)` +
+        (normalized.extraReasoningTokens > 0
+          ? ` + (${fmtTokensK(normalized.extraReasoningTokens)} reason * $${pricing.reasoningPer1M}/1M)`
+          : '') +
         ` = $${estimatedCostUsd.toFixed(4)}`;
 
-  return { estimatedCostUsd, formula, pricing };
+  return { estimatedCostUsd, formula, pricing, normalized };
 }
 
 export function listCombinedPricingRules(overrides: readonly ModelPricingRule[]): ModelPricingRule[] {

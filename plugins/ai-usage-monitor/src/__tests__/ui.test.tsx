@@ -21,15 +21,18 @@ vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
 }));
 
 import appPlugin from '../../app.tsx';
+import { formatShortLocalDateTime } from '../app/format.ts';
+import { LogsTab } from '../app/LogsTab.tsx';
+import { ModelsSpendTab } from '../app/ModelsSpendTab.tsx';
+import { OverviewTab } from '../app/OverviewTab.tsx';
 import { SettingsSection } from '../app/SettingsSection.tsx';
 import { UsageMonitorPanel } from '../app/UsageMonitorPanel.tsx';
-import { OverviewTab } from '../app/OverviewTab.tsx';
-import { LogsTab } from '../app/LogsTab.tsx';
 
-it('keeps the All log count stable when a kind filter is active', () => {
+it('keeps the All log count stable when a kind filter is active and displays date+time', () => {
   const logs = { ...makeLogs(), totalCount: 1 };
   render(<LogsTab logs={logs} kindFilter="error" searchQuery="" onKindChange={vi.fn()} onSearchChange={vi.fn()} />);
   expect(screen.getByRole('button', { name: 'All (2)' })).toBeTruthy();
+  expect(screen.getAllByText(formatShortLocalDateTime(logs.items[0].timestampMs)).length).toBeGreaterThan(0);
 });
 
 function makeDashboard(): DashboardPayload {
@@ -471,6 +474,27 @@ afterEach(() => {
 });
 
 describe('AI Usage Monitor UI & app slot registration', () => {
+  it('validates non-global budget scopeId on submit before calling onSaveBudget', async () => {
+    const onSaveBudget = vi.fn().mockResolvedValue(undefined);
+    const { container } = render(
+      <ModelsSpendTab
+        data={makeDashboard()}
+        onSaveBudget={onSaveBudget}
+        onDeleteBudget={vi.fn().mockResolvedValue(undefined)}
+        onSavePricing={vi.fn().mockResolvedValue(undefined)}
+        onDeletePricing={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '+ New Rule' }));
+    const scopeSelect = container.querySelector('select.aum-select')!;
+    fireEvent.change(scopeSelect, { target: { value: 'provider' } });
+    fireEvent.change(screen.getByPlaceholderText('provider ID'), { target: { value: '   ' } });
+    fireEvent.submit(container.querySelector('form')!);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('provider ID');
+    expect(onSaveBudget).not.toHaveBeenCalled();
+  });
+
   it('shows only Gemini model chips on the Antigravity card', () => {
     const dash = makeDashboard();
     dash.providers.push({ ...dash.providers[0], providerId: 'antigravity', displayName: 'Antigravity', configuredModels: ['claude-opus-4', 'gemini-4-argon', 'google/gemini-3-flash', 'gpt-5', 'gemini-4-hydrogen'] });
