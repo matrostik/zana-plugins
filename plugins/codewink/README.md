@@ -1,14 +1,28 @@
 # CodeWink for Zana
 
-CodeWink reviews GitHub pull requests with AI, inside Zana Command Center. It uses the AI providers you already set up in Zana (Claude Code, Codex, Cursor, OpenCode, Pi, and others), so there are no separate API keys to manage.
+CodeWink reviews GitHub pull requests and local Git changes with AI, inside Zana Command Center. It uses the AI providers you already set up in Zana (Claude Code, Codex, Cursor, OpenCode, Pi, and others), so there are no separate AI API keys to manage. Local reviews cover uncommitted work, staged files, branches, or selected commits.
 
 This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt as a Zana plugin with a smaller, focused feature set.
 
 ## Prerequisites
 
 - Zana Command Center with at least one AI provider configured
-- A GitHub account (github.com and/or GitHub Enterprise)
-- One of: the GitHub CLI signed in (`gh auth login`), a Git credential helper that knows your GitHub host, or a personal access token
+- Git installed and a repository registered as a Zana project for local reviews
+- For pull request reviews: a GitHub account (github.com and/or GitHub Enterprise), plus the GitHub CLI signed in (`gh auth login`), a Git credential helper that knows your GitHub host, or a personal access token
+
+## Installation
+
+After adding the [community marketplace](../../README.md#install-a-plugin-from-this-marketplace):
+
+```bash
+zcc marketplace install codewink@zana-community
+```
+
+Or install from the root of this repository:
+
+```bash
+zcc plugin install ./plugins/codewink
+```
 
 ## How To Get Started
 
@@ -16,11 +30,13 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 2. Open **CodeWink** from the Zana sidebar.
 3. Click **Settings** in the CodeWink toolbar. The **Profile** tab opens.
 4. Under **GitHub accounts**, check that each host shows your name and login. If a host says "Not signed in", see Troubleshooting.
-5. Optionally edit **Custom review instructions** and click **Save instructions**. CodeWink starts you off with default instructions; **Reset to default** brings them back.
+5. Under **Custom review instructions**, select a prompt or click **New prompt**, give it a name, edit its instructions, and click **Save instructions**. Choose a **Default prompt**, or **Built-in prompt only**. **Reset to default** restores the editor's starter instructions; save them to keep the change.
 6. Open the **AI Model** tab. Under **Review models**, pick one or more models and click **Save models**.
 7. Open the **Organizations & Repos** tab. Add any GitHub Enterprise hosts and click **Save hosts**. Then add at least one repository under **Watched repositories**, and tick **Auto-review** for any that should be reviewed automatically.
 8. Click **Back to pull requests**, then **Refresh**. Open pull requests in those repositories appear under **Needs my review**, **Mine**, and **Watched**.
 9. Inside a Zana project, open the **CodeWink** project tab to see only that project's pull requests and local checkouts. If the project's GitHub repository isn't watched yet, click **Watch repository** there.
+
+For local reviews only, configure review models and switch to **Local changes**; GitHub sign-in and watched repositories are not required.
 
 ## How To Review a Pull Request
 
@@ -32,7 +48,7 @@ This plugin is a port of the standalone **CodeNod 2.5.1** application, rebuilt a
 6. Select or unselect individual findings, or use **Select all issues**, **Select visible**, and **Clear selection**. **Copy N selected as prompt** copies the selected findings with PR context, location, suggestions, and model attribution for use in another agent.
 7. Dismiss findings you want to exclude. Bulk dismiss affects only findings matching the current filters; **Undo** and **Restore** bring them back.
 8. Choose **Comment**, then click **Post N findings to GitHub**. This posts selected active findings matching the filters (including previously published findings when re-posting), including those in collapsed file groups. Findings outside the diff appear in the review body. Unposted findings start selected; published findings are deselected after posting. Clear or adjust the selection before posting when needed.
-8. To approve or request changes, choose that option instead. Zana asks you to confirm in a dialog first.
+9. To approve or request changes, choose that option instead. Zana asks you to confirm in a dialog first.
 
 Use **Deep Review in thread** to open a normal, visible Zana thread with the pull request loaded, when you want to dig in interactively.
 
@@ -46,15 +62,26 @@ Prerequisites: the folder is a Zana project (or a `git worktree` of one), and at
 
 1. Open **CodeWink** and choose **Local changes** in the switch at the top.
 2. Pick a checkout on the left. Checkouts are grouped by project and show how many files changed. Clean checkouts are hidden until you tick **Show clean**.
-3. Under **Review local changes**, choose a scope: **Uncommitted**, **Staged**, or **Branch vs base** (optionally type a base branch).
+3. Under **Review local changes**, choose **Uncommitted**, **Staged**, **Branch vs base**, or **Commits**. For branch reviews, choose a **Target branch** and **Base branch**. For commit reviews, select one or more commits; **Show 10 more** loads more history.
 4. Optionally describe the change under **Intent** so CodeWink can score requirements.
 5. Click **Review changes**. A green **Snapshot taken** pill appears, then the review progress.
 6. Read the scores and findings as for a pull request. **N files not reviewed** lists anything skipped and why.
 
 **Expected result**: the latest review for the checkout, with **Rerun**, **Deep Review in thread**, **Fix with agent**, and **Delete review**. Earlier reviews are under **History**; click **View** to open one.
 
+| Scope | Changes reviewed |
+| --- | --- |
+| Uncommitted | Working tree versus HEAD, including non-ignored new files. |
+| Staged | Git index versus HEAD. |
+| Branch vs base | Changes since the merge base with the base branch. **Current checkout + uncommitted** includes work in progress; choosing an explicit local or remote branch reviews its committed content without switching branches. The base defaults to the remote's default branch. |
+| Commits | Changes introduced by selected commits, excluding unselected intermediate changes. Non-contiguous selections are replayed in a temporary index; conflicting patches, non-text changes across skipped commits, or non-contiguous merge commits require a contiguous selection instead. |
+
 - If you edit files after the review, an amber **Working tree changed since this review** banner appears. Click **Review outdated — Rerun**.
+- Commit reviews track the selected commit SHAs: unrelated working tree edits do not invalidate them, but commits that are no longer available in the repository are flagged.
 - **Fix with agent** opens a picker for **Provider**, **Model**, and **Mode** (**Edit** or **Full**, as supported by the provider). It offers compatible providers independently of your review model list. Your last launch choices are remembered on this device; the initial choice is the first review model with Edit mode. Full must be chosen explicitly if Edit is unavailable. Launch failures stay in the picker so you can retry or choose another model. The agent edits your checkout and never commits. If files changed since the review, CodeWink asks before starting and preserves your chosen agent through that confirmation. Click **Re-review** when the agent finishes.
+
+- Select findings to target the fix agent. While it runs, the status banner shows the provider, model, mode, and elapsed time, with **Open fix thread** and **Stop fix** controls. Completion, failure, and stopped states remain visible. **Fix completed** means the agent finished; use **Re-review** to check the result.
+- Fix agents edit the live checkout. If a branch or commit selection differs from that checkout, CodeWink asks for confirmation before starting.
 
 Starting a new PR or local review clears the previous scores, summary, findings, and model results from the current view once the server accepts the review, then shows the new progress. If a PR rerun fails or is cancelled, the view returns to the last completed review when available and displays the unsuccessful rerun's status and error alongside those results; terminal output reports it too. Local reviews keep showing the latest attempt, with earlier reviews available through **History**.
 
@@ -64,11 +91,26 @@ Starting a new PR or local review clears the previous scores, summary, findings,
 2. Run `zcc codewink review-local --wait`. This reviews every change since your last commit, including new files.
    - Add `--scope staged` to review only what you staged with `git add`.
    - Add `--scope branch` to review everything since your branch left the main branch (use `--base origin/develop` for another base).
+   - Add `--scope branch --branch feature/example` to review a specific branch's committed changes without checking it out.
+   - Add `--scope commits --commits <sha1>,<sha2>` to review selected commits.
    - Add `--intent "What the change should do"` so CodeWink can score requirements.
 3. Wait for the review to finish. It prints scores, skipped files, and findings.
 4. Run `zcc codewink show-local` at any time to see the latest results again. If you edited files since, the results are marked **stale**.
 
 **Expected result**: scores and findings like a pull request review. Files that look like secrets (such as `.env` or private keys), binaries, and very large new files are skipped and listed so you know what was not reviewed.
+
+Examples (replace branch names and commit SHAs with ones in your repository):
+
+```bash
+zcc codewink review-local --scope branch --branch feature/example --base origin/master --wait
+zcc codewink review-local --scope commits --commits abc1234,def5678 --wait
+zcc codewink review-local --scope staged --intent "Reject invalid input" --prompt builtin --wait
+zcc codewink show-local --json
+```
+
+Use `--path <checkout>` to select another registered checkout, `--models provider:model,...` to override review models, and `--prompt <id>` to choose a saved prompt. Discover accepted values with `zcc codewink models` and `zcc codewink prompts`.
+
+For automation, `--wait --fail-on high` exits with code 1 for active findings at high or critical severity, an incomplete review, or a result that became stale while running. Other thresholds are `critical`, `medium`, and `low`; `--fail-on` requires `--wait`.
 
 **Tips**
 
@@ -92,7 +134,7 @@ Starting a new PR or local review clears the previous scores, summary, findings,
 - **Requirements from GitHub**: taken from the pull request title and description, up to 3 linked issues, and optional spec files per repository (for example `docs/**/*.md`). When nothing is stated, the requirements score shows N/A instead of guessing.
 - **Several GitHub hosts at once**: github.com and any number of GitHub Enterprise hosts.
 - **Opt-in auto-review** per watched repository: once per new commit, skipping drafts and your own pull requests.
-- **Local reviews** of uncommitted, staged, or branch changes, before a pull request exists.
+- **Local reviews** of uncommitted work, staged files, explicit branches, or selected commits, before a pull request exists.
 - **Command line**: `zcc codewink list | sync | review | show | post | review-local | show-local | repos | models | prompts | auth`.
 - **Agent tools**: `codewink_list_prs`, `codewink_get_review`, `codewink_list_prompts`, `codewink_review_pr`, and `codewink_review_local`, so Zana agents can check and start reviews.
 
@@ -124,7 +166,7 @@ The **Profile** tab presents the prompt library as a compact prompt selector wit
 | Tab | Setting | Default | Purpose |
 | --- | --- | --- | --- |
 | Profile | GitHub accounts | read-only | Name, email, and login from each signed-in host |
-| Profile | Custom review instructions | starter text | Extra guidance added to every review; empty means the built-in prompt only |
+| Profile | Custom review instructions | starter prompt | Named prompt library and default selection; choose Built-in prompt only to omit extra instructions |
 | Organizations & Repos | GitHub hosts | github.com | Add GitHub Enterprise hosts; the first one is used for `owner/repo#123` |
 | Organizations & Repos | Sync interval (minutes) | 5 | How often to poll GitHub |
 | Organizations & Repos | Watched repositories | none | Grouped by host and owner, with Auto-review and a spec pattern each |
@@ -188,7 +230,7 @@ These parts were ported and adapted, mostly unchanged in behavior:
 
 ```bash
 npm install          # dev dependencies only (tests and type checking)
-npm test             # 33 tests: pure logic, a fake Zana host end to end, and UI rendering
+npm test             # pure logic, a fake Zana host end to end, and UI rendering
 npm run typecheck
 npm run build        # zcc plugin build → server.mjs and app.js
 zcc plugin reload codewink
