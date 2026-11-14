@@ -209,16 +209,17 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   const now = useNow(isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
-  const act = async (label: string, fn: () => Promise<void>) => {
+  const act = async (label: string, fn: (ctx: { prId: string; isCurrent: () => boolean }) => Promise<void>) => {
     const startedPrId = currentPrIdRef.current;
+    const isCurrent = () => currentPrIdRef.current === startedPrId;
     setBusy(label);
     setNotice(null);
     try {
-      await fn();
+      await fn({ prId: startedPrId, isCurrent });
     } catch (cause) {
-      if (currentPrIdRef.current === startedPrId) setNotice({ kind: 'error', text: errorText(cause) });
+      if (isCurrent()) setNotice({ kind: 'error', text: errorText(cause) });
     } finally {
-      if (currentPrIdRef.current === startedPrId) setBusy(null);
+      if (isCurrent()) setBusy(null);
     }
   };
 
@@ -240,11 +241,10 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
       : undefined;
 
   const startReview = (models?: ModelChoice[], rerun = false) =>
-    act('review', async () => {
-      const startedPrId = pr.id;
+    act('review', async ({ prId: startedPrId, isCurrent }) => {
       setPickerOpen(false);
       const accepted = await rpc.call('startReview', { prId: startedPrId, ...(models ? { models } : {}), ...(rerun && review?.promptSnapshot ? { rerunReviewId: review.id } : promptId !== undefined ? { promptId } : {}) }) as ReviewRow;
-      if (currentPrIdRef.current !== startedPrId) return;
+      if (!isCurrent()) return;
       ++requestSeq.current;
       setDetail((current) => current && accepted?.id ? { ...current, review: { ...accepted, stale: accepted.headSha !== current.pr.headSha }, runs: [], findings: [], posted: [], latestAttempt: undefined } : current);
       setSelectedFindingIds(new Set());
