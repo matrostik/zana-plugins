@@ -14,12 +14,20 @@ import type {
 } from '../shared/types.ts';
 import { formatCountdown, formatTokens, formatUsd, providerColor } from './format.ts';
 
+/**
+ * Mutation callbacks resolve to `true` when the RPC succeeded and `false` when it failed.
+ * The panel shows the failure in its error banner, so forms only use the flag to decide
+ * whether to close and clear their input.
+ */
+export type MutationHandler<T> = (input: T) => Promise<boolean>;
+type PricingRuleInput = Omit<ModelPricingRule, 'isOverride'>;
+
 interface ModelsSpendTabProps {
   data: DashboardPayload;
-  onSaveBudget: (input: BudgetRuleInput) => Promise<void>;
-  onDeleteBudget: (id: string) => Promise<void>;
-  onSavePricing: (rule: Omit<ModelPricingRule, 'isOverride'>) => Promise<void>;
-  onDeletePricing: (pattern: string) => Promise<void>;
+  onSaveBudget: MutationHandler<BudgetRuleInput>;
+  onDeleteBudget: MutationHandler<string>;
+  onSavePricing: MutationHandler<PricingRuleInput>;
+  onDeletePricing: MutationHandler<string>;
 }
 
 type GroupMode = 'model' | 'project';
@@ -104,7 +112,7 @@ function validateBudgetForm(args: {
   };
 }
 
-function BudgetRuleForm({ onSave, onDone }: { onSave: (input: BudgetRuleInput) => Promise<void>; onDone: () => void }) {
+function BudgetRuleForm({ onSave, onDone }: { onSave: MutationHandler<BudgetRuleInput>; onDone: () => void }) {
   const [name, setName] = useState('Monthly Spend Cap');
   const [scopeType, setScopeType] = useState<BudgetScopeType>('global');
   const [scopeId, setScopeId] = useState('');
@@ -119,7 +127,8 @@ function BudgetRuleForm({ onSave, onDone }: { onSave: (input: BudgetRuleInput) =
     const res = validateBudgetForm({ name, scopeType, scopeId, period, metric, limit, alertPct });
     if ('error' in res) { setValidationError(res.error); return; }
     setValidationError(null);
-    await onSave(res.input);
+    // On failure keep the form open so the user's input is not lost.
+    if (!(await onSave(res.input))) return;
     onDone();
   }
 
@@ -153,8 +162,8 @@ function BudgetRuleForm({ onSave, onDone }: { onSave: (input: BudgetRuleInput) =
 
 function BudgetsCard({ budgets, onSaveBudget, onDeleteBudget }: {
   budgets: BudgetEvaluation[];
-  onSaveBudget: (input: BudgetRuleInput) => Promise<void>;
-  onDeleteBudget: (id: string) => Promise<void>;
+  onSaveBudget: MutationHandler<BudgetRuleInput>;
+  onDeleteBudget: MutationHandler<string>;
 }) {
   const [showForm, setShowForm] = useState(false);
 
@@ -197,8 +206,8 @@ function BudgetsCard({ budgets, onSaveBudget, onDeleteBudget }: {
 
 function PricingOverrideForm({ pricingRules, onSave, onDelete, onDone }: {
   pricingRules: ModelPricingRule[];
-  onSave: (rule: Omit<ModelPricingRule, 'isOverride'>) => Promise<void>;
-  onDelete: (pattern: string) => Promise<void>;
+  onSave: MutationHandler<PricingRuleInput>;
+  onDelete: MutationHandler<string>;
   onDone: () => void;
 }) {
   const [pattern, setPattern] = useState('');
@@ -209,7 +218,7 @@ function PricingOverrideForm({ pricingRules, onSave, onDelete, onDone }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!pattern.trim()) return;
-    await onSave({
+    const saved = await onSave({
       pattern: pattern.trim(),
       inputPer1M: Number.parseFloat(inRate) || 0,
       cachedInputPer1M: Number.parseFloat(cachedRate) || 0,
@@ -217,6 +226,8 @@ function PricingOverrideForm({ pricingRules, onSave, onDelete, onDone }: {
       reasoningPer1M: Number.parseFloat(outRate) || 0,
       billingMode: null
     });
+    // On failure keep the form open so the user's input is not lost.
+    if (!saved) return;
     setPattern('');
     onDone();
   }
@@ -303,8 +314,8 @@ function ProjectsLedgerTable({ rows }: { rows: ProjectConsumptionRow[] }) {
 
 function ConsumptionLedgerCard({ data, onSavePricing, onDeletePricing }: {
   data: DashboardPayload;
-  onSavePricing: (rule: Omit<ModelPricingRule, 'isOverride'>) => Promise<void>;
-  onDeletePricing: (pattern: string) => Promise<void>;
+  onSavePricing: MutationHandler<PricingRuleInput>;
+  onDeletePricing: MutationHandler<string>;
 }) {
   const [groupBy, setGroupBy] = useState<GroupMode>('model');
   const [search, setSearch] = useState('');

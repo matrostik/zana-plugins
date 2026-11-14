@@ -377,11 +377,13 @@ export function createTelemetryIndexer(deps: TelemetryIndexerDeps) {
 
   async function indexThread(
     thread: ThreadSummaryLike,
-    options: { existingCursor?: ThreadCursorRow | null; allowHostOptionsLookup?: boolean } = {}
+    options: { existingCursor?: ThreadCursorRow | null; allowHostOptionsLookup?: boolean; skipUnchangedCheck?: boolean } = {}
   ): Promise<number> {
     const existing = options.existingCursor !== undefined ? options.existingCursor : deps.store.getThreadCursor(thread.id);
+    // Invariant: tUpdated must be the host-reported thread.updatedAt. It is saved as the cursor's
+    // threadUpdatedAtMs, and full syncs compare host values against it to decide what to re-index.
     const tUpdated = threadUpdatedMs(thread);
-    if (existing && tUpdated > 0 && (existing.threadUpdatedAtMs ?? 0) > 0 && tUpdated <= (existing.threadUpdatedAtMs ?? 0)) {
+    if (!options.skipUnchangedCheck && existing && tUpdated > 0 && (existing.threadUpdatedAtMs ?? 0) > 0 && tUpdated <= (existing.threadUpdatedAtMs ?? 0)) {
       return 0;
     }
     const meta = await resolveThreadMeta(thread, existing, options.allowHostOptionsLookup === true);
@@ -489,9 +491,11 @@ export function createTelemetryIndexer(deps: TelemetryIndexerDeps) {
         ? await withTimeout(deps.threads.get({ threadId: event.threadId }), THREAD_EVENTS_TIMEOUT_MS, 'threads.get').catch(() => null)
         : null);
       if (!summary) return 0;
+      // Keep the host's updatedAt. It is persisted as the cursor's threadUpdatedAtMs, and a local
+      // clock value could exceed later host timestamps and make full syncs skip new events.
       const merged: ThreadSummaryLike = {
         ...summary, providerId: event.providerId || summary.providerId,
-        projectId: event.projectId || summary.projectId, updatedAt: now()
+        projectId: event.projectId || summary.projectId
       };
       if (event.model && !deps.store.getThreadCursor(merged.id)?.model) {
         const existing = deps.store.getThreadCursor(merged.id);
@@ -501,7 +505,8 @@ export function createTelemetryIndexer(deps: TelemetryIndexerDeps) {
           lastTotalJson: existing?.lastTotalJson ?? null, updatedAtMs: now(), threadUpdatedAtMs: existing?.threadUpdatedAtMs ?? 0
         });
       }
-      return await indexThread(merged, { allowHostOptionsLookup: true });
+      // A lifecycle event signals new activity even if the summary's updatedAt has not advanced yet.
+      return await indexThread(merged, { allowHostOptionsLookup: true, skipUnchangedCheck: true });
     } catch (err) {
       deps.log.warn(`ai-usage-monitor: lifecycle index failed for ${event.threadId}: ${errorMessage(err)}`);
       return 0;

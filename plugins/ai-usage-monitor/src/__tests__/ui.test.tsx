@@ -714,6 +714,51 @@ describe('AI Usage Monitor UI & app slot registration', () => {
     expect(await screen.findByText('Failed to delete budget rule')).toBeTruthy();
   });
 
+  it('keeps the budget form open with the user input when saving fails, and closes it on success', async () => {
+    const dash = makeDashboard();
+    let failSave = true;
+    rpcCallMock.mockImplementation(async (method: string) => {
+      if (method === RPC_METHODS.dashboard) return dash;
+      if (method === RPC_METHODS.logs) return makeLogs();
+      if (method === RPC_METHODS.setBudget) {
+        if (failSave) throw new Error('Budget store unavailable');
+        return dash.budgets[0].rule;
+      }
+      return null;
+    });
+
+    render(<UsageMonitorPanel pluginId="ai-usage-monitor" subPath="models" />);
+    fireEvent.click(await screen.findByRole('button', { name: '+ New Rule' }));
+    fireEvent.change(screen.getByPlaceholderText('Budget name'), { target: { value: 'Team cap' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Budget Rule' }));
+
+    expect(await screen.findByText('Budget store unavailable')).toBeTruthy();
+    expect((screen.getByPlaceholderText('Budget name') as HTMLInputElement).value).toBe('Team cap');
+
+    failSave = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Save Budget Rule' }));
+    await waitFor(() => expect(screen.queryByPlaceholderText('Budget name')).toBeNull());
+  });
+
+  it('keeps the pricing override form open with the pattern when saving fails', async () => {
+    const onSavePricing = vi.fn().mockResolvedValue(false);
+    render(
+      <ModelsSpendTab
+        data={makeDashboard()}
+        onSaveBudget={vi.fn().mockResolvedValue(true)}
+        onDeleteBudget={vi.fn().mockResolvedValue(true)}
+        onSavePricing={onSavePricing}
+        onDeletePricing={vi.fn().mockResolvedValue(true)}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '+ Custom Rate' }));
+    const patternInput = screen.getByPlaceholderText(/Model pattern/) as HTMLInputElement;
+    fireEvent.change(patternInput, { target: { value: 'gpt-5*' } });
+    fireEvent.submit(patternInput.closest('form')!);
+    await waitFor(() => expect(onSavePricing).toHaveBeenCalledTimes(1));
+    expect((screen.getByPlaceholderText(/Model pattern/) as HTMLInputElement).value).toBe('gpt-5*');
+  });
+
   it('supports Last Week calendar range, local-timezone boundary chip, OpenCode local card, and Balance Pending connector', async () => {
     const dash = makeDashboard();
     rpcCallMock.mockImplementation(async (method: string, args?: { range?: string }) => {

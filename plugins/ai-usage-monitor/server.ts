@@ -76,6 +76,22 @@ interface PluginRuntimeState {
   continuationTimer: ReturnType<typeof setTimeout> | null;
 }
 
+interface SyncPassOptions {
+  timeBudgetMs?: number;
+  continueBackfill?: boolean;
+}
+
+interface RefreshNowOptions extends SyncPassOptions {
+  /**
+   * Set when the caller changed state the sync depends on (sync cursors, settings). If a pass is
+   * already running it read the old state, so instead of joining it a single follow-up pass is
+   * queued to run once it finishes. Without this flag concurrent callers share the in-flight pass.
+   */
+  requireFreshPass?: boolean;
+}
+
+type RefreshNowFn = (opts?: RefreshNowOptions) => Promise<void>;
+
 function parseSubscriptionOverrides(raw: unknown): Map<string, BillingMode> {
   const map = new Map<string, BillingMode>();
   if (typeof raw !== 'string') return map;
@@ -215,12 +231,17 @@ interface SyncCoordinatorDeps {
   now: () => number;
 }
 
-async function executeProviderRefresh(ctx: SyncCoordinatorDeps, providerId: string): Promise<void> {
+interface ProviderRefreshOptions {
+  /** The panel already probed Antigravity's usage:status itself; skip the server's loopback probe. */
+  skipAntigravityProbe?: boolean;
+}
+
+async function executeProviderRefresh(ctx: SyncCoordinatorDeps, providerId: string, opts: ProviderRefreshOptions): Promise<void> {
   const { zcc, deps, state, refreshSettingsCache, collectors, now } = ctx;
   const key = providerId.toLowerCase();
   const vals = await refreshSettingsCache();
   const [discovered] = await Promise.all([
-    collectors.zccQuotas.collectOne(providerId),
+    collectors.zccQuotas.collectOne(providerId, { skipAntigravityProbe: opts.skipAntigravityProbe === true }),
     collectors.cloudBilling.collectOne(providerId),
     key === 'opencode'
       ? syncOpenCodeLocalStats({ zcc, deps, state, vals, now }).catch((err) => {
@@ -240,7 +261,7 @@ async function executeProviderRefresh(ctx: SyncCoordinatorDeps, providerId: stri
 
 async function executeSyncPass(
   ctx: SyncCoordinatorDeps,
-  opts: { timeBudgetMs?: number; continueBackfill?: boolean },
+  opts: SyncPassOptions,
   onMore: () => void
 ): Promise<void> {
   const { zcc, deps, state, defaultBudgetMs, refreshSettingsCache, collectors, now } = ctx;
@@ -281,17 +302,36 @@ function createSyncCoordinator(ctx: SyncCoordinatorDeps) {
       });
     }, 150);
   }
-  function refreshProvider(providerId: string): Promise<void> {
+  function refreshProvider(providerId: string, opts: ProviderRefreshOptions = {}): Promise<void> {
     const key = providerId.toLowerCase();
     const existing = activeProviderRefreshes.get(key);
     if (existing) return existing;
-    const run = executeProviderRefresh(ctx, providerId).finally(() => activeProviderRefreshes.delete(key));
+    const run = executeProviderRefresh(ctx, providerId, opts).finally(() => activeProviderRefreshes.delete(key));
     activeProviderRefreshes.set(key, run);
     return run;
   }
-  function refreshNow(opts: { timeBudgetMs?: number; continueBackfill?: boolean } = {}): Promise<void> {
-    if (!ctx.state.activeRefresh) ctx.state.activeRefresh = executeSyncPass(ctx, opts, scheduleContinuation);
+
+  let queuedFreshPass: Promise<void> | null = null;
+  function startSyncPass(opts: SyncPassOptions): Promise<void> {
+    ctx.state.activeRefresh = executeSyncPass(ctx, opts, scheduleContinuation);
     return ctx.state.activeRefresh;
+  }
+  function refreshNow(opts: RefreshNowOptions = {}): Promise<void> {
+    const { requireFreshPass, ...passOpts } = opts;
+    const active = ctx.state.activeRefresh;
+    if (!active) return startSyncPass(passOpts);
+    if (!requireFreshPass) return active;
+    // The in-flight pass started with the old cursors/settings: queue one follow-up pass (shared by
+    // every caller that arrives meanwhile) instead of reporting the stale pass as the result.
+    queuedFreshPass ??= active
+      .catch(() => undefined)
+      .then(() => {
+        queuedFreshPass = null;
+        if (ctx.state.disposed) return undefined;
+        // Any pass started after the in-flight one finished already sees the new state.
+        return ctx.state.activeRefresh ?? startSyncPass(passOpts);
+      });
+    return queuedFreshPass;
   }
   return { refreshNow, refreshProvider };
 }
@@ -327,8 +367,8 @@ function registerReadAndSyncRpcs(args: {
   defaultBudgetMs: number;
   store: UsageStore;
   dashboard: DashboardService;
-  refreshNow: (opts?: { timeBudgetMs?: number; continueBackfill?: boolean }) => Promise<void>;
-  refreshProvider: (providerId: string) => Promise<void>;
+  refreshNow: RefreshNowFn;
+  refreshProvider: (providerId: string, opts?: ProviderRefreshOptions) => Promise<void>;
 }) {
   const { zcc, deps, state, defaultBudgetMs, store, dashboard, refreshNow, refreshProvider } = args;
   zcc.rpc.method(RPC_METHODS.dashboard, async (rawArgs) => {
@@ -359,12 +399,12 @@ function registerReadAndSyncRpcs(args: {
   zcc.rpc.method(RPC_METHODS.refreshProvider, async (rawArgs) => {
     const providerId = asString(asRecord(rawArgs), 'providerId').trim();
     if (!providerId) throw new Error('providerId is required.');
-    await refreshProvider(providerId);
+    await refreshProvider(providerId, { skipAntigravityProbe: asRecord(rawArgs).skipAntigravityProbe === true });
     return { ok: true, providerId, lastSyncedAtMs: state.lastSyncedAtMs };
   });
   zcc.rpc.method(RPC_METHODS.resetSync, async () => {
     store.resetSyncCursors();
-    await refreshNow({ timeBudgetMs: defaultBudgetMs, continueBackfill: true });
+    await refreshNow({ timeBudgetMs: defaultBudgetMs, continueBackfill: true, requireFreshPass: true });
     return { ok: true, lastSyncedAtMs: state.lastSyncedAtMs, isSyncing: state.isSyncing };
   });
 }
@@ -434,7 +474,7 @@ function attachRuntimeHooks(args: {
   defaultBudgetMs: number;
   settings: ReturnType<typeof definePluginSettings>;
   collectors: ReturnType<typeof createCollectors>;
-  refreshNow: (opts?: { timeBudgetMs?: number; continueBackfill?: boolean }) => Promise<void>;
+  refreshNow: RefreshNowFn;
   now: () => number;
 }) {
   const { zcc, deps, state, defaultBudgetMs, settings, collectors, refreshNow, now } = args;
@@ -453,7 +493,7 @@ function attachRuntimeHooks(args: {
     });
   });
   settings.onChange(() => {
-    void refreshNow({ timeBudgetMs: defaultBudgetMs, continueBackfill: true }).catch((err) => {
+    void refreshNow({ timeBudgetMs: defaultBudgetMs, continueBackfill: true, requireFreshPass: true }).catch((err) => {
       zcc.log.warn(`ai-usage-monitor: settings-triggered sync failed: ${errorMessage(err)}`);
     });
   });

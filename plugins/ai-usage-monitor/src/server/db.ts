@@ -507,354 +507,388 @@ function repriceTurnRow(
   );
 }
 
+/** Shared handles for the module-level store operations bound by `createUsageStore`. */
+interface StoreContext {
+  db: PluginDatabase;
+  now: () => number;
+}
+
+type StoreOperation = (ctx: StoreContext, ...args: never[]) => unknown;
+type BoundOperation<F> = F extends (ctx: StoreContext, ...args: infer A) => infer R ? (...args: A) => R : never;
+
+/** Partially applies the store context to every operation, preserving each signature. */
+function bindStoreOperations<T extends Record<string, StoreOperation>>(
+  ctx: StoreContext,
+  operations: T
+): { [K in keyof T]: BoundOperation<T[K]> } {
+  const bound: Record<string, (...args: never[]) => unknown> = {};
+  for (const [name, operation] of Object.entries(operations)) bound[name] = (...args: never[]) => operation(ctx, ...args);
+  return bound as { [K in keyof T]: BoundOperation<T[K]> };
+}
+
+
+function upsertTurn(ctx: StoreContext, turn: UpsertTurnRecord): void {
+  const normalized = normalizeTurnForStorage(turn);
+  ctx.db.prepare(UPSERT_TURN_SQL).run(
+    slugId('turn'), turn.turnKey, turn.threadId, turn.providerId, turn.model, turn.projectId,
+    turn.timestampMs, turn.billingMode, normalized.inputTokens, normalized.cachedInputTokens,
+    turn.outputTokens, turn.reasoningOutputTokens, turn.totalTokens, turn.contextUsedTokens,
+    turn.contextWindowTokens, turn.estimatedCostUsd, turn.costFormula, turn.isSubagent ? 1 : 0,
+    turn.rawJson, turn.hasExplicitTotal === undefined ? null : turn.hasExplicitTotal ? 1 : 0,
+    normalized.cachedInputMode, normalized.reasoningMode
+  );
+}
+
+function updateLatestThreadContext(ctx: StoreContext, threadId: string, usedTokens: number | null, windowTokens: number | null): void {
+  if (usedTokens === null && windowTokens === null) return;
+  const latest = ctx.db.prepare('SELECT id FROM usage_turns WHERE thread_id = ? ORDER BY timestamp_ms DESC LIMIT 1').get(threadId) as { id?: string } | undefined;
+  if (latest?.id) {
+    ctx.db.prepare('UPDATE usage_turns SET context_used_tokens = COALESCE(?, context_used_tokens), context_window_tokens = COALESCE(?, context_window_tokens) WHERE id = ?')
+      .run(usedTokens, windowTokens, latest.id);
+  }
+  const latestLog = ctx.db.prepare("SELECT id FROM usage_events_log WHERE thread_id = ? AND kind = 'turn_usage' ORDER BY timestamp_ms DESC LIMIT 1").get(threadId) as { id?: string } | undefined;
+  if (latestLog?.id) {
+    ctx.db.prepare('UPDATE usage_events_log SET context_used_tokens = COALESCE(?, context_used_tokens), context_window_tokens = COALESCE(?, context_window_tokens) WHERE id = ?')
+      .run(usedTokens, windowTokens, latestLog.id);
+  }
+}
+
+function upsertLogEvent(ctx: StoreContext, entry: UpsertLogRecord): void {
+  ctx.db.prepare(UPSERT_LOG_SQL).run(
+    slugId('evt'), entry.eventKey, entry.timestampMs, entry.kind, entry.severity, entry.providerId,
+    entry.model, entry.projectId, entry.threadId, entry.summary, entry.costUsd,
+    entry.inputTokens ?? null, entry.cachedInputTokens ?? null, entry.outputTokens ?? null,
+    entry.reasoningOutputTokens ?? null, entry.contextUsedTokens ?? null, entry.contextWindowTokens ?? null,
+    entry.costFormula ?? null, entry.payloadJson
+  );
+}
+
+function getThreadCursor(ctx: StoreContext, threadId: string): ThreadCursorRow | null {
+  const row = ctx.db.prepare('SELECT * FROM thread_sync_cursors WHERE thread_id = ?').get(threadId) as Record<string, unknown> | undefined;
+  return row ? mapThreadCursor(row) : null;
+}
+
+function listThreadCursors(ctx: StoreContext): Map<string, ThreadCursorRow> {
+  const rows = ctx.db.prepare('SELECT * FROM thread_sync_cursors').all() as Record<string, unknown>[];
+  return new Map(rows.map((row) => { const c = mapThreadCursor(row); return [c.threadId, c]; }));
+}
+
+function saveThreadCursor(ctx: StoreContext, cursor: ThreadCursorRow): void {
+  ctx.db.prepare(
+    `INSERT INTO thread_sync_cursors (
+      thread_id, last_seq, provider_id, model, project_id, is_subagent, last_total_json, updated_at_ms, thread_updated_at_ms
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(thread_id) DO UPDATE SET
+      last_seq = excluded.last_seq, provider_id = excluded.provider_id, model = excluded.model,
+      project_id = excluded.project_id, is_subagent = excluded.is_subagent,
+      last_total_json = excluded.last_total_json, updated_at_ms = excluded.updated_at_ms,
+      thread_updated_at_ms = excluded.thread_updated_at_ms`
+  ).run(cursor.threadId, cursor.lastSeq, cursor.providerId, cursor.model, cursor.projectId,
+    cursor.isSubagent ? 1 : 0, cursor.lastTotalJson, cursor.updatedAtMs, cursor.threadUpdatedAtMs ?? 0);
+}
+
+function resetSyncCursors(ctx: StoreContext): void {
+  ctx.db.prepare('DELETE FROM thread_sync_cursors').run();
+}
+
+function upsertQuotaSnapshot(ctx: StoreContext, snapshot: UpsertQuotaRecord): void {
+  ctx.db.prepare(UPSERT_QUOTA_SQL).run(
+    snapshot.providerId, snapshot.displayName, snapshot.source, snapshot.status, snapshot.accountLabel,
+    snapshot.planLabel, snapshot.billingMode, JSON.stringify(snapshot.windows), snapshot.creditRemainingUsd,
+    snapshot.creditLimitUsd, snapshot.creditUsedUsd, snapshot.billedCostUsd, snapshot.errorMessage, snapshot.updatedAtMs
+  );
+}
+
+/**
+ * Deletes a provider's quota snapshot only when it was written by one of `sources`, so clearing a
+ * cloud billing key never removes a snapshot another collector owns for the same provider id.
+ */
+function deleteQuotaSnapshot(ctx: StoreContext, providerId: string, sources: readonly string[]): boolean {
+  if (sources.length === 0) return false;
+  // Only "?" placeholders are interpolated; ids and sources are bound parameters.
+  const placeholders = sources.map(() => '?').join(', ');
+  return ctx.db.prepare(`DELETE FROM provider_quota_snapshots WHERE provider_id = ? AND source IN (${placeholders})`)
+    .run(providerId, ...sources).changes > 0;
+}
+
+function listQuotaSnapshots(ctx: StoreContext): UpsertQuotaRecord[] {
+  const rows = ctx.db.prepare('SELECT * FROM provider_quota_snapshots ORDER BY provider_id ASC').all() as Record<string, unknown>[];
+  return rows.map(mapQuotaRow);
+}
+
+function aggregateSummary(ctx: StoreContext, sinceMs: number, untilMs?: number | null) {
+  const filter = buildTimeRangeFilter(sinceMs, untilMs);
+  const row = ctx.db.prepare(
+    `SELECT COALESCE(SUM(estimated_cost_usd), 0) AS total_usd,
+      COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_usd,
+      COALESCE(SUM(CASE WHEN billing_mode = 'subscription' THEN estimated_cost_usd ELSE 0 END), 0) AS sub_usd,
+      COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+      COALESCE(SUM(output_tokens), 0) AS output_tokens, COALESCE(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
+      COALESCE(SUM(total_tokens), 0) AS total_tokens, COUNT(*) AS turn_count, COALESCE(SUM(is_subagent), 0) AS subagent_count
+     FROM usage_turns WHERE ${filter.sql}`
+  ).get(...filter.params) as Record<string, unknown>;
+  return {
+    totalValueUsd: Number(row?.total_usd ?? 0), billedSpendUsd: Number(row?.billed_usd ?? 0),
+    subscriptionEquivUsd: Number(row?.sub_usd ?? 0), inputTokens: Number(row?.input_tokens ?? 0),
+    cachedInputTokens: Number(row?.cached_input_tokens ?? 0), outputTokens: Number(row?.output_tokens ?? 0),
+    reasoningOutputTokens: Number(row?.reasoning_output_tokens ?? 0), totalTokens: Number(row?.total_tokens ?? 0),
+    turnCount: Number(row?.turn_count ?? 0), subagentTurnCount: Number(row?.subagent_count ?? 0)
+  };
+}
+
+function aggregateByProvider(ctx: StoreContext, sinceMs: number, untilMs?: number | null) {
+  const filter = buildTimeRangeFilter(sinceMs, untilMs);
+  const rows = ctx.db.prepare(
+    `SELECT provider_id, COALESCE(SUM(total_tokens), 0) AS total_tokens,
+      COALESCE(SUM(cached_input_tokens), 0) AS cached_tokens, COUNT(*) AS turn_count,
+      COALESCE(SUM(estimated_cost_usd), 0) AS est_usd,
+      COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_usd
+     FROM usage_turns WHERE ${filter.sql} GROUP BY provider_id`
+  ).all(...filter.params) as Record<string, unknown>[];
+  return new Map(rows.map((row) => [String(row.provider_id), {
+    totalTokens: Number(row.total_tokens ?? 0), cachedTokens: Number(row.cached_tokens ?? 0),
+    turnCount: Number(row.turn_count ?? 0), estimatedCostUsd: Number(row.est_usd ?? 0),
+    billedCostUsd: Number(row.billed_usd ?? 0)
+  }]));
+}
+
+function listModelBreakdown(
+  ctx: StoreContext,
+  sinceMs: number,
+  overrides: readonly ModelPricingRule[],
+  untilMs?: number | null,
+  providerModeOverrides: ReadonlyMap<string, BillingMode> = new Map()
+): ModelConsumptionRow[] {
+  const filter = buildTimeRangeFilter(sinceMs, untilMs);
+  const rows = ctx.db.prepare(
+    `SELECT provider_id, model, MAX(billing_mode) AS billing_mode, COUNT(*) AS turn_count,
+      COALESCE(SUM(is_subagent), 0) AS subagent_count, COALESCE(SUM(input_tokens), 0) AS input_tokens,
+      COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
+      COALESCE(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
+      COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd
+     FROM usage_turns WHERE ${filter.sql} GROUP BY provider_id, model ORDER BY estimated_cost_usd DESC, total_tokens DESC`
+  ).all(...filter.params) as Record<string, unknown>[];
+
+  return rows.map((row) => {
+    const providerId = String(row.provider_id);
+    const model = String(row.model);
+    const inputTokens = Number(row.input_tokens ?? 0);
+    const cachedInputTokens = Number(row.cached_input_tokens ?? 0);
+    const pricing = resolveModelPricing(providerId, model, overrides, providerModeOverrides);
+    return {
+      providerId, model, billingMode: (String(row.billing_mode) as BillingMode) || pricing.billingMode,
+      turnCount: Number(row.turn_count ?? 0), subagentTurnCount: Number(row.subagent_count ?? 0),
+      inputTokens, cachedInputTokens, outputTokens: Number(row.output_tokens ?? 0),
+      reasoningOutputTokens: Number(row.reasoning_output_tokens ?? 0), totalTokens: Number(row.total_tokens ?? 0),
+      cacheHitPercent: computeCacheHitPercent(inputTokens, cachedInputTokens),
+      inputRatePer1M: pricing.inputPer1M, cachedInputRatePer1M: pricing.cachedInputPer1M,
+      outputRatePer1M: pricing.outputPer1M, estimatedCostUsd: Number(Number(row.estimated_cost_usd ?? 0).toFixed(4))
+    };
+  });
+}
+
+function listProjectBreakdown(
+  ctx: StoreContext,
+  sinceMs: number,
+  projectNames: ReadonlyMap<string, string>,
+  untilMs?: number | null
+): ProjectConsumptionRow[] {
+  const filter = buildTimeRangeFilter(sinceMs, untilMs);
+  const rows = ctx.db.prepare(
+    `SELECT project_id, COUNT(*) AS turn_count, COALESCE(SUM(is_subagent), 0) AS subagent_count,
+      COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens,
+      COALESCE(SUM(output_tokens), 0) AS output_tokens, COALESCE(SUM(total_tokens), 0) AS total_tokens,
+      COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd,
+      COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_cost_usd,
+      COALESCE(SUM(CASE WHEN billing_mode = 'subscription' THEN estimated_cost_usd ELSE 0 END), 0) AS sub_equiv_usd
+     FROM usage_turns WHERE ${filter.sql} GROUP BY project_id ORDER BY estimated_cost_usd DESC, total_tokens DESC`
+  ).all(...filter.params) as Record<string, unknown>[];
+  const topRows = ctx.db.prepare(
+    `WITH ranked AS (
+      SELECT project_id, provider_id, model,
+        ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY SUM(estimated_cost_usd) DESC, SUM(total_tokens) DESC) AS rn
+      FROM usage_turns WHERE ${filter.sql} GROUP BY project_id, provider_id, model
+    ) SELECT project_id, provider_id, model FROM ranked WHERE rn = 1`
+  ).all(...filter.params) as Array<{ project_id?: string; provider_id?: string; model?: string }>;
+  const topByProject = new Map(topRows.map((r) => [String(r.project_id ?? ''), { providerId: r.provider_id ?? null, model: r.model ?? null }]));
+  return rows.map((row) => {
+    const projectId = String(row.project_id);
+    const top = topByProject.get(projectId);
+    return {
+      projectId, projectName: projectNames.get(projectId) ?? (projectId || 'Unassigned'),
+      turnCount: Number(row.turn_count ?? 0), subagentTurnCount: Number(row.subagent_count ?? 0),
+      inputTokens: Number(row.input_tokens ?? 0), cachedInputTokens: Number(row.cached_input_tokens ?? 0),
+      outputTokens: Number(row.output_tokens ?? 0), totalTokens: Number(row.total_tokens ?? 0),
+      estimatedCostUsd: Number(Number(row.estimated_cost_usd ?? 0).toFixed(4)),
+      billedCostUsd: Number(Number(row.billed_cost_usd ?? 0).toFixed(4)),
+      subscriptionEquivUsd: Number(Number(row.sub_equiv_usd ?? 0).toFixed(4)),
+      topProviderId: top?.providerId ?? null, topModel: top?.model ?? null
+    };
+  });
+}
+
+function listDailyTrend(ctx: StoreContext, range: TimeRangeKey): DailySpendPoint[] {
+  const effectiveRange: TimeRangeKey = range === 'today' ? '7d' : range;
+  const bounds = resolveTimeRangeBounds(effectiveRange, ctx.now());
+  const filter = buildTimeRangeFilter(bounds.startMs, bounds.endMs);
+  const rows = ctx.db.prepare(`SELECT timestamp_ms, provider_id, estimated_cost_usd, total_tokens FROM usage_turns WHERE ${filter.sql} ORDER BY timestamp_ms ASC`)
+    .all(...filter.params) as Record<string, unknown>[];
+  const buckets = new Map<string, DailySpendPoint>();
+  for (const row of rows) {
+    const date = localDateKey(Number(row.timestamp_ms ?? 0));
+    const prov = String(row.provider_id);
+    const usd = Number(row.estimated_cost_usd ?? 0);
+    const tok = Number(row.total_tokens ?? 0);
+    let point = buckets.get(date);
+    if (!point) {
+      point = { date, byProviderUsd: {}, byProviderTokens: {}, totalUsd: 0, totalTokens: 0 };
+      buckets.set(date, point);
+    }
+    point.byProviderUsd[prov] = Number(((point.byProviderUsd[prov] ?? 0) + usd).toFixed(6));
+    point.byProviderTokens[prov] = (point.byProviderTokens[prov] ?? 0) + tok;
+    point.totalUsd = Number((point.totalUsd + usd).toFixed(4));
+    point.totalTokens += tok;
+  }
+  return [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function computeMetricInWindow(ctx: StoreContext, args: { sinceMs: number; scopeType: BudgetScopeType; scopeId: string; metric: BudgetMetric }): number {
+  const { clauses, params, col } = buildMetricFilter(args);
+  const row = ctx.db.prepare(`SELECT COALESCE(SUM(${col}), 0) AS total FROM usage_turns WHERE ${clauses.join(' AND ')}`).get(...params) as { total?: number } | undefined;
+  return Number(row?.total ?? 0);
+}
+
+function findTopProjectInWindow(ctx: StoreContext, args: { sinceMs: number; scopeType: BudgetScopeType; scopeId: string; metric: BudgetMetric }): string | null {
+  const { clauses, params, col } = buildMetricFilter(args);
+  const scopedRow = ctx.db.prepare(
+    `SELECT project_id FROM usage_turns WHERE ${clauses.join(' AND ')} AND project_id <> ''
+     GROUP BY project_id ORDER BY COALESCE(SUM(${col}), 0) DESC, COALESCE(SUM(total_tokens), 0) DESC LIMIT 1`
+  ).get(...params) as { project_id?: string } | undefined;
+  return scopedRow?.project_id ?? null;
+}
+
+function listBudgets(ctx: StoreContext): BudgetRule[] {
+  return (ctx.db.prepare('SELECT * FROM budgets ORDER BY created_at_ms ASC').all() as Record<string, unknown>[]).map(mapBudgetRow);
+}
+
+function upsertBudget(ctx: StoreContext, input: BudgetRuleInput): BudgetRule {
+  if (!Number.isFinite(input.limitValue) || input.limitValue <= 0) {
+    throw new Error('Budget limitValue must be greater than 0.');
+  }
+  if (!Number.isFinite(input.alertThresholdPct) || input.alertThresholdPct <= 0 || input.alertThresholdPct > 100) {
+    throw new Error('Budget alertThresholdPct must be greater than 0 and at most 100.');
+  }
+  const scopeId = input.scopeType === 'global' ? '' : (input.scopeId ?? '').trim();
+  if (input.scopeType !== 'global' && !scopeId) {
+    throw new Error(`Budget scopeId is required when scopeType is "${input.scopeType}".`);
+  }
+  const id = input.id && input.id.trim() ? input.id.trim() : slugId('budget');
+  const createdAtMs = ctx.now();
+  const name = input.name.trim();
+  ctx.db.prepare(
+    `INSERT INTO budgets (id, name, scope_type, scope_id, period, metric, limit_value, alert_threshold_pct, enabled, created_at_ms)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name, scope_type = excluded.scope_type, scope_id = excluded.scope_id,
+      period = excluded.period, metric = excluded.metric, limit_value = excluded.limit_value,
+      alert_threshold_pct = excluded.alert_threshold_pct, enabled = excluded.enabled`
+  ).run(id, name, input.scopeType, scopeId, input.period, input.metric, input.limitValue, input.alertThresholdPct, input.enabled ? 1 : 0, createdAtMs);
+  return listBudgets(ctx).find((row) => row.id === id) ?? {
+    id, name, scopeType: input.scopeType, scopeId, period: input.period, metric: input.metric,
+    limitValue: input.limitValue, alertThresholdPct: input.alertThresholdPct, enabled: input.enabled, createdAtMs
+  };
+}
+
+function deleteBudget(ctx: StoreContext, id: string): boolean {
+  return ctx.db.prepare('DELETE FROM budgets WHERE id = ?').run(id).changes > 0;
+}
+
+function hasAlertBeenSent(ctx: StoreContext, budgetId: string, periodKey: string, level: string): boolean {
+  const row = ctx.db.prepare('SELECT 1 AS ok FROM budget_alerts_sent WHERE budget_id = ? AND period_key = ? AND level = ?')
+    .get(budgetId, periodKey, level) as { ok?: number } | undefined;
+  return row?.ok === 1;
+}
+
+function markAlertSent(ctx: StoreContext, budgetId: string, periodKey: string, level: string): void {
+  ctx.db.prepare('INSERT OR IGNORE INTO budget_alerts_sent (budget_id, period_key, level, sent_at_ms) VALUES (?, ?, ?, ?)')
+    .run(budgetId, periodKey, level, ctx.now());
+}
+
+function listPricingOverrides(ctx: StoreContext): ModelPricingRule[] {
+  const rows = ctx.db.prepare('SELECT * FROM model_pricing_overrides ORDER BY updated_at_ms DESC').all() as Record<string, unknown>[];
+  return rows.map((row) => ({
+    pattern: String(row.pattern), inputPer1M: Number(row.input_per_1m ?? 0), cachedInputPer1M: Number(row.cached_input_per_1m ?? 0),
+    outputPer1M: Number(row.output_per_1m ?? 0), reasoningPer1M: Number(row.reasoning_per_1m ?? 0),
+    billingMode: typeof row.billing_mode === 'string' ? (row.billing_mode as BillingMode) : null, isOverride: true
+  }));
+}
+
+function upsertPricingOverride(ctx: StoreContext, rule: Omit<ModelPricingRule, 'isOverride'>): ModelPricingRule {
+  ctx.db.prepare(
+    `INSERT INTO model_pricing_overrides (pattern, input_per_1m, cached_input_per_1m, output_per_1m, reasoning_per_1m, billing_mode, updated_at_ms)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(pattern) DO UPDATE SET input_per_1m = excluded.input_per_1m, cached_input_per_1m = excluded.cached_input_per_1m,
+      output_per_1m = excluded.output_per_1m, reasoning_per_1m = excluded.reasoning_per_1m, billing_mode = excluded.billing_mode, updated_at_ms = excluded.updated_at_ms`
+  ).run(rule.pattern.trim(), rule.inputPer1M, rule.cachedInputPer1M, rule.outputPer1M, rule.reasoningPer1M, rule.billingMode, ctx.now());
+  return { ...rule, pattern: rule.pattern.trim(), isOverride: true };
+}
+
+function deletePricingOverride(ctx: StoreContext, pattern: string): boolean {
+  return ctx.db.prepare('DELETE FROM model_pricing_overrides WHERE pattern = ?').run(pattern).changes > 0;
+}
+
+function repriceTurns(ctx: StoreContext, providerModeOverrides: ReadonlyMap<string, BillingMode>): void {
+  const overrides = listPricingOverrides(ctx);
+  const updateTurn = ctx.db.prepare('UPDATE usage_turns SET estimated_cost_usd = ?, cost_formula = ?, billing_mode = ? WHERE id = ?');
+  const updateLog = ctx.db.prepare('UPDATE usage_events_log SET cost_usd = ?, cost_formula = ? WHERE event_key = ?');
+  let afterId = '';
+  while (true) {
+    const rows = ctx.db.prepare('SELECT * FROM usage_turns WHERE id > ? ORDER BY id LIMIT ?').all(afterId, REPRICE_BATCH_SIZE) as Record<string, unknown>[];
+    if (rows.length === 0) return;
+    ctx.db.transaction(() => {
+      for (const row of rows) {
+        const cost = repriceTurnRow(row, overrides, providerModeOverrides);
+        updateTurn.run(cost.estimatedCostUsd, cost.formula, cost.pricing.billingMode, row.id);
+        updateLog.run(cost.estimatedCostUsd, cost.formula, `turn_usage:${row.turn_key}`);
+      }
+    });
+    afterId = String(rows[rows.length - 1].id);
+  }
+}
+
+function queryLogs(
+  ctx: StoreContext,
+  query: LogsQuery,
+  projectNames: ReadonlyMap<string, string>
+): { items: UsageLogEntry[]; totalCount: number; countsByKind: Record<LogEventKind, number> } {
+  const { nonKindWhereSql, nonKindParams, whereSql, params } = buildLogFilterParts(query);
+  const rawLimit = typeof query.limit === 'number' && Number.isFinite(query.limit) ? Math.floor(query.limit) : 50;
+  const rawOffset = typeof query.offset === 'number' && Number.isFinite(query.offset) ? Math.floor(query.offset) : 0;
+  const limit = Math.max(1, Math.min(200, rawLimit));
+  const offset = Math.max(0, rawOffset);
+
+  const rows = ctx.db.prepare(`SELECT * FROM usage_events_log ${whereSql} ORDER BY timestamp_ms DESC LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset) as Record<string, unknown>[];
+  const countRow = ctx.db.prepare(`SELECT COUNT(*) AS cnt FROM usage_events_log ${whereSql}`).get(...params) as { cnt?: number } | undefined;
+  const kindRows = ctx.db.prepare(`SELECT kind, COUNT(*) AS cnt FROM usage_events_log ${nonKindWhereSql} GROUP BY kind`)
+    .all(...nonKindParams) as Array<{ kind?: string; cnt?: number }>;
+
+  const countsByKind: Record<LogEventKind, number> = { turn_usage: 0, rate_limit: 0, fallback: 0, error: 0 };
+  for (const kr of kindRows) {
+    if (kr.kind && kr.kind in countsByKind) countsByKind[kr.kind as LogEventKind] = Number(kr.cnt ?? 0);
+  }
+  const items = rows.map((row) => mapLogRow(row, projectNames));
+  return { items, totalCount: Number(countRow?.cnt ?? items.length), countsByKind };
+}
+
 export function createUsageStore(db: PluginDatabase, now: () => number = Date.now) {
   db.migrate(MIGRATIONS);
-
-  function upsertTurn(turn: UpsertTurnRecord): void {
-    const normalized = normalizeTurnForStorage(turn);
-    db.prepare(UPSERT_TURN_SQL).run(
-      slugId('turn'), turn.turnKey, turn.threadId, turn.providerId, turn.model, turn.projectId,
-      turn.timestampMs, turn.billingMode, normalized.inputTokens, normalized.cachedInputTokens,
-      turn.outputTokens, turn.reasoningOutputTokens, turn.totalTokens, turn.contextUsedTokens,
-      turn.contextWindowTokens, turn.estimatedCostUsd, turn.costFormula, turn.isSubagent ? 1 : 0,
-      turn.rawJson, turn.hasExplicitTotal === undefined ? null : turn.hasExplicitTotal ? 1 : 0,
-      normalized.cachedInputMode, normalized.reasoningMode
-    );
-  }
-
-  function updateLatestThreadContext(threadId: string, usedTokens: number | null, windowTokens: number | null): void {
-    if (usedTokens === null && windowTokens === null) return;
-    const latest = db.prepare('SELECT id FROM usage_turns WHERE thread_id = ? ORDER BY timestamp_ms DESC LIMIT 1').get(threadId) as { id?: string } | undefined;
-    if (latest?.id) {
-      db.prepare('UPDATE usage_turns SET context_used_tokens = COALESCE(?, context_used_tokens), context_window_tokens = COALESCE(?, context_window_tokens) WHERE id = ?')
-        .run(usedTokens, windowTokens, latest.id);
-    }
-    const latestLog = db.prepare("SELECT id FROM usage_events_log WHERE thread_id = ? AND kind = 'turn_usage' ORDER BY timestamp_ms DESC LIMIT 1").get(threadId) as { id?: string } | undefined;
-    if (latestLog?.id) {
-      db.prepare('UPDATE usage_events_log SET context_used_tokens = COALESCE(?, context_used_tokens), context_window_tokens = COALESCE(?, context_window_tokens) WHERE id = ?')
-        .run(usedTokens, windowTokens, latestLog.id);
-    }
-  }
-
-  function upsertLogEvent(entry: UpsertLogRecord): void {
-    db.prepare(UPSERT_LOG_SQL).run(
-      slugId('evt'), entry.eventKey, entry.timestampMs, entry.kind, entry.severity, entry.providerId,
-      entry.model, entry.projectId, entry.threadId, entry.summary, entry.costUsd,
-      entry.inputTokens ?? null, entry.cachedInputTokens ?? null, entry.outputTokens ?? null,
-      entry.reasoningOutputTokens ?? null, entry.contextUsedTokens ?? null, entry.contextWindowTokens ?? null,
-      entry.costFormula ?? null, entry.payloadJson
-    );
-  }
-
-  function getThreadCursor(threadId: string): ThreadCursorRow | null {
-    const row = db.prepare('SELECT * FROM thread_sync_cursors WHERE thread_id = ?').get(threadId) as Record<string, unknown> | undefined;
-    return row ? mapThreadCursor(row) : null;
-  }
-
-  function listThreadCursors(): Map<string, ThreadCursorRow> {
-    const rows = db.prepare('SELECT * FROM thread_sync_cursors').all() as Record<string, unknown>[];
-    return new Map(rows.map((row) => { const c = mapThreadCursor(row); return [c.threadId, c]; }));
-  }
-
-  function saveThreadCursor(cursor: ThreadCursorRow): void {
-    db.prepare(
-      `INSERT INTO thread_sync_cursors (
-        thread_id, last_seq, provider_id, model, project_id, is_subagent, last_total_json, updated_at_ms, thread_updated_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(thread_id) DO UPDATE SET
-        last_seq = excluded.last_seq, provider_id = excluded.provider_id, model = excluded.model,
-        project_id = excluded.project_id, is_subagent = excluded.is_subagent,
-        last_total_json = excluded.last_total_json, updated_at_ms = excluded.updated_at_ms,
-        thread_updated_at_ms = excluded.thread_updated_at_ms`
-    ).run(cursor.threadId, cursor.lastSeq, cursor.providerId, cursor.model, cursor.projectId,
-      cursor.isSubagent ? 1 : 0, cursor.lastTotalJson, cursor.updatedAtMs, cursor.threadUpdatedAtMs ?? 0);
-  }
-
-  function resetSyncCursors(): void {
-    db.prepare('DELETE FROM thread_sync_cursors').run();
-  }
-
-  function upsertQuotaSnapshot(snapshot: UpsertQuotaRecord): void {
-    db.prepare(UPSERT_QUOTA_SQL).run(
-      snapshot.providerId, snapshot.displayName, snapshot.source, snapshot.status, snapshot.accountLabel,
-      snapshot.planLabel, snapshot.billingMode, JSON.stringify(snapshot.windows), snapshot.creditRemainingUsd,
-      snapshot.creditLimitUsd, snapshot.creditUsedUsd, snapshot.billedCostUsd, snapshot.errorMessage, snapshot.updatedAtMs
-    );
-  }
-
-  function listQuotaSnapshots(): UpsertQuotaRecord[] {
-    const rows = db.prepare('SELECT * FROM provider_quota_snapshots ORDER BY provider_id ASC').all() as Record<string, unknown>[];
-    return rows.map(mapQuotaRow);
-  }
-
-  function aggregateSummary(sinceMs: number, untilMs?: number | null) {
-    const filter = buildTimeRangeFilter(sinceMs, untilMs);
-    const row = db.prepare(
-      `SELECT COALESCE(SUM(estimated_cost_usd), 0) AS total_usd,
-        COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_usd,
-        COALESCE(SUM(CASE WHEN billing_mode = 'subscription' THEN estimated_cost_usd ELSE 0 END), 0) AS sub_usd,
-        COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens,
-        COALESCE(SUM(output_tokens), 0) AS output_tokens, COALESCE(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
-        COALESCE(SUM(total_tokens), 0) AS total_tokens, COUNT(*) AS turn_count, COALESCE(SUM(is_subagent), 0) AS subagent_count
-       FROM usage_turns WHERE ${filter.sql}`
-    ).get(...filter.params) as Record<string, unknown>;
-    return {
-      totalValueUsd: Number(row?.total_usd ?? 0), billedSpendUsd: Number(row?.billed_usd ?? 0),
-      subscriptionEquivUsd: Number(row?.sub_usd ?? 0), inputTokens: Number(row?.input_tokens ?? 0),
-      cachedInputTokens: Number(row?.cached_input_tokens ?? 0), outputTokens: Number(row?.output_tokens ?? 0),
-      reasoningOutputTokens: Number(row?.reasoning_output_tokens ?? 0), totalTokens: Number(row?.total_tokens ?? 0),
-      turnCount: Number(row?.turn_count ?? 0), subagentTurnCount: Number(row?.subagent_count ?? 0)
-    };
-  }
-
-  function aggregateByProvider(sinceMs: number, untilMs?: number | null) {
-    const filter = buildTimeRangeFilter(sinceMs, untilMs);
-    const rows = db.prepare(
-      `SELECT provider_id, COALESCE(SUM(total_tokens), 0) AS total_tokens,
-        COALESCE(SUM(cached_input_tokens), 0) AS cached_tokens, COUNT(*) AS turn_count,
-        COALESCE(SUM(estimated_cost_usd), 0) AS est_usd,
-        COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_usd
-       FROM usage_turns WHERE ${filter.sql} GROUP BY provider_id`
-    ).all(...filter.params) as Record<string, unknown>[];
-    return new Map(rows.map((row) => [String(row.provider_id), {
-      totalTokens: Number(row.total_tokens ?? 0), cachedTokens: Number(row.cached_tokens ?? 0),
-      turnCount: Number(row.turn_count ?? 0), estimatedCostUsd: Number(row.est_usd ?? 0),
-      billedCostUsd: Number(row.billed_usd ?? 0)
-    }]));
-  }
-
-  function listModelBreakdown(
-    sinceMs: number,
-    overrides: readonly ModelPricingRule[],
-    untilMs?: number | null,
-    providerModeOverrides: ReadonlyMap<string, BillingMode> = new Map()
-  ): ModelConsumptionRow[] {
-    const filter = buildTimeRangeFilter(sinceMs, untilMs);
-    const rows = db.prepare(
-      `SELECT provider_id, model, MAX(billing_mode) AS billing_mode, COUNT(*) AS turn_count,
-        COALESCE(SUM(is_subagent), 0) AS subagent_count, COALESCE(SUM(input_tokens), 0) AS input_tokens,
-        COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
-        COALESCE(SUM(reasoning_output_tokens), 0) AS reasoning_output_tokens,
-        COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd
-       FROM usage_turns WHERE ${filter.sql} GROUP BY provider_id, model ORDER BY estimated_cost_usd DESC, total_tokens DESC`
-    ).all(...filter.params) as Record<string, unknown>[];
-
-    return rows.map((row) => {
-      const providerId = String(row.provider_id);
-      const model = String(row.model);
-      const inputTokens = Number(row.input_tokens ?? 0);
-      const cachedInputTokens = Number(row.cached_input_tokens ?? 0);
-      const pricing = resolveModelPricing(providerId, model, overrides, providerModeOverrides);
-      return {
-        providerId, model, billingMode: (String(row.billing_mode) as BillingMode) || pricing.billingMode,
-        turnCount: Number(row.turn_count ?? 0), subagentTurnCount: Number(row.subagent_count ?? 0),
-        inputTokens, cachedInputTokens, outputTokens: Number(row.output_tokens ?? 0),
-        reasoningOutputTokens: Number(row.reasoning_output_tokens ?? 0), totalTokens: Number(row.total_tokens ?? 0),
-        cacheHitPercent: computeCacheHitPercent(inputTokens, cachedInputTokens),
-        inputRatePer1M: pricing.inputPer1M, cachedInputRatePer1M: pricing.cachedInputPer1M,
-        outputRatePer1M: pricing.outputPer1M, estimatedCostUsd: Number(Number(row.estimated_cost_usd ?? 0).toFixed(4))
-      };
-    });
-  }
-
-  function listProjectBreakdown(
-    sinceMs: number,
-    projectNames: ReadonlyMap<string, string>,
-    untilMs?: number | null
-  ): ProjectConsumptionRow[] {
-    const filter = buildTimeRangeFilter(sinceMs, untilMs);
-    const rows = db.prepare(
-      `SELECT project_id, COUNT(*) AS turn_count, COALESCE(SUM(is_subagent), 0) AS subagent_count,
-        COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(cached_input_tokens), 0) AS cached_input_tokens,
-        COALESCE(SUM(output_tokens), 0) AS output_tokens, COALESCE(SUM(total_tokens), 0) AS total_tokens,
-        COALESCE(SUM(estimated_cost_usd), 0) AS estimated_cost_usd,
-        COALESCE(SUM(CASE WHEN billing_mode = 'billed_api' THEN estimated_cost_usd ELSE 0 END), 0) AS billed_cost_usd,
-        COALESCE(SUM(CASE WHEN billing_mode = 'subscription' THEN estimated_cost_usd ELSE 0 END), 0) AS sub_equiv_usd
-       FROM usage_turns WHERE ${filter.sql} GROUP BY project_id ORDER BY estimated_cost_usd DESC, total_tokens DESC`
-    ).all(...filter.params) as Record<string, unknown>[];
-    const topRows = db.prepare(
-      `WITH ranked AS (
-        SELECT project_id, provider_id, model,
-          ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY SUM(estimated_cost_usd) DESC, SUM(total_tokens) DESC) AS rn
-        FROM usage_turns WHERE ${filter.sql} GROUP BY project_id, provider_id, model
-      ) SELECT project_id, provider_id, model FROM ranked WHERE rn = 1`
-    ).all(...filter.params) as Array<{ project_id?: string; provider_id?: string; model?: string }>;
-    const topByProject = new Map(topRows.map((r) => [String(r.project_id ?? ''), { providerId: r.provider_id ?? null, model: r.model ?? null }]));
-    return rows.map((row) => {
-      const projectId = String(row.project_id);
-      const top = topByProject.get(projectId);
-      return {
-        projectId, projectName: projectNames.get(projectId) ?? (projectId || 'Unassigned'),
-        turnCount: Number(row.turn_count ?? 0), subagentTurnCount: Number(row.subagent_count ?? 0),
-        inputTokens: Number(row.input_tokens ?? 0), cachedInputTokens: Number(row.cached_input_tokens ?? 0),
-        outputTokens: Number(row.output_tokens ?? 0), totalTokens: Number(row.total_tokens ?? 0),
-        estimatedCostUsd: Number(Number(row.estimated_cost_usd ?? 0).toFixed(4)),
-        billedCostUsd: Number(Number(row.billed_cost_usd ?? 0).toFixed(4)),
-        subscriptionEquivUsd: Number(Number(row.sub_equiv_usd ?? 0).toFixed(4)),
-        topProviderId: top?.providerId ?? null, topModel: top?.model ?? null
-      };
-    });
-  }
-
-  function listDailyTrend(range: TimeRangeKey): DailySpendPoint[] {
-    const effectiveRange: TimeRangeKey = range === 'today' ? '7d' : range;
-    const bounds = resolveTimeRangeBounds(effectiveRange, now());
-    const filter = buildTimeRangeFilter(bounds.startMs, bounds.endMs);
-    const rows = db.prepare(`SELECT timestamp_ms, provider_id, estimated_cost_usd, total_tokens FROM usage_turns WHERE ${filter.sql} ORDER BY timestamp_ms ASC`)
-      .all(...filter.params) as Record<string, unknown>[];
-    const buckets = new Map<string, DailySpendPoint>();
-    for (const row of rows) {
-      const date = localDateKey(Number(row.timestamp_ms ?? 0));
-      const prov = String(row.provider_id);
-      const usd = Number(row.estimated_cost_usd ?? 0);
-      const tok = Number(row.total_tokens ?? 0);
-      let point = buckets.get(date);
-      if (!point) {
-        point = { date, byProviderUsd: {}, byProviderTokens: {}, totalUsd: 0, totalTokens: 0 };
-        buckets.set(date, point);
-      }
-      point.byProviderUsd[prov] = Number(((point.byProviderUsd[prov] ?? 0) + usd).toFixed(6));
-      point.byProviderTokens[prov] = (point.byProviderTokens[prov] ?? 0) + tok;
-      point.totalUsd = Number((point.totalUsd + usd).toFixed(4));
-      point.totalTokens += tok;
-    }
-    return [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date));
-  }
-
-  function computeMetricInWindow(args: { sinceMs: number; scopeType: BudgetScopeType; scopeId: string; metric: BudgetMetric }): number {
-    const { clauses, params, col } = buildMetricFilter(args);
-    const row = db.prepare(`SELECT COALESCE(SUM(${col}), 0) AS total FROM usage_turns WHERE ${clauses.join(' AND ')}`).get(...params) as { total?: number } | undefined;
-    return Number(row?.total ?? 0);
-  }
-
-  function findTopProjectInWindow(args: { sinceMs: number; scopeType: BudgetScopeType; scopeId: string; metric: BudgetMetric }): string | null {
-    const { clauses, params, col } = buildMetricFilter(args);
-    const scopedRow = db.prepare(
-      `SELECT project_id FROM usage_turns WHERE ${clauses.join(' AND ')} AND project_id <> ''
-       GROUP BY project_id ORDER BY COALESCE(SUM(${col}), 0) DESC, COALESCE(SUM(total_tokens), 0) DESC LIMIT 1`
-    ).get(...params) as { project_id?: string } | undefined;
-    return scopedRow?.project_id ?? null;
-  }
-
-  function listBudgets(): BudgetRule[] {
-    return (db.prepare('SELECT * FROM budgets ORDER BY created_at_ms ASC').all() as Record<string, unknown>[]).map(mapBudgetRow);
-  }
-
-  function upsertBudget(input: BudgetRuleInput): BudgetRule {
-    if (!Number.isFinite(input.limitValue) || input.limitValue <= 0) {
-      throw new Error('Budget limitValue must be greater than 0.');
-    }
-    if (!Number.isFinite(input.alertThresholdPct) || input.alertThresholdPct <= 0 || input.alertThresholdPct > 100) {
-      throw new Error('Budget alertThresholdPct must be greater than 0 and at most 100.');
-    }
-    const scopeId = input.scopeType === 'global' ? '' : (input.scopeId ?? '').trim();
-    if (input.scopeType !== 'global' && !scopeId) {
-      throw new Error(`Budget scopeId is required when scopeType is "${input.scopeType}".`);
-    }
-    const id = input.id && input.id.trim() ? input.id.trim() : slugId('budget');
-    const createdAtMs = now();
-    const name = input.name.trim();
-    db.prepare(
-      `INSERT INTO budgets (id, name, scope_type, scope_id, period, metric, limit_value, alert_threshold_pct, enabled, created_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET name = excluded.name, scope_type = excluded.scope_type, scope_id = excluded.scope_id,
-        period = excluded.period, metric = excluded.metric, limit_value = excluded.limit_value,
-        alert_threshold_pct = excluded.alert_threshold_pct, enabled = excluded.enabled`
-    ).run(id, name, input.scopeType, scopeId, input.period, input.metric, input.limitValue, input.alertThresholdPct, input.enabled ? 1 : 0, createdAtMs);
-    return listBudgets().find((row) => row.id === id) ?? {
-      id, name, scopeType: input.scopeType, scopeId, period: input.period, metric: input.metric,
-      limitValue: input.limitValue, alertThresholdPct: input.alertThresholdPct, enabled: input.enabled, createdAtMs
-    };
-  }
-
-  function deleteBudget(id: string): boolean {
-    return db.prepare('DELETE FROM budgets WHERE id = ?').run(id).changes > 0;
-  }
-
-  function hasAlertBeenSent(budgetId: string, periodKey: string, level: string): boolean {
-    const row = db.prepare('SELECT 1 AS ok FROM budget_alerts_sent WHERE budget_id = ? AND period_key = ? AND level = ?')
-      .get(budgetId, periodKey, level) as { ok?: number } | undefined;
-    return row?.ok === 1;
-  }
-
-  function markAlertSent(budgetId: string, periodKey: string, level: string): void {
-    db.prepare('INSERT OR IGNORE INTO budget_alerts_sent (budget_id, period_key, level, sent_at_ms) VALUES (?, ?, ?, ?)')
-      .run(budgetId, periodKey, level, now());
-  }
-
-  function listPricingOverrides(): ModelPricingRule[] {
-    const rows = db.prepare('SELECT * FROM model_pricing_overrides ORDER BY updated_at_ms DESC').all() as Record<string, unknown>[];
-    return rows.map((row) => ({
-      pattern: String(row.pattern), inputPer1M: Number(row.input_per_1m ?? 0), cachedInputPer1M: Number(row.cached_input_per_1m ?? 0),
-      outputPer1M: Number(row.output_per_1m ?? 0), reasoningPer1M: Number(row.reasoning_per_1m ?? 0),
-      billingMode: typeof row.billing_mode === 'string' ? (row.billing_mode as BillingMode) : null, isOverride: true
-    }));
-  }
-
-  function upsertPricingOverride(rule: Omit<ModelPricingRule, 'isOverride'>): ModelPricingRule {
-    db.prepare(
-      `INSERT INTO model_pricing_overrides (pattern, input_per_1m, cached_input_per_1m, output_per_1m, reasoning_per_1m, billing_mode, updated_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(pattern) DO UPDATE SET input_per_1m = excluded.input_per_1m, cached_input_per_1m = excluded.cached_input_per_1m,
-        output_per_1m = excluded.output_per_1m, reasoning_per_1m = excluded.reasoning_per_1m, billing_mode = excluded.billing_mode, updated_at_ms = excluded.updated_at_ms`
-    ).run(rule.pattern.trim(), rule.inputPer1M, rule.cachedInputPer1M, rule.outputPer1M, rule.reasoningPer1M, rule.billingMode, now());
-    return { ...rule, pattern: rule.pattern.trim(), isOverride: true };
-  }
-
-  function deletePricingOverride(pattern: string): boolean {
-    return db.prepare('DELETE FROM model_pricing_overrides WHERE pattern = ?').run(pattern).changes > 0;
-  }
-
-  function repriceTurns(providerModeOverrides: ReadonlyMap<string, BillingMode>): void {
-    const overrides = listPricingOverrides();
-    const updateTurn = db.prepare('UPDATE usage_turns SET estimated_cost_usd = ?, cost_formula = ?, billing_mode = ? WHERE id = ?');
-    const updateLog = db.prepare('UPDATE usage_events_log SET cost_usd = ?, cost_formula = ? WHERE event_key = ?');
-    let afterId = '';
-    while (true) {
-      const rows = db.prepare('SELECT * FROM usage_turns WHERE id > ? ORDER BY id LIMIT ?').all(afterId, REPRICE_BATCH_SIZE) as Record<string, unknown>[];
-      if (rows.length === 0) return;
-      db.transaction(() => {
-        for (const row of rows) {
-          const cost = repriceTurnRow(row, overrides, providerModeOverrides);
-          updateTurn.run(cost.estimatedCostUsd, cost.formula, cost.pricing.billingMode, row.id);
-          updateLog.run(cost.estimatedCostUsd, cost.formula, `turn_usage:${row.turn_key}`);
-        }
-      });
-      afterId = String(rows[rows.length - 1].id);
-    }
-  }
-
-  function queryLogs(
-    query: LogsQuery,
-    projectNames: ReadonlyMap<string, string>
-  ): { items: UsageLogEntry[]; totalCount: number; countsByKind: Record<LogEventKind, number> } {
-    const { nonKindWhereSql, nonKindParams, whereSql, params } = buildLogFilterParts(query);
-    const rawLimit = typeof query.limit === 'number' && Number.isFinite(query.limit) ? Math.floor(query.limit) : 50;
-    const rawOffset = typeof query.offset === 'number' && Number.isFinite(query.offset) ? Math.floor(query.offset) : 0;
-    const limit = Math.max(1, Math.min(200, rawLimit));
-    const offset = Math.max(0, rawOffset);
-
-    const rows = db.prepare(`SELECT * FROM usage_events_log ${whereSql} ORDER BY timestamp_ms DESC LIMIT ? OFFSET ?`)
-      .all(...params, limit, offset) as Record<string, unknown>[];
-    const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM usage_events_log ${whereSql}`).get(...params) as { cnt?: number } | undefined;
-    const kindRows = db.prepare(`SELECT kind, COUNT(*) AS cnt FROM usage_events_log ${nonKindWhereSql} GROUP BY kind`)
-      .all(...nonKindParams) as Array<{ kind?: string; cnt?: number }>;
-
-    const countsByKind: Record<LogEventKind, number> = { turn_usage: 0, rate_limit: 0, fallback: 0, error: 0 };
-    for (const kr of kindRows) {
-      if (kr.kind && kr.kind in countsByKind) countsByKind[kr.kind as LogEventKind] = Number(kr.cnt ?? 0);
-    }
-    const items = rows.map((row) => mapLogRow(row, projectNames));
-    return { items, totalCount: Number(countRow?.cnt ?? items.length), countsByKind };
-  }
-
-  return {
+  return bindStoreOperations({ db, now }, {
     upsertTurn, updateLatestThreadContext, upsertLogEvent, getThreadCursor, listThreadCursors, saveThreadCursor,
-    resetSyncCursors, upsertQuotaSnapshot, listQuotaSnapshots, aggregateSummary, aggregateByProvider,
+    resetSyncCursors, upsertQuotaSnapshot, deleteQuotaSnapshot, listQuotaSnapshots, aggregateSummary, aggregateByProvider,
     listModelBreakdown, listProjectBreakdown, listDailyTrend, computeMetricInWindow, findTopProjectInWindow,
     listBudgets, upsertBudget, deleteBudget, hasAlertBeenSent, markAlertSent,
     listPricingOverrides, upsertPricingOverride, deletePricingOverride, repriceTurns, queryLogs
-  };
+  });
 }
 
 export type UsageStore = ReturnType<typeof createUsageStore>;

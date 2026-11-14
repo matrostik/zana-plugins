@@ -304,7 +304,16 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
     });
   }
 
-  async function collectOne(providerId: string): Promise<DiscoveredProviderModels | null> {
+  /**
+   * Refreshes one provider's models and quota snapshot. With `skipAntigravityProbe` the caller has
+   * already probed Antigravity's usage:status itself, so the loopback probe is skipped and the
+   * stored Antigravity snapshot is left untouched (persisting without a probe result would replace
+   * its live windows with observed/fallback data). The next full sync refreshes it.
+   */
+  async function collectOne(
+    providerId: string,
+    opts: { skipAntigravityProbe?: boolean } = {}
+  ): Promise<DiscoveredProviderModels | null> {
     const providerList = await withTimeout(deps.providers.list(), PROVIDER_RPC_TIMEOUT_MS, 'providers.list')
       .catch((err: unknown) => { deps.log.warn(`ai-usage-monitor: providers.list failed: ${errorMessage(err)}`); return []; });
     const provider = providerList.find((p) => p.id === providerId) ??
@@ -315,12 +324,16 @@ export function createZccQuotaCollector(deps: ZccQuotaCollectorDeps) {
     const isAntigravity = normId === 'antigravity';
     const isCloudOnly = CLOUD_BILLING_PROVIDER_IDS.has(normId) ||
       (existingSnapshot !== undefined && PRESERVED_CLOUD_SOURCES.has(existingSnapshot.source));
+    const displayName = provider.displayName ?? provider.id;
+    if (isAntigravity && opts.skipAntigravityProbe === true) {
+      const models = await fetchProviderModels(provider.id);
+      return { providerId: provider.id, displayName, available: provider.available, models };
+    }
     const [hostUsage, models, antigravityUsage] = await Promise.all([
       isAntigravity || isCloudOnly ? Promise.resolve(null) : probeHostUsage([provider.id]),
       fetchProviderModels(provider.id),
       isAntigravity && provider.available ? probeAntigravityUsage() : Promise.resolve(null)
     ]);
-    const displayName = provider.displayName ?? provider.id;
     const billingMode = deps.getProviderModeOverrides().get(normId) ?? inferDefaultBillingMode(provider.id, '');
     persistProviderSnapshot({
       providerId: provider.id, displayName, available: provider.available, billingMode,

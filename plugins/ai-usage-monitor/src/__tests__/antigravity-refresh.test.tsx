@@ -213,6 +213,29 @@ afterEach(() => {
 });
 
 describe('Quota & provider refresh behavior', () => {
+  it('runs a single Antigravity usage probe per card refresh by asking the server to skip its loopback probe', async () => {
+    peerRpcMock.mockResolvedValue({
+      supported: true,
+      usage: { status: 'ok', windows: [{ label: 'Gemini Models — Five Hour Limit Remaining', usedPercent: 30, resetsAt: null }] }
+    });
+    rpcCallMock.mockImplementation(async (method: string) => {
+      if (method === RPC_METHODS.dashboard) return makeDashboardWithAntigravity();
+      if (method === RPC_METHODS.logs) return makeEmptyLogs();
+      if (method === RPC_METHODS.refreshProvider) return { ok: true };
+      return null;
+    });
+
+    render(<UsageMonitorPanel pluginId="ai-usage-monitor" subPath="" />);
+    const refreshBtn = await screen.findByRole('button', { name: 'Refresh Antigravity' });
+    await waitFor(() => expect(peerRpcMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(refreshBtn);
+    await waitFor(() => {
+      expect(rpcCallMock).toHaveBeenCalledWith(RPC_METHODS.refreshProvider, { providerId: 'antigravity', skipAntigravityProbe: true });
+      expect(peerRpcMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('keeps previous quota windows visible with a spinning reload badge while refreshing and updates when resolved', async () => {
     const dash = makeDashboardWithAntigravity();
     let resolveProbe!: (value: unknown) => void;
