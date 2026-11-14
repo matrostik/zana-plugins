@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Usage Monitor — Model Comparison proposal</title>
+<style>
+:root{color-scheme:dark;font:14px system-ui,sans-serif;background:#101218;color:#e5e7ee}
+*{box-sizing:border-box}body{margin:0;padding:24px}button,input,select{font:inherit;color:inherit;background:#202431;border:1px solid #3b4152;border-radius:6px;padding:8px 10px}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #9b93ff;outline-offset:3px}button:disabled{opacity:.5;cursor:default}.review{padding:14px;background:#242039;border:1px solid #50486f;border-radius:10px;margin-bottom:24px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}.review small{color:#cbc1e5}.app{border:1px solid #303544;border-radius:12px;overflow:hidden;background:#171b24}header{padding:24px;display:flex;gap:14px;align-items:center}.badge{background:#383052;color:#c7bcff;padding:10px;border-radius:10px;font-weight:700}h1{font-size:21px;margin:0 0 5px}h2{font-size:18px;margin:0 0 6px}.muted{font-size:12px;color:#a6afbf}nav{padding:0 24px;border-bottom:1px solid #333847;display:flex;gap:22px;overflow:auto}nav span{padding:14px 0;white-space:nowrap;color:#a6afbf}nav .active{border-bottom:2px solid #a399ff;color:#ddd8ff}main{padding:24px}.heading{display:flex;justify-content:space-between;gap:18px;align-items:center;flex-wrap:wrap}.primary{background:#6654b8;border-color:#8c7bd2}.filters{display:flex;gap:14px;flex-wrap:wrap;margin:24px 0 18px}.filters label{display:grid;gap:7px;color:#acb5c6;font-size:12px}.filters input{width:145px}.filters .search input{width:260px}.notice{border:1px solid #64502c;background:#30291c;padding:12px 14px;border-radius:7px;margin:18px 0;color:#edd3a0}.notice.info{border-color:#3c466a;background:#20283a;color:#bfcbee}.table-wrap{overflow:auto;border:1px solid #333847;border-radius:8px}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{padding:14px 15px;text-align:left;border-bottom:1px solid #2c3240}th{background:#202530;font-size:12px;color:#b5bfd2}th button{border:0;background:none;padding:0;color:inherit;font-size:inherit}th[aria-sort=descending] button,th[aria-sort=ascending] button{color:#c3b6ff}td.num{font-variant-numeric:tabular-nums}.creator{font-size:12px;color:#a2acbf;margin-top:4px}.score{display:inline-block;border-radius:5px;padding:4px 8px;background:#35314c;color:#d7caff}.foot{margin-top:16px;line-height:1.8}a{color:#bdb2ff}.empty{text-align:center;color:#a6afbf;padding:32px}.hidden{display:none}@media(max-width:650px){body{padding:10px}main,header{padding:16px}.filters .search input{width:100%}.filters .search{width:100%}nav{padding:0 16px;gap:18px}}
+</style>
+<div class="review">
+  <strong>Interactive mock · simulated data</strong>
+  <label>Preview state <select id="state"><option value="ready">Cached data</option><option value="offline">Offline / stale</option><option value="limited">Rate limited</option><option value="setup">Key not configured</option></select></label>
+  <small>Try search, creator, price caps, column sorting and refresh. This preview never accepts API keys.</small>
+</div>
+<div class="app">
+  <header><div class="badge">AI</div><div><h1>AI Usage Monitor</h1><div class="muted">Cross-provider quotas, spend, credits &amp; telemetry</div></div></header>
+  <nav aria-label="Dashboard sections"><span>Overview &amp; Quotas</span><span>Models, Spend &amp; Budgets</span><span class="active">Model Comparison</span><span>Usage &amp; Error Logs</span></nav>
+  <main>
+    <div class="heading"><div><h2>Model Comparison</h2><div class="muted">Compare intelligence, token prices and response speed across all models.</div></div><button id="refresh" class="primary">Refresh models</button></div>
+    <div id="notice" class="notice hidden" role="status"></div>
+    <section id="results">
+      <div class="filters">
+        <label class="search">Search models<input id="search" type="search" placeholder="Model or creator name"></label>
+        <label>Creator<select id="creator"><option value="">All creators</option><option>Anthropic</option><option>OpenAI</option><option>Google</option><option>Example Lab</option></select></label>
+        <label>Max input · $ / 1M tokens<input id="input" type="number" min="0" step="0.1" placeholder="No limit"></label>
+        <label>Max output · $ / 1M tokens<input id="output" type="number" min="0" step="0.1" placeholder="No limit"></label>
+        <button id="clear" style="align-self:end">Clear filters</button>
+      </div>
+      <div id="count" class="muted" style="margin-bottom:12px" aria-live="polite"></div>
+      <div class="table-wrap"><table><thead><tr>
+        <th data-sort="name"><button>Model</button></th><th data-sort="intelligence" aria-sort="descending"><button>Intelligence ↓</button></th><th data-sort="input"><button>Input $ / 1M</button></th><th data-sort="output"><button>Output $ / 1M</button></th><th data-sort="speed"><button>Output tok/s</button></th><th data-sort="ttft"><button>First token · s</button></th>
+      </tr></thead><tbody id="rows"></tbody></table></div>
+      <div class="foot muted"><div id="updated">Last updated: simulated snapshot · Intelligence Index v5 (example)</div><div>Scores from different Intelligence Index versions may not be comparable. Missing measurements are shown as n/a.</div><div>Data source: <a href="https://artificialanalysis.ai/" target="_blank" rel="noopener noreferrer">Artificial Analysis</a> · Refresh interval: 24 hours</div></div>
+    </section>
+  </main>
+</div>
+<script>
+// Invented fixtures illustrate interactions; these are not current benchmark results or an API schema.
+const models = [
+  {name:'Example flagship A',creator:'Anthropic',intelligence:55,input:3,output:15,speed:82,ttft:1.8},
+  {name:'Example flagship B',creator:'OpenAI',intelligence:52,input:2,output:8,speed:105,ttft:1.2},
+  {name:'Example fast model',creator:'Google',intelligence:38,input:.3,output:2.5,speed:210,ttft:.5},
+  {name:'Example open model',creator:'Example Lab',intelligence:35,input:null,output:null,speed:null,ttft:null},
+  {name:'Example small model',creator:'Example Lab',intelligence:null,input:0,output:0,speed:150,ttft:.7}
+];
+const el = id => document.getElementById(id);
+let sort = 'intelligence', direction = -1, busy = false;
+const text = (tag, value, className) => {const node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node};
+const number = (value, price=false) => value===null?'n/a':price?'$'+value.toFixed(2):String(value);
+function visibleModels() {
+  const query=el('search').value.toLowerCase().trim(), creator=el('creator').value;
+  return models.filter(model => {
+    if(query && !(model.name+' '+model.creator).toLowerCase().includes(query))return false;
+    if(creator && model.creator!==creator)return false;
+    return ['input','output'].every(key=>el(key).value==='' || (model[key]!==null && model[key]<=Number(el(key).value)));
+  }).sort((a,b)=>{
+    if(a[sort]===null)return b[sort]===null?0:1;
+    if(b[sort]===null)return -1;
+    return direction*(typeof a[sort]==='string'?a[sort].localeCompare(b[sort]):a[sort]-b[sort]);
+  });
+}
+function render() {
+  const rows=visibleModels();el('rows').replaceChildren();
+  for(const model of rows){
+    const row=document.createElement('tr'), name=text('td','');
+    name.append(text('strong',model.name),text('div',model.creator,'creator'));row.append(name);
+    for(const key of ['intelligence','input','output','speed','ttft']){
+      const cell=text('td',number(model[key],key==='input'||key==='output'),'num');
+      if(key==='intelligence' && model[key]!==null){cell.replaceChildren(text('span',model[key],'score'))}row.append(cell);
+    }
+    el('rows').append(row);
+  }
+  if(!rows.length){const row=document.createElement('tr'),cell=text('td','No models match these filters.','empty');cell.colSpan=6;row.append(cell);el('rows').append(row)}
+  el('count').textContent=rows.length+' of '+models.length+' example models';
+}
+function renderState() {
+  const state=el('state').value;
+  const messages={offline:'Offline. Showing the saved snapshot from 2 days ago. We will retry when the connection is available.',limited:'Refresh paused until tomorrow at 09:00 (example). Showing the last saved snapshot.',setup:'Add your Artificial Analysis key in AI Usage Monitor settings to load model data. Saved keys are never displayed.'};
+  el('notice').textContent=messages[state]||'';el('notice').className=messages[state]?'notice':'notice hidden';
+  el('results').classList.toggle('hidden',state==='setup');el('refresh').disabled=busy||state==='limited'||state==='setup';
+  el('refresh').textContent=busy?'Refreshing…':'Refresh models';
+}
+for(const id of ['search','creator','input','output'])el(id).addEventListener('input',render);
+el('clear').onclick=()=>{for(const id of ['search','creator','input','output'])el(id).value='';render()};
+document.querySelectorAll('th[data-sort]').forEach(th=>th.querySelector('button').onclick=()=>{
+  direction=sort===th.dataset.sort?-direction:th.dataset.sort==='name'?1:-1;sort=th.dataset.sort;
+  document.querySelectorAll('th[data-sort]').forEach(header=>{
+    header.setAttribute('aria-sort',header===th?(direction===1?'ascending':'descending'):'none');
+    header.querySelector('button').textContent=header.querySelector('button').textContent.replace(/ [↑↓]$/,'')+(header===th?(direction===1?' ↑':' ↓'):'');
+  });render();
+});
+el('state').onchange=renderState;
+el('refresh').onclick=()=>{busy=true;renderState();setTimeout(()=>{busy=false;if(el('state').value!=='offline')el('updated').textContent='Last updated: just now (simulated) · Intelligence Index v5 (example)';renderState()},800)};
+render();renderState();
+</script>
+</html>

@@ -8,6 +8,7 @@ import {
   type CloudConnectorStatus,
   type DashboardPayload
 } from '../shared/types.ts';
+import { ComparisonKeySettings } from './ComparisonKeySettings.tsx';
 import { formatRelativeTime, formatUsd } from './format.ts';
 import { ReloadSpinner } from './OverviewTab.tsx';
 import { ensureStylesInjected } from './styles.ts';
@@ -204,6 +205,7 @@ export function SettingsSection() {
       {message && <div className="aum-banner aum-banner-info">{message}</div>}
       <LocalProbeNotice enabled={settings.values?.enableLocalCredentialProbing === true} />
       {data && <ConnectorStatusList connectors={data.cloudConnectors} />}
+      <ComparisonKeySettings />
     </div>
   );
 }
