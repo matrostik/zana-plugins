@@ -18,8 +18,8 @@ import type {
   TimeRangeKey,
   UsageLogEntry
 } from '../shared/types.ts';
-import { computeCacheHitPercent, localDateKey, resolveTimeRangeBounds, safeJsonParse, slugId } from './util.ts';
-import { resolveModelPricing } from './pricing.ts';
+import { asRecord, computeCacheHitPercent, localDateKey, resolveTimeRangeBounds, safeJsonParse, slugId } from './util.ts';
+import { computeTurnCost, resolveModelPricing } from './pricing.ts';
 
 export const MIGRATIONS: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS usage_turns (
@@ -123,7 +123,8 @@ export const MIGRATIONS: readonly string[] = [
     last_total_json TEXT,
     updated_at_ms INTEGER NOT NULL
   )`,
-  `ALTER TABLE thread_sync_cursors ADD COLUMN thread_updated_at_ms INTEGER NOT NULL DEFAULT 0`
+  `ALTER TABLE thread_sync_cursors ADD COLUMN thread_updated_at_ms INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE usage_turns ADD COLUMN has_explicit_total INTEGER`
 ];
 
 export interface UpsertTurnRecord {
@@ -139,6 +140,7 @@ export interface UpsertTurnRecord {
   outputTokens: number;
   reasoningOutputTokens: number;
   totalTokens: number;
+  hasExplicitTotal?: boolean;
   contextUsedTokens: number | null;
   contextWindowTokens: number | null;
   estimatedCostUsd: number;
@@ -239,6 +241,21 @@ function buildMetricFilter(args: {
   return { clauses, params, col };
 }
 
+const REPRICE_BATCH_SIZE = 200;
+
+function hasExplicitTurnTotal(row: Record<string, unknown>): boolean {
+  if (row.has_explicit_total !== null && row.has_explicit_total !== undefined) {
+    return Number(row.has_explicit_total) === 1;
+  }
+  // Legacy rows predate the flag. Prefer the same last/total selection as ingestion.
+  const payload = asRecord(safeJsonParse<unknown>(String(row.raw_json), {}));
+  if (!payload.tokenUsage) return Number(row.total_tokens) > 0;
+  const usage = asRecord(payload.tokenUsage);
+  const last = asRecord(usage.last);
+  const hasLast = Number(last.totalTokens) > 0 || Number(last.inputTokens) > 0 || Number(last.outputTokens) > 0;
+  return Number((hasLast ? last : asRecord(usage.total)).totalTokens) > 0;
+}
+
 export function createUsageStore(db: PluginDatabase, now: () => number = Date.now) {
   db.migrate(MIGRATIONS);
 
@@ -247,8 +264,8 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
       `INSERT INTO usage_turns (
         id, turn_key, thread_id, provider_id, model, project_id, timestamp_ms, billing_mode,
         input_tokens, cached_input_tokens, output_tokens, reasoning_output_tokens, total_tokens,
-        context_used_tokens, context_window_tokens, estimated_cost_usd, cost_formula, is_subagent, raw_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        context_used_tokens, context_window_tokens, estimated_cost_usd, cost_formula, is_subagent, raw_json, has_explicit_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(turn_key) DO UPDATE SET
         provider_id = excluded.provider_id,
         model = excluded.model,
@@ -265,7 +282,8 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
         estimated_cost_usd = excluded.estimated_cost_usd,
         cost_formula = excluded.cost_formula,
         is_subagent = excluded.is_subagent,
-        raw_json = excluded.raw_json`
+        raw_json = excluded.raw_json,
+        has_explicit_total = excluded.has_explicit_total`
     ).run(
       slugId('turn'),
       turn.turnKey,
@@ -285,7 +303,8 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
       turn.estimatedCostUsd,
       turn.costFormula,
       turn.isSubagent ? 1 : 0,
-      turn.rawJson
+      turn.rawJson,
+      turn.hasExplicitTotal === undefined ? null : turn.hasExplicitTotal ? 1 : 0
     );
   }
 
@@ -561,7 +580,8 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
   function listModelBreakdown(
     sinceMs: number,
     overrides: readonly ModelPricingRule[],
-    untilMs?: number | null
+    untilMs?: number | null,
+    providerModeOverrides: ReadonlyMap<string, BillingMode> = new Map()
   ): ModelConsumptionRow[] {
     const filter = buildTimeRangeFilter(sinceMs, untilMs);
     const rows = db
@@ -590,7 +610,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
       const model = String(row.model);
       const inputTokens = Number(row.input_tokens ?? 0);
       const cachedInputTokens = Number(row.cached_input_tokens ?? 0);
-      const pricing = resolveModelPricing(providerId, model, overrides);
+      const pricing = resolveModelPricing(providerId, model, overrides, providerModeOverrides);
       return {
         providerId,
         model,
@@ -776,6 +796,12 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
   }
 
   function upsertBudget(input: BudgetRuleInput): BudgetRule {
+    if (!Number.isFinite(input.limitValue) || input.limitValue <= 0) {
+      throw new Error('Budget limitValue must be greater than 0.');
+    }
+    if (!Number.isFinite(input.alertThresholdPct) || input.alertThresholdPct <= 0 || input.alertThresholdPct > 100) {
+      throw new Error('Budget alertThresholdPct must be greater than 0 and at most 100.');
+    }
     const id = input.id && input.id.trim() ? input.id.trim() : slugId('budget');
     const createdAtMs = now();
     const scopeId = input.scopeId ?? '';
@@ -877,6 +903,29 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
 
   function deletePricingOverride(pattern: string): boolean {
     return db.prepare('DELETE FROM model_pricing_overrides WHERE pattern = ?').run(pattern).changes > 0;
+  }
+
+  function repriceTurns(providerModeOverrides: ReadonlyMap<string, BillingMode>): void {
+    const overrides = listPricingOverrides();
+    const updateTurn = db.prepare('UPDATE usage_turns SET estimated_cost_usd = ?, cost_formula = ?, billing_mode = ? WHERE id = ?');
+    const updateLog = db.prepare('UPDATE usage_events_log SET cost_usd = ?, cost_formula = ? WHERE event_key = ?');
+    let afterId = '';
+    while (true) {
+      const rows = db.prepare('SELECT * FROM usage_turns WHERE id > ? ORDER BY id LIMIT ?')
+        .all(afterId, REPRICE_BATCH_SIZE) as Record<string, unknown>[];
+      if (rows.length === 0) return;
+      db.transaction(() => {
+        for (const row of rows) {
+          const cost = computeTurnCost({ providerId: String(row.provider_id), model: String(row.model),
+            inputTokens: Number(row.input_tokens), cachedInputTokens: Number(row.cached_input_tokens),
+            outputTokens: Number(row.output_tokens), reasoningOutputTokens: Number(row.reasoning_output_tokens),
+            totalTokens: hasExplicitTurnTotal(row) ? Number(row.total_tokens) : undefined }, overrides, providerModeOverrides);
+          updateTurn.run(cost.estimatedCostUsd, cost.formula, cost.pricing.billingMode, row.id);
+          updateLog.run(cost.estimatedCostUsd, cost.formula, `turn_usage:${row.turn_key}`);
+        }
+      });
+      afterId = String(rows[rows.length - 1].id);
+    }
   }
 
   function queryLogs(
@@ -985,6 +1034,7 @@ export function createUsageStore(db: PluginDatabase, now: () => number = Date.no
     listPricingOverrides,
     upsertPricingOverride,
     deletePricingOverride,
+    repriceTurns,
     queryLogs
   };
 }

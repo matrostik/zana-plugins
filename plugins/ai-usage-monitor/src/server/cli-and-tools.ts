@@ -3,6 +3,7 @@ import type { LogEventKind, TimeRangeKey } from '../shared/types.ts';
 import type { OpenCodeQualificationProbeEntry } from './collectors/opencode-usage.ts';
 import type { DashboardService } from './dashboard.ts';
 import type { UsageStore } from './db.ts';
+import { errorMessage } from './util.ts';
 
 export interface CliAndToolsApp {
   dashboard: DashboardService;
@@ -111,14 +112,18 @@ export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void
       { name: 'qualify-opencode', summary: 'Probe OpenCode Console billing/usage endpoints with configured key (read-only, sanitized)', usage: 'zcc ai-usage qualify-opencode' }
     ],
     async run(argv: string[]) {
-      const sub = argv[0] ?? 'summary';
-      if (argv.includes('--refresh')) await app.refreshNow();
-      if (sub === 'summary') return runSummaryCommand(app, argv);
-      if (sub === 'quotas') return runQuotasCommand(app);
-      if (sub === 'budgets') return runBudgetsCommand(app);
-      if (sub === 'logs') return runLogsCommand(app, argv);
-      if (sub === 'qualify-opencode') return runQualifyOpenCodeCommand(app);
-      return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs, qualify-opencode.\n` };
+      try {
+        const sub = !argv[0] || argv[0].startsWith('--') ? 'summary' : argv[0];
+        if (argv.includes('--refresh')) await app.refreshNow();
+        if (sub === 'summary') return await runSummaryCommand(app, argv);
+        if (sub === 'quotas') return await runQuotasCommand(app);
+        if (sub === 'budgets') return await runBudgetsCommand(app);
+        if (sub === 'logs') return await runLogsCommand(app, argv);
+        if (sub === 'qualify-opencode') return await runQualifyOpenCodeCommand(app);
+        return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs, qualify-opencode.\n` };
+      } catch (err) {
+        return { exitCode: 1, stderr: `AI usage command failed: ${errorMessage(err)}\n` };
+      }
     }
   });
 }

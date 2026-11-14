@@ -233,6 +233,7 @@ export function createTelemetryIndexer(deps: TelemetryIndexerDeps) {
       outputTokens: turnCounts.outputTokens,
       reasoningOutputTokens: turnCounts.reasoningOutputTokens,
       totalTokens: turnCounts.totalTokens,
+      hasExplicitTotal: Boolean(turnCounts.hasExplicitTotal),
       contextUsedTokens: null,
       contextWindowTokens: windowTokens,
       estimatedCostUsd: breakdown.estimatedCostUsd,

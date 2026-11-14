@@ -51,8 +51,9 @@ function findTightestWindow(providers: readonly ProviderQuotaSnapshot[]): Dashbo
   } | null = null;
 
   for (const prov of providers) {
+    if (!prov.available || prov.billingMode !== 'subscription' || prov.status === 'not_installed') continue;
     for (const win of prov.windows) {
-      if (win.remainingPercent === null) continue;
+      if (win.remainingPercent === null || win.status === 'unknown') continue;
       if (!tightest || win.remainingPercent < (tightest.window.remainingPercent ?? 100)) {
         tightest = { providerId: prov.providerId, displayName: prov.displayName, window: win };
       }
@@ -141,7 +142,7 @@ function buildDashboardKpis(args: {
   const credits = sumCloudCredits(args.providers);
   const budgetAlerts = args.budgets.filter((b) => b.rule.enabled && b.status !== 'ok').length;
   const providerAlerts = args.providers.filter(
-    (p) => p.status === 'warning' || p.status === 'blocked' || p.status === 'error'
+    (p) => ['warning', 'blocked', 'error', 'unauthenticated', 'expired'].includes(p.status)
   ).length;
 
   return {
@@ -166,6 +167,34 @@ function buildDashboardKpis(args: {
   };
 }
 
+function reconcileProviders(
+  deps: DashboardServiceDeps, bounds: TimeRangeBounds, currentNowMs: number,
+  modeOverrides: ReadonlyMap<string, BillingMode> | undefined
+): ProviderQuotaSnapshot[] {
+  const providerUsage = deps.store.aggregateByProvider(bounds.startMs, bounds.endMs);
+  const discovered = deps.getDiscoveredProviders();
+  const discoveredMap = new Map(discovered.map((d) => [d.providerId, d]));
+  const snapshots = deps.store.listQuotaSnapshots();
+  const snapMap = new Map(snapshots.map((s) => [s.providerId, s]));
+
+  const allProviderIds = new Set<string>([
+    ...snapshots.map((s) => s.providerId),
+    ...discovered.map((d) => d.providerId),
+    ...providerUsage.keys()
+  ]);
+
+  return [...allProviderIds].map((providerId) =>
+    buildProviderSnapshot({
+      providerId,
+      snap: snapMap.get(providerId),
+      disc: discoveredMap.get(providerId),
+      agg: providerUsage.get(providerId),
+      modeOverrides,
+      currentNowMs
+    })
+  );
+}
+
 export function createDashboardService(deps: DashboardServiceDeps) {
   const now = deps.now ?? Date.now;
 
@@ -187,30 +216,9 @@ export function createDashboardService(deps: DashboardServiceDeps) {
     const bounds = resolveTimeRangeBounds(range, currentNowMs);
     const projectMap = await projectNamesMap();
     const summary = deps.store.aggregateSummary(bounds.startMs, bounds.endMs);
-    const providerUsage = deps.store.aggregateByProvider(bounds.startMs, bounds.endMs);
     const overrides = deps.store.listPricingOverrides();
-    const discovered = deps.getDiscoveredProviders();
-    const discoveredMap = new Map(discovered.map((d) => [d.providerId, d]));
-    const snapshots = deps.store.listQuotaSnapshots();
-    const snapMap = new Map(snapshots.map((s) => [s.providerId, s]));
     const modeOverrides = deps.getProviderModeOverrides?.();
-
-    const allProviderIds = new Set<string>([
-      ...snapshots.map((s) => s.providerId),
-      ...discovered.map((d) => d.providerId),
-      ...providerUsage.keys()
-    ]);
-
-    const providers = [...allProviderIds].map((providerId) =>
-      buildProviderSnapshot({
-        providerId,
-        snap: snapMap.get(providerId),
-        disc: discoveredMap.get(providerId),
-        agg: providerUsage.get(providerId),
-        modeOverrides,
-        currentNowMs
-      })
-    );
+    const providers = reconcileProviders(deps, bounds, currentNowMs, modeOverrides);
 
     const providerOrder = deps.getProviderOrder?.() ?? DEFAULT_PROVIDER_ORDER;
     const sortedProviders = sortProviders(providers, providerOrder);
@@ -228,7 +236,7 @@ export function createDashboardService(deps: DashboardServiceDeps) {
       }),
       providers: sortedProviders,
       providerOrder,
-      models: deps.store.listModelBreakdown(bounds.startMs, overrides, bounds.endMs),
+      models: deps.store.listModelBreakdown(bounds.startMs, overrides, bounds.endMs, modeOverrides),
       projects: deps.store.listProjectBreakdown(bounds.startMs, projectMap, bounds.endMs),
       dailyTrend: deps.store.listDailyTrend(range),
       budgets,

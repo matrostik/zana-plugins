@@ -52,75 +52,25 @@ export function resolveLocalTimezone(): string {
   }
 }
 
-export function resolveTimeRangeBounds(
-  range: TimeRangeKey,
-  nowMs: number,
-  timezone: string = resolveLocalTimezone()
+function timeRangeBounds(
+  range: TimeRangeKey, label: string, timezone: string, startMs: number, endMs: number | null = null
 ): TimeRangeBounds {
-  if (range === 'all') {
-    return {
-      range,
-      label: 'All time',
-      timezone,
-      startMs: 0,
-      endMs: null,
-      startIso: new Date(0).toISOString(),
-      endIso: null
-    };
-  }
+  return { range, label, timezone, startMs, endMs,
+    startIso: new Date(startMs).toISOString(), endIso: endMs === null ? null : new Date(endMs).toISOString() };
+}
 
-  if (range === 'today') {
-    const startMs = localMidnightMs(nowMs, 0);
-    return {
-      range,
-      label: 'Today (local midnight)',
-      timezone,
-      startMs,
-      endMs: null,
-      startIso: new Date(startMs).toISOString(),
-      endIso: null
-    };
-  }
-
-  if (range === '7d') {
-    const startMs = localMidnightMs(nowMs, -6);
-    return {
-      range,
-      label: 'Last 7 calendar days',
-      timezone,
-      startMs,
-      endMs: null,
-      startIso: new Date(startMs).toISOString(),
-      endIso: null
-    };
-  }
-
+export function resolveTimeRangeBounds(
+  range: TimeRangeKey, nowMs: number, timezone: string = resolveLocalTimezone()
+): TimeRangeBounds {
+  if (range === 'all') return timeRangeBounds(range, 'All time', timezone, 0);
+  if (range === 'today') return timeRangeBounds(range, 'Today (local midnight)', timezone, localMidnightMs(nowMs));
+  if (range === '7d') return timeRangeBounds(range, 'Last 7 calendar days', timezone, localMidnightMs(nowMs, -6));
   if (range === 'last_week') {
-    const dt = new Date(nowMs);
-    const daysSinceMonday = (dt.getDay() + 6) % 7;
-    const thisMondayMs = localMidnightMs(nowMs, -daysSinceMonday);
-    const lastMondayMs = localMidnightMs(nowMs, -daysSinceMonday - 7);
-    return {
-      range,
-      label: 'Last calendar week (Monâ€“Sun)',
-      timezone,
-      startMs: lastMondayMs,
-      endMs: thisMondayMs,
-      startIso: new Date(lastMondayMs).toISOString(),
-      endIso: new Date(thisMondayMs).toISOString()
-    };
+    const daysSinceMonday = (new Date(nowMs).getDay() + 6) % 7;
+    return timeRangeBounds(range, 'Last calendar week (Mon–Sun)', timezone,
+      localMidnightMs(nowMs, -daysSinceMonday - 7), localMidnightMs(nowMs, -daysSinceMonday));
   }
-
-  const startMs = localMidnightMs(nowMs, -29);
-  return {
-    range: '30d',
-    label: 'Last 30 calendar days',
-    timezone,
-    startMs,
-    endMs: null,
-    startIso: new Date(startMs).toISOString(),
-    endIso: null
-  };
+  return timeRangeBounds('30d', 'Last 30 calendar days', timezone, localMidnightMs(nowMs, -29));
 }
 
 export function rangeStartMs(range: TimeRangeKey, nowMs: number): number {

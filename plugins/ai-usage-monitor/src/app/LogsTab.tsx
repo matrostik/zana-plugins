@@ -26,7 +26,7 @@ function LogFiltersBar({
   onSearchChange
 }: LogsTabProps) {
   const filters: Array<{ kind: LogEventKind | 'all'; label: string }> = [
-    { kind: 'all', label: `All (${logs.totalCount})` },
+    { kind: 'all', label: `All (${Object.values(logs.countsByKind).reduce((sum, count) => sum + count, 0)})` },
     { kind: 'turn_usage', label: `Turns (${logs.countsByKind.turn_usage})` },
     { kind: 'rate_limit', label: `Rate Limits (${logs.countsByKind.rate_limit})` },
     { kind: 'fallback', label: `Fallbacks (${logs.countsByKind.fallback})` },
@@ -115,6 +115,34 @@ function LogsTable({
   );
 }
 
+function LogContextDetails({ selected }: { selected: UsageLogEntry }) {
+  if (selected.inputTokens === null) return null;
+  const ctxPct =
+    selected.contextUsedTokens && selected.contextWindowTokens && selected.contextWindowTokens > 0
+      ? Math.min(100, Math.round((selected.contextUsedTokens / selected.contextWindowTokens) * 100))
+      : null;
+
+  return (
+    <div className="aum-window-box">
+      <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
+        <span>Context Window Fill</span>
+        <span>
+          {selected.contextUsedTokens ? formatTokens(selected.contextUsedTokens) : '—'} /{' '}
+          {selected.contextWindowTokens ? formatTokens(selected.contextWindowTokens) : '—'}
+          {ctxPct !== null ? ` (${ctxPct}%)` : ''}
+        </span>
+      </div>
+      <div className="aum-bar-track">
+        <div className="aum-bar-fill" style={{ width: `${ctxPct ?? 0}%`, background: '#6366f1' }} />
+      </div>
+      <div className="aum-subtext aum-mono">
+        In: {formatTokens(selected.inputTokens)} ({formatTokens(selected.cachedInputTokens ?? 0)} cached) • Out:{' '}
+        {formatTokens(selected.outputTokens ?? 0)} • Reasoning: {formatTokens(selected.reasoningOutputTokens ?? 0)}
+      </div>
+    </div>
+  );
+}
+
 function LogEventInspector({
   selected,
   onOpenThread
@@ -130,10 +158,6 @@ function LogEventInspector({
     );
   }
   const badge = kindBadge(selected.kind);
-  const ctxPct =
-    selected.contextUsedTokens && selected.contextWindowTokens && selected.contextWindowTokens > 0
-      ? Math.min(100, Math.round((selected.contextUsedTokens / selected.contextWindowTokens) * 100))
-      : null;
 
   return (
     <div className="aum-card">
@@ -145,25 +169,7 @@ function LogEventInspector({
         <span className={badge.cls}>{badge.label}</span>
       </div>
 
-      {selected.inputTokens !== null && (
-        <div className="aum-window-box">
-          <div className="aum-row-between aum-mono" style={{ fontSize: 11 }}>
-            <span>Context Window Fill</span>
-            <span>
-              {selected.contextUsedTokens ? formatTokens(selected.contextUsedTokens) : '—'} /{' '}
-              {selected.contextWindowTokens ? formatTokens(selected.contextWindowTokens) : '—'}
-              {ctxPct !== null ? ` (${ctxPct}%)` : ''}
-            </span>
-          </div>
-          <div className="aum-bar-track">
-            <div className="aum-bar-fill" style={{ width: `${ctxPct ?? 0}%`, background: '#6366f1' }} />
-          </div>
-          <div className="aum-subtext aum-mono">
-            In: {formatTokens(selected.inputTokens)} ({formatTokens(selected.cachedInputTokens ?? 0)} cached) • Out:{' '}
-            {formatTokens(selected.outputTokens ?? 0)} • Reasoning: {formatTokens(selected.reasoningOutputTokens ?? 0)}
-          </div>
-        </div>
-      )}
+      <LogContextDetails selected={selected} />
 
       {selected.costFormula && (
         <div className="aum-window-box">

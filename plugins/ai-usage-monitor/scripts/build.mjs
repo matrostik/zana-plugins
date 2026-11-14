@@ -75,7 +75,7 @@ export const jsxDEV = jsx;
 
 function hostReactPlugin() {
   const namespace = 'zcc-host-react';
-  const filter = /^(react|react-dom|react-dom\/client|react\/jsx-runtime|react\/jsx-dev-runtime)$/;
+  const filter = /^(react|react\/jsx-runtime|react\/jsx-dev-runtime)$/;
   return {
     name: 'zcc-host-react',
     setup(build) {

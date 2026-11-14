@@ -393,7 +393,7 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
             onClick={() => setTab('logs')}
           >
             Usage &amp; Error Logs
-            <span className="aum-pill aum-pill-neutral">{logs.totalCount}</span>
+            <span className="aum-pill aum-pill-neutral">{dashboard?.kpis.logCount ?? 0}</span>
           </button>
         </div>
         {boundarySummary && <span className="aum-chip">{boundarySummary}</span>}

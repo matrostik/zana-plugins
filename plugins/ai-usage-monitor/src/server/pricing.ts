@@ -95,13 +95,21 @@ export function inferDefaultBillingMode(providerId: string, model: string): Bill
   return 'billed_api';
 }
 
+const PATTERN_CACHE_LIMIT = 256;
+const patternCache = new Map<string, RegExp>();
+
 function wildcardToRegex(pattern: string): RegExp {
+  const cached = patternCache.get(pattern);
+  if (cached) return cached;
   const escaped = pattern
     .trim()
     .toLowerCase()
     .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`);
+  const regex = new RegExp(`^${escaped}$`);
+  if (patternCache.size >= PATTERN_CACHE_LIMIT) patternCache.clear();
+  patternCache.set(pattern, regex);
+  return regex;
 }
 
 function matchesPattern(pattern: string, providerId: string, model: string): boolean {
@@ -124,7 +132,7 @@ export function resolveModelPricing(
   const billingMode =
     matched.billingMode ?? providerModeOverrides.get(providerId.toLowerCase()) ?? inferDefaultBillingMode(providerId, model);
 
-  if (billingMode === 'free' && !overrides.some((rule) => matchesPattern(rule.pattern, providerId, model))) {
+  if (billingMode === 'free') {
     return {
       pattern: matched.pattern,
       inputPer1M: 0,

@@ -296,8 +296,14 @@ describe('UsageStore SQLite persistence & aggregations', () => {
       period: 'daily',
       metric: 'tokens',
       limitValue: 1,
-      alertThresholdPct: 0,
+      alertThresholdPct: 80,
       enabled: true
+    });
+    emptyStore.upsertTurn({
+      turnKey: 'orphan:turn', threadId: 'orphan', providerId: 'missing-provider', model: 'test', projectId: '',
+      timestampMs: nowMs, billingMode: 'billed_api', inputTokens: 10, cachedInputTokens: 0, outputTokens: 0,
+      reasoningOutputTokens: 0, totalTokens: 10, contextUsedTokens: null, contextWindowTokens: null,
+      estimatedCostUsd: 0, costFormula: '', isSubagent: false, rawJson: '{}'
     });
     const failingEvaluator = createBudgetEvaluator({
       store: emptyStore,

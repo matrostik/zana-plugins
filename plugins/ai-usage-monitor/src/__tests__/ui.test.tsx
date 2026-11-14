@@ -24,6 +24,13 @@ import appPlugin from '../../app.tsx';
 import { SettingsSection } from '../app/SettingsSection.tsx';
 import { UsageMonitorPanel } from '../app/UsageMonitorPanel.tsx';
 import { OverviewTab } from '../app/OverviewTab.tsx';
+import { LogsTab } from '../app/LogsTab.tsx';
+
+it('keeps the All log count stable when a kind filter is active', () => {
+  const logs = { ...makeLogs(), totalCount: 1 };
+  render(<LogsTab logs={logs} kindFilter="error" searchQuery="" onKindChange={vi.fn()} onSearchChange={vi.fn()} />);
+  expect(screen.getByRole('button', { name: 'All (2)' })).toBeTruthy();
+});
 
 function makeDashboard(): DashboardPayload {
   return {

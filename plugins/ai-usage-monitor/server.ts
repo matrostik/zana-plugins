@@ -139,18 +139,24 @@ export default async function createAiUsageMonitorPlugin(
     }
   });
 
+  const db = zcc.storage.database();
+  const store = createUsageStore(db, now);
   let cachedModeOverrides = parseSubscriptionOverrides(DEFAULT_SUBSCRIPTION_PROVIDERS_CSV);
+  let pricingModesKey = '';
   let cachedLocalProbeEnabled = false;
   const refreshSettingsCache = async (): Promise<SettingsMap> => {
     const vals = await settings.get().catch((): SettingsMap => ({}));
     cachedModeOverrides = parseSubscriptionOverrides(vals.subscriptionProviders);
+    const nextModesKey = JSON.stringify([...cachedModeOverrides].sort());
+    if (nextModesKey !== pricingModesKey) {
+      store.repriceTurns(cachedModeOverrides);
+      pricingModesKey = nextModesKey;
+    }
     cachedLocalProbeEnabled = vals.enableLocalCredentialProbing === true;
     return vals;
   };
   await refreshSettingsCache();
 
-  const db = zcc.storage.database();
-  const store = createUsageStore(db, now);
   let discoveredProviders: DiscoveredProviderModels[] = [];
   let cachedOpenCodeLocalStats: OpenCodeLocalStatsSnapshot | null =
     (await zcc.storage.kv.get<OpenCodeLocalStatsSnapshot>('opencodeLocalStats').catch(() => undefined)) ?? null;
@@ -467,6 +473,7 @@ export default async function createAiUsageMonitorPlugin(
       reasoningPer1M: Math.max(0, asNumber(rec, 'reasoningPer1M', 0)),
       billingMode: rawMode
     });
+    store.repriceTurns(cachedModeOverrides);
     zcc.realtime.publish(REALTIME_CHANNEL, { pricingPattern: pattern });
     return saved;
   });
@@ -475,6 +482,7 @@ export default async function createAiUsageMonitorPlugin(
     const pattern = asString(asRecord(args), 'pattern').trim();
     if (!pattern) throw new Error('Pricing pattern is required.');
     const deleted = store.deletePricingOverride(pattern);
+    if (deleted) store.repriceTurns(cachedModeOverrides);
     zcc.realtime.publish(REALTIME_CHANNEL, { pricingDeleted: pattern });
     return { deleted };
   });
