@@ -1,5 +1,5 @@
 import type { Store } from './db.ts';
-import type { FindingRow, LocalScope, LocalTargetRow, PrBucket, PullRequestRow, ReviewRow, ReviewRunRow, SkippedFile } from './types.ts';
+import type { FindingRow, LocalFixRunRow, LocalScope, LocalTargetRow, PrBucket, PullRequestRow, ReviewRow, ReviewRunRow, SkippedFile } from './types.ts';
 
 export interface PrListItem extends PullRequestRow {
   outdated?: boolean;
@@ -78,6 +78,8 @@ export function getPrDetail(store: Store, prId: string): PrDetail | null {
 
 export interface LocalSnapshotView {
   scope: LocalScope;
+  headRef?: string | null;
+  commitShas?: string[];
   baseRef: string | null;
   baseSha: string;
   headSha: string;
@@ -95,6 +97,8 @@ export interface LocalHistoryItem {
   riskScore: number | null;
   createdAt: number;
   scope: LocalScope | null;
+  headRef?: string | null;
+  commitCount?: number;
   baseRef: string | null;
   findingCount: number;
 }
@@ -109,6 +113,10 @@ export interface LocalDetail {
   runs: ReviewRunRow[];
   findings: FindingRow[];
   history: LocalHistoryItem[];
+  /** Currently running fix agent in this checkout, if any. */
+  activeFix?: LocalFixRunRow | null;
+  /** Most recent fix run for the displayed review. */
+  latestFix?: LocalFixRunRow | null;
 }
 
 /** The latest local review (or an explicitly requested historical review). */
@@ -125,6 +133,10 @@ export function getLocalDetail(store: Store, targetId: string, reviewId?: string
   const hasAttempt = Boolean(
     requested && latest && latest.id !== requested.id && (latest.status === 'queued' || latest.status === 'running')
   );
+  const targetFix = store.latestLocalFixRunForTarget(targetId);
+  const activeFix = targetFix?.status === 'running' ? targetFix : null;
+  const reviewFixes = review ? store.listLocalFixRuns(review.id) : [];
+  const latestFix = reviewFixes[0] ?? null;
   return {
     target,
     ...(hasAttempt ? { latestAttempt: latest, latestRuns: store.listRuns(latest.id) } : {}),
@@ -132,6 +144,8 @@ export function getLocalDetail(store: Store, targetId: string, reviewId?: string
     snapshot: snapshot
       ? {
           scope: snapshot.scope,
+          headRef: snapshot.headRef,
+          commitShas: snapshot.commitShas,
           baseRef: snapshot.baseRef,
           baseSha: snapshot.baseSha,
           headSha: snapshot.headSha,
@@ -151,9 +165,13 @@ export function getLocalDetail(store: Store, targetId: string, reviewId?: string
       riskScore: item.riskScore,
       createdAt: item.createdAt,
       scope: itemSnapshot?.scope ?? null,
+      headRef: itemSnapshot?.headRef ?? null,
+      commitCount: itemSnapshot?.commitShas?.length ?? 0,
       baseRef: itemSnapshot?.baseRef ?? null,
       findingCount: counts.get(item.id) ?? 0
-    }))
+    })),
+    activeFix,
+    latestFix
   };
 }
 
@@ -178,12 +196,15 @@ export function formatLocalDetail(detail: LocalDetail, options: { stale?: boolea
     lines.push('Not reviewed yet. Run: zcc codewink review-local');
     return lines.join('\n');
   }
+  const branchText = snapshot.headRef ? ` (${snapshot.headRef})` : '';
+  const commitText = snapshot.scope === 'commits' && snapshot.commitShas?.length ? ` (${snapshot.commitShas.length} commit${snapshot.commitShas.length === 1 ? '' : 's'})` : '';
   lines.push(
-    `Scope ${snapshot.scope}${snapshot.baseRef ? ` vs ${snapshot.baseRef}` : ''} · snapshot ${snapshot.snapshotSha.slice(0, 12)} · ${snapshot.files.length} file(s) reviewed`,
+    `Scope ${snapshot.scope}${branchText}${commitText}${snapshot.baseRef ? ` vs ${snapshot.baseRef}` : ''} · snapshot ${snapshot.snapshotSha.slice(0, 12)} · ${snapshot.files.length} file(s) reviewed`,
     '',
     `Review ${review.status}${options.stale ? ' (stale: files changed since this review)' : ''} · ${runs.map((run) => `${run.model}: ${run.status}`).join(', ')}`
   );
   if (detail.latestAttempt) lines.push(`Latest rerun ${detail.latestAttempt.status}${detail.latestAttempt.error ? ': ' + detail.latestAttempt.error : ''}; showing selected review.`);
+  if (detail.activeFix) lines.push(`Active fix: ${detail.activeFix.providerId}/${detail.activeFix.model} (${detail.activeFix.permissionMode})`);
   if (review.promptSnapshot) lines.push(`Review prompt: ${review.promptSnapshot.name}`);
   if (review.error) lines.push(`Error: ${review.error}`);
   if (snapshot.skipped.length > 0) {

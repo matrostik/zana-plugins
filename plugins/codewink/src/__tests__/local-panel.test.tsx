@@ -6,7 +6,9 @@ import { CodewinkPanel } from '../app/CodewinkPanel.tsx';
 import { LocalDetail } from '../app/LocalDetail.tsx';
 import { CODEWINK_STYLES } from '../app/styles.ts';
 import type { LocalOverview } from '../app/types.ts';
+import type { BranchList, CommitPage } from '../server/local/git.ts';
 import type { LocalLocationSummary, LocalReviewStatus } from '../server/local/service.ts';
+import type { LocalFixRunRow } from '../server/types.ts';
 import type { LocalDetail as LocalDetailData } from '../server/views.ts';
 import { detail, finding, NOW } from './pr-fixtures.ts';
 
@@ -37,6 +39,57 @@ function location(overrides: Partial<LocalLocationSummary> = {}): LocalLocationS
     lastScope: null,
     latest: null,
     ...overrides
+  };
+}
+
+function branchListFixture(overrides: Partial<BranchList> = {}): BranchList {
+  return {
+    currentBranch: 'feat/login',
+    defaultBase: 'origin/main',
+    branches: [
+      { ref: 'feat/login', kind: 'local', isCurrent: true },
+      { ref: 'feat/other', kind: 'local', isCurrent: false },
+      { ref: 'origin/main', kind: 'remote', isCurrent: false },
+      { ref: 'origin/develop', kind: 'remote', isCurrent: false }
+    ],
+    ...overrides
+  };
+}
+
+function fixRunFixture(overrides: Partial<LocalFixRunRow> = {}): LocalFixRunRow {
+  return {
+    id: 'fix-run-1',
+    reviewId: 'rev-2',
+    targetId: TARGET_ID,
+    threadId: 'fix-1',
+    providerId: 'cursor',
+    model: 'a',
+    reasoningLevel: null,
+    permissionMode: 'full',
+    findingIds: ['f1'],
+    status: 'running',
+    summary: null,
+    error: null,
+    startedAt: NOW - 15_000,
+    completedAt: null,
+    ...overrides
+  };
+}
+
+function commitPageFixture(start: number, count: number, hasMore: boolean): CommitPage {
+  return {
+    commits: Array.from({ length: count }, (_, idx) => {
+      const n = start + idx + 1;
+      const sha = n.toString(16).padStart(40, '0');
+      return {
+        sha,
+        shortSha: sha.slice(0, 7),
+        subject: `Commit ${n}`,
+        author: 'Alice',
+        authoredAt: new Date(NOW - n * 60_000).toISOString()
+      };
+    }),
+    hasMore
   };
 }
 
@@ -137,7 +190,7 @@ describe('Pull requests | Local changes switch', () => {
       location({ targetId: 'local:clean', worktreePath: '/work/app-clean', branch: 'main', isMain: false, changedFiles: 0 }),
       location({ targetId: 'local:web', projectId: 'web', projectName: 'Web', worktreePath: '/work/web', branch: 'fix/nav', changedFiles: 1, latest: { id: 'r', status: 'completed', riskScore: 8, createdAt: NOW } })
     ],
-    scopes: ['uncommitted', 'staged', 'branch'],
+    scopes: ['uncommitted', 'staged', 'branch', 'commits'],
     hasModels: true
   };
 
@@ -180,6 +233,30 @@ describe('Pull requests | Local changes switch', () => {
     unmount();
     render(<CodewinkPanel pluginId="codewink" />);
     expect((await screen.findByRole('tab', { name: 'Local changes' })).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('shows Fixing… badge and keeps clean checkouts visible while a fix run is active', async () => {
+    const localsWithFix: LocalOverview = {
+      ...locals,
+      locations: [
+        location({
+          targetId: 'local:clean-fixing',
+          worktreePath: '/work/app-clean-fixing',
+          branch: 'fix/active',
+          isMain: false,
+          changedFiles: 0,
+          latestFix: fixRunFixture({ targetId: 'local:clean-fixing', status: 'running' })
+        })
+      ]
+    };
+    answer({ overview, config: { models: [] }, localTargets: localsWithFix });
+    localStorage.setItem('codewink.mode', 'local');
+    render(<CodewinkPanel pluginId="codewink" />);
+
+    const list = await screen.findByRole('navigation', { name: 'Local checkouts' });
+    expect(within(list).getByText('fix/active')).toBeTruthy();
+    expect(within(list).getByText('Fixing…')).toBeTruthy();
+    expect(within(list).queryByRole('checkbox', { name: /hidden/ })).toBeNull();
   });
 
   it('opens the selected checkout and reloads the list and its status on Refresh', async () => {
@@ -263,22 +340,88 @@ describe('LocalDetail', () => {
     expect(screen.queryByText('Null token crashes login')).toBeNull();
     expect(calls('localDetail').at(-1)?.reviewId).toBeUndefined();
   });
-  it('starts a review for the chosen scope, base, and intent', async () => {
-    answer({ localDetail: localDetail({ review: null, snapshot: null, runs: [], findings: [], history: [] }), startLocalReview: { id: 'rev-3' } });
+
+  it('starts a review for the chosen scope, branch dropdowns, and intent', async () => {
+    answer({
+      localDetail: localDetail({ review: null, snapshot: null, runs: [], findings: [], history: [] }),
+      localBranches: branchListFixture(),
+      startLocalReview: { id: 'rev-3' }
+    });
     renderDetail();
 
     const scopes = await screen.findByRole('radiogroup', { name: 'Changes to review' });
     const uncommitted = within(scopes).getByRole('radio', { name: 'Uncommitted' });
     expect(uncommitted.getAttribute('aria-checked')).toBe('true');
-    fireEvent.keyDown(uncommitted, { key: 'End' });
+    fireEvent.keyDown(uncommitted, { key: 'ArrowRight' });
+    fireEvent.keyDown(within(scopes).getByRole('radio', { name: 'Staged' }), { key: 'ArrowRight' });
     expect(within(scopes).getByRole('radio', { name: 'Branch vs base' }).getAttribute('aria-checked')).toBe('true');
-    fireEvent.change(screen.getByLabelText('Base branch'), { target: { value: ' origin/develop ' } });
+
+    await waitFor(() => expect(calls('localBranches')).toEqual([{ targetId: TARGET_ID }]));
+    const targetSelect = screen.getByLabelText('Target branch') as HTMLSelectElement;
+    const baseSelect = screen.getByLabelText('Base branch') as HTMLSelectElement;
+    expect(within(targetSelect).getByRole('option', { name: 'feat/other' })).toBeTruthy();
+    fireEvent.change(targetSelect, { target: { value: 'feat/other' } });
+    fireEvent.change(baseSelect, { target: { value: 'origin/develop' } });
     fireEvent.change(screen.getByLabelText('Intent (optional)'), { target: { value: 'Add login' } });
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
 
     expect(await screen.findByText('Snapshot taken')).toBeTruthy();
-    expect(calls('startLocalReview')).toEqual([{ projectId: 'app', worktreePath: '/work/app', scope: 'branch', base: 'origin/develop', intent: 'Add login' }]);
+    expect(calls('startLocalReview')).toEqual([
+      { projectId: 'app', worktreePath: '/work/app', scope: 'branch', base: 'origin/develop', headRef: 'feat/other', intent: 'Add login' }
+    ]);
     expect(screen.getByText('Not reviewed yet.')).toBeTruthy();
+  });
+
+  it('loads commits in pages of 10, paginates with Show 10 more, and reviews selected commits', async () => {
+    answer({
+      localDetail: localDetail({ review: null, snapshot: null, runs: [], findings: [], history: [] }),
+      localCommits: (args: Record<string, unknown>) =>
+        args.skip === 0 ? commitPageFixture(0, 10, true) : commitPageFixture(10, 5, false),
+      startLocalReview: { id: 'rev-3' }
+    });
+    renderDetail();
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'Commits' }));
+    await waitFor(() => expect(calls('localCommits')).toEqual([{ targetId: TARGET_ID, limit: 10, skip: 0 }]));
+    expect(await screen.findByText('Commit 1')).toBeTruthy();
+    expect(screen.getByText('Commit 10')).toBeTruthy();
+    const reviewBtn = screen.getByRole('button', { name: 'Review changes' }) as HTMLButtonElement;
+    expect(reviewBtn.disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show 10 more' }));
+    await waitFor(() => expect(calls('localCommits')).toEqual([
+      { targetId: TARGET_ID, limit: 10, skip: 0 },
+      { targetId: TARGET_ID, limit: 10, skip: 10 }
+    ]));
+    expect(await screen.findByText('Commit 15')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show 10 more' })).toBeNull();
+
+    const commit1Box = screen.getByText('Commit 1').closest('label')!.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const commit12Box = screen.getByText('Commit 12').closest('label')!.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    fireEvent.click(commit1Box);
+    fireEvent.click(commit12Box);
+    expect(screen.getByText('2 selected')).toBeTruthy();
+    expect(reviewBtn.disabled).toBe(false);
+
+    fireEvent.click(reviewBtn);
+    await waitFor(() =>
+      expect(calls('startLocalReview')).toEqual([
+        {
+          projectId: 'app',
+          worktreePath: '/work/app',
+          scope: 'commits',
+          base: null,
+          commits: [
+            (1).toString(16).padStart(40, '0'),
+            (12).toString(16).padStart(40, '0')
+          ],
+          intent: null
+        }
+      ])
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(reviewBtn.disabled).toBe(true);
   });
 
   it('remembers the last scope and hides the base field outside branch scope', async () => {
@@ -432,6 +575,46 @@ describe('LocalDetail', () => {
     expect(toThread).toHaveBeenCalledWith('fix-1');
     fireEvent.click(screen.getByRole('button', { name: 'Re-review' }));
     await waitFor(() => expect(calls('startLocalReview')).toHaveLength(1));
+  });
+
+  it('reflects persisted running, completed, failed, and stopped fix runs and lets users stop an active fix', async () => {
+    const toThread = vi.fn();
+    sdk.toThread = toThread;
+    const runningFix = fixRunFixture();
+    let currentDetail = localDetail({ activeFix: runningFix, latestFix: runningFix });
+    answer({
+      localDetail: () => currentDetail,
+      localStatus: fresh(),
+      localDiff: [],
+      stopLocalFix: () => {
+        const stopped = fixRunFixture({ status: 'stopped', completedAt: NOW - 5_000 });
+        currentDetail = localDetail({ activeFix: null, latestFix: stopped });
+        return stopped;
+      }
+    });
+    renderDetail();
+
+    expect(await screen.findByText(/A fix agent is editing this checkout · cursor\/a \(full\)/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open fix thread' }));
+    expect(toThread).toHaveBeenCalledWith('fix-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop fix' }));
+    await waitFor(() => expect(calls('stopLocalFix')).toEqual([{ fixRunId: 'fix-run-1' }]));
+    expect(await screen.findByText('Fix stopped')).toBeTruthy();
+
+    cleanup();
+    const completedFix = fixRunFixture({ status: 'completed', summary: 'Fixed null check in login.ts', completedAt: NOW - 2_000 });
+    answer({ localDetail: localDetail({ activeFix: null, latestFix: completedFix }), localStatus: fresh(), localDiff: [] });
+    renderDetail();
+    expect(await screen.findByText('Fix completed')).toBeTruthy();
+    expect(screen.getByText('Fixed null check in login.ts')).toBeTruthy();
+
+    cleanup();
+    const failedFix = fixRunFixture({ status: 'failed', error: 'Agent crashed', completedAt: NOW - 2_000 });
+    answer({ localDetail: localDetail({ activeFix: null, latestFix: failedFix }), localStatus: fresh(), localDiff: [] });
+    renderDetail();
+    expect(await screen.findByText('Fix failed')).toBeTruthy();
+    expect(screen.getByText(/Agent crashed/)).toBeTruthy();
   });
 
   it('keeps launch errors in the picker and releases busy state for a retry', async () => {

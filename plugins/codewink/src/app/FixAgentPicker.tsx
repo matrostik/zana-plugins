@@ -5,19 +5,26 @@ import { errorText } from './format.ts';
 import type { Rpc } from './types.ts';
 
 const PREFERENCE_KEY = 'codewink.fixAgent';
-const [EDIT_MODE, ACCEPT_EDITS_MODE] = FIX_PERMISSION_MODES;
+const [EDIT_MODE, ACCEPT_EDITS_MODE, FULL_MODE] = FIX_PERMISSION_MODES;
 const PERMISSION_MODE_LABELS: Record<(typeof FIX_PERMISSION_MODES)[number], string> = {
   edit: 'Edit',
   'accept-edits': 'Accept edits',
   full: 'Full'
 };
 
+function defaultModeFor(modes: string[]): string {
+  if (modes.includes(FULL_MODE)) return FULL_MODE;
+  if (modes.includes(ACCEPT_EDITS_MODE)) return ACCEPT_EDITS_MODE;
+  if (modes.includes(EDIT_MODE)) return EDIT_MODE;
+  return '';
+}
+
 function readPreference(defaults: ModelChoice[]): FixAgentChoice | null {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFERENCE_KEY) ?? 'null') as FixAgentChoice | null;
     if (saved && typeof saved.providerId === 'string' && typeof saved.model === 'string' && typeof saved.permissionMode === 'string') return { providerId: saved.providerId, model: saved.model, permissionMode: saved.permissionMode };
   } catch { /* Missing or invalid browser storage leaves the initial defaults intact. */ }
-  return defaults[0] ? { providerId: defaults[0].providerId, model: defaults[0].model, permissionMode: EDIT_MODE } : null;
+  return defaults[0] ? { providerId: defaults[0].providerId, model: defaults[0].model, permissionMode: FULL_MODE } : null;
 }
 
 function useFixCatalog(rpc: Rpc, container: RefObject<HTMLDivElement | null>) {
@@ -39,7 +46,14 @@ function resolveChoice(providers: FixProvider[], choice: FixAgentChoice | null) 
   const provider = compatible.find((item) => item.providerId === choice?.providerId);
   const model = provider?.models.find((item) => item.id === choice?.model);
   const modes = provider?.permissionModes ?? [];
-  const permissionMode = choice?.permissionMode === EDIT_MODE && !modes.includes(EDIT_MODE) && modes.includes(ACCEPT_EDITS_MODE) ? ACCEPT_EDITS_MODE : choice?.permissionMode ?? '';
+  let permissionMode = choice?.permissionMode ?? '';
+  if (provider && !modes.includes(permissionMode)) {
+    if (permissionMode === FULL_MODE) {
+      permissionMode = modes.includes(ACCEPT_EDITS_MODE) ? ACCEPT_EDITS_MODE : modes.includes(EDIT_MODE) ? EDIT_MODE : permissionMode;
+    } else if (permissionMode === EDIT_MODE && modes.includes(ACCEPT_EDITS_MODE)) {
+      permissionMode = ACCEPT_EDITS_MODE;
+    }
+  }
   return { compatible, provider, model, modes, permissionMode, valid: Boolean(provider && model && modes.includes(permissionMode)) };
 }
 
@@ -88,7 +102,7 @@ function FixAgentFields({ providers, choice, busy, onChange }: { providers: FixP
   const chooseProvider = (id: string) => {
     const next = compatible.find((item) => item.providerId === id);
     if (!next) return;
-    onChange({ providerId: id, model: next.models[0].id, permissionMode: next.permissionModes.includes(EDIT_MODE) ? EDIT_MODE : next.permissionModes.includes(ACCEPT_EDITS_MODE) ? ACCEPT_EDITS_MODE : '' });
+    onChange({ providerId: id, model: next.models[0].id, permissionMode: defaultModeFor(next.permissionModes) });
   };
   return <div className="cn-fields">
         <label className="cn-field"><span>Provider</span><select className="cn-select" aria-label="Provider" value={choice?.providerId ?? ''} disabled={busy} onChange={(event) => chooseProvider(event.target.value)}>

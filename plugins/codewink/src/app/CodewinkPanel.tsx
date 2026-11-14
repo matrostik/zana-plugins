@@ -7,7 +7,7 @@ import { PrDetail } from './PrDetail.tsx';
 import { PrList } from './PrList.tsx';
 import { ProjectRepoBanners } from './ProjectRepoBanners.tsx';
 import { Segmented, type SegmentedOption } from './Segmented.tsx';
-import { SettingsView } from './SettingsView.tsx';
+import { SettingsView, type SettingsTab } from './SettingsView.tsx';
 import { storageKey } from './storage.ts';
 import type { ConfigSnapshot, Overview } from './types.ts';
 
@@ -51,10 +51,12 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
   const rpc = useRpc();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [models, setModels] = useState<ModelChoice[]>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const [tab, setTab] = useState<PrBucket>(() => initialTab(projectId));
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<'inbox' | 'settings'>('inbox');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile');
   const [chosenMode, setMode] = useState<Mode | null>(() => savedMode(projectId));
   const [localReloadToken, setLocalReloadToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,16 +65,31 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
   const mode: Mode = chosenMode ?? (noRemote ? 'local' : 'pr');
 
   const load = useCallback(() => {
+    // Models come from `config` when the overview omits them or fails; a config failure is shown unless an overview error already is.
+    const loadConfigModels = () =>
+      rpc
+        .call('config')
+        .then((configValue) => {
+          setModels((configValue as ConfigSnapshot).models);
+          setModelsLoaded(true);
+        })
+        .catch((cause) => setError((current) => current ?? errorText(cause)));
     (projectId ? rpc.call('overview', { projectId }) : rpc.call('overview'))
       .then((value) => {
-        setOverview(value as Overview);
+        const nextOverview = value as Overview;
+        setOverview(nextOverview);
         setError(null);
+        if (Array.isArray(nextOverview.models)) {
+          setModels(nextOverview.models);
+          setModelsLoaded(true);
+        } else {
+          void loadConfigModels();
+        }
       })
-      .catch((cause) => setError(errorText(cause)));
-    rpc
-      .call('config')
-      .then((value) => setModels((value as ConfigSnapshot).models))
-      .catch(() => undefined);
+      .catch((cause) => {
+        setError(errorText(cause));
+        void loadConfigModels();
+      });
   }, [rpc, projectId]);
 
   useEffect(load, [load]);
@@ -113,6 +130,11 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
     }
   };
 
+  const openModelsSettings = () => {
+    setSettingsTab('models');
+    setView('settings');
+  };
+
   const refresh = async () => {
     if (mode === 'local') {
       setLocalReloadToken((token) => token + 1);
@@ -130,6 +152,7 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
   };
 
   const hostProblems = overview?.hosts.filter((host) => host.error) ?? [];
+  const activeFixes = overview?.activeFixes ?? 0;
 
   return (
     <div className="cn-root">
@@ -147,13 +170,30 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
             {overview.activeReviews} review{overview.activeReviews === 1 ? '' : 's'} running
           </span>
         ) : null}
+        {activeFixes > 0 ? (
+          <span className="cn-badge cn-badge-warn" role="status">
+            {activeFixes} fix{activeFixes === 1 ? '' : 'es'} running
+          </span>
+        ) : null}
         <span className="cn-spacer" />
         {view === 'inbox' ? (
           <button type="button" className="cn-btn" disabled={mode === 'pr' && (refreshing || overview?.syncing)} onClick={() => void refresh()}>
             {mode === 'pr' && (refreshing || overview?.syncing) ? 'Syncing…' : 'Refresh'}
           </button>
         ) : null}
-        <button type="button" className="cn-btn" aria-pressed={view === 'settings'} onClick={() => setView(view === 'settings' ? 'inbox' : 'settings')}>
+        <button
+          type="button"
+          className="cn-btn"
+          aria-pressed={view === 'settings'}
+          onClick={() => {
+            if (view === 'settings') {
+              setView('inbox');
+            } else {
+              setSettingsTab('profile');
+              setView('settings');
+            }
+          }}
+        >
           {view === 'settings' ? (mode === 'local' ? 'Back to local changes' : 'Back to pull requests') : 'Settings'}
         </button>
       </div>
@@ -167,14 +207,14 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
 
       {view === 'settings' ? (
         <div className="cn-settings">
-          <SettingsView rpc={rpc} />
+          <SettingsView rpc={rpc} initialTab={settingsTab} initialModels={modelsLoaded ? models : undefined} />
         </div>
       ) : mode === 'local' ? (
         <LocalReviewsView
           rpc={rpc}
           defaultModels={models}
           hasModels={overview?.hasModels ?? models.length > 0}
-          onOpenSettings={() => setView('settings')}
+          onOpenSettings={openModelsSettings}
           reloadToken={localReloadToken}
           projectId={projectId}
         />
@@ -198,7 +238,7 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
               prId={selectedId}
               defaultModels={models}
               hasModels={overview?.hasModels ?? models.length > 0}
-              onOpenSettings={() => setView('settings')}
+              onOpenSettings={openModelsSettings}
             />
           ) : (
             <div className="cn-detail">

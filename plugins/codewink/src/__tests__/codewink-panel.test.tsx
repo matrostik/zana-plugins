@@ -7,7 +7,8 @@ import { detail } from './pr-fixtures.ts';
 
 const sdk = vi.hoisted(() => {
   const call = vi.fn();
-  return { call, rpc: { call } };
+  const settingsProps = vi.fn();
+  return { call, rpc: { call }, settingsProps };
 });
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', async (importActual) => ({
@@ -15,7 +16,12 @@ vi.mock('@zana-ai/zcc-plugin-sdk/app', async (importActual) => ({
   useRpc: () => sdk.rpc
 }));
 
-vi.mock('../app/SettingsView.tsx', () => ({ SettingsView: () => <p>Settings stub</p> }));
+vi.mock('../app/SettingsView.tsx', () => ({
+  SettingsView: (props: Record<string, unknown>) => {
+    sdk.settingsProps(props);
+    return <p>Settings stub</p>;
+  }
+}));
 
 const PR = detail('completed').pr;
 
@@ -43,6 +49,7 @@ function answer(responses: Record<string, unknown>) {
 
 beforeEach(() => {
   sdk.call.mockReset();
+  sdk.settingsProps.mockReset();
   const stored = new Map<string, string>();
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => stored.get(key) ?? null,
@@ -63,6 +70,31 @@ describe('CodewinkPanel', () => {
     await waitFor(() => expect(sdk.call).toHaveBeenCalledWith('refresh'));
     fireEvent.focus(window);
     expect(sdk.call.mock.calls.filter(([method]) => method === 'refresh')).toHaveLength(1);
+  });
+
+  it('skips redundant config calls when overview includes models and renders activeFixes badge', async () => {
+    const models = [{ providerId: 'codex', model: 'gpt-5' }];
+    answer({
+      overview: overview({ models, activeFixes: 2 })
+    });
+    render(<CodewinkPanel pluginId="codewink" />);
+    expect(await screen.findByText('2 fixes running')).toBeTruthy();
+    expect(sdk.call.mock.calls.filter(([method]) => method === 'config')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(sdk.settingsProps).toHaveBeenCalledWith(expect.objectContaining({ initialTab: 'profile', initialModels: models }));
+  });
+
+  it('opens Settings directly on the AI Model tab from Choose models', async () => {
+    answer({
+      overview: overview({ prs: [], projectRepos: [], models: [], hasModels: false }),
+      localTargets: { locations: [{ targetId: 'local:abc', projectId: 'p1', projectName: 'P1', worktreePath: '/work/p1', branch: 'main', isMain: true, changedFiles: 1, lastScope: null, latest: null }], scopes: ['uncommitted'], hasModels: false },
+      localDetail: { target: { id: 'local:abc', projectId: 'p1', worktreePath: '/work/p1', branch: 'main', lastScope: null, lastSeenAt: 1, createdAt: 1 }, review: null, snapshot: null, runs: [], findings: [], history: [] }
+    });
+    render(<CodewinkPanel pluginId="codewink" projectId="p1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /main/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose models' }));
+    expect(screen.getByText('Settings stub')).toBeTruthy();
+    expect(sdk.settingsProps).toHaveBeenCalledWith(expect.objectContaining({ initialTab: 'models', initialModels: [] }));
   });
 
   it('shows sync status, running reviews, and host problems', async () => {

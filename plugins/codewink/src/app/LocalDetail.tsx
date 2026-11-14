@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useRealtime, useZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
+import type { BranchList, CommitInfo, CommitPage } from '../server/local/git.ts';
 import type { LocalLocationSummary, LocalReviewStatus } from '../server/local/service.ts';
-import type { ChangedFile, FixAgentChoice, LocalScope, ModelChoice, ReviewRow, ReviewRunRow } from '../server/types.ts';
+import type { ChangedFile, FixAgentChoice, LocalFixRunRow, LocalScope, ModelChoice, ReviewRow, ReviewRunRow } from '../server/types.ts';
 import { FixAgentPicker } from './FixAgentPicker.tsx';
 import type { LocalDetail as LocalDetailData, LocalHistoryItem, LocalSnapshotView } from '../server/views.ts';
 import { copyTextToClipboard, errorText, formatDuration, formatLocalFindingsPrompt, relativeTime, scoreTone, skipReasonText } from './format.ts';
@@ -13,26 +14,34 @@ import type { Rpc } from './types.ts';
 
 type DetailTab = 'findings' | 'models' | 'files';
 type SpawnResult = { threadId: string; priority: number; model: ModelChoice; usedFallback: boolean };
-type FixResult = { needsConfirmation: true; reason: string } | { needsConfirmation: false; threadId: string };
+type FixResult = { needsConfirmation: true; reason: string } | { needsConfirmation: false; threadId: string; fixRun?: LocalFixRunRow };
 
 const STATUS_CHECK_THROTTLE_MS = 60_000;
 const SAVED_PILL_MS = 3_000;
 const MAX_INTENT_CHARS = 2_000;
+const COMMIT_PAGE_SIZE = 10;
 
 export const SCOPE_OPTIONS: Array<SegmentedOption<LocalScope>> = [
   { id: 'uncommitted', label: 'Uncommitted' },
   { id: 'staged', label: 'Staged' },
-  { id: 'branch', label: 'Branch vs base' }
+  { id: 'branch', label: 'Branch vs base' },
+  { id: 'commits', label: 'Commits' }
 ];
 
 const SCOPE_HINTS: Record<LocalScope, string> = {
   uncommitted: 'Every change since the last commit, including new files that are not ignored.',
   staged: 'Only the changes staged with git add.',
-  branch: 'Everything since this branch left the base branch, including uncommitted work.'
+  branch: 'Everything on the selected branch (or current checkout + uncommitted work) since the base branch.',
+  commits: 'Changes introduced by one or more selected commits.'
 };
 
 function scopeLabel(scope: LocalScope | null): string {
   return SCOPE_OPTIONS.find((option) => option.id === scope)?.label ?? '–';
+}
+
+function formatCommitDate(authoredAt: string): string {
+  const ts = Date.parse(authoredAt);
+  return Number.isFinite(ts) ? relativeTime(ts) : '';
 }
 
 function CheckIcon() {
@@ -152,6 +161,8 @@ function LocalHistory({ history, currentId, onView }: { history: LocalHistoryIte
                   <td>{relativeTime(item.createdAt)}</td>
                   <td>
                     {scopeLabel(item.scope)}
+                    {item.headRef ? <span className="cn-muted cn-small"> ({item.headRef})</span> : null}
+                    {item.scope === 'commits' && item.commitCount ? <span className="cn-muted cn-small"> ({item.commitCount})</span> : null}
                     {item.baseRef ? <span className="cn-muted cn-small"> vs {item.baseRef}</span> : null}
                   </td>
                   <td>{item.riskScore === null ? '–' : <span className={`cn-badge ${tone ? `cn-badge-${tone}` : ''}`}>{item.riskScore}/10</span>}</td>
@@ -184,8 +195,21 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [status, setStatus] = useState<LocalReviewStatus | null>(null);
   const [scope, setScope] = useState<LocalScope>(location.lastScope ?? 'uncommitted');
+  const [headRef, setHeadRef] = useState('');
   const [base, setBase] = useState('');
   const [intent, setIntent] = useState('');
+
+  const [branchList, setBranchList] = useState<BranchList | null>(null);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [branchesError, setBranchesError] = useState<string | null>(null);
+
+  const [commits, setCommits] = useState<CommitInfo[]>([]);
+  const [commitsLoaded, setCommitsLoaded] = useState(false);
+  const [commitsHasMore, setCommitsHasMore] = useState(false);
+  const [commitsLoading, setCommitsLoading] = useState(false);
+  const [commitsError, setCommitsError] = useState<string | null>(null);
+  const [selectedCommits, setSelectedCommits] = useState<Set<string>>(new Set());
+
   const [tab, setTab] = useState<DetailTab>('findings');
   const [filters, setFilters] = useState<FindingFilters>({ severity: 'all', category: 'all' });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -196,7 +220,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const [snapshotTaken, setSnapshotTaken] = useState(false);
   const [fixSelection, setFixSelection] = useState<string[] | null>(null);
   const [confirmFix, setConfirmFix] = useState<{ findingIds: string[]; reason: string; agent: FixAgentChoice } | null>(null);
-  const [fixThreadId, setFixThreadId] = useState<string | null>(null);
+  const [optimisticFix, setOptimisticFix] = useState<LocalFixRunRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
 
@@ -211,6 +235,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
         if (requestSeq.current !== requestId) return;
         const next = value as LocalDetailData;
         setDetail(next);
+        if (next.activeFix || next.latestFix) setOptimisticFix(null);
         const nextReviewId = next.review?.status === 'completed' ? next.review.id : null;
         if (nextReviewId && initializedReviewId.current !== nextReviewId) {
           initializedReviewId.current = nextReviewId;
@@ -230,9 +255,78 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     load();
   }, [load]);
   useRealtime('codewink:changed', (payload) => {
-    const record = (payload ?? {}) as { prId?: unknown; targetId?: unknown; finding?: unknown; swept?: unknown };
-    if (record.prId === location.targetId || record.targetId === location.targetId || record.finding || record.swept) load();
+    const record = (payload ?? {}) as { prId?: unknown; targetId?: unknown; finding?: unknown; swept?: unknown; fix?: unknown };
+    if (record.prId === location.targetId || record.targetId === location.targetId || record.finding || record.swept || record.fix) load();
   });
+
+  const branchLoadSeq = useRef(0);
+  const loadBranches = useCallback(() => {
+    const seq = ++branchLoadSeq.current;
+    setBranchesLoading(true);
+    setBranchesError(null);
+    rpc
+      .call('localBranches', { targetId: location.targetId })
+      .then((value) => {
+        if (branchLoadSeq.current !== seq) return;
+        setBranchList(value as BranchList);
+        setBranchesError(null);
+      })
+      .catch((cause) => {
+        if (branchLoadSeq.current !== seq) return;
+        setBranchesError(errorText(cause));
+      })
+      .finally(() => {
+        if (branchLoadSeq.current === seq) setBranchesLoading(false);
+      });
+  }, [rpc, location.targetId]);
+
+  useEffect(() => {
+    if (scope === 'branch') loadBranches();
+  }, [scope, loadBranches]);
+
+  const commitsCountRef = useRef(0);
+  commitsCountRef.current = commits.length;
+  const commitLoadSeq = useRef(0);
+  const loadCommits = useCallback(
+    (reset: boolean) => {
+      const seq = ++commitLoadSeq.current;
+      const skip = reset ? 0 : commitsCountRef.current;
+      setCommitsLoading(true);
+      setCommitsError(null);
+      rpc
+        .call('localCommits', { targetId: location.targetId, limit: COMMIT_PAGE_SIZE, skip })
+        .then((value) => {
+          if (commitLoadSeq.current !== seq) return;
+          const page = value as CommitPage;
+          setCommits((current) => {
+            const baseList = reset ? [] : current;
+            const seen = new Set(baseList.map((item) => item.sha));
+            const next = [...baseList];
+            for (const item of page.commits) {
+              if (!seen.has(item.sha)) {
+                seen.add(item.sha);
+                next.push(item);
+              }
+            }
+            return next;
+          });
+          setCommitsHasMore(page.hasMore);
+          setCommitsLoaded(true);
+        })
+        .catch((cause) => {
+          if (commitLoadSeq.current !== seq) return;
+          setCommitsError(errorText(cause));
+        })
+        .finally(() => {
+          if (commitLoadSeq.current === seq) setCommitsLoading(false);
+        });
+    },
+    [rpc, location.targetId]
+  );
+
+  useEffect(() => {
+    if (scope === 'commits' && !commitsLoaded) loadCommits(true);
+  }, [scope, commitsLoaded, loadCommits]);
 
   const reviewId = detail?.review?.id ?? null;
   const reviewCompleted = detail?.review?.status === 'completed';
@@ -278,7 +372,9 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     if (reloadToken === initialToken.current) return;
     load();
     checkStatus(true);
-  }, [reloadToken, load, checkStatus]);
+    if (scope === 'branch') loadBranches();
+    if (scope === 'commits') loadCommits(true);
+  }, [reloadToken, load, checkStatus, scope, loadBranches, loadCommits]);
 
   // Reset review-scoped actions before the new results can receive user input.
   useLayoutEffect(() => {
@@ -298,7 +394,11 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const attempt = detail?.latestAttempt ?? detail?.review ?? null;
   const attemptRuns = detail?.latestRuns ?? detail?.runs ?? [];
   const reviewing = isActive(attempt?.status);
-  const now = useNow(reviewing || (detail?.runs.some((run) => isActive(run.status)) ?? false));
+  const displayedReviewId = detail?.review?.id ?? null;
+  const activeFix = detail?.activeFix ?? (optimisticFix?.status === 'running' && optimisticFix.reviewId === displayedReviewId ? optimisticFix : null);
+  const latestFix = detail?.latestFix ?? (!activeFix && optimisticFix && optimisticFix.reviewId === displayedReviewId ? optimisticFix : null);
+  const fixing = Boolean(activeFix);
+  const now = useNow(reviewing || fixing || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
   const act = async (label: string, fn: () => Promise<void>, options: { rethrow?: boolean } = {}) => {
     setBusy(label);
@@ -323,21 +423,43 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     }
   };
 
-  const startReview = (models?: ModelChoice[], override?: { scope: LocalScope; base: string | null; intent: string | null }) =>
+  const startReview = (
+    models?: ModelChoice[],
+    override?: { scope: LocalScope; base: string | null; headRef?: string | null; commits?: string[]; intent: string | null }
+  ) =>
     act('review', async () => {
       setPickerOpen(false);
-      setFixThreadId(null);
-      const accepted = await rpc.call('startLocalReview', {
+      setOptimisticFix(null);
+      const chosenScope = override?.scope ?? scope;
+      const chosenBase = override ? override.base : chosenScope === 'branch' ? base.trim() || null : null;
+      const chosenHeadRef = override ? (override.headRef ?? null) : chosenScope === 'branch' ? headRef.trim() || null : null;
+      const chosenCommits = override ? (override.commits ?? []) : chosenScope === 'commits' ? [...selectedCommits] : [];
+      const accepted = (await rpc.call('startLocalReview', {
         projectId: location.projectId,
         worktreePath: location.worktreePath,
-        scope: override?.scope ?? scope,
-        base: override ? override.base : scope === 'branch' ? base.trim() || null : null,
+        scope: chosenScope,
+        base: chosenBase,
+        ...(chosenHeadRef ? { headRef: chosenHeadRef } : {}),
+        ...(chosenCommits.length > 0 ? { commits: chosenCommits } : {}),
         intent: override ? override.intent : intent.trim() || null,
         ...(override && detail?.review?.promptSnapshot ? { rerunReviewId: detail.review.id } : promptId !== undefined ? { promptId } : {}),
         ...(models ? { models } : {})
-      }) as ReviewRow;
+      })) as ReviewRow;
       ++requestSeq.current;
-      setDetail((current) => current && accepted?.id ? { ...current, review: accepted, snapshot: null, runs: [], findings: [], latestAttempt: undefined, latestRuns: undefined } : current);
+      setDetail((current) =>
+        current && accepted?.id
+          ? {
+              ...current,
+              review: accepted,
+              snapshot: null,
+              runs: [],
+              findings: [],
+              latestAttempt: undefined,
+              latestRuns: undefined,
+              latestFix: null
+            }
+          : current
+      );
       setSelectedIds(new Set());
       initializedReviewId.current = null;
       setTab('findings');
@@ -348,7 +470,15 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
 
   const snapshot = detail?.snapshot ?? null;
   const rerun = () =>
-    snapshot ? startReview(undefined, { scope: snapshot.scope, base: snapshot.baseRef, intent: snapshot.intent }) : startReview();
+    snapshot
+      ? startReview(undefined, {
+          scope: snapshot.scope,
+          base: snapshot.baseRef,
+          headRef: snapshot.headRef ?? null,
+          commits: snapshot.commitShas ?? [],
+          intent: snapshot.intent
+        })
+      : startReview();
 
   if (!detail) {
     return (
@@ -366,8 +496,23 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const nothingSelected = activeFindings.length > 0 && selectedFindings.length === 0;
   const stale = Boolean(status?.stale) && reviewCompleted;
   const attemptElapsed = attempt ? formatDuration(attempt.createdAt, attempt.completedAt ?? now) : '';
+  const fixElapsed = activeFix ? formatDuration(activeFix.startedAt, now) : latestFix ? formatDuration(latestFix.startedAt, latestFix.completedAt ?? now) : '';
   const viewingOlder = viewingId !== null && detail.history[0]?.id !== viewingId;
   const label = `${location.projectName} · ${location.branch ?? 'detached HEAD'}`;
+  const commitsEmptySelection = scope === 'commits' && selectedCommits.size === 0;
+
+  const localBranches = branchList?.branches.filter((branch) => branch.kind === 'local') ?? [];
+  const remoteBranches = branchList?.branches.filter((branch) => branch.kind === 'remote') ?? [];
+  const knownBranchRefs = new Set((branchList?.branches ?? []).map((branch) => branch.ref));
+
+  const toggleCommit = (sha: string) => {
+    setSelectedCommits((current) => {
+      const next = new Set(current);
+      if (next.has(sha)) next.delete(sha);
+      else next.add(sha);
+      return next;
+    });
+  };
 
   const deepReview = () =>
     act('deep', async () => {
@@ -384,8 +529,25 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
       return;
     }
     setConfirmFix(null);
-    setFixThreadId(result.threadId);
+    const nextFix: LocalFixRunRow = result.fixRun ?? {
+      id: 'optimistic',
+      reviewId: review.id,
+      targetId: location.targetId,
+      threadId: result.threadId,
+      providerId: agent.providerId,
+      model: agent.model,
+      reasoningLevel: agent.reasoningLevel ?? null,
+      permissionMode: agent.permissionMode,
+      findingIds,
+      status: 'running',
+      summary: null,
+      error: null,
+      startedAt: Date.now(),
+      completedAt: null
+    };
+    setOptimisticFix(nextFix);
     spawnedNotice(result, 'Fix');
+    load();
   };
 
   const remove = () =>
@@ -446,16 +608,109 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
               <span className="cn-small cn-muted">{SCOPE_HINTS[scope]}</span>
             </div>
             {scope === 'branch' ? (
-              <div className="cn-field">
-                <label htmlFor={`${formId}-base`}>Base branch</label>
-                <input
-                  id={`${formId}-base`}
-                  className="cn-input"
-                  value={base}
-                  placeholder="Remote default branch"
-                  spellCheck={false}
-                  onChange={(event) => setBase(event.target.value)}
-                />
+              <div className="cn-branch-fields">
+                <div className="cn-field">
+                  <label htmlFor={`${formId}-head`}>Target branch</label>
+                  <select id={`${formId}-head`} className="cn-select" value={headRef} disabled={busy !== null} onChange={(event) => setHeadRef(event.target.value)}>
+                    <option value="">
+                      Current checkout ({branchList?.currentBranch ?? location.branch ?? 'detached HEAD'}) + uncommitted
+                    </option>
+                    {headRef && !knownBranchRefs.has(headRef) ? <option value={headRef}>{headRef}</option> : null}
+                    {localBranches.length > 0 ? (
+                      <optgroup label="Local branches">
+                        {localBranches.map((branch) => (
+                          <option key={`head-local-${branch.ref}`} value={branch.ref}>
+                            {branch.ref}{branch.isCurrent ? ' (current)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                    {remoteBranches.length > 0 ? (
+                      <optgroup label="Remote branches">
+                        {remoteBranches.map((branch) => (
+                          <option key={`head-remote-${branch.ref}`} value={branch.ref}>
+                            {branch.ref}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </div>
+                <div className="cn-field">
+                  <label htmlFor={`${formId}-base`}>Base branch</label>
+                  <select id={`${formId}-base`} className="cn-select" value={base} disabled={busy !== null} onChange={(event) => setBase(event.target.value)}>
+                    <option value="">
+                      Remote default branch{branchList?.defaultBase ? ` (${branchList.defaultBase})` : ''}
+                    </option>
+                    {base && !knownBranchRefs.has(base) ? <option value={base}>{base}</option> : null}
+                    {localBranches.length > 0 ? (
+                      <optgroup label="Local branches">
+                        {localBranches.map((branch) => (
+                          <option key={`base-local-${branch.ref}`} value={branch.ref}>
+                            {branch.ref}{branch.isCurrent ? ' (current)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                    {remoteBranches.length > 0 ? (
+                      <optgroup label="Remote branches">
+                        {remoteBranches.map((branch) => (
+                          <option key={`base-remote-${branch.ref}`} value={branch.ref}>
+                            {branch.ref}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </div>
+                {branchesLoading && !branchList ? <span className="cn-muted cn-small">Loading branches…</span> : null}
+                {branchesError ? <span className="cn-muted cn-small">Could not load branches ({branchesError}).</span> : null}
+              </div>
+            ) : null}
+            {scope === 'commits' ? (
+              <div className="cn-field cn-field-wide">
+                <div className="cn-inline">
+                  <span>Commits to review</span>
+                  {selectedCommits.size > 0 ? <span className="cn-badge">{selectedCommits.size} selected</span> : null}
+                  {selectedCommits.size > 0 ? (
+                    <button type="button" className="cn-btn cn-small" disabled={busy !== null} onClick={() => setSelectedCommits(new Set())}>
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                {commitsError ? <p className="cn-banner cn-banner-error">{commitsError}</p> : null}
+                {commitsLoading && commits.length === 0 ? <p className="cn-muted cn-small">Loading commits…</p> : null}
+                {commitsLoaded && commits.length === 0 && !commitsError ? <p className="cn-muted cn-small">No commits found in this repository.</p> : null}
+                {commits.length > 0 ? (
+                  <ul className="cn-commit-list" aria-label="Commits">
+                    {commits.map((commit) => {
+                      const commitDate = formatCommitDate(commit.authoredAt);
+                      return (
+                        <li key={commit.sha}>
+                          <label className="cn-commit-item">
+                            <input
+                              type="checkbox"
+                              checked={selectedCommits.has(commit.sha)}
+                              disabled={busy !== null}
+                              onChange={() => toggleCommit(commit.sha)}
+                            />
+                            <span className="cn-mono cn-commit-sha">{commit.shortSha}</span>
+                            <span className="cn-commit-subject">{commit.subject || '(no commit message)'}</span>
+                            <span className="cn-muted cn-small cn-commit-meta">
+                              {commit.author}
+                              {commitDate ? ` · ${commitDate}` : ''}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                {commitsHasMore ? (
+                  <button type="button" className="cn-btn cn-small" disabled={commitsLoading || busy !== null} onClick={() => loadCommits(false)}>
+                    {commitsLoading ? 'Loading…' : 'Show 10 more'}
+                  </button>
+                ) : null}
               </div>
             ) : null}
             <div className="cn-field cn-field-wide">
@@ -473,7 +728,12 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
           <PromptSelector prompts={prompts} error={promptsError} value={promptId} onChange={setPromptId} />
           {review?.promptSnapshot ? <details><summary>Review prompt: {review.promptSnapshot.name}</summary><pre className="cn-prompt-text">{review.promptSnapshot.instructions || 'Built-in prompt only'}</pre></details> : null}
           <div className="cn-inline">
-            <button type="button" className="cn-btn cn-btn-primary" disabled={busy !== null || !props.hasModels || reviewing || status?.missing === true} onClick={() => void startReview()}>
+            <button
+              type="button"
+              className="cn-btn cn-btn-primary"
+              disabled={busy !== null || !props.hasModels || reviewing || status?.missing === true || commitsEmptySelection}
+              onClick={() => void startReview()}
+            >
               {busy === 'review' ? (
                 <span className="cn-inline">
                   <span className="cn-spinner" aria-hidden="true" />
@@ -483,7 +743,13 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                 'Review changes'
               )}
             </button>
-            <button type="button" className="cn-btn" disabled={busy !== null || reviewing || status?.missing === true} aria-expanded={pickerOpen} onClick={() => setPickerOpen((open) => !open)}>
+            <button
+              type="button"
+              className="cn-btn"
+              disabled={busy !== null || reviewing || status?.missing === true || commitsEmptySelection}
+              aria-expanded={pickerOpen}
+              onClick={() => setPickerOpen((open) => !open)}
+            >
               Models…
             </button>
             {snapshotTaken ? (
@@ -512,7 +778,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
             ) : null}
             {stale && status ? (
               <div className="cn-banner cn-banner-warn" role="status" aria-label="Review outdated">
-                <strong>Working tree changed since this review</strong>
+                <strong>{snapshot?.scope === 'commits' ? 'Reviewed commits are no longer reachable' : 'Working tree changed since this review'}</strong>
                 <p>
                   This review saw tree <code title={status.reviewedTree}>{status.reviewedTree.slice(0, 7)}</code>
                   {status.currentTree ? (
@@ -551,18 +817,82 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                 </div>
               </div>
             ) : null}
-            {fixThreadId ? (
-              <p className="cn-banner cn-inline" role="status">
-                A fix agent is editing this checkout. Re-review when it finishes.
+            {activeFix ? (
+              <div className="cn-banner cn-inline" role="status" aria-busy="true">
+                <span className="cn-spinner" aria-hidden="true" />
+                <span>
+                  A fix agent is editing this checkout · {activeFix.providerId}/{activeFix.model} ({activeFix.permissionMode}) · {fixElapsed}. Re-review when it finishes.
+                </span>
                 {navigate?.toThread ? (
-                  <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(fixThreadId)}>
+                  <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(activeFix.threadId)}>
                     Open fix thread
+                  </button>
+                ) : null}
+                {activeFix.id !== 'optimistic' ? (
+                  <button
+                    type="button"
+                    className="cn-btn cn-small"
+                    disabled={busy !== null}
+                    onClick={() =>
+                      void act('stop-fix', async () => {
+                        await rpc.call('stopLocalFix', { fixRunId: activeFix.id });
+                        load();
+                      })
+                    }
+                  >
+                    Stop fix
                   </button>
                 ) : null}
                 <button type="button" className="cn-btn cn-small" disabled={busy !== null || reviewing || status?.missing === true} onClick={() => void rerun()}>
                   Re-review
                 </button>
-              </p>
+              </div>
+            ) : latestFix ? (
+              latestFix.status === 'completed' ? (
+                <div className="cn-banner" role="status">
+                  <div className="cn-inline">
+                    <strong>Fix completed</strong>
+                    <span className="cn-muted cn-small">
+                      {latestFix.providerId}/{latestFix.model} · {fixElapsed}
+                    </span>
+                    {navigate?.toThread ? (
+                      <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(latestFix.threadId)}>
+                        Open fix thread
+                      </button>
+                    ) : null}
+                    <button type="button" className="cn-btn cn-small" disabled={busy !== null || reviewing || status?.missing === true} onClick={() => void rerun()}>
+                      Re-review
+                    </button>
+                  </div>
+                  {latestFix.summary ? <p className="cn-small cn-muted" style={{ margin: '6px 0 0' }}>{latestFix.summary}</p> : null}
+                </div>
+              ) : latestFix.status === 'failed' ? (
+                <div className="cn-banner cn-banner-error" role="status">
+                  <div className="cn-inline">
+                    <strong>Fix failed</strong>
+                    <span className="cn-small">
+                      {latestFix.providerId}/{latestFix.model} · {latestFix.error ?? 'Unknown error'}
+                    </span>
+                    {navigate?.toThread ? (
+                      <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(latestFix.threadId)}>
+                        Open fix thread
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : latestFix.status === 'stopped' ? (
+                <div className="cn-banner cn-inline" role="status">
+                  <strong>Fix stopped</strong>
+                  <span className="cn-muted cn-small">
+                    {latestFix.providerId}/{latestFix.model} · {fixElapsed}
+                  </span>
+                  {navigate?.toThread ? (
+                    <button type="button" className="cn-btn cn-small" onClick={() => navigate?.toThread?.(latestFix.threadId)}>
+                      Open fix thread
+                    </button>
+                  ) : null}
+                </div>
+              ) : null
             ) : null}
 
             {review.status === 'completed' ? (
@@ -582,6 +912,8 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
                 <p className="cn-summary">{review.consensusSummary ?? review.summary}</p>
                 <p className="cn-muted cn-small">
                   {scopeLabel(snapshot?.scope ?? null)}
+                  {snapshot?.headRef ? ` (${snapshot.headRef})` : ''}
+                  {snapshot?.scope === 'commits' && snapshot?.commitShas?.length ? ` (${snapshot.commitShas.length} commit${snapshot.commitShas.length === 1 ? '' : 's'})` : ''}
                   {snapshot?.baseRef ? ` vs ${snapshot.baseRef}` : ''} · {snapshot?.files.length ?? 0} file(s) reviewed · {relativeTime(review.createdAt)}
                   {snapshot?.intent ? ` · Intent: ${snapshot.intent}` : ''}
                 </p>
@@ -651,7 +983,7 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
             <button
               type="button"
               className="cn-btn"
-              disabled={busy !== null || fixSelection !== null || reviewing || editingFinding || activeFindings.length === 0 || nothingSelected || status?.missing === true}
+              disabled={busy !== null || fixSelection !== null || reviewing || fixing || editingFinding || activeFindings.length === 0 || nothingSelected || status?.missing === true}
               onClick={() => { setNotice(null); setConfirmFix(null); setFixSelection(targetedIds); }}
             >
               {targetedIds.length > 0 ? `Fix ${targetedIds.length} with agent` : 'Fix with agent'}

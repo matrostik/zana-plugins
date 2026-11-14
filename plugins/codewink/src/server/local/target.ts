@@ -2,12 +2,13 @@ import { createHash } from 'node:crypto';
 import { basename } from 'node:path';
 import type { LocalScope, LocalTargetRow } from '../types.ts';
 
-export const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch'];
+export const LOCAL_SCOPES: readonly LocalScope[] = ['uncommitted', 'staged', 'branch', 'commits'];
 
 export const SCOPE_TITLES: Record<LocalScope, string> = {
   uncommitted: 'Uncommitted changes',
   staged: 'Staged changes',
-  branch: 'Branch changes'
+  branch: 'Branch changes',
+  commits: 'Selected commits'
 };
 
 export function localTargetId(projectId: string, worktreePath: string): string {

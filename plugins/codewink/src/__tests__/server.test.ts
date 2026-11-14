@@ -159,6 +159,60 @@ describe('codewink server', () => {
     expect(overview.projectRepos?.map((repo) => repo.host)).toEqual(['unconfigured.example']);
   });
 
+  it('includes configured models and activeFixes in overview and supports refreshing cached provider models', async () => {
+    const { host } = await setup();
+    const modelsSpy = vi.spyOn(host.zcc.sdk.providers, 'models');
+    await host.callRpc('setModels', { models: [MODELS[0]] });
+
+    const overview = (await host.callRpc('overview')) as Overview;
+    expect(overview.models).toEqual([MODELS[0]]);
+    expect(overview.activeFixes).toBe(0);
+
+    modelsSpy.mockClear();
+    await host.callRpc('availableModels');
+    expect(modelsSpy).toHaveBeenCalledTimes(0);
+    await host.callRpc('availableModels', { refresh: true });
+    expect(modelsSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes localBranches, localCommits, and stopLocalFix RPCs', async () => {
+    const sha = 'a'.repeat(40);
+    const git = vi.fn<GitRunner>(async (cwd, args) => {
+      if (args[0] === 'worktree') return { code: 0, stdout: `worktree ${cwd}\0HEAD ${sha}\0branch refs/heads/main\0\0` };
+      if (args[0] === 'status') return { code: 0, stdout: ' M a.ts\0' };
+      if (args[0] === 'rev-parse' && args.includes('--abbrev-ref')) return { code: 0, stdout: 'main\n' };
+      if (args[0] === 'for-each-ref') return { code: 0, stdout: 'refs/heads/main\t\nrefs/remotes/origin/main\t\n' };
+      if (args[0] === 'rev-parse') return { code: 0, stdout: `${sha}\n` };
+      if (args[0] === 'log') return { code: 0, stdout: `${sha}\x1faaaaaaa\x1fInitial commit\x1fAlice\x1f2026-10-01T12:00:00Z\x1e` };
+      return { code: 0, stdout: '' };
+    });
+    const { host } = await setup({ projects: [{ id: 'app', name: 'App', path: resolve('/work/app') }], git });
+    const overview = (await host.callRpc('localTargets', { projectId: 'app' })) as LocalOverview;
+    const targetId = overview.locations[0].targetId;
+
+    const branches = await host.callRpc('localBranches', { targetId });
+    expect(branches).toMatchObject({ currentBranch: 'main', defaultBase: 'origin/main', branches: [{ ref: 'main', kind: 'local', isCurrent: true }, { ref: 'origin/main', kind: 'remote', isCurrent: false }] });
+
+    const commits = await host.callRpc('localCommits', { targetId, limit: 10, skip: 0 });
+    expect(commits).toEqual({ commits: [{ sha, shortSha: 'aaaaaaa', subject: 'Initial commit', author: 'Alice', authoredAt: '2026-10-01T12:00:00Z' }], hasMore: false });
+
+    await host.callRpc('localCommits', { targetId, limit: Number.NaN, skip: 1.5 });
+    expect(git.mock.calls.filter(([, args]) => args[0] === 'log').at(-1)?.[1]).toEqual(
+      expect.arrayContaining(['--skip=0', '--max-count=11'])
+    );
+
+    const db = host.zcc.storage.database();
+    db.prepare("INSERT INTO reviews (id, pr_id, target_kind, head_sha, trigger, status, created_at) VALUES ('rev-fix', ?, 'local', ?, 'manual', 'completed', 1)").run(targetId, sha);
+    db.prepare("INSERT INTO local_fix_runs (id, review_id, target_id, thread_id, provider_id, model, permission_mode, finding_ids_json, status, started_at) VALUES ('fix-1', 'rev-fix', ?, 'th-fix', 'claude-code', 'opus', 'full', '[]', 'running', 1)").run(targetId);
+
+    expect(((await host.callRpc('overview')) as Overview).activeFixes).toBe(1);
+    expect(((await host.callRpc('overview', { projectId: 'app' })) as Overview).activeFixes).toBe(1);
+    expect(((await host.callRpc('overview', { projectId: 'other' })) as Overview).activeFixes).toBe(0);
+    const stopped = (await host.callRpc('stopLocalFix', { fixRunId: 'fix-1' })) as { ok: true };
+    expect(stopped).toEqual({ ok: true });
+    expect(((await host.callRpc('overview')) as Overview).activeFixes).toBe(0);
+  });
+
   it('scans only the requested project before discovering worktrees and counting changes', async () => {
     const git = vi.fn<GitRunner>(async (cwd, args) => ({ code: 0, stdout: args[0] === 'worktree'
       ? `worktree ${cwd}\0HEAD ${'a'.repeat(40)}\0branch refs/heads/main\0\0`

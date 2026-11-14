@@ -1,7 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import type { Store } from '../db.ts';
 import type { ZanaProject } from '../projects.ts';
-import type { LocalScope, LocalTargetRow, ReviewRow } from '../types.ts';
+import type { LocalFixRunRow, LocalScope, LocalTargetRow, ReviewRow } from '../types.ts';
 import { mapWithConcurrency } from '../util.ts';
 import { changedPathCount, listWorktrees, repoTopLevel, type GitRunner, type WorktreeInfo } from './git.ts';
 import { localTargetId } from './target.ts';
@@ -26,6 +26,7 @@ export interface LocalLocationSummary {
   changedFiles: number | null;
   lastScope: LocalScope | null;
   latest: Pick<ReviewRow, 'id' | 'status' | 'riskScore' | 'createdAt'> | null;
+  latestFix?: Pick<LocalFixRunRow, 'id' | 'reviewId' | 'threadId' | 'providerId' | 'model' | 'permissionMode' | 'status' | 'startedAt' | 'completedAt'> | null;
 }
 
 export interface LocationResolverDeps {
@@ -78,6 +79,7 @@ export function createLocationResolver(deps: LocationResolverDeps) {
     const counts = await mapWithConcurrency(locations, STATUS_CONCURRENCY, (location) => changedPathCount(deps.git, location.worktree.path));
     return locations.map((location, index) => {
       const latest = deps.store.listLocalReviews(location.target.id)[0]?.review ?? null;
+      const latestFix = deps.store.latestLocalFixRunForTarget(location.target.id);
       return {
         targetId: location.target.id,
         projectId: location.project.id,
@@ -87,7 +89,20 @@ export function createLocationResolver(deps: LocationResolverDeps) {
         isMain: location.worktree.isMain,
         changedFiles: counts[index],
         lastScope: location.target.lastScope,
-        latest: latest ? { id: latest.id, status: latest.status, riskScore: latest.riskScore, createdAt: latest.createdAt } : null
+        latest: latest ? { id: latest.id, status: latest.status, riskScore: latest.riskScore, createdAt: latest.createdAt } : null,
+        latestFix: latestFix
+          ? {
+              id: latestFix.id,
+              reviewId: latestFix.reviewId,
+              threadId: latestFix.threadId,
+              providerId: latestFix.providerId,
+              model: latestFix.model,
+              permissionMode: latestFix.permissionMode,
+              status: latestFix.status,
+              startedAt: latestFix.startedAt,
+              completedAt: latestFix.completedAt
+            }
+          : null
       };
     });
   }

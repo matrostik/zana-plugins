@@ -152,7 +152,7 @@ const USAGE = `Usage:
   zcc codewink review <pr-url|owner/repo#123> [--models provider:model,...] [--wait] [--json]
   zcc codewink show <pr-url|owner/repo#123> [--json]
   zcc codewink post <pr-url|owner/repo#123> --yes [--findings all|id,id] [--message "..."]
-  zcc codewink review-local [--path dir] [--scope uncommitted|staged|branch] [--base origin/main] [--intent "..."] [--models provider:model,...] [--wait] [--fail-on critical|high|medium|low] [--json]
+  zcc codewink review-local [--path dir] [--scope uncommitted|staged|branch|commits] [--branch ref] [--base origin/main] [--commits sha,sha] [--intent "..."] [--models provider:model,...] [--wait] [--fail-on critical|high|medium|low] [--json]
   zcc codewink show-local [--path dir] [--json]
   zcc codewink repos [list | add <owner/repo|host/owner/repo> [--auto] [--spec "docs/**/*.md"] | remove <host/owner/repo>]
   zcc codewink models [--json]
@@ -176,17 +176,22 @@ async function handleReviewLocal(app: CodewinkApp, args: ParsedArgs, ctx: { cwd?
   const prompt = promptFlag(args);
   const asJson = args.flags.has('json');
   const scope = flagString(args, 'scope') ?? 'uncommitted';
-  if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch');
+  if (!isLocalScope(scope)) throw new Error('--scope must be one of uncommitted, staged, branch, commits');
   const failOn = flagString(args, 'fail-on');
   if (failOn !== undefined && !isSeverity(failOn)) throw new Error('--fail-on must be one of critical, high, medium, low');
   const wait = args.flags.has('wait');
   if (failOn && !wait) throw new Error('--fail-on needs --wait');
   const { local, path, location } = await cliLocalLocation(app, args, ctx);
   const models = flagString(args, 'models') ? parseModelList(flagString(args, 'models')!) : undefined;
+  const branch = flagString(args, 'branch');
+  const rawCommits = flagString(args, 'commits');
+  const commits = rawCommits ? rawCommits.split(',').map((item) => item.trim()).filter(Boolean) : undefined;
   let review = await local.start({
     projectId: location.projectId,
     worktreePath: location.worktreePath,
     scope,
+    ...(branch ? { headRef: branch } : {}),
+    ...(commits?.length ? { commits } : {}),
     base: flagString(args, 'base') ?? null,
     intent: flagString(args, 'intent') ?? null,
     models,
@@ -253,8 +258,8 @@ export function registerCli(cli: CliRegistrar, app: CodewinkApp): void {
       { name: 'post', summary: 'Post review findings to GitHub as comments', usage: 'zcc codewink post <pr> --yes [--findings all|id,id] [--message "..."]' },
       {
         name: 'review-local',
-        summary: 'AI-review local changes (uncommitted, staged, or branch) without a pull request',
-        usage: 'zcc codewink review-local [--path dir] [--scope uncommitted|staged|branch] [--base ref] [--intent "..."] [--models ...] [--prompt id|builtin] [--wait] [--fail-on high] [--json]'
+        summary: 'AI-review local changes (uncommitted, staged, branch, or commits) without a pull request',
+        usage: 'zcc codewink review-local [--path dir] [--scope uncommitted|staged|branch|commits] [--branch ref] [--base ref] [--commits sha,...] [--intent "..."] [--models ...] [--prompt id|builtin] [--wait] [--fail-on high] [--json]'
       },
       { name: 'show-local', summary: 'Show the latest local review of a checkout', usage: 'zcc codewink show-local [--path dir] [--json]' },
       { name: 'repos', summary: 'List, add, or remove watched repositories', usage: 'zcc codewink repos [list|add|remove]' },
@@ -504,8 +509,10 @@ export function registerTools(agents: ToolRegistrar, app: CodewinkApp): void {
     parameters: {
       type: 'object',
       properties: {
-        scope: { type: 'string', enum: ['uncommitted', 'staged', 'branch'], description: 'uncommitted (default): working tree vs HEAD incl. new files; staged: index vs HEAD; branch: everything since the base branch' },
+        scope: { type: 'string', enum: ['uncommitted', 'staged', 'branch', 'commits'], description: 'uncommitted (default): working tree vs HEAD incl. new files; staged: index vs HEAD; branch: everything since the base branch; commits: specific commits' },
+        headRef: { type: 'string', description: 'Branch to review for scope "branch" (defaults to current checkout + uncommitted work)' },
         base: { type: 'string', description: 'Base branch for scope "branch" (defaults to the remote default branch)' },
+        commits: { type: 'array', items: { type: 'string' }, description: 'Commit SHAs to review for scope "commits"' },
         intent: { type: 'string', description: 'What the change is meant to do; used to score requirements' },
         promptId: { type: ['string', 'null'], description: 'Prompt ID from CodeWink settings; null selects built-in prompt only' },
         worktreePath: { type: 'string', description: "Another checked-out location of this thread's project to review instead of this thread's checkout" },
@@ -524,9 +531,9 @@ export function registerTools(agents: ToolRegistrar, app: CodewinkApp): void {
     },
     execute: async (input, ctx) => {
       const local = requireLocal(app);
-      const record = (input ?? {}) as { scope?: unknown; base?: unknown; intent?: unknown; worktreePath?: unknown; promptId?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
+      const record = (input ?? {}) as { scope?: unknown; headRef?: unknown; base?: unknown; commits?: unknown; intent?: unknown; worktreePath?: unknown; promptId?: unknown; models?: unknown; wait?: unknown; remediationGate?: unknown };
       const scope = record.scope === undefined ? 'uncommitted' : String(record.scope);
-      if (!isLocalScope(scope)) throw new Error('scope must be one of uncommitted, staged, branch');
+      if (!isLocalScope(scope)) throw new Error('scope must be one of uncommitted, staged, branch, commits');
       let location: LocalLocationRef;
       if (typeof record.worktreePath === 'string' && record.worktreePath.trim()) {
         location = await local.resolveLocation(ctx.projectId, record.worktreePath.trim());
@@ -536,10 +543,15 @@ export function registerTools(agents: ToolRegistrar, app: CodewinkApp): void {
         location = await local.locationForPath(path, ctx.projectId);
       }
       const models = toolModels(record.models);
+      const commits = Array.isArray(record.commits)
+        ? record.commits.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim())
+        : undefined;
       const review = await local.start({
         projectId: location.projectId,
         worktreePath: location.worktreePath,
         scope,
+        ...(typeof record.headRef === 'string' && record.headRef.trim() ? { headRef: record.headRef.trim() } : {}),
+        ...(commits?.length ? { commits } : {}),
         base: typeof record.base === 'string' ? record.base : null,
         intent: typeof record.intent === 'string' ? record.intent : null,
         models,

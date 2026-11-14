@@ -11,16 +11,23 @@ import {
   diffFiles,
   isSafeRef,
   isSecretLike,
+  listBranches,
+  listCommits,
   listTreeFiles,
   listWorktrees,
   MAX_NEW_FILE_BYTES,
   MAX_NEW_FILES,
   mergeBase,
+  orderCommits,
   readFileAt,
   resolveBase,
+  resolveBranchRef,
   runGit,
+  snapshotBranchTree,
+  snapshotCommitsTree,
   snapshotTree,
-  SNAPSHOT_REF_PREFIX
+  SNAPSHOT_REF_PREFIX,
+  type GitRunner
 } from '../server/local/git.ts';
 
 const IDENTITY = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
@@ -271,6 +278,216 @@ describe('local git snapshot', () => {
     expect((await diffFiles(runGit, repo, from, snapshotSha)).map((file) => file.path)).toEqual(['c.ts', 'd.ts']);
     expect(await commitMessages(runGit, repo, from, tree.headSha)).toEqual(['Add c\nNeeded for W-123.']);
   });
+
+  it('lists local and remote branches while excluding internal codewink branches', async () => {
+    const repo = createRepo();
+    sh(repo, 'branch', 'feat/beta');
+    sh(repo, 'branch', 'feat/alpha');
+    sh(repo, 'branch', 'zcc/codewink-internal');
+    sh(repo, 'update-ref', 'refs/remotes/origin/main', sh(repo, 'rev-parse', 'HEAD').trim());
+    sh(repo, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+
+    const result = await listBranches(runGit, repo);
+
+    expect(result.currentBranch).toBe('main');
+    expect(result.defaultBase).toBe('origin/main');
+    expect(result.branches).toEqual([
+      { ref: 'main', kind: 'local', isCurrent: true },
+      { ref: 'feat/alpha', kind: 'local', isCurrent: false },
+      { ref: 'feat/beta', kind: 'local', isCurrent: false },
+      { ref: 'origin/main', kind: 'remote', isCurrent: false }
+    ]);
+  });
+
+  it('snapshots a non-checked-out branch relative to its base without altering HEAD', async () => {
+    const repo = createRepo();
+    sh(repo, 'switch', '-q', '-c', 'other');
+    writeFileSync(join(repo, 'branch-file.ts'), 'export const x = 1;\n');
+    sh(repo, 'add', 'branch-file.ts');
+    sh(repo, 'commit', '-q', '-m', 'Add branch file');
+    sh(repo, 'switch', '-q', 'main');
+
+    const head = await resolveBranchRef(runGit, repo, 'other');
+    const base = await resolveBase(runGit, repo, 'main');
+    const from = await mergeBase(runGit, repo, base.sha, head.sha);
+    const tree = await snapshotBranchTree(runGit, repo, head.sha, from);
+    const snapshotSha = await commitSnapshot(runGit, repo, tree, 'branch', REVIEW_ID);
+
+    expect(sh(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('main');
+    expect((await diffFiles(runGit, repo, from, snapshotSha)).map((file) => file.path)).toEqual(['branch-file.ts']);
+  });
+
+  it('paginates commit logs with hasMore and ignores non-finite limit/skip', async () => {
+    const repo = createRepo();
+    for (let i = 2; i <= 6; i++) {
+      writeFileSync(join(repo, 'a.ts'), `const a = ${i};\n`);
+      sh(repo, 'commit', '-q', '-am', `Commit ${i}`);
+    }
+
+    const page1 = await listCommits(runGit, repo, { limit: 4, skip: 0 });
+    expect(page1.commits).toHaveLength(4);
+    expect(page1.hasMore).toBe(true);
+    expect(page1.commits[0].subject).toBe('Commit 6');
+
+    const page2 = await listCommits(runGit, repo, { limit: 4, skip: 4 });
+    expect(page2.commits).toHaveLength(2);
+    expect(page2.hasMore).toBe(false);
+    expect(page2.commits.at(-1)?.subject).toBe('init');
+
+    const fallback = await listCommits(runGit, repo, { limit: Number.NaN, skip: Number.POSITIVE_INFINITY });
+    expect(fallback.commits).toHaveLength(6);
+    expect(fallback.hasMore).toBe(false);
+  }, 30_000);
+
+  it('orders commits topologically with bounded rev-list walks even with skewed dates or root commits', async () => {
+    const repo = createRepo();
+    const rootSha = sh(repo, 'rev-parse', 'HEAD').trim();
+    const commitWithDate = (file: string, content: string, message: string, date: string) => {
+      writeFileSync(join(repo, file), content);
+      sh(repo, 'add', file);
+      execFileSync('git', ['commit', '-q', '-m', message], {
+        cwd: repo,
+        env: { ...process.env, ...IDENTITY, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+        encoding: 'utf8'
+      });
+      return sh(repo, 'rev-parse', 'HEAD').trim();
+    };
+
+    // Out-of-order committer timestamps: c1 (2030) -> c2 (2020) -> c3 (2025)
+    const c1 = commitWithDate('c1.ts', '1\n', 'c1', '2030-01-01T00:00:00Z');
+    const c2 = commitWithDate('c2.ts', '2\n', 'c2', '2020-01-01T00:00:00Z');
+    const c3 = commitWithDate('c3.ts', '3\n', 'c3', '2025-01-01T00:00:00Z');
+
+    const revListCalls: string[][] = [];
+    const spyGit: GitRunner = async (cwd, args, options) => {
+      if (args[0] === 'rev-list') revListCalls.push(args);
+      return runGit(cwd, args, options);
+    };
+
+    expect(await orderCommits(spyGit, repo, [c3, c1, c2])).toEqual([c1, c2, c3]);
+    expect(await orderCommits(spyGit, repo, [c3, rootSha])).toEqual([rootSha, c3]);
+
+    // Bounded range check even when root commit is included in non-contiguous snapshot
+    await snapshotCommitsTree(spyGit, repo, [rootSha, c3]);
+    for (const args of revListCalls) {
+      const bounded =
+        args.includes('--no-walk=sorted') ||
+        args.includes('-n') ||
+        args.some((arg) => arg.startsWith('--max-count=')) ||
+        args.some((arg) => arg.startsWith('^'));
+      expect(bounded).toBe(true);
+    }
+  }, 30_000);
+
+  it('orders commits from unrelated histories without a full history walk', async () => {
+    const repo = createRepo();
+    const rootSha = sh(repo, 'rev-parse', 'HEAD').trim();
+    sh(repo, 'checkout', '-q', '--orphan', 'other');
+    sh(repo, 'rm', '-rq', '--cached', '.');
+    writeFileSync(join(repo, 'o1.ts'), '1\n');
+    sh(repo, 'add', 'o1.ts');
+    sh(repo, 'commit', '-q', '-m', 'o1');
+    const o1 = sh(repo, 'rev-parse', 'HEAD').trim();
+    writeFileSync(join(repo, 'o2.ts'), '2\n');
+    sh(repo, 'add', 'o2.ts');
+    sh(repo, 'commit', '-q', '-m', 'o2');
+    const o2 = sh(repo, 'rev-parse', 'HEAD').trim();
+
+    const revListCalls: string[][] = [];
+    const spyGit: GitRunner = async (cwd, args, options) => {
+      if (args[0] === 'rev-list') revListCalls.push(args);
+      return runGit(cwd, args, options);
+    };
+    const ordered = await orderCommits(spyGit, repo, [o2, rootSha, o1]);
+    expect([...ordered].sort()).toEqual([rootSha, o1, o2].sort());
+    expect(ordered.indexOf(o1)).toBeLessThan(ordered.indexOf(o2));
+    expect(revListCalls.every((args) => args.includes('--no-walk=sorted'))).toBe(true);
+  }, 30_000);
+
+  it('orders two unrelated commits deterministically regardless of selection order', async () => {
+    const repo = createRepo();
+    const commitDated = (file: string, content: string, message: string, date: string) => {
+      writeFileSync(join(repo, file), content);
+      sh(repo, 'add', file);
+      execFileSync('git', ['commit', '-q', '-m', message], {
+        cwd: repo,
+        env: { ...process.env, ...IDENTITY, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+        encoding: 'utf8'
+      });
+      return sh(repo, 'rev-parse', 'HEAD').trim();
+    };
+
+    const earlier = commitDated('earlier.ts', '1\n', 'earlier', '2024-01-01T00:00:00Z');
+    sh(repo, 'checkout', '-q', '--orphan', 'side');
+    sh(repo, 'rm', '-rq', '--cached', '.');
+    const later = commitDated('later.ts', '2\n', 'later', '2025-01-01T00:00:00Z');
+
+    expect(await orderCommits(runGit, repo, [earlier, later])).toEqual([earlier, later]);
+    expect(await orderCommits(runGit, repo, [later, earlier])).toEqual([earlier, later]);
+
+    sh(repo, 'checkout', '-q', '--orphan', 'same-ts');
+    sh(repo, 'rm', '-rq', '--cached', '.');
+    const tied = commitDated('tied.ts', '3\n', 'tied', '2025-01-01T00:00:00Z');
+    const forward = await orderCommits(runGit, repo, [later, tied]);
+    const reversed = await orderCommits(runGit, repo, [tied, later]);
+    expect(reversed).toEqual(forward);
+  }, 30_000);
+
+  it('snapshots root, single, contiguous, and non-contiguous commits and errors on conflicts or merge commits', async () => {
+    const repo = createRepo();
+    const rootSha = sh(repo, 'rev-parse', 'HEAD').trim();
+    writeFileSync(join(repo, 'b.ts'), 'export const b = 1;\n');
+    sh(repo, 'add', 'b.ts');
+    sh(repo, 'commit', '-q', '-m', 'Add b');
+    const secondSha = sh(repo, 'rev-parse', 'HEAD').trim();
+
+    writeFileSync(join(repo, 'c.ts'), 'export const c = 1;\n');
+    sh(repo, 'add', 'c.ts');
+    sh(repo, 'commit', '-q', '-m', 'Add c');
+    const thirdSha = sh(repo, 'rev-parse', 'HEAD').trim();
+
+    writeFileSync(join(repo, 'd.ts'), 'export const d = 1;\n');
+    sh(repo, 'add', 'd.ts');
+    sh(repo, 'commit', '-q', '-m', 'Add d');
+    const fourthSha = sh(repo, 'rev-parse', 'HEAD').trim();
+
+    // Root commit
+    const rootTree = await snapshotCommitsTree(runGit, repo, [rootSha]);
+    const rootSnapshot = await commitSnapshot(runGit, repo, rootTree, 'commits', REVIEW_ID);
+    expect((await diffFiles(runGit, repo, rootTree.baseSha, rootSnapshot)).map((f) => f.path).sort()).toEqual(['.gitignore', 'a.ts']);
+
+    // Contiguous commits (passed out of order -> ordered oldest-to-newest)
+    const contiguous = await snapshotCommitsTree(runGit, repo, [thirdSha, secondSha]);
+    expect(contiguous.orderedShas).toEqual([secondSha, thirdSha]);
+    const contiguousSnapshot = await commitSnapshot(runGit, repo, contiguous, 'commits', REVIEW_ID);
+    expect((await diffFiles(runGit, repo, contiguous.baseSha, contiguousSnapshot)).map((f) => f.path).sort()).toEqual(['b.ts', 'c.ts']);
+
+    // Non-contiguous commits touching independent files (with an empty commit skipped cleanly)
+    sh(repo, 'commit', '--allow-empty', '-q', '-m', 'Empty checkpoint');
+    const emptySha = sh(repo, 'rev-parse', 'HEAD').trim();
+    const sparse = await snapshotCommitsTree(runGit, repo, [secondSha, fourthSha, emptySha]);
+    expect(sparse.orderedShas).toEqual([secondSha, fourthSha, emptySha]);
+    const sparseSnapshot = await commitSnapshot(runGit, repo, sparse, 'commits', REVIEW_ID);
+    expect((await diffFiles(runGit, repo, sparse.baseSha, sparseSnapshot)).map((f) => f.path).sort()).toEqual(['b.ts', 'd.ts']);
+
+    // Non-contiguous selection including a merge commit is rejected
+    sh(repo, 'switch', '-q', '-c', 'side', secondSha);
+    writeFileSync(join(repo, 'side.ts'), 'export const s = 1;\n');
+    sh(repo, 'add', 'side.ts');
+    sh(repo, 'commit', '-q', '-m', 'Side commit');
+    sh(repo, 'switch', '-q', 'main');
+    sh(repo, 'merge', '--no-ff', '-q', '-m', 'Merge side', 'side');
+    const mergeSha = sh(repo, 'rev-parse', 'HEAD').trim();
+    await expect(snapshotCommitsTree(runGit, repo, [secondSha, mergeSha])).rejects.toThrow(/merge commit/i);
+
+    // Non-contiguous conflict on same line of a.ts
+    writeFileSync(join(repo, 'a.ts'), 'line 1 changed\n');
+    sh(repo, 'commit', '-q', '-am', 'Edit a once');
+    writeFileSync(join(repo, 'a.ts'), 'line 1 changed twice\n');
+    sh(repo, 'commit', '-q', '-am', 'Edit a twice');
+    const conflictSha = sh(repo, 'rev-parse', 'HEAD').trim();
+    await expect(snapshotCommitsTree(runGit, repo, [rootSha, conflictSha])).rejects.toThrow(/conflicts with skipped intermediate changes/);
+  }, 30_000);
 
   it('falls back to main as the default base and rejects unsafe or missing bases', async () => {
     const repo = createRepo();

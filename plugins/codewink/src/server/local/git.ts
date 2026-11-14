@@ -92,6 +92,7 @@ async function must(git: GitRunner, cwd: string, args: string[], what: string, o
 const SHA_PATTERN = /^[0-9a-f]{7,64}$/i;
 const REF_PATTERN = /^(?!-)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9._/@{}^~+-]{1,200}$/;
 const REVIEW_ID_PATTERN = /^[A-Za-z0-9-]{8,64}$/;
+const CODEWINK_BRANCH_PATTERN = /^zcc\/codewink-/;
 
 export function isSafeRef(ref: string): boolean {
   return REF_PATTERN.test(ref);
@@ -126,6 +127,31 @@ export interface WorktreeInfo {
   isMain: boolean;
 }
 
+export interface BranchEntry {
+  ref: string;
+  kind: 'local' | 'remote';
+  isCurrent: boolean;
+}
+
+export interface BranchList {
+  currentBranch: string | null;
+  defaultBase: string | null;
+  branches: BranchEntry[];
+}
+
+export interface CommitInfo {
+  sha: string;
+  shortSha: string;
+  subject: string;
+  author: string;
+  authoredAt: string;
+}
+
+export interface CommitPage {
+  commits: CommitInfo[];
+  hasMore: boolean;
+}
+
 /** Checked-out locations of the repository containing `repoPath`; the first entry is the main checkout. */
 export async function listWorktrees(git: GitRunner, repoPath: string): Promise<WorktreeInfo[]> {
   const out = await must(git, repoPath, ['worktree', 'list', '--porcelain', '-z'], 'worktree list');
@@ -149,6 +175,72 @@ export async function listWorktrees(git: GitRunner, repoPath: string): Promise<W
   }
   flush();
   return worktrees;
+}
+
+/** Available local and remote branches for `worktreePath`, excluding CodeWink internal branches and symbolic HEADs. */
+export async function listBranches(git: GitRunner, worktreePath: string): Promise<BranchList> {
+  const headRes = await git(worktreePath, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  const headName = headRes.code === 0 ? headRes.stdout.trim() : '';
+  const currentBranch = headName && headName !== 'HEAD' ? headName : null;
+
+  const out = await must(git, worktreePath, ['for-each-ref', '--format=%(refname)%09%(symref)', 'refs/heads', 'refs/remotes'], 'for-each-ref');
+  const branches: BranchEntry[] = [];
+  for (const line of out.split('\n')) {
+    if (!line.trim()) continue;
+    const [refname = '', symref = ''] = line.split('\t');
+    if (!refname || symref.trim()) continue;
+    if (refname.startsWith('refs/heads/')) {
+      const ref = refname.slice('refs/heads/'.length);
+      if (CODEWINK_BRANCH_PATTERN.test(ref)) continue;
+      branches.push({ ref, kind: 'local', isCurrent: ref === currentBranch });
+    } else if (refname.startsWith('refs/remotes/')) {
+      const ref = refname.slice('refs/remotes/'.length);
+      if (ref.endsWith('/HEAD')) continue;
+      branches.push({ ref, kind: 'remote', isCurrent: false });
+    }
+  }
+  branches.sort((a, b) => {
+    if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+    if (a.kind !== b.kind) return a.kind === 'local' ? -1 : 1;
+    return a.ref.localeCompare(b.ref);
+  });
+
+  const defaultBase = await resolveBase(git, worktreePath, null).then((found) => found.ref).catch(() => null);
+  return { currentBranch, defaultBase, branches };
+}
+
+/** Paginated commit log of `ref` (default `HEAD`). */
+export async function listCommits(
+  git: GitRunner,
+  worktreePath: string,
+  options: { limit?: number; skip?: number; ref?: string } = {}
+): Promise<CommitPage> {
+  const rawLimit = typeof options.limit === 'number' && Number.isFinite(options.limit) ? Math.trunc(options.limit) : 10;
+  const rawSkip = typeof options.skip === 'number' && Number.isFinite(options.skip) ? Math.trunc(options.skip) : 0;
+  const limit = Math.max(1, Math.min(rawLimit, 50));
+  const skip = Math.max(0, rawSkip);
+  const ref = options.ref ?? 'HEAD';
+  if (!isSafeRef(ref)) throw new Error(`Invalid ref: ${ref}`);
+
+  const exists = await git(worktreePath, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  if (exists.code !== 0) return { commits: [], hasMore: false };
+
+  const out = await must(
+    git,
+    worktreePath,
+    ['log', '--no-color', `--skip=${skip}`, `--max-count=${limit + 1}`, '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1e', ref],
+    'log'
+  );
+  const records = out
+    .split('\x1e')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const hasMore = records.length > limit;
+  const commits = records.slice(0, limit).map((record) => {
+    const [sha = '', shortSha = '', subject = '', author = '', authoredAt = ''] = record.split('\x1f');
+    return { sha, shortSha, subject, author, authoredAt };
+  });
+  return { commits, hasMore };
 }
 
 /** Number of changed paths (staged, unstaged, or untracked), or null when git status fails. */
@@ -177,6 +269,14 @@ export async function headCommit(git: GitRunner, worktreePath: string): Promise<
   const sha = result.stdout.trim();
   if (result.code !== 0 || !SHA_PATTERN.test(sha)) throw new Error('This branch has no commits yet. Commit once before reviewing local changes.');
   return sha;
+}
+
+export async function resolveBranchRef(git: GitRunner, worktreePath: string, ref: string): Promise<{ ref: string; sha: string }> {
+  if (!isSafeRef(ref)) throw new Error(`Invalid branch: ${ref}`);
+  const result = await git(worktreePath, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  const sha = result.stdout.trim();
+  if (result.code !== 0 || !SHA_PATTERN.test(sha)) throw new Error(`Branch ${ref} does not exist in this repository`);
+  return { ref, sha };
 }
 
 async function withTempIndex<T>(git: GitRunner, worktreePath: string, work: (env: Record<string, string>) => Promise<T>): Promise<T> {
@@ -251,6 +351,11 @@ export interface SnapshotTree {
   headSha: string;
   treeSha: string;
   skipped: SkippedFile[];
+}
+
+export interface CommitsSnapshotTree extends SnapshotTree {
+  baseSha: string;
+  orderedShas: string[];
 }
 
 interface IndexChange {
@@ -380,6 +485,213 @@ export async function snapshotTree(git: GitRunner, worktreePath: string, scope: 
   });
 }
 
+/** Snapshots the committed tree of `headSha` (a non-checked-out branch tip) relative to `baseSha`, without touching the worktree. */
+export async function snapshotBranchTree(git: GitRunner, worktreePath: string, headSha: string, baseSha: string): Promise<SnapshotTree> {
+  assertSha(headSha);
+  assertSha(baseSha);
+  return withTempIndex(git, worktreePath, async (env) => {
+    await must(git, worktreePath, ['read-tree', headSha], 'read-tree', { env });
+    const skipped = await excludeUnsafeChanges(git, worktreePath, env, baseSha);
+    const treeSha = (await must(git, worktreePath, ['write-tree'], 'write-tree', { env })).trim();
+    return { headSha, treeSha, skipped };
+  });
+}
+
+/** Parent commit of `sha`, or an empty tree SHA when `sha` is a root commit. */
+export async function parentCommit(git: GitRunner, worktreePath: string, sha: string): Promise<{ sha: string; isEmptyTree: boolean }> {
+  assertSha(sha);
+  const parent = await git(worktreePath, ['rev-parse', '--verify', '--quiet', `${sha}^1^{commit}`]);
+  const trimmed = parent.stdout.trim();
+  if (parent.code === 0 && SHA_PATTERN.test(trimmed)) return { sha: trimmed, isEmptyTree: false };
+  if (!(await commitExists(git, worktreePath, sha))) throw new Error(`Commit ${sha} does not exist in this repository`);
+  const emptyTree = (await must(git, worktreePath, ['mktree'], 'mktree', { input: '' })).trim();
+  assertSha(emptyTree);
+  return { sha: emptyTree, isEmptyTree: true };
+}
+
+/** Above this many selected commits, pairwise ancestry checks are refused rather than spawning O(n²) git processes. */
+const MAX_PAIRWISE_ORDER_CANDIDATES = 25;
+/** Number of `git merge-base` processes run at once while ordering commits pairwise. */
+const PAIRWISE_ORDER_CONCURRENCY = 8;
+
+async function isAncestor(git: GitRunner, worktreePath: string, ancestor: string, descendant: string): Promise<boolean> {
+  const res = await git(worktreePath, ['merge-base', '--is-ancestor', ancestor, descendant]);
+  if (res.code === 0) return true;
+  if (res.code === 1) return false;
+  throw new Error(`git merge-base failed in ${worktreePath}`);
+}
+
+/** Returns -1 when `a` is an ancestor of `b`, 1 when `b` is an ancestor of `a`, 0 when unrelated — using one git process. */
+async function ancestryRelation(git: GitRunner, worktreePath: string, a: string, b: string): Promise<-1 | 0 | 1> {
+  const res = await git(worktreePath, ['merge-base', a, b]);
+  if (res.code === 1) return 0; // No common ancestor.
+  if (res.code !== 0) throw new Error(`git merge-base failed in ${worktreePath}`);
+  const base = res.stdout.trim();
+  if (base === a) return -1;
+  if (base === b) return 1;
+  return 0;
+}
+
+/** Topologically sorts a small set of commits that share no common merge-base, via bounded-concurrency pairwise checks. */
+async function topoSortByAncestry(git: GitRunner, worktreePath: string, candidates: readonly string[]): Promise<string[]> {
+  const n = candidates.length;
+  const pairs: Array<[number, number]> = [];
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) pairs.push([i, j]);
+  const relations = await mapWithConcurrency(pairs, PAIRWISE_ORDER_CONCURRENCY, ([i, j]) => ancestryRelation(git, worktreePath, candidates[i], candidates[j]));
+  const edges: number[][] = Array.from({ length: n }, () => []);
+  const inDegree = new Array<number>(n).fill(0);
+  pairs.forEach(([i, j], index) => {
+    const relation = relations[index];
+    if (relation === 0) return;
+    const [from, to] = relation === -1 ? [i, j] : [j, i];
+    edges[from].push(to);
+    inDegree[to]++;
+  });
+  const ordered: string[] = [];
+  const used = new Array<boolean>(n).fill(false);
+  while (ordered.length < n) {
+    const next = inDegree.findIndex((deg, idx) => !used[idx] && deg === 0);
+    if (next === -1) throw new Error('Could not order selected commits.');
+    used[next] = true;
+    ordered.push(candidates[next]);
+    for (const target of edges[next]) inDegree[target]--;
+  }
+  return ordered;
+}
+
+/** Validates each selected SHA and resolves it to a unique full commit SHA, preserving selection order. */
+async function resolveCommitShas(git: GitRunner, worktreePath: string, shas: readonly string[]): Promise<string[]> {
+  const unique = [...new Set(shas.map((s) => s.trim()).filter(Boolean))];
+  if (unique.length === 0) throw new Error('Select at least one commit to review.');
+  const resolved: string[] = [];
+  for (const candidate of unique) {
+    assertSha(candidate);
+    const res = await git(worktreePath, ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`]);
+    const full = res.stdout.trim();
+    if (res.code !== 0 || !SHA_PATTERN.test(full)) throw new Error(`Commit ${candidate} does not exist in this repository`);
+    if (!resolved.includes(full)) resolved.push(full);
+  }
+  return resolved;
+}
+
+/** Sorts commits oldest-to-newest by commit date; sorting SHAs first keeps identical timestamps independent of selection order. */
+async function sortByDateDeterministic(git: GitRunner, worktreePath: string, resolved: readonly string[]): Promise<string[]> {
+  const stableInput = [...resolved].sort();
+  const out = await git(worktreePath, ['rev-list', '--no-walk=sorted', '--reverse', ...stableInput]);
+  const sorted = out.code === 0 ? out.stdout.split('\n').map((line) => line.trim()).filter(Boolean) : [];
+  return sorted.length === stableInput.length ? sorted : stableInput;
+}
+
+/** Sorts by commit date and returns the result only when it forms an ancestor chain — no history walk for linear selections. */
+async function orderByDateChain(git: GitRunner, worktreePath: string, resolved: readonly string[]): Promise<{ candidates: string[]; chain: boolean }> {
+  const candidates = await sortByDateDeterministic(git, worktreePath, resolved);
+  const chainChecks = await Promise.all(
+    candidates.slice(0, -1).map((sha, index) => isAncestor(git, worktreePath, sha, candidates[index + 1]))
+  );
+  return { candidates, chain: chainChecks.every(Boolean) };
+}
+
+/**
+ * Orders commits that share a common merge-base by walking only the ancestry path between that
+ * merge-base and the selected tips. Returns null when the selection has no common merge-base.
+ */
+async function orderFromMergeBase(git: GitRunner, worktreePath: string, resolved: readonly string[]): Promise<string[] | null> {
+  const mb = await git(worktreePath, ['merge-base', '--octopus', ...resolved]);
+  const mbSha = mb.code === 0 ? mb.stdout.trim().split('\n')[0]?.trim() : '';
+  if (!mbSha || !SHA_PATTERN.test(mbSha)) return null;
+  const wanted = new Set(resolved);
+  // Excluding the merge-base itself keeps the walk bounded even when it is a root commit; it is re-added as the oldest entry.
+  const out = await must(git, worktreePath, ['rev-list', '--topo-order', '--reverse', '--ancestry-path', ...resolved, `^${mbSha}`], 'rev-list');
+  const walked = out.split('\n').map((line) => line.trim()).filter((sha) => wanted.has(sha));
+  const ordered = wanted.has(mbSha) ? [mbSha, ...walked] : walked;
+  if (ordered.length !== resolved.length) throw new Error('Could not order selected commits.');
+  return ordered;
+}
+
+/** Orders commit SHAs oldest-to-newest topologically and validates that all exist. */
+export async function orderCommits(git: GitRunner, worktreePath: string, shas: readonly string[]): Promise<string[]> {
+  const resolved = await resolveCommitShas(git, worktreePath, shas);
+  if (resolved.length === 1) return resolved;
+  if (resolved.length === 2) {
+    const relation = await ancestryRelation(git, worktreePath, resolved[0], resolved[1]);
+    if (relation === -1) return resolved;
+    if (relation === 1) return [resolved[1], resolved[0]];
+    return sortByDateDeterministic(git, worktreePath, resolved);
+  }
+  const { candidates, chain } = await orderByDateChain(git, worktreePath, resolved);
+  if (chain) return candidates;
+  const fromMergeBase = await orderFromMergeBase(git, worktreePath, resolved);
+  if (fromMergeBase) return fromMergeBase;
+  if (candidates.length > MAX_PAIRWISE_ORDER_CANDIDATES) {
+    throw new Error(`Selected commits do not share a common history. Select at most ${MAX_PAIRWISE_ORDER_CANDIDATES} commits from unrelated histories.`);
+  }
+  return topoSortByAncestry(git, worktreePath, candidates);
+}
+
+/** Replays non-contiguous single-parent commits sequentially onto `baseSha` in a throwaway index. */
+async function replayCommitsOntoIndex(
+  git: GitRunner,
+  worktreePath: string,
+  env: Record<string, string>,
+  baseSha: string,
+  ordered: readonly string[]
+): Promise<void> {
+  await must(git, worktreePath, ['read-tree', baseSha], 'read-tree', { env });
+  for (const sha of ordered) {
+    const secondParent = await git(worktreePath, ['rev-parse', '--verify', '--quiet', `${sha}^2^{commit}`]);
+    if (secondParent.code === 0) {
+      throw new Error(`Cannot combine non-contiguous commits that include merge commit ${sha.slice(0, 7)}. Select a contiguous range instead.`);
+    }
+    const parent = await parentCommit(git, worktreePath, sha);
+    const changed = await git(worktreePath, ['diff', '--quiet', parent.sha, sha]);
+    if (changed.code === 0) continue;
+    if (changed.code !== 1) throw new Error(`git diff failed for ${sha.slice(0, 7)} in ${worktreePath}`);
+    const patch = await must(git, worktreePath, ['diff', '--binary', '--full-index', parent.sha, sha], 'diff');
+    if (patch.trim().length === 0) {
+      throw new Error(`Cannot replay non-text changes in ${sha.slice(0, 7)} across skipped commits. Select a contiguous range instead.`);
+    }
+    const applied = await git(worktreePath, ['apply', '--cached'], { env, input: patch });
+    if (applied.code !== 0) {
+      throw new Error(`Cannot combine the selected commits because ${sha.slice(0, 7)} conflicts with skipped intermediate changes. Select a contiguous range or fewer commits.`);
+    }
+  }
+}
+
+/**
+ * Snapshots one or more selected commits into a git tree relative to the oldest commit's parent.
+ * Contiguous commit ranges use the exact tree of the newest commit; non-contiguous selections
+ * reject merge commits and replay each commit's patch onto the base tree inside a temporary index.
+ */
+export async function snapshotCommitsTree(git: GitRunner, worktreePath: string, shas: readonly string[]): Promise<CommitsSnapshotTree> {
+  const ordered = await orderCommits(git, worktreePath, shas);
+  const oldest = ordered[0];
+  const newest = ordered[ordered.length - 1];
+  const baseParent = await parentCommit(git, worktreePath, oldest);
+  const baseSha = baseParent.sha;
+
+  if (ordered.length === 1) {
+    const tree = await snapshotBranchTree(git, worktreePath, newest, baseSha);
+    return { ...tree, baseSha, orderedShas: ordered };
+  }
+
+  const maxCountArg = `--max-count=${ordered.length + 1}`;
+  const rangeArgs = baseParent.isEmptyTree ? ['rev-list', maxCountArg, newest] : ['rev-list', maxCountArg, `${baseSha}..${newest}`];
+  const rangeOut = await must(git, worktreePath, rangeArgs, 'rev-list');
+  const rangeSet = new Set(rangeOut.split('\n').map((line) => line.trim()).filter(Boolean));
+  const contiguous = rangeSet.size === ordered.length && ordered.every((sha) => rangeSet.has(sha));
+  if (contiguous) {
+    const tree = await snapshotBranchTree(git, worktreePath, newest, baseSha);
+    return { ...tree, baseSha, orderedShas: ordered };
+  }
+
+  return withTempIndex(git, worktreePath, async (env) => {
+    await replayCommitsOntoIndex(git, worktreePath, env, baseSha, ordered);
+    const skipped = await excludeUnsafeChanges(git, worktreePath, env, baseSha);
+    const treeSha = (await must(git, worktreePath, ['write-tree'], 'write-tree', { env })).trim();
+    return { headSha: newest, treeSha, skipped, baseSha, orderedShas: ordered };
+  });
+}
+
 /** Records `tree` as a commit on top of HEAD and pins it under `refs/codewink/local/<reviewId>`. */
 export async function commitSnapshot(git: GitRunner, worktreePath: string, tree: SnapshotTree, scope: LocalScope, reviewId: string): Promise<string> {
   if (!REVIEW_ID_PATTERN.test(reviewId)) throw new Error(`Invalid review id: ${reviewId}`);
@@ -444,7 +756,7 @@ function countLines(patch: string | null): { additions: number; deletions: numbe
   return { additions, deletions };
 }
 
-/** Changed files between two commits with per-file patches; files past MAX_DIFF_FILES carry no patch. */
+/** Changed files between two commits (or trees) with per-file patches; files past MAX_DIFF_FILES carry no patch. */
 export async function diffFiles(git: GitRunner, worktreePath: string, from: string, to: string): Promise<ChangedFile[]> {
   assertSha(from);
   assertSha(to);
@@ -490,6 +802,16 @@ export async function commitMessages(git: GitRunner, worktreePath: string, from:
   assertSha(from);
   assertSha(to);
   const result = await git(worktreePath, ['log', '--no-color', `--max-count=${max}`, '--format=%s%n%b%x1e', `${from}..${to}`]);
+  if (result.code !== 0) return [];
+  return result.stdout.split('\x1e').map((message) => message.trim()).filter(Boolean);
+}
+
+/** Subjects and bodies of specific commits, newest first. */
+export async function commitMessagesForShas(git: GitRunner, worktreePath: string, shas: readonly string[], max = 20): Promise<string[]> {
+  if (shas.length === 0) return [];
+  const selected = shas.slice(-max);
+  for (const sha of selected) assertSha(sha);
+  const result = await git(worktreePath, ['log', '--no-color', '--no-walk', '--format=%s%n%b%x1e', ...selected]);
   if (result.code !== 0) return [];
   return result.stdout.split('\x1e').map((message) => message.trim()).filter(Boolean);
 }

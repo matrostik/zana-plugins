@@ -13,10 +13,12 @@ export type ReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES';
 export type ReviewTargetKind = 'pr' | 'local';
 
 /** Which local changes a local review covers. */
-export type LocalScope = 'uncommitted' | 'staged' | 'branch';
+export type LocalScope = 'uncommitted' | 'staged' | 'branch' | 'commits';
 
 /** Who started a local review; agent-started reviews stay off the Agents board and Inbox. */
 export type LocalReviewSource = 'ui' | 'cli' | 'agent';
+
+export type LocalFixStatus = 'running' | 'completed' | 'failed' | 'stopped';
 
 export interface RepoRef {
   host: string;
@@ -189,6 +191,8 @@ export interface LocalSnapshotRow {
   reviewId: string;
   targetId: string;
   scope: LocalScope;
+  headRef: string | null;
+  commitShas: string[];
   baseRef: string | null;
   baseSha: string;
   headSha: string;
@@ -199,4 +203,21 @@ export interface LocalSnapshotRow {
   files: ChangedFile[];
   skipped: SkippedFile[];
   createdAt: number;
+}
+
+export interface LocalFixRunRow {
+  id: string;
+  reviewId: string;
+  targetId: string;
+  threadId: string;
+  providerId: string;
+  model: string;
+  reasoningLevel: string | null;
+  permissionMode: string;
+  findingIds: string[];
+  status: LocalFixStatus;
+  summary: string | null;
+  error: string | null;
+  startedAt: number;
+  completedAt: number | null;
 }
