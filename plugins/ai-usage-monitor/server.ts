@@ -35,6 +35,7 @@ import {
   type FetchLike,
   type HostUsageProbeResult
 } from './src/server/collectors/zcc-quotas.ts';
+import { createComparisonSetup } from './src/server/comparison-setup.ts';
 import { createDashboardService, type DashboardService } from './src/server/dashboard.ts';
 import { createUsageStore, type UsageStore } from './src/server/db.ts';
 import { createTelemetryIndexer, type ThreadsApiLike } from './src/server/indexer.ts';
@@ -544,6 +545,7 @@ export default async function createAiUsageMonitorPlugin(
   await refreshSettingsCache();
 
   const collectors = createCollectors({ zcc, deps, store, state, refreshSettingsCache, getSettingValues, now });
+  const comparisonSetup = createComparisonSetup(zcc, { fetch: deps.fetch, now });
   const { refreshNow, refreshProvider } = createSyncCoordinator({ zcc, deps, state, defaultBudgetMs, refreshSettingsCache, collectors, now });
   attachRuntimeHooks({ zcc, deps, state, defaultBudgetMs, settings, collectors, refreshNow, now });
   registerReadAndSyncRpcs({ zcc, deps, state, defaultBudgetMs, store, dashboard: collectors.dashboard, refreshNow, refreshProvider });
@@ -551,6 +553,7 @@ export default async function createAiUsageMonitorPlugin(
   registerPricingAndOrderRpcs(zcc, state, store);
   registerCli(zcc.cli, {
     dashboard: collectors.dashboard, store, refreshNow,
+    readComparisonSample: comparisonSetup.readSample,
     qualifyOpenCode: async () => {
       const vals = await refreshSettingsCache();
       return qualifyOpenCodeConsole({

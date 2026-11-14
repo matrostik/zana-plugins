@@ -10,6 +10,7 @@ export interface CliAndToolsApp {
   store: UsageStore;
   refreshNow: () => Promise<void>;
   qualifyOpenCode?: () => Promise<{ ok: boolean; probes: OpenCodeQualificationProbeEntry[]; error?: string }>;
+  readComparisonSample?: () => { fetchedAtMs: number; body: unknown } | null;
 }
 
 type ToolRegistration = Parameters<ZccPluginApi['agents']['registerTool']>[0] & {
@@ -100,6 +101,34 @@ async function runQualifyOpenCodeCommand(app: CliAndToolsApp): Promise<CliResult
   return { exitCode: res.ok ? 0 : 1, stdout: JSON.stringify(res, null, 2) + '\n' };
 }
 
+function summarizeSampleShape(value: unknown, depth = 0): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return {
+      kind: 'array',
+      length: value.length,
+      sample: depth < 3 ? value.slice(0, 2).map((item) => summarizeSampleShape(item, depth + 1)) : []
+    };
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = depth < 3 ? summarizeSampleShape(v, depth + 1) : typeof v;
+  }
+  return out;
+}
+
+function runComparisonSampleCommand(app: CliAndToolsApp, argv: string[]): CliResult {
+  const sample = app.readComparisonSample?.() ?? null;
+  if (!sample) {
+    return { exitCode: 1, stderr: 'No Artificial Analysis sample captured yet. Connect a key in AI Usage Monitor settings first.\n' };
+  }
+  const raw = argv.includes('--raw');
+  const output = raw
+    ? { fetchedAtMs: sample.fetchedAtMs, body: sample.body }
+    : { fetchedAtMs: sample.fetchedAtMs, shape: summarizeSampleShape(sample.body) };
+  return { exitCode: 0, stdout: JSON.stringify(output, null, 2) + '\n' };
+}
+
 export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void {
   cli.register({
     name: 'ai-usage',
@@ -109,7 +138,8 @@ export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void
       { name: 'quotas', summary: 'Show configured providers, subscription windows, and remaining credits', usage: 'zcc ai-usage quotas [--refresh]' },
       { name: 'budgets', summary: 'Show budget rules and remaining allowance', usage: 'zcc ai-usage budgets' },
       { name: 'logs', summary: 'Show recent usage, rate-limit, fallback, and error logs', usage: 'zcc ai-usage logs [--kind all|turn_usage|rate_limit|fallback|error] [--limit 20]' },
-      { name: 'qualify-opencode', summary: 'Probe OpenCode Console billing/usage endpoints with configured key (read-only, sanitized)', usage: 'zcc ai-usage qualify-opencode' }
+      { name: 'qualify-opencode', summary: 'Probe OpenCode Console billing/usage endpoints with configured key (read-only, sanitized)', usage: 'zcc ai-usage qualify-opencode' },
+      { name: 'comparison-sample', summary: 'Inspect the captured Artificial Analysis live response schema or raw JSON', usage: 'zcc ai-usage comparison-sample [--raw]' }
     ],
     async run(argv: string[]) {
       try {
@@ -120,7 +150,8 @@ export function registerCli(cli: ZccPluginApi['cli'], app: CliAndToolsApp): void
         if (sub === 'budgets') return await runBudgetsCommand(app);
         if (sub === 'logs') return await runLogsCommand(app, argv);
         if (sub === 'qualify-opencode') return await runQualifyOpenCodeCommand(app);
-        return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs, qualify-opencode.\n` };
+        if (sub === 'comparison-sample') return runComparisonSampleCommand(app, argv);
+        return { exitCode: 1, stderr: `Unknown subcommand "${sub}". Try: summary, quotas, budgets, logs, qualify-opencode, comparison-sample.\n` };
       } catch (err) {
         return { exitCode: 1, stderr: `AI usage command failed: ${errorMessage(err)}\n` };
       }
