@@ -173,7 +173,10 @@ export function createGitHubClient(tokens: TokenResolver, fetchImpl: FetchLike =
         items.push(...batch);
         if (result.incomplete_results) complete = false;
         const reachedEnd = batch.length < pageSize || (typeof result.total_count === 'number' && items.length >= result.total_count);
-        if (reachedEnd || items.length >= maxResults) return { items: items.slice(0, maxResults), complete: complete && reachedEnd };
+        if (reachedEnd || items.length >= maxResults) {
+          const truncated = items.length > maxResults;
+          return { items: items.slice(0, maxResults), complete: complete && reachedEnd && !truncated };
+        }
       }
       return { items: items.slice(0, maxResults), complete: false };
     },
