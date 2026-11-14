@@ -511,6 +511,7 @@ describe('local reviews', () => {
     harness.threads.output.mockResolvedValue({ output: 'Exported `a` cleanly.' });
     await harness.local.onFixThreadEvent({ name: 'thread.idle', threadId: started.threadId });
     expect(harness.store.getLocalFixRun(started.fixRun!.id)).toMatchObject({ status: 'completed', summary: 'Exported `a` cleanly.' });
+    expect(harness.store.completeLocalFixRun(started.fixRun!.id, { status: 'stopped', error: 'late' })).toBe(false);
     expect(getLocalDetail(harness.store, harness.targetId)?.activeFix).toBeNull();
     expect(getLocalDetail(harness.store, harness.targetId)?.latestFix?.status).toBe('completed');
 
@@ -528,6 +529,24 @@ describe('local reviews', () => {
     expect(stopped).toEqual({ ok: true });
     expect(harness.store.getLocalFixRun(second.fixRun!.id)?.status).toBe('stopped');
     expect(harness.threads.stop).toHaveBeenCalledWith({ threadId: second.threadId });
+
+    // If thread.idle settles the run while threads.stop is in flight, completed status and summary are preserved
+    const racing = await harness.local.fix(review.id, [], true, agent);
+    if (racing.needsConfirmation) throw new Error('unexpected confirmation');
+    harness.threads.output.mockResolvedValue({ output: 'Finished before stop settled.' });
+    harness.threads.stop.mockImplementationOnce(async () => {
+      await harness.local.onFixThreadEvent({ name: 'thread.idle', threadId: racing.threadId });
+      return { ok: true as const };
+    });
+    const publishedCountBeforeRaceStop = harness.published.length;
+    await expect(harness.local.stopFix(racing.fixRun!.id)).resolves.toEqual({ ok: true });
+    expect(harness.store.getLocalFixRun(racing.fixRun!.id)).toMatchObject({
+      status: 'completed',
+      summary: 'Finished before stop settled.',
+      error: null
+    });
+    // Only the thread.idle completion published a change event; stopFix did not emit a second overwrite event.
+    expect(harness.published.slice(publishedCountBeforeRaceStop)).toHaveLength(1);
 
     // Reconcile stale running run after restart
     const third = await harness.local.fix(review.id, [], true, agent);

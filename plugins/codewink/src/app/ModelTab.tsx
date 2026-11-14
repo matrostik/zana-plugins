@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ModelChoice } from '../server/types.ts';
-import { errorText } from './format.ts';
 import { ModelPriorityPicker } from './ModelSearchPicker.tsx';
 import { NumberSetting } from './SettingFields.tsx';
 import { useSettingsAction } from './settings-action.ts';
@@ -16,57 +15,24 @@ interface ModelsSectionProps {
   rpc: Rpc;
   models: ModelChoice[];
   onSaved(): void;
-  providers?: AvailableProvider[] | null;
-  providersError?: string | null;
-  refreshingProviders?: boolean;
-  onRefreshProviders?: () => void;
+  providers: AvailableProvider[] | null;
+  providersError: string | null;
+  refreshingProviders: boolean;
+  onRefreshProviders: () => void;
 }
 
-/** Loads and refreshes the provider catalog locally; skipped when `enabled` is false because the parent supplies providers. */
-function useLocalProviders(rpc: Rpc, enabled: boolean) {
-  const [providers, setProviders] = useState<AvailableProvider[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const seqRef = useRef(0);
-  const load = (refresh: boolean) => {
-    const seq = ++seqRef.current;
-    setRefreshing(refresh);
-    setError(null);
-    (refresh ? rpc.call('availableModels', { refresh: true }) : rpc.call('availableModels'))
-      .then((value) => {
-        if (seqRef.current !== seq) return;
-        setProviders(value as AvailableProvider[]);
-        setError(null);
-      })
-      .catch((cause) => {
-        if (seqRef.current !== seq) return;
-        setError(errorText(cause));
-      })
-      .finally(() => {
-        if (seqRef.current === seq) setRefreshing(false);
-      });
-  };
-  useEffect(() => {
-    if (!enabled) return;
-    load(false);
-    return () => {
-      seqRef.current++;
-    };
-  }, [rpc, enabled]);
-  return { providers, error, refreshing, refresh: () => load(true) };
-}
-
-function ModelsSection({ rpc, models, onSaved, providers: prefetchedProviders, providersError, refreshingProviders, onRefreshProviders }: ModelsSectionProps) {
+function ModelsSection({
+  rpc,
+  models,
+  onSaved,
+  providers,
+  providersError,
+  refreshingProviders,
+  onRefreshProviders
+}: ModelsSectionProps) {
   const [draft, setDraft] = useState<ModelChoice[]>(models);
   const dirtyRef = useRef(false);
   const action = useSettingsAction(onSaved);
-
-  const managed = prefetchedProviders !== undefined;
-  const local = useLocalProviders(rpc, !managed);
-  const providers = managed ? prefetchedProviders : local.providers;
-  const error = managed ? (providersError ?? null) : local.error;
-  const refreshing = managed ? Boolean(refreshingProviders) : local.refreshing;
-  const refresh = onRefreshProviders ?? local.refresh;
 
   const savedKey = JSON.stringify(models);
   useEffect(() => {
@@ -78,14 +44,14 @@ function ModelsSection({ rpc, models, onSaved, providers: prefetchedProviders, p
     setDraft(next);
   };
 
-  const shownError = action.error ?? error;
+  const shownError = action.error ?? providersError;
   return (
     <section className="cn-section" aria-labelledby="cn-models-heading">
       <div className="cn-inline">
         <h3 id="cn-models-heading">Review models</h3>
         <span className="cn-spacer" />
-        <button type="button" className="cn-btn cn-small" disabled={refreshing} onClick={refresh}>
-          {refreshing ? 'Refreshing…' : 'Refresh models'}
+        <button type="button" className="cn-btn cn-small" disabled={refreshingProviders} onClick={onRefreshProviders}>
+          {refreshingProviders ? 'Refreshing…' : 'Refresh models'}
         </button>
       </div>
       <p className="cn-muted cn-small">
@@ -227,10 +193,10 @@ export function ModelTab({
   config: ConfigSnapshot | null;
   initialModels?: ModelChoice[];
   onChanged(): void;
-  providers?: AvailableProvider[] | null;
-  providersError?: string | null;
-  refreshingProviders?: boolean;
-  onRefreshProviders?: () => void;
+  providers: AvailableProvider[] | null;
+  providersError: string | null;
+  refreshingProviders: boolean;
+  onRefreshProviders: () => void;
 }) {
   return (
     <>

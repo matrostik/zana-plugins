@@ -30,6 +30,7 @@ export const MAX_NEW_FILES = 200;
 export const MAX_NEW_FILE_BYTES = 256 * 1024;
 export const MAX_DIFF_FILES = 300;
 export const MAX_FILE_READ_CHARS = 1_000_000;
+export const MAX_SELECTED_COMMITS = 50;
 export const SNAPSHOT_REF_PREFIX = 'refs/codewink/local/';
 
 /** Identity for snapshot commits, so users without git identity config can still snapshot. */
@@ -563,6 +564,9 @@ async function topoSortByAncestry(git: GitRunner, worktreePath: string, candidat
 async function resolveCommitShas(git: GitRunner, worktreePath: string, shas: readonly string[]): Promise<string[]> {
   const unique = [...new Set(shas.map((s) => s.trim()).filter(Boolean))];
   if (unique.length === 0) throw new Error('Select at least one commit to review.');
+  if (unique.length > MAX_SELECTED_COMMITS) {
+    throw new Error(`Select at most ${MAX_SELECTED_COMMITS} commits to review.`);
+  }
   const resolved: string[] = [];
   for (const candidate of unique) {
     assertSha(candidate);

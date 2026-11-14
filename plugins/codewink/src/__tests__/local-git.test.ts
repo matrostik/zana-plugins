@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   changedPathCount,
   commitMessages,
@@ -17,6 +17,7 @@ import {
   listWorktrees,
   MAX_NEW_FILE_BYTES,
   MAX_NEW_FILES,
+  MAX_SELECTED_COMMITS,
   mergeBase,
   orderCommits,
   readFileAt,
@@ -432,6 +433,14 @@ describe('local git snapshot', () => {
     const reversed = await orderCommits(runGit, repo, [tied, later]);
     expect(reversed).toEqual(forward);
   }, 30_000);
+
+  it(`rejects selecting more than ${MAX_SELECTED_COMMITS} commits before running git`, async () => {
+    const spyGit = vi.fn<GitRunner>(async () => ({ code: 0, stdout: '' }));
+    const tooMany = Array.from({ length: MAX_SELECTED_COMMITS + 1 }, (_, index) => index.toString(16).padStart(7, '0'));
+
+    await expect(orderCommits(spyGit, '/repo', tooMany)).rejects.toThrow(`Select at most ${MAX_SELECTED_COMMITS} commits`);
+    expect(spyGit).not.toHaveBeenCalled();
+  });
 
   it('snapshots root, single, contiguous, and non-contiguous commits and errors on conflicts or merge commits', async () => {
     const repo = createRepo();

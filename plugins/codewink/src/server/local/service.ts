@@ -17,6 +17,7 @@ import type {
   FixAgentChoice,
   FixProvider,
   LocalFixRunRow,
+  LocalFixStatus,
   LocalReviewSource,
   LocalScope,
   LocalSnapshotRow,
@@ -545,32 +546,26 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return { threadId: spawned.id, projectId: project.id, priority: spawned.priority, model: spawned.model, usedFallback: spawned.usedFallback };
   }
 
+  function finishFixRun(run: LocalFixRunRow, input: { status: Exclude<LocalFixStatus, 'running'>; summary?: string | null; error?: string | null }): boolean {
+    if (!deps.store.completeLocalFixRun(run.id, input)) return false;
+    changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
+    return true;
+  }
+
   async function settleFixRunFromThread(run: LocalFixRunRow, thread: { status: string } | null, options: { allowDone?: boolean } = {}): Promise<boolean> {
     const latest = deps.store.getLocalFixRun(run.id);
     if (!latest || latest.status !== 'running') return false;
-    if (!thread) {
-      deps.store.completeLocalFixRun(run.id, { status: 'stopped', error: 'Fix thread no longer exists' });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
-      return true;
-    }
+    if (!thread) return finishFixRun(run, { status: 'stopped', error: 'Fix thread no longer exists' });
     const statusText = thread.status?.toLowerCase() ?? '';
     if (FAILED_FIX_STATUSES.has(statusText)) {
-      deps.store.completeLocalFixRun(run.id, { status: 'failed', error: `Fix thread ended with status "${statusText}"` });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
-      return true;
+      return finishFixRun(run, { status: 'failed', error: `Fix thread ended with status "${statusText}"` });
     }
     if (STOPPED_FIX_STATUSES.has(statusText)) {
-      deps.store.completeLocalFixRun(run.id, { status: 'stopped', error: 'Fix thread was stopped' });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
-      return true;
+      return finishFixRun(run, { status: 'stopped', error: 'Fix thread was stopped' });
     }
     if (options.allowDone !== false && DONE_FIX_STATUSES.has(statusText)) {
       const output = await deps.threads.output({ threadId: run.threadId }).catch(() => ({ output: '' }));
-      const current = deps.store.getLocalFixRun(run.id);
-      if (!current || current.status !== 'running') return false;
-      deps.store.completeLocalFixRun(run.id, { status: 'completed', summary: summarizeFixOutput(output.output) });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
-      return true;
+      return finishFixRun(run, { status: 'completed', summary: summarizeFixOutput(output.output) });
     }
     return false;
   }
@@ -579,22 +574,17 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const run = deps.store.getLocalFixRunByThread(event.threadId);
     if (!run || run.status !== 'running') return;
     if (event.name === 'thread.failed') {
-      deps.store.completeLocalFixRun(run.id, { status: 'failed', error: `Fix thread failed: ${errorMessage(event.error ?? 'unknown error')}` });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
+      finishFixRun(run, { status: 'failed', error: `Fix thread failed: ${errorMessage(event.error ?? 'unknown error')}` });
       return;
     }
     if (event.name === 'thread.archived' || event.name === 'thread.deleted') {
-      deps.store.completeLocalFixRun(run.id, { status: 'stopped', error: 'Fix thread was closed' });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
+      finishFixRun(run, { status: 'stopped', error: 'Fix thread was closed' });
       return;
     }
     if (event.name === 'thread.idle') {
       const output = await deps.threads.output({ threadId: event.threadId }).catch(() => ({ output: '' }));
-      const current = deps.store.getLocalFixRun(run.id);
-      if (!current || current.status !== 'running') return;
       const summary = summarizeFixOutput(output.output?.trim() ? output.output : event.lastAssistantText);
-      deps.store.completeLocalFixRun(run.id, { status: 'completed', summary });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
+      finishFixRun(run, { status: 'completed', summary });
     }
   }
 
@@ -606,6 +596,43 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       if (thread === undefined) continue;
       await settleFixRunFromThread(run, thread);
     }
+  }
+
+  async function validateFixAgent(agent: FixAgentChoice): Promise<void> {
+    const provider = (await deps.fixProviders(agent.providerId)).find((item) => item.providerId === agent.providerId);
+    if (!provider || !provider.models.some((model) => model.id === agent.model)) {
+      throw new Error('The selected fix model is unavailable. Choose another provider or model.');
+    }
+    if (!provider.permissionModes.includes(agent.permissionMode)) {
+      throw new Error('The selected mode is unavailable for this provider. Choose a supported mode.');
+    }
+    const model = provider.models.find((item) => item.id === agent.model)!;
+    if (agent.reasoningLevel && !model.reasoningLevels.includes(agent.reasoningLevel)) {
+      throw new Error('The selected reasoning level is unavailable for this model.');
+    }
+  }
+
+  async function recordAndSettleFixRun(
+    reviewId: string,
+    targetId: string,
+    threadId: string,
+    agent: FixAgentChoice,
+    findingIds: string[]
+  ): Promise<LocalFixRunRow> {
+    const fixRun = deps.store.createLocalFixRun({
+      reviewId,
+      targetId,
+      threadId,
+      providerId: agent.providerId,
+      model: agent.model,
+      reasoningLevel: agent.reasoningLevel ?? null,
+      permissionMode: agent.permissionMode,
+      findingIds
+    });
+    changed({ targetId, reviewId, fix: fixRun.id });
+    const thread = await deps.threads.get({ threadId }).catch(() => null);
+    if (thread) await settleFixRunFromThread(fixRun, thread, { allowDone: false });
+    return deps.store.getLocalFixRun(fixRun.id) ?? fixRun;
   }
 
   /**
@@ -630,11 +657,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         reason: current.stale ? 'Files changed since this review.' : 'The live checkout differs from the reviewed selection.'
       };
     }
-    const provider = (await deps.fixProviders(agent.providerId)).find((item) => item.providerId === agent.providerId);
-    if (!provider || !provider.models.some((model) => model.id === agent.model)) throw new Error('The selected fix model is unavailable. Choose another provider or model.');
-    if (!provider.permissionModes.includes(agent.permissionMode)) throw new Error('The selected mode is unavailable for this provider. Choose a supported mode.');
-    const model = provider.models.find((item) => item.id === agent.model)!;
-    if (agent.reasoningLevel && !model.reasoningLevels.includes(agent.reasoningLevel)) throw new Error('The selected reasoning level is unavailable for this model.');
+    await validateFixAgent(agent);
     const project = await projectFor(target);
     const separateWorktree = !isWithin(await canonicalPath(project.path), await canonicalPath(target.worktreePath));
     // A single explicit choice prevents priority fallback from changing permissions or providers.
@@ -653,20 +676,8 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       permissionMode: agent.permissionMode,
       environment: { kind: 'unmanaged' }
     });
-    const fixRun = deps.store.createLocalFixRun({
-      reviewId,
-      targetId: target.id,
-      threadId: spawned.id,
-      providerId: agent.providerId,
-      model: agent.model,
-      reasoningLevel: agent.reasoningLevel ?? null,
-      permissionMode: agent.permissionMode,
-      findingIds: findings.map((f) => f.id)
-    });
-    changed({ targetId: target.id, reviewId, fix: fixRun.id });
-    const thread = await deps.threads.get({ threadId: spawned.id }).catch(() => null);
-    if (thread) await settleFixRunFromThread(fixRun, thread, { allowDone: false });
-    return { needsConfirmation: false as const, threadId: spawned.id, projectId: project.id, fixRun: deps.store.getLocalFixRun(fixRun.id) ?? fixRun };
+    const fixRun = await recordAndSettleFixRun(reviewId, target.id, spawned.id, agent, findings.map((f) => f.id));
+    return { needsConfirmation: false as const, threadId: spawned.id, projectId: project.id, fixRun };
   }
 
   async function stopFix(fixRunId: string): Promise<{ ok: true }> {
@@ -683,8 +694,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         deps.log.warn(`codewink: failed to stop fix thread ${run.threadId}: ${errorMessage(error)}`);
         throw error;
       }
-      deps.store.completeLocalFixRun(run.id, { status: 'stopped', error: 'Stopped by user' });
-      changed({ targetId: run.targetId, reviewId: run.reviewId, fix: run.id });
+      finishFixRun(run, { status: 'stopped', error: 'Stopped by user' });
     }
     return { ok: true };
   }

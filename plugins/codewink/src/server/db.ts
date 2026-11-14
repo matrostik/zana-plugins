@@ -645,14 +645,12 @@ export function createStore(db: Database, now: () => number = Date.now) {
       return (db.prepare(sql).all(projectId) as Row[]).map(toLocalFixRun);
     },
 
-    completeLocalFixRun(id: string, input: { status: Exclude<LocalFixStatus, 'running'>; summary?: string | null; error?: string | null }): void {
-      db.prepare('UPDATE local_fix_runs SET status = ?, summary = ?, error = ?, completed_at = ? WHERE id = ?').run(
-        input.status,
-        input.summary ?? null,
-        input.error ?? null,
-        now(),
-        id
-      );
+    /** Transitions a running fix run to a terminal status once; returns false if already settled. */
+    completeLocalFixRun(id: string, input: { status: Exclude<LocalFixStatus, 'running'>; summary?: string | null; error?: string | null }): boolean {
+      const result = db
+        .prepare("UPDATE local_fix_runs SET status = ?, summary = ?, error = ?, completed_at = ? WHERE id = ? AND status = 'running'")
+        .run(input.status, input.summary ?? null, input.error ?? null, now(), id);
+      return result.changes > 0;
     },
 
     getReview(id: string): ReviewRow | null {
