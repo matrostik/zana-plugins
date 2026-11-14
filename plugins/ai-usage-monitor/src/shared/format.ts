@@ -10,4 +10,3 @@ export function formatTokens(tokens: number | null | undefined): string {
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
   return String(Math.round(tokens));
 }
-
