@@ -14,14 +14,39 @@ import { detail, finding, NOW } from './pr-fixtures.ts';
 
 const sdk = vi.hoisted(() => {
   const call = vi.fn();
-  return { call, rpc: { call }, toThread: undefined as undefined | ((threadId: string) => void) };
+  const realtime = new Map<string, Set<(payload: unknown) => void>>();
+  return {
+    call,
+    rpc: { call },
+    realtime,
+    emit(event: string, payload: unknown) {
+      for (const listener of realtime.get(event) ?? []) listener(payload);
+    },
+    toThread: undefined as undefined | ((threadId: string) => void)
+  };
 });
 
-vi.mock('@zana-ai/zcc-plugin-sdk/app', async (importActual) => ({
-  ...(await importActual<Record<string, unknown>>()),
-  useRpc: () => sdk.rpc,
-  useZccNavigate: () => (sdk.toThread ? { toThread: sdk.toThread } : {})
-}));
+vi.mock('@zana-ai/zcc-plugin-sdk/app', async (importActual) => {
+  const React = await import('react');
+  return {
+    ...(await importActual<Record<string, unknown>>()),
+    useRpc: () => sdk.rpc,
+    useRealtime: (event: string, listener: (payload: unknown) => void) => {
+      const ref = React.useRef(listener);
+      ref.current = listener;
+      React.useEffect(() => {
+        const set = sdk.realtime.get(event) ?? new Set();
+        const handler = (payload: unknown) => ref.current(payload);
+        set.add(handler);
+        sdk.realtime.set(event, set);
+        return () => {
+          set.delete(handler);
+        };
+      }, [event]);
+    },
+    useZccNavigate: () => (sdk.toThread ? { toThread: sdk.toThread } : {})
+  };
+});
 
 vi.mock('../app/SettingsView.tsx', () => ({ SettingsView: () => <p>Settings stub</p> }));
 
@@ -159,6 +184,7 @@ function renderDetail(overrides: Partial<LocalLocationSummary> = {}) {
 
 beforeEach(() => {
   sdk.call.mockReset();
+  sdk.realtime.clear();
   sdk.toThread = undefined;
   const stored = new Map<string, string>();
   vi.stubGlobal('localStorage', {
@@ -777,5 +803,27 @@ describe('LocalDetail', () => {
     expect(rerunButton.disabled).toBe(true);
     const reviewChanges = screen.getByRole('button', { name: 'Review changes' }) as HTMLButtonElement;
     expect(reviewChanges.disabled).toBe(true);
+  });
+
+  it('rechecks localStatus on realtime fix events and ignores out-of-order status responses', async () => {
+    const firstStatus = deferred<LocalReviewStatus>();
+    const secondStatus = deferred<LocalReviewStatus>();
+    let statusCall = 0;
+    answer({
+      localDetail: localDetail(),
+      localStatus: () => (++statusCall === 1 ? firstStatus.promise : secondStatus.promise),
+      localDiff: []
+    });
+    renderDetail();
+
+    await waitFor(() => expect(calls('localStatus')).toHaveLength(1));
+    sdk.emit('codewink:changed', { local: true, targetId: TARGET_ID, reviewId: 'rev-2', fix: 'fix-run-1' });
+    await waitFor(() => expect(calls('localStatus')).toHaveLength(2));
+
+    secondStatus.resolve(fresh(true));
+    expect(await screen.findByRole('button', { name: 'Review outdated — Rerun' })).toBeTruthy();
+
+    firstStatus.resolve(fresh(false));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Review outdated — Rerun' })).toBeTruthy());
   });
 });

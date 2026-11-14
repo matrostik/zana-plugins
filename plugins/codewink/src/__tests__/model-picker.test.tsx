@@ -115,4 +115,12 @@ describe('ModelPriorityPicker', () => {
     expect((screen.getByRole('button', { name: 'Move priority 1 up' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Move priority 2 down' }) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('does not show an empty Add model row when no selectable providers are available', () => {
+    const unavailable: AvailableProvider = { providerId: 'grok', displayName: 'Grok', error: 'missing', models: [] };
+    render(<ModelPriorityPicker value={[{ providerId: 'grok', model: 'a' }]} providers={[unavailable]} onChange={() => {}} />);
+
+    expect(screen.queryByRole('button', { name: 'Add model' })).toBeNull();
+    expect(screen.queryByLabelText('Provider for priority 2')).toBeNull();
+  });
 });

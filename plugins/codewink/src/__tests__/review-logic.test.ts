@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { aggregateScores, clusterIssues, dedupeIssues, type TaggedIssue } from '../server/review/consensus.ts';
 import { annotateDiffWithLineNumbers, commentableLines, prepareDiff } from '../server/review/diff.ts';
 import { extractJsonObject, parseAnalysis } from '../server/review/parse.ts';
@@ -293,6 +293,15 @@ describe('settings store', () => {
     await expect(second).resolves.toMatchObject({ syncIntervalMinutes: 9, maxConcurrentReviews: 4 });
     expect(saved).toMatchObject({ syncIntervalMinutes: 9, maxConcurrentReviews: 4 });
   });
+  it('deduplicates concurrent cold loads into a single KV read', async () => {
+    const get = vi.fn(async (key: string) => (key === 'settingsMigrated' ? true : {}));
+    const settings = createSettingsStore({ kv: { get: <T>(key: string) => get(key) as Promise<T | undefined>, set: async () => {} }, readHostValues: async () => ({}) });
+
+    const [a, b] = await Promise.all([settings.load(), settings.load()]);
+
+    expect(a).toEqual(b);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
   it('updates autoSyncEnabled in settings store', async () => {
     let saved: unknown = {};
     const settings = createSettingsStore({
@@ -313,5 +322,4 @@ describe('settings store', () => {
     expect(reenabled.autoSyncEnabled).toBe(true);
     expect(saved).toMatchObject({ autoSyncEnabled: true });
   });
-
 });

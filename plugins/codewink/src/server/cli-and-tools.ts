@@ -164,6 +164,22 @@ function json(value: unknown) {
 
 type CliResult = { exitCode: number; stdout?: string; stderr?: string };
 
+/** Resolves `--findings` selection (`all` or comma-separated unique, unambiguous ID prefixes). */
+function selectPostFindingIds(findings: FindingRow[], selection: string): string[] {
+  const active = findings.filter((finding) => !finding.dismissed);
+  if (selection === 'all') return active.filter((finding) => !finding.postedAt).map((finding) => finding.id);
+  const prefixes = selection.split(',').map((prefix) => prefix.trim()).filter(Boolean);
+  if (prefixes.length === 0) throw new Error('Specify at least one finding ID prefix with --findings');
+  const selected = new Set<string>();
+  for (const prefix of prefixes) {
+    const matches = active.filter((finding) => finding.id.startsWith(prefix));
+    if (matches.length === 0) throw new Error(`No finding matches "${prefix}"`);
+    if (matches.length > 1) throw new Error(`Ambiguous finding prefix "${prefix}" (matches ${matches.length} findings)`);
+    selected.add(matches[0].id);
+  }
+  return [...selected];
+}
+
 /** The checkout a local command targets: `--path`, else the terminal's working directory. */
 async function cliLocalLocation(app: CodewinkApp, args: ParsedArgs, ctx: { cwd?: string } | undefined) {
   const local = requireLocal(app);
@@ -313,15 +329,7 @@ export function registerCli(cli: CliRegistrar, app: CodewinkApp): void {
             if (!args.flags.has('yes')) throw new Error('Posting writes to GitHub. Re-run with --yes to confirm. Approving is only available in the CodeWink panel.');
             const detail = await app.detail(await prArg());
             if (!detail.review || detail.review.status !== 'completed') throw new Error('This pull request has no completed review to post');
-            const selection = flagString(args, 'findings') ?? 'all';
-            const unposted = detail.findings.filter((finding) => !finding.dismissed && !finding.postedAt);
-            const findingIds = selection === 'all'
-              ? unposted.map((finding) => finding.id)
-              : selection.split(',').map((prefix) => {
-                  const match = detail.findings.find((finding) => finding.id.startsWith(prefix.trim()));
-                  if (!match) throw new Error(`No finding matches "${prefix}"`);
-                  return match.id;
-                });
+            const findingIds = selectPostFindingIds(detail.findings, flagString(args, 'findings') ?? 'all');
             const result = await app.post({ reviewId: detail.review.id, findingIds, event: 'COMMENT', body: flagString(args, 'message') });
             const skipped = findingIds.length - result.publishedCount;
             return { exitCode: 0, stdout: `Posted ${result.publishedCount} finding(s), ${result.commentCount} inline.${skipped > 0 ? ` ${skipped} selected finding(s) were left unposted (GitHub review body size limit).` : ''}${result.url ? `\n${result.url}` : ''}` };

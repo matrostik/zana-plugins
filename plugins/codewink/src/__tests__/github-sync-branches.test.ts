@@ -239,6 +239,27 @@ describe('GitHub client pagination and endpoints', () => {
     expect(new URL(calls[1].url).searchParams.get('per_page')).toBe('100');
   });
 
+  it('keeps per_page constant across search pages when maxResults is not a multiple of page size', async () => {
+    const { client, calls } = clientFor((url) => {
+      const page = Number(url.searchParams.get('page'));
+      const offset = (page - 1) * 100;
+      const count = page === 1 ? 100 : 80;
+      return jsonResponse({
+        total_count: 180,
+        items: Array.from({ length: count }, (_, idx) => ({ number: offset + idx + 1 }))
+      });
+    });
+
+    const res = await client.searchPullRequests('github.com', 'is:pr', 150);
+
+    expect(calls.map((c) => [new URL(c.url).searchParams.get('per_page'), new URL(c.url).searchParams.get('page')])).toEqual([
+      ['100', '1'],
+      ['100', '2']
+    ]);
+    expect(res.items).toHaveLength(150);
+    expect(res.items[149]).toEqual({ number: 150 });
+  });
+
   it('decodes base64 file contents and encodes the path and ref', async () => {
     const { client, calls } = clientFor(() => jsonResponse({ content: Buffer.from('# Spec').toString('base64'), encoding: 'base64' }));
 
@@ -246,6 +267,11 @@ describe('GitHub client pagination and endpoints', () => {
 
     expect(text).toBe('# Spec');
     expect(calls[0].url).toBe('https://api.github.com/repos/acme/api/contents/docs/my%20spec.md?ref=feat%2Fx');
+  });
+
+  it('decodes empty base64 file content as an empty string instead of null', async () => {
+    const { client } = clientFor(() => jsonResponse({ content: '', encoding: 'base64' }));
+    await expect(client.getFileText(REF, 'docs/empty.md', 'main')).resolves.toBe('');
   });
 
   it('returns null for missing, non-base64, empty, or not-found file contents', async () => {
@@ -604,6 +630,25 @@ describe('sync service', () => {
 
     expect(result.hosts[0]).toMatchObject({ error: 'boom', pullRequestCount: 0, syncedAt: null });
     expect(result.changed).toEqual([]);
+  });
+
+  it('reports partial new-PR fetch failures without counting failed PRs or closing missing ones', async () => {
+    const { store, sync } = syncFixture({
+      github: {
+        searchPullRequests: vi.fn(async () => [searchItem(1), searchItem(2)]),
+        getPull: vi.fn(async (ref: PrRef) => {
+          if (ref.number === 2) throw new Error('rate limited');
+          return ghPull({ number: 1 });
+        })
+      }
+    });
+    store.upsertPullRequest(storedPull({ id: 'github.com/acme/api#99', number: 99 }));
+
+    const result = await sync.syncAll();
+
+    expect(result.hosts[0]).toMatchObject({ error: 'rate limited', pullRequestCount: 1, syncedAt: Date.UTC(2026, 9, 25) });
+    expect(result.changed.map((pr) => pr.number)).toEqual([1]);
+    expect(store.getPullRequest('github.com/acme/api#99')?.state).toBe('open');
   });
 
   it('keeps each search query within 256 characters and continues after a failed query', async () => {

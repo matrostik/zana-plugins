@@ -350,24 +350,29 @@ function toLocalTarget(row: Row): LocalTargetRow {
   };
 }
 
-function toLocalSnapshot(row: Row): LocalSnapshotRow {
+function snapshotFromRow(row: Row, prefix = ''): LocalSnapshotRow {
+  const source = row[`${prefix}source`];
   return {
-    reviewId: String(row.review_id),
-    targetId: String(row.target_id),
-    scope: localScope(row.scope) ?? 'uncommitted',
-    headRef: str(row.head_ref),
-    commitShas: jsonArray(row.commit_shas_json),
-    baseRef: str(row.base_ref),
-    baseSha: String(row.base_sha),
-    headSha: String(row.head_sha),
-    snapshotSha: String(row.snapshot_sha),
-    treeSha: String(row.tree_sha),
-    intent: str(row.intent),
-    source: LOCAL_SOURCES.includes(row.source as LocalReviewSource) ? (row.source as LocalReviewSource) : 'ui',
-    files: jsonList<ChangedFile>(row.files_json),
-    skipped: jsonList<SkippedFile>(row.skipped_json),
-    createdAt: Number(row.created_at)
+    reviewId: String(row[`${prefix}review_id`]),
+    targetId: String(row[`${prefix}target_id`]),
+    scope: localScope(row[`${prefix}scope`]) ?? 'uncommitted',
+    headRef: str(row[`${prefix}head_ref`]),
+    commitShas: jsonArray(row[`${prefix}commit_shas_json`]),
+    baseRef: str(row[`${prefix}base_ref`]),
+    baseSha: String(row[`${prefix}base_sha`]),
+    headSha: String(row[`${prefix}head_sha`]),
+    snapshotSha: String(row[`${prefix}snapshot_sha`]),
+    treeSha: String(row[`${prefix}tree_sha`]),
+    intent: str(row[`${prefix}intent`]),
+    source: LOCAL_SOURCES.includes(source as LocalReviewSource) ? (source as LocalReviewSource) : 'ui',
+    files: jsonList<ChangedFile>(row[`${prefix}files_json`]),
+    skipped: jsonList<SkippedFile>(row[`${prefix}skipped_json`]),
+    createdAt: Number(row[`${prefix}created_at`])
   };
+}
+
+function toLocalSnapshot(row: Row): LocalSnapshotRow {
+  return snapshotFromRow(row);
 }
 
 function toLocalFixRun(row: Row): LocalFixRunRow {
@@ -578,8 +583,23 @@ export function createStore(db: Database, now: () => number = Date.now) {
 
     /** Local reviews of a target, newest first. */
     listLocalReviews(targetId: string): Array<{ review: ReviewRow; snapshot: LocalSnapshotRow | null }> {
-      const rows = db.prepare("SELECT * FROM reviews WHERE pr_id = ? AND target_kind = 'local' ORDER BY created_at DESC, rowid DESC").all(targetId) as Row[];
-      return rows.map((row) => ({ review: toReview(row), snapshot: this.getLocalSnapshot(String(row.id)) }));
+      const rows = db.prepare(
+        `SELECT r.*,
+           s.review_id AS s_review_id, s.target_id AS s_target_id, s.scope AS s_scope,
+           s.head_ref AS s_head_ref, s.commit_shas_json AS s_commit_shas_json,
+           s.base_ref AS s_base_ref, s.base_sha AS s_base_sha, s.head_sha AS s_head_sha,
+           s.snapshot_sha AS s_snapshot_sha, s.tree_sha AS s_tree_sha, s.intent AS s_intent,
+           s.source AS s_source, s.files_json AS s_files_json, s.skipped_json AS s_skipped_json,
+           s.created_at AS s_created_at
+         FROM reviews r
+         LEFT JOIN local_snapshots s ON s.review_id = r.id
+         WHERE r.pr_id = ? AND r.target_kind = 'local'
+         ORDER BY r.created_at DESC, r.rowid DESC`
+      ).all(targetId) as Row[];
+      return rows.map((row) => ({
+        review: toReview(row),
+        snapshot: row.s_review_id ? snapshotFromRow(row, 's_') : null
+      }));
     },
 
     createLocalFixRun(input: {
@@ -692,8 +712,11 @@ export function createStore(db: Database, now: () => number = Date.now) {
       const rows = db
         .prepare(
           `SELECT r.* FROM reviews r
-           JOIN (SELECT pr_id, MAX(created_at) AS created_at FROM reviews GROUP BY pr_id) latest
-             ON latest.pr_id = r.pr_id AND latest.created_at = r.created_at`
+           WHERE r.rowid = (
+             SELECT latest.rowid FROM reviews latest
+             WHERE latest.pr_id = r.pr_id
+             ORDER BY latest.created_at DESC, latest.rowid DESC LIMIT 1
+           )`
         )
         .all() as Row[];
       return new Map(rows.map((row) => [String(row.pr_id), toReview(row)]));

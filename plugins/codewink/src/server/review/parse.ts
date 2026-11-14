@@ -86,13 +86,24 @@ function normalizeSeverity(value: unknown): Severity {
   return SEVERITY_ALIASES[raw] ?? 'medium';
 }
 
+export function normalizeIssuePath(rawPath: string): string | null {
+  const slashed = rawPath.replace(/\\/g, '/');
+  if (slashed.startsWith('/')) return null;
+  const normalized = slashed.replace(/^(?:\.\/)+/, '');
+  if (!normalized || normalized.includes('\0') || /^[A-Za-z]:/.test(normalized)) return null;
+  const segments = normalized.split('/');
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) return null;
+  return normalized;
+}
+
 const RETRACTION = /\b(no (action|change)s? (needed|required)|not an issue|this is fine|false positive)\b/i;
 
 function normalizeIssue(raw: unknown, category: IssueCategory): ParsedIssue | null {
   if (!raw || typeof raw !== 'object') return null;
   const record = raw as Record<string, unknown>;
   const description = note(record.description) ?? note(record.comment) ?? note(record.message);
-  const file = note(record.file) ?? note(record.path);
+  const rawFile = note(record.file) ?? note(record.path);
+  const file = rawFile ? normalizeIssuePath(rawFile) : null;
   if (!description || !file) return null;
   const suggestion = note(record.suggestion);
   if (RETRACTION.test(description) || (suggestion && RETRACTION.test(suggestion))) return null;
@@ -100,7 +111,7 @@ function normalizeIssue(raw: unknown, category: IssueCategory): ParsedIssue | nu
   return {
     category,
     severity: normalizeSeverity(record.severity),
-    file: file.replace(/^\.?\//, ''),
+    file,
     line,
     description,
     suggestion

@@ -41,7 +41,9 @@ export function repoId(ref: RepoRef): string {
 }
 
 function assertName(value: string, label: string): string {
-  if (!NAME_PATTERN.test(value)) throw new Error(`Invalid ${label}: ${value}`);
+  if (!NAME_PATTERN.test(value) || value === '.' || value === '..') {
+    throw new Error(`Invalid ${label}: ${value}`);
+  }
   return value;
 }
 
@@ -113,7 +115,11 @@ export function repoFromRemoteUrl(remote: string): RepoRef | null {
   const match = https ?? sshUrl ?? scp;
   if (!match) return null;
   try {
-    return { host: normalizeHost(match[1]), owner: match[2], name: match[3] };
+    return {
+      host: normalizeHost(match[1]),
+      owner: assertName(match[2], 'owner'),
+      name: assertName(match[3], 'repository')
+    };
   } catch {
     return null;
   }

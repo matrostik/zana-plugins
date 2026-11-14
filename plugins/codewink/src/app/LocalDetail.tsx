@@ -254,10 +254,6 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   useEffect(() => {
     load();
   }, [load]);
-  useRealtime('codewink:changed', (payload) => {
-    const record = (payload ?? {}) as { prId?: unknown; targetId?: unknown; finding?: unknown; swept?: unknown; fix?: unknown };
-    if (record.prId === location.targetId || record.targetId === location.targetId || record.finding || record.swept || record.fix) load();
-  });
 
   const branchLoadSeq = useRef(0);
   const loadBranches = useCallback(() => {
@@ -334,7 +330,10 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
   const statusSeq = useRef(0);
   const checkStatus = useCallback(
     (force = false) => {
-      if (!reviewId || !reviewCompleted) return;
+      if (!reviewId || !reviewCompleted) {
+        ++statusSeq.current;
+        return;
+      }
       if (!force && Date.now() - lastStatusCheck.current < STATUS_CHECK_THROTTLE_MS) return;
       lastStatusCheck.current = Date.now();
       const requestId = ++statusSeq.current;
@@ -350,7 +349,17 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
     },
     [rpc, reviewId, reviewCompleted]
   );
+
+  useRealtime('codewink:changed', (payload) => {
+    const record = (payload ?? {}) as { prId?: unknown; targetId?: unknown; finding?: unknown; swept?: unknown; fix?: unknown };
+    if (record.prId === location.targetId || record.targetId === location.targetId || record.finding || record.swept || record.fix) {
+      load();
+      if (record.fix) checkStatus(true);
+    }
+  });
+
   useEffect(() => {
+    ++statusSeq.current;
     setStatus(null);
     checkStatus(true);
   }, [checkStatus]);
@@ -368,13 +377,17 @@ export function LocalDetail(props: { rpc: Rpc; location: LocalLocationSummary; d
 
   const reloadToken = props.reloadToken;
   const initialToken = useRef(reloadToken);
+  const reloadActionsRef = useRef({ load, checkStatus, scope, loadBranches, loadCommits });
+  reloadActionsRef.current = { load, checkStatus, scope, loadBranches, loadCommits };
   useEffect(() => {
     if (reloadToken === initialToken.current) return;
-    load();
-    checkStatus(true);
-    if (scope === 'branch') loadBranches();
-    if (scope === 'commits') loadCommits(true);
-  }, [reloadToken, load, checkStatus, scope, loadBranches, loadCommits]);
+    initialToken.current = reloadToken;
+    const actions = reloadActionsRef.current;
+    actions.load();
+    actions.checkStatus(true);
+    if (actions.scope === 'branch') actions.loadBranches();
+    if (actions.scope === 'commits') actions.loadCommits(true);
+  }, [reloadToken]);
 
   // Reset review-scoped actions before the new results can receive user input.
   useLayoutEffect(() => {

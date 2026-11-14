@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTokenResolver, parseTokenSetting, type CommandRunner } from '../server/github/auth.ts';
 import { apiBaseUrl, normalizeHost, parseHostList, parsePrRef, parseRepoRef, prId, repoFromRemoteUrl } from '../server/github/refs.ts';
 
@@ -10,14 +10,22 @@ describe('refs', () => {
     expect(prId({ host: 'github.com', owner: 'acme', name: 'api', number: 42 })).toBe('github.com/acme/api#42');
   });
 
-  it('rejects malformed references', () => {
+  it('rejects malformed references and dot segments', () => {
     expect(() => parsePrRef('not a pr')).toThrow(/Cannot parse/);
     expect(() => parsePrRef('https://github.com/acme/a b/pull/1')).toThrow();
     expect(() => normalizeHost('bad host!')).toThrow(/Invalid GitHub host/);
+    expect(() => parseRepoRef('../api')).toThrow(/Invalid owner/);
+    expect(() => parseRepoRef('acme/..')).toThrow(/Invalid repository/);
+    expect(() => parseRepoRef('acme/.')).toThrow(/Invalid repository/);
+    expect(repoFromRemoteUrl('https://github.com/../api.git')).toBeNull();
+    expect(repoFromRemoteUrl('git@github.com:acme/...git')).toBeNull();
   });
 
   it('parses repositories and remotes', () => {
     expect(parseRepoRef('acme/api')).toEqual({ host: 'github.com', owner: 'acme', name: 'api' });
+    expect(parseRepoRef('acme/foo..bar')).toEqual({ host: 'github.com', owner: 'acme', name: 'foo..bar' });
+    expect(parsePrRef('acme/foo..bar#7')).toEqual({ host: 'github.com', owner: 'acme', name: 'foo..bar', number: 7 });
+    expect(repoFromRemoteUrl('https://github.com/acme/foo..bar.git')).toEqual({ host: 'github.com', owner: 'acme', name: 'foo..bar' });
     expect(parseRepoRef('https://git.example.com/acme/api.git')).toEqual({ host: 'git.example.com', owner: 'acme', name: 'api' });
     expect(repoFromRemoteUrl('git@git.example.com:acme/api.git')).toEqual({ host: 'git.example.com', owner: 'acme', name: 'api' });
     expect(repoFromRemoteUrl('ssh://git@github.com/acme/api.git')).toEqual({ host: 'github.com', owner: 'acme', name: 'api' });
@@ -66,5 +74,34 @@ describe('token resolution', () => {
     token = 'second';
     resolver.invalidate('github.com');
     expect((await resolver.resolve('github.com'))?.token).toBe('second');
+  });
+
+  it('deduplicates concurrent resolves and does not cache across invalidation', async () => {
+    let release!: (value: string | null) => void;
+    let token = 'stale';
+    const run = vi.fn<CommandRunner>(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    const resolver = createTokenResolver({ run, readTokenSetting: async () => '' });
+
+    const first = resolver.resolve('github.com');
+    const second = resolver.resolve('github.com');
+    expect(run).toHaveBeenCalledTimes(1);
+
+    resolver.invalidate('github.com');
+    release(token);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { token: 'stale', source: 'gh' },
+      { token: 'stale', source: 'gh' }
+    ]);
+
+    token = 'fresh';
+    const third = resolver.resolve('github.com');
+    release(token);
+    await expect(third).resolves.toEqual({ token: 'fresh', source: 'gh' });
+    expect(run).toHaveBeenCalledTimes(2);
   });
 });

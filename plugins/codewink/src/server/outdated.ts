@@ -16,19 +16,23 @@ export function createOutdatedNotifier(deps: {
           ? prIds.flatMap((id) => { const pr = deps.store.getPullRequest(id); return pr ? [pr] : []; })
           : deps.store.listPullRequests();
         for (const pr of prs) {
-          const review = deps.store.latestCompletedReview(pr.id);
-          if (pr.state !== 'open' || !review || !pr.headSha || review.headSha === pr.headSha || deps.store.hasOutdatedNotification(pr.id, pr.headSha)) continue;
-          const projectId = await deps.projectForPr(pr);
-          if (!projectId) continue;
-          const result = await deps.push({
-            projectId,
-            comments: [
-              `Review outdated — ${pr.owner}/${pr.repo}#${pr.number}: ${pr.title}`,
-              `Reviewed commit ${review.headSha.slice(0, 7)}; current PR commit ${pr.headSha.slice(0, 7)}. Rerun the review in CodeWink to get up-to-date findings.`,
-              pr.url
-            ].join('\n')
-          });
-          deps.store.recordOutdatedNotification(pr.id, pr.headSha, result.id);
+          try {
+            const review = deps.store.latestCompletedReview(pr.id);
+            if (pr.state !== 'open' || !review || !pr.headSha || review.headSha === pr.headSha || deps.store.hasOutdatedNotification(pr.id, pr.headSha)) continue;
+            const projectId = await deps.projectForPr(pr);
+            if (!projectId) continue;
+            const result = await deps.push({
+              projectId,
+              comments: [
+                `Review outdated — ${pr.owner}/${pr.repo}#${pr.number}: ${pr.title}`,
+                `Reviewed commit ${review.headSha.slice(0, 7)}; current PR commit ${pr.headSha.slice(0, 7)}. Rerun the review in CodeWink to get up-to-date findings.`,
+                pr.url
+              ].join('\n')
+            });
+            deps.store.recordOutdatedNotification(pr.id, pr.headSha, result.id);
+          } catch (error) {
+            deps.warn(`codewink: outdated notification failed for ${pr.id}: ${error instanceof Error ? error.message : String(error)}`);
+          }
         }
       } catch (error) {
         deps.warn(`codewink: outdated notification batch failed: ${error instanceof Error ? error.message : String(error)}`);

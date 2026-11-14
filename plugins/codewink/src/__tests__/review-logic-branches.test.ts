@@ -13,7 +13,7 @@ import {
   type TaggedIssue
 } from '../server/review/consensus.ts';
 import { annotateDiffWithLineNumbers, commentableLines, isReviewable, prepareDiff } from '../server/review/diff.ts';
-import { extractJsonObject, parseAnalysis } from '../server/review/parse.ts';
+import { extractJsonObject, normalizeIssuePath, parseAnalysis } from '../server/review/parse.ts';
 import {
   getConsensusPrompt,
   getDeepReviewPrompt,
@@ -122,6 +122,20 @@ describe('consensus grouping', () => {
     expect(result.map((item) => item.severity)).toEqual(['high', 'medium']);
   });
 
+  it('preserves suggestions across duplicates regardless of severity order', () => {
+    const [kept] = dedupeIssues([
+      issue({ severity: 'medium', suggestion: 'Check null first' }),
+      issue({ severity: 'high', line: 11, suggestion: null })
+    ]);
+    expect(kept).toMatchObject({ severity: 'high', suggestion: 'Check null first' });
+
+    const [keptSecond] = dedupeIssues([
+      issue({ severity: 'high', suggestion: null }),
+      issue({ severity: 'low', line: 11, suggestion: 'Use optional chaining' })
+    ]);
+    expect(keptSecond).toMatchObject({ severity: 'high', suggestion: 'Use optional chaining' });
+  });
+
   it('ranks unknown severities below every known one when deduping', () => {
     expect(dedupeIssues([issue({ severity: 'urgent' as Severity }), issue({ severity: 'low', line: 11 })])[0].severity).toBe('low');
     expect(dedupeIssues([issue({ severity: 'low' }), issue({ severity: 'urgent' as Severity, line: 11 })])[0].severity).toBe('low');
@@ -143,7 +157,7 @@ describe('consensus grouping', () => {
       2
     );
     expect(clusters).toHaveLength(2);
-    expect(clusters[0]).toMatchObject({ agreedBy: ['a', 'b'], severity: 'high', line: 11, confidence: 1, suggestion: 'Guard against null' });
+    expect(clusters[0]).toMatchObject({ agreedBy: ['a', 'b'], file: 'src/a.ts', severity: 'high', line: 11, confidence: 1, suggestion: 'Guard against null' });
     expect(clusters[1]).toMatchObject({ agreedBy: ['b'], severity: 'critical', line: 12 });
   });
 
@@ -293,6 +307,12 @@ describe('review prompt', () => {
 
   it('renders an empty diff for files without a patch', () => {
     expect(getReviewPrompt(context({ files: [{ path: 'bin.dat', status: 'added', additions: 0, deletions: 0, patch: null }] }))).toContain('Diff:\n```diff\n\n```');
+  });
+
+  it('sanitizes untrusted file paths in the review prompt', () => {
+    const prompt = getReviewPrompt(context({ files: [{ path: "src/`evil`\npath.ts", status: 'modified', additions: 1, deletions: 0, patch: '+x' }] }));
+    expect(prompt).toContain("File: src/'evil' path.ts");
+    expect(prompt).not.toContain("`evil`");
   });
 
   it('asks for a JSON-only retry with the stated problem', () => {
@@ -483,7 +503,7 @@ describe('parse analysis', () => {
           'text',
           { description: '   ', file: 'src/a.ts' },
           { description: 'No file given' },
-          { comment: 'Uses comment field', path: '/src/b.ts', severity: ' CRITICAL ', line: 2.5, suggestion: 42 },
+          { comment: 'Uses comment field', path: './src/b.ts', severity: ' CRITICAL ', line: 2.5, suggestion: 42 },
           { message: 'Uses message field', file: 'src/c.ts', severity: 'blocker', line: 0 },
           { description: 'Retracted', file: 'src/d.ts', line: 4, suggestion: 'False positive, ignore' },
           { description: 'Unknown severity', file: 'src/e.ts', severity: 'urgent', line: '3' },
@@ -507,6 +527,14 @@ describe('parse analysis', () => {
     const logicIssues = Array.from({ length: 120 }, (_, index) => ({ description: `Problem ${index}`, file: 'src/a.ts', line: index + 1 }));
     const parsed = parseAnalysis(reply({ logicIssues }), { hasRequirements: false });
     expect(parsed.ok && parsed.analysis.issues).toHaveLength(100);
+  });
+
+  it('normalizes safe relative paths and rejects absolute, traversal, drive-letter, and NUL paths', () => {
+    expect(normalizeIssuePath('./src\\a.ts')).toBe('src/a.ts');
+    expect(normalizeIssuePath('././src/a.ts')).toBe('src/a.ts');
+    for (const bad of ['/src/a.ts', '///src/a.ts', '/etc/passwd', '\\\\server\\share\\a.ts', '../secret.ts', 'src/../secret.ts', 'a//b.ts', 'a/./b.ts', 'C:/secret.ts', 'src/a\0.ts', '', '/']) {
+      expect(normalizeIssuePath(bad)).toBeNull();
+    }
   });
 
   it('keeps requirements when present and filters change types and notes', () => {
@@ -739,11 +767,18 @@ describe('poster', () => {
     await expect(poster.post({ reviewId: 'r', findingIds: [], event: 'COMMENT', body: '  ' })).rejects.toThrow('Select at least one finding or write a message to post');
   });
 
-  it('posts stale comments without inline positions', async () => {
+  it('posts stale comments without inline positions and skips listFiles', async () => {
     const { poster, github } = posterHarness({ headSha: 'def4567890', findings: [finding('in')] });
     const result = await poster.post({ reviewId: 'r', findingIds: ['in'], event: 'COMMENT' });
     expect(result).toEqual({ url: 'https://github.com/acme/api/pull/4#r7', commentCount: 0, bodyFindingCount: 1, publishedCount: 1 });
+    expect(github.listFiles).not.toHaveBeenCalled();
     expect(github.createReview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ commitId: 'abc1234567', comments: [] }));
+  });
+
+  it('skips listFiles when posting with no selected findings', async () => {
+    const { poster, github } = posterHarness({ findings: [finding('in')] });
+    await poster.post({ reviewId: 'r', findingIds: [], event: 'APPROVE' });
+    expect(github.listFiles).not.toHaveBeenCalled();
   });
 
   it('posts selected findings even if previously published', async () => {

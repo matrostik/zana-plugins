@@ -328,6 +328,23 @@ describe('codewink cli', () => {
       const result = await cli(['post', 'acme/api#1', '--yes', '--findings', 'zzzz']);
       expect(result).toEqual({ exitCode: 1, stderr: 'No finding matches "zzzz"' });
     });
+
+    it('rejects empty finding IDs and ambiguous prefixes', async () => {
+      const detailWithSharedPrefix = (): PrDetail => ({
+        ...detailFixture('completed'),
+        findings: [finding({ id: 'aaaa1111' }), finding({ id: 'aaab2222' })]
+      });
+      const { cli } = createCli({ detail: async () => detailWithSharedPrefix() });
+
+      expect(await cli(['post', 'acme/api#1', '--yes', '--findings', ' , '])).toEqual({
+        exitCode: 1,
+        stderr: 'Specify at least one finding ID prefix with --findings'
+      });
+      expect(await cli(['post', 'acme/api#1', '--yes', '--findings', 'aaa'])).toEqual({
+        exitCode: 1,
+        stderr: 'Ambiguous finding prefix "aaa" (matches 2 findings)'
+      });
+    });
   });
 
   describe('repos', () => {
