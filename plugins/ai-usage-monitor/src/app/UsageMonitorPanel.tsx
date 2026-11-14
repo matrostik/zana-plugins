@@ -13,6 +13,7 @@ import {
 import { applyAntigravityUsage } from './antigravity-usage.ts';
 import { formatRangeBoundarySummary, formatRelativeTime } from './format.ts';
 import { LogsTab } from './LogsTab.tsx';
+import { ModelComparisonTab } from './ModelComparisonTab.tsx';
 import { ModelsSpendTab } from './ModelsSpendTab.tsx';
 import { OverviewTab, ReloadSpinner } from './OverviewTab.tsx';
 import {
@@ -25,13 +26,14 @@ import {
 } from './panel-hooks.ts';
 import { ensureStylesInjected } from './styles.ts';
 
-type ActiveTab = 'overview' | 'models' | 'logs';
+type ActiveTab = 'overview' | 'models' | 'comparison' | 'logs';
 
 const RANGE_OPTIONS: readonly TimeRangeKey[] = ['today', '7d', 'last_week', '30d', 'all'];
 
 function initialTabFromSubPath(subPath: string | undefined): ActiveTab {
   const clean = (subPath ?? '').replace(/^\/+/, '').toLowerCase();
   if (clean.startsWith('models')) return 'models';
+  if (clean.startsWith('comparison')) return 'comparison';
   if (clean.startsWith('logs')) return 'logs';
   return 'overview';
 }
@@ -129,6 +131,7 @@ function PanelSubtabs({ tab, onTabChange, logCount, boundarySummary }: {
       <div className="aum-tablist" role="tablist">
         <TabButton id="overview" active={tab} onSelect={onTabChange}>Overview &amp; Quotas</TabButton>
         <TabButton id="models" active={tab} onSelect={onTabChange}>Models, Spend &amp; Budgets</TabButton>
+        <TabButton id="comparison" active={tab} onSelect={onTabChange}>Model Comparison</TabButton>
         <TabButton id="logs" active={tab} onSelect={onTabChange}>
           Usage &amp; Error Logs
           <span className="aum-pill aum-pill-neutral">{logCount}</span>
@@ -147,8 +150,8 @@ interface LogFilters {
 }
 
 function PanelTabContent(props: {
-  tab: ActiveTab;
-  onTabChange: (tab: ActiveTab) => void;
+  tab: Exclude<ActiveTab, 'comparison'>;
+  onTabChange: (tab: 'overview' | 'models' | 'logs') => void;
   dashboard: DashboardPayload;
   logs: LogsResponse;
   logFilters: LogFilters;
@@ -220,7 +223,9 @@ function useUsageMonitorState(subPath: string | undefined) {
   const antigravity = useAntigravityUsage(hasAntigravity, mountedRef);
   const actions = usePanelActions({ rpcRef, mountedRef, data, antigravity });
 
-  useRealtime(REALTIME_CHANNEL, () => {
+  useRealtime(REALTIME_CHANNEL, (payload) => {
+    const rec = payload && typeof payload === 'object' ? (payload as { comparisonUpdated?: boolean }) : null;
+    if (rec?.comparisonUpdated && Object.keys(rec).length === 1) return;
     void loadAll();
   });
 
@@ -252,30 +257,36 @@ export function UsageMonitorPanel({ subPath }: Partial<PluginNavPanelProps>) {
         tab={tab}
         onTabChange={setTab}
         logCount={dashboard?.kpis.logCount ?? 0}
-        boundarySummary={formatRangeBoundarySummary(dashboard?.kpis.rangeBounds)}
+        boundarySummary={tab === 'comparison' ? null : formatRangeBoundarySummary(dashboard?.kpis.rangeBounds)}
       />
       <main className="aum-scroll">
-        {error && <div className="aum-banner aum-banner-error">{error}</div>}
-        {loading && !dashboard ? (
-          <div className="aum-card">
-            <div className="aum-muted" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ReloadSpinner />
-              <span>Indexing Zana thread telemetry and probing provider quotas...</span>
-            </div>
-          </div>
-        ) : dashboard ? (
-          <PanelTabContent
-            tab={tab}
-            onTabChange={setTab}
-            dashboard={dashboard}
-            logs={data.logs}
-            logFilters={logFilters}
-            actions={actions}
-            antigravityUsage={antigravity.usage}
-            refreshingProviderIds={refreshingProviderIds}
-            isGlobalRefreshing={isGlobalRefreshing}
-          />
-        ) : null}
+        {tab === 'comparison' ? (
+          <ModelComparisonTab />
+        ) : (
+          <>
+            {error && <div className="aum-banner aum-banner-error">{error}</div>}
+            {loading && !dashboard ? (
+              <div className="aum-card">
+                <div className="aum-muted" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ReloadSpinner />
+                  <span>Indexing Zana thread telemetry and probing provider quotas...</span>
+                </div>
+              </div>
+            ) : dashboard ? (
+              <PanelTabContent
+                tab={tab}
+                onTabChange={setTab}
+                dashboard={dashboard}
+                logs={data.logs}
+                logFilters={logFilters}
+                actions={actions}
+                antigravityUsage={antigravity.usage}
+                refreshingProviderIds={refreshingProviderIds}
+                isGlobalRefreshing={isGlobalRefreshing}
+              />
+            ) : null}
+          </>
+        )}
       </main>
     </div>
   );
