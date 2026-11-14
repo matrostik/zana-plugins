@@ -271,17 +271,8 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     const path = location.worktree.path;
     const { headSha, baseSha, baseRef, headRef, commitShas, tree } = await resolveScopeSnapshot(path, input);
     const existing = activeReviewFor(location.target.id, {
-      scope: input.scope,
-      headRef,
-      commitShas,
-      baseRef,
-      baseSha,
-      headSha,
-      treeSha: tree.treeSha,
-      intent,
-      modelsKey: modelsKey(models),
-      promptSnapshot,
-      explicitPrompt: input.promptId !== undefined || !!input.rerunReviewId
+      scope: input.scope, headRef, commitShas, baseRef, baseSha, headSha, treeSha: tree.treeSha, intent,
+      modelsKey: modelsKey(models), promptSnapshot, explicitPrompt: input.promptId !== undefined || !!input.rerunReviewId
     });
     if (existing) return existing;
 
@@ -290,27 +281,14 @@ export function createLocalReviews(deps: LocalReviewDeps) {
       const snapshotSha = await commitSnapshot(deps.git, path, tree, input.scope, review.id);
       const prepared = prepareLocalFiles(await diffFiles(deps.git, path, baseSha, snapshotSha), tree.skipped);
       if (prepared.files.length === 0) {
-        throw new Error(
-          prepared.skipped.length > 0
-            ? `No reviewable ${input.scope} changes: ${prepared.skipped.length} file(s) were skipped (${[...new Set(prepared.skipped.map((file) => file.reason))].join(', ')}).`
-            : `No ${input.scope} changes to review.`
-        );
+        const reason = prepared.skipped.length > 0
+          ? `No reviewable ${input.scope} changes: ${prepared.skipped.length} file(s) were skipped (${[...new Set(prepared.skipped.map((file) => file.reason))].join(', ')}).`
+          : `No ${input.scope} changes to review.`;
+        throw new Error(reason);
       }
       deps.store.recordLocalSnapshot({
-        reviewId: review.id,
-        targetId: location.target.id,
-        scope: input.scope,
-        headRef,
-        commitShas,
-        baseRef,
-        baseSha,
-        headSha: tree.headSha,
-        snapshotSha,
-        treeSha: tree.treeSha,
-        intent,
-        source: input.source,
-        files: prepared.files,
-        skipped: prepared.skipped
+        reviewId: review.id, targetId: location.target.id, scope: input.scope, headRef, commitShas, baseRef, baseSha,
+        headSha: tree.headSha, snapshotSha, treeSha: tree.treeSha, intent, source: input.source, files: prepared.files, skipped: prepared.skipped
       });
     } catch (error) {
       deps.store.deleteReview(review.id);
@@ -319,7 +297,12 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     }
     deps.store.setLocalTargetScope(location.target.id, input.scope);
     inflightModelsKey.set(review.id, modelsKey(models));
-    deps.reviews().enqueueReview(review, models);
+    try {
+      deps.reviews().enqueueReview(review, models);
+    } catch (error) {
+      inflightModelsKey.delete(review.id);
+      throw error;
+    }
     await pruneTarget(location.target, path).catch((error) => deps.log.warn(`codewink: local review cleanup failed: ${errorMessage(error)}`));
     return deps.store.getReview(review.id) ?? review;
   }
@@ -350,8 +333,17 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     return specs.filter((spec): spec is SpecFileContext => spec !== null);
   }
 
+  function targetSnapshot(reviewId: string): { review: ReviewRow; snapshot: LocalSnapshotRow; target: LocalTargetRow } {
+    try {
+      return snapshotFor(reviewId);
+    } catch (error) {
+      inflightModelsKey.delete(reviewId);
+      throw error;
+    }
+  }
+
   function reviewTarget(review: ReviewRow): ReviewTarget {
-    const { snapshot, target } = snapshotFor(review.id);
+    const { snapshot, target } = targetSnapshot(review.id);
     return {
       subject: { id: target.id, label: localLabel(target, snapshot.scope), title: SCOPE_TITLES[snapshot.scope], url: null },
       quiet: snapshot.source === 'agent',
@@ -392,9 +384,11 @@ export function createLocalReviews(deps: LocalReviewDeps) {
         return { workspace, prompt: getFullLocalReviewPrompt(context), hasRequirements: hasLocalRequirementsContext(context) };
       },
       async afterComplete() {
-        // Once runs exist, dedup can read models from them; drop the in-flight hint to avoid unbounded growth.
-        inflightModelsKey.delete(review.id);
         changed({ targetId: target.id, reviewId: review.id });
+      },
+      onCleanup() {
+        // Drop the in-flight models hint regardless of completion, failure, or cancellation.
+        inflightModelsKey.delete(review.id);
       }
     };
   }
@@ -638,7 +632,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
   /**
    * Starts a visible fix thread in the reviewed checkout with the user's chosen provider, model, and supported mode.
    * Returns `needsConfirmation` instead when files changed since the review (or the live checkout differs from a
-   * commit/branch-ref review) and `force` is not set.
+   * staged/commit/branch-ref review) and `force` is not set.
    */
   async function fix(reviewId: string, findingIds: string[], force: boolean, agent: FixAgentChoice) {
     const { snapshot, target } = snapshotFor(reviewId);
@@ -648,7 +642,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     if (current.missing) throw new Error(`${target.worktreePath} no longer exists`);
     const snapshotNotInCheckout =
       !current.stale &&
-      (snapshot.scope === 'commits' || (snapshot.scope === 'branch' && snapshot.headRef !== null)) &&
+      (snapshot.scope === 'staged' || snapshot.scope === 'commits' || (snapshot.scope === 'branch' && snapshot.headRef !== null)) &&
       (await checkoutDiffersFromSnapshot(snapshot, target.worktreePath));
     const changedSinceReview = current.stale || snapshotNotInCheckout;
     if (changedSinceReview && !force) {
@@ -659,7 +653,7 @@ export function createLocalReviews(deps: LocalReviewDeps) {
     }
     await validateFixAgent(agent);
     const project = await projectFor(target);
-    const separateWorktree = !isWithin(await canonicalPath(project.path), await canonicalPath(target.worktreePath));
+    const separateWorktree = !isWithin(await canonicalPath(target.worktreePath), await canonicalPath(project.path));
     // A single explicit choice prevents priority fallback from changing permissions or providers.
     const spawned = await spawnVisibleWithPriorityFallback(deps.threads, deps.waiter, [agent], {
       projectId: project.id,

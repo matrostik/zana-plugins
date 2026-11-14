@@ -45,6 +45,7 @@ export const runCommand: CommandRunner = (command, args, options = {}) =>
       clearTimeout(timer);
       resolve(code === 0 ? stdout.trim() : null);
     });
+    child.stdin?.on('error', () => {});
     child.stdin?.end(options.input ?? '');
   });
 
@@ -106,10 +107,12 @@ export function createTokenResolver(options: TokenResolverOptions) {
   const now = options.now ?? Date.now;
   const ttl = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
   const cache = new Map<string, { value: ResolvedToken | null; at: number }>();
+  const inFlight = new Map<string, Promise<ResolvedToken | null>>();
+  const versions = new Map<string, number>();
 
-  async function resolve(host: string): Promise<ResolvedToken | null> {
-    const cached = cache.get(host);
-    if (cached && now() - cached.at < (cached.value ? ttl : Math.min(ttl, MISSING_TOKEN_TTL_MS))) return cached.value;
+  const versionFor = (host: string) => versions.get(host) ?? 0;
+
+  async function resolveUncached(host: string, version: number): Promise<ResolvedToken | null> {
     let value: ResolvedToken | null = null;
     const fromGh = await tokenFromGh(host, run);
     if (fromGh) value = { token: fromGh, source: 'gh' };
@@ -121,15 +124,37 @@ export function createTokenResolver(options: TokenResolverOptions) {
       const fromSetting = parseTokenSetting(await options.readTokenSetting()).get(host);
       if (fromSetting) value = { token: fromSetting, source: 'setting' };
     }
-    cache.set(host, { value, at: now() });
+    if (versionFor(host) === version) cache.set(host, { value, at: now() });
     return value;
+  }
+
+  async function resolve(host: string): Promise<ResolvedToken | null> {
+    const cached = cache.get(host);
+    if (cached && now() - cached.at < (cached.value ? ttl : Math.min(ttl, MISSING_TOKEN_TTL_MS))) return cached.value;
+    const active = inFlight.get(host);
+    if (active) return active;
+    const version = versionFor(host);
+    const pending = resolveUncached(host, version).finally(() => {
+      if (inFlight.get(host) === pending) inFlight.delete(host);
+    });
+    inFlight.set(host, pending);
+    return pending;
   }
 
   return {
     resolve,
     invalidate(host?: string) {
-      if (host) cache.delete(host);
-      else cache.clear();
+      if (host) {
+        versions.set(host, versionFor(host) + 1);
+        cache.delete(host);
+        inFlight.delete(host);
+        return;
+      }
+      for (const key of new Set([...cache.keys(), ...inFlight.keys(), ...versions.keys()])) {
+        versions.set(key, versionFor(key) + 1);
+      }
+      cache.clear();
+      inFlight.clear();
     }
   };
 }

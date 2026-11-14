@@ -148,8 +148,16 @@ export function dedupeIssues(issues: ParsedIssue[]): ParsedIssue[] {
   const kept: ParsedIssue[] = [];
   for (const issue of issues) {
     const duplicate = kept.findIndex((existing) => areIssuesSimilar(existing, issue));
-    if (duplicate === -1) kept.push(issue);
-    else if ((SEVERITY_RANK[issue.severity] ?? 0) > (SEVERITY_RANK[kept[duplicate].severity] ?? 0)) kept[duplicate] = issue;
+    if (duplicate === -1) {
+      kept.push(issue);
+      continue;
+    }
+    const existing = kept[duplicate];
+    if ((SEVERITY_RANK[issue.severity] ?? 0) > (SEVERITY_RANK[existing.severity] ?? 0)) {
+      kept[duplicate] = { ...issue, suggestion: issue.suggestion ?? existing.suggestion };
+    } else if (existing.suggestion == null && issue.suggestion != null) {
+      kept[duplicate] = { ...existing, suggestion: issue.suggestion };
+    }
   }
   return kept;
 }
@@ -173,7 +181,7 @@ export function clusterIssues(issues: TaggedIssue[], modelCount: number): IssueC
     const best = group.reduce((top, current) => ((SEVERITY_RANK[current.severity] ?? 0) > (SEVERITY_RANK[top.severity] ?? 0) ? current : top), group[0]);
     clusters.push({
       category: group[0].category,
-      file: group[0].file,
+      file: best.file,
       line: best.line,
       severity: best.severity,
       confidence: Math.min(1, group.length / Math.max(1, modelCount)),

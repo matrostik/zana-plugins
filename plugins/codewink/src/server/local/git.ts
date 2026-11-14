@@ -324,6 +324,10 @@ async function selectUntracked(git: GitRunner, worktreePath: string, env: Record
       skipped.push({ path, reason: 'possible-secret' });
       continue;
     }
+    if (include.length >= MAX_NEW_FILES) {
+      skipped.push({ path, reason: 'too-many-files' });
+      continue;
+    }
     const absolute = resolve(worktreePath, path);
     const info = await lstat(absolute).catch(() => null);
     if (!info) continue;
@@ -337,10 +341,6 @@ async function selectUntracked(git: GitRunner, worktreePath: string, env: Record
     }
     if (await looksBinary(absolute).catch(() => true)) {
       skipped.push({ path, reason: 'binary' });
-      continue;
-    }
-    if (include.length >= MAX_NEW_FILES) {
-      skipped.push({ path, reason: 'too-many-files' });
       continue;
     }
     include.push(path);
@@ -650,7 +650,12 @@ async function replayCommitsOntoIndex(
     const changed = await git(worktreePath, ['diff', '--quiet', parent.sha, sha]);
     if (changed.code === 0) continue;
     if (changed.code !== 1) throw new Error(`git diff failed for ${sha.slice(0, 7)} in ${worktreePath}`);
-    const patch = await must(git, worktreePath, ['diff', '--binary', '--full-index', parent.sha, sha], 'diff');
+    const patch = await must(
+      git,
+      worktreePath,
+      ['diff', '--binary', '--full-index', '--no-ext-diff', '--no-color', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', parent.sha, sha],
+      'diff'
+    );
     if (patch.trim().length === 0) {
       throw new Error(`Cannot replay non-text changes in ${sha.slice(0, 7)} across skipped commits. Select a contiguous range instead.`);
     }

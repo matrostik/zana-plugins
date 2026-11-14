@@ -534,6 +534,12 @@ describe('detectUsageLimit and looksLikeValidReview', () => {
     expect(looksLikeValidReview('Usage Limit Reached\nYou have reached your current quota.')).toBe(false);
   });
 
+  it('rejects whitespace, blank summary, or non-finite riskScore in looksLikeValidReview', () => {
+    expect(looksLikeValidReview(JSON.stringify({ summary: 'Valid', riskScore: '   ' }))).toBe(false);
+    expect(looksLikeValidReview(JSON.stringify({ summary: 'Valid', riskScore: 'Infinity' }))).toBe(false);
+    expect(looksLikeValidReview(JSON.stringify({ summary: '   ', riskScore: 5 }))).toBe(false);
+  });
+
   it('does not treat malformed reviews containing review JSON keys as usage limit', () => {
     const malformed = '{"summary": "Review for rate limiting", "riskScore": 4, "logicIssues": [{"description": "quota exceeded in check"';
     expect(detectUsageLimit(malformed)).toBeNull();
@@ -590,7 +596,7 @@ describe('fetchPullRequestHead', () => {
     };
 
     await expect(fetchPullRequestHead(run, '/repo', 'upstream', 4, head)).resolves.toBe(head);
-    expect(commands[0]).toEqual(['-C', '/repo', 'fetch', 'upstream', 'pull/4/head:refs/codewink/pr-4']);
+    expect(commands[0]).toEqual(['-C', '/repo', 'fetch', 'upstream', '+pull/4/head:refs/codewink/pr-4']);
   });
 
   it('rejects a fetch failure or a different commit', async () => {
@@ -671,6 +677,7 @@ interface HarnessOptions {
   headShaForPull?: (number: number, read: number) => string;
   complete?: ReviewServiceDeps['complete'];
   notify?: ReviewServiceDeps['notify'];
+  localReviewTarget?: ReviewServiceDeps['localReviewTarget'];
 }
 
 function createServiceHarness(options: HarnessOptions = {}) {
@@ -744,6 +751,7 @@ function createServiceHarness(options: HarnessOptions = {}) {
     fetchPullRequestHead: options.fetchPullRequestHead,
     complete: options.complete,
     notify: options.notify,
+    localReviewTarget: options.localReviewTarget,
     syncPullRequest: async (ref) => {
       const pull = await github.getPull(ref);
       const id = prId(ref);
@@ -892,6 +900,72 @@ describe('review service', () => {
     expect(blank.store.getReview(blankReview.id)).toMatchObject({ status: 'completed', consensusSummary: null });
     expect(failing.store.getReview(failingReview.id)).toMatchObject({ status: 'completed', consensusSummary: null });
     expect(failing.log.warn).toHaveBeenCalledWith('codewink: consensus summary failed: model busy');
+  });
+
+  it('keeps cancelled status and invokes onCleanup when cancelled during consensus summary', async () => {
+    let releaseComplete!: () => void;
+    let completeStarted = false;
+    const onCleanup = vi.fn();
+    const { store, service, settled } = createServiceHarness({
+      config: { models: SERVICE_MODELS },
+      complete: () =>
+        new Promise((resolve) => {
+          completeStarted = true;
+          releaseComplete = () => resolve({ text: 'Summary after abort' });
+        }),
+      localReviewTarget: (review) => ({
+        subject: { id: review.prId, label: 'local:1', title: 'Local changes', url: null },
+        quiet: true,
+        prepare: async () => ({ workspace: { projectId: 'home', hasWorkspace: false }, prompt: 'Review', hasRequirements: false }),
+        afterComplete: async () => undefined,
+        onCleanup
+      })
+    });
+
+    const review = store.createReview({ prId: 'local:1', headSha: 'sha1', trigger: 'manual', targetKind: 'local' });
+    service.enqueueReview(review, SERVICE_MODELS);
+    await until(() => completeStarted);
+    expect(service.cancelReview(review.id)).toBe(true);
+    releaseComplete();
+    await settled();
+
+    expect(store.getReview(review.id)).toMatchObject({ status: 'cancelled', error: 'Cancelled' });
+    expect(store.listFindings(review.id)).toEqual([]);
+    expect(onCleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('invokes onCleanup when a queued local review is cancelled or disposed', async () => {
+    const gate = createGate();
+    const onCleanup = vi.fn();
+    const { store, service, settled } = createServiceHarness({
+      config: { maxConcurrent: 1 },
+      respond: gate.respond,
+      localReviewTarget: (review) => ({
+        subject: { id: review.prId, label: 'local:1', title: 'Local changes', url: null },
+        quiet: true,
+        prepare: async () => ({ workspace: { projectId: 'home', hasWorkspace: false }, prompt: 'Review', hasRequirements: false }),
+        afterComplete: async () => undefined,
+        onCleanup
+      })
+    });
+
+    const first = store.createReview({ prId: 'local:1', headSha: 'sha1', trigger: 'manual', targetKind: 'local' });
+    const second = store.createReview({ prId: 'local:1', headSha: 'sha2', trigger: 'manual', targetKind: 'local' });
+    const third = store.createReview({ prId: 'local:1', headSha: 'sha3', trigger: 'manual', targetKind: 'local' });
+    service.enqueueReview(first, [SERVICE_MODELS[0]]);
+    await until(() => gate.waiting() === 1);
+    service.enqueueReview(second, [SERVICE_MODELS[0]]);
+    service.enqueueReview(third, [SERVICE_MODELS[0]]);
+
+    expect(service.cancelReview(second.id)).toBe(true);
+    expect(onCleanup).toHaveBeenCalledTimes(1);
+
+    await service.dispose();
+    expect(onCleanup).toHaveBeenCalledTimes(2);
+
+    gate.release();
+    await settled();
+    expect(onCleanup).toHaveBeenCalledTimes(3);
   });
 
   it('skips the consensus summary when no summarizer is available', async () => {
@@ -1460,6 +1534,39 @@ describe('store', () => {
     for (const buckets of ['{"needs-review":true}', 7]) {
       expect(createStore(createRowDatabase({ ...row, buckets })).getPullRequest('row-1')?.buckets).toEqual([]);
     }
+  });
+
+  it('lists local reviews paired with their snapshots', () => {
+    const store = createTestStore();
+    store.upsertLocalTarget({ id: 'local:1', projectId: 'app', worktreePath: '/work/app', branch: 'main' });
+    const withSnapshot = store.createReview({ prId: 'local:1', headSha: 'sha1', trigger: 'manual', targetKind: 'local' });
+    store.recordLocalSnapshot({
+      reviewId: withSnapshot.id,
+      targetId: 'local:1',
+      scope: 'uncommitted',
+      baseRef: null,
+      baseSha: 'base1',
+      headSha: 'sha1',
+      snapshotSha: 'snap1',
+      treeSha: 'tree1',
+      intent: 'Fix bug',
+      source: 'ui',
+      files: [{ path: 'src/a.ts', status: 'modified', additions: 2, deletions: 1, patch: null }],
+      skipped: []
+    });
+    const withoutSnapshot = store.createReview({ prId: 'local:1', headSha: 'sha2', trigger: 'manual', targetKind: 'local' });
+
+    expect(store.listLocalReviews('local:1')).toEqual([
+      { review: withoutSnapshot, snapshot: null },
+      {
+        review: withSnapshot,
+        snapshot: expect.objectContaining({
+          reviewId: withSnapshot.id,
+          scope: 'uncommitted',
+          files: [{ path: 'src/a.ts', status: 'modified', additions: 2, deletions: 1, patch: null }]
+        })
+      }
+    ]);
   });
 
   it('stamps rows with the system clock by default', () => {

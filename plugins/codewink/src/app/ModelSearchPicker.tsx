@@ -94,7 +94,7 @@ export function ModelPriorityPicker(props: {
           ))}
         </ol>
       ) : null}
-      {addingModel ? (
+      {addingModel && canAddModel ? (
         <AddPriorityRow
           priority={value.length + 1}
           value={value}

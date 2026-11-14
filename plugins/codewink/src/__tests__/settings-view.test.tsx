@@ -103,6 +103,24 @@ describe('SettingsView tabs', () => {
 });
 
 describe('Profile tab', () => {
+  it('disables prompt editing inputs when no prompt is selected until New prompt is clicked', async () => {
+    await renderView(snapshot({ prompts: [], defaultPromptId: null, customInstructions: '' }));
+    const nameInput = screen.getByRole('textbox', { name: 'Prompt name' }) as HTMLInputElement;
+    const instructionsBox = screen.getByRole('textbox', { name: 'Custom review instructions' }) as HTMLTextAreaElement;
+    const resetButton = screen.getByRole('button', { name: 'Reset to default' }) as HTMLButtonElement;
+    const newButton = screen.getByRole('button', { name: 'New prompt' }) as HTMLButtonElement;
+
+    expect(nameInput.disabled).toBe(true);
+    expect(instructionsBox.disabled).toBe(true);
+    expect(resetButton.disabled).toBe(true);
+    expect(newButton.disabled).toBe(false);
+
+    fireEvent.click(newButton);
+    expect(nameInput.disabled).toBe(false);
+    expect(instructionsBox.disabled).toBe(false);
+    expect(resetButton.disabled).toBe(false);
+  });
+
   it('restores a selected prompt when leaving creation through the selector', async () => {
     await renderView();
     fireEvent.click(screen.getByRole('button', { name: 'New prompt' }));

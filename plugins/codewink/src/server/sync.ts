@@ -178,6 +178,8 @@ export function createSyncService(deps: {
       }
 
       const changed: PullRequestRow[] = [];
+      let failedNewCount = 0;
+      let detailError: string | null = null;
       await mapWithConcurrency([...found.entries()], DETAIL_CONCURRENCY, async ([id, entry]) => {
         const buckets = [...entry.buckets];
         const existing = deps.store.getPullRequest(id);
@@ -191,14 +193,21 @@ export function createSyncService(deps: {
           const updated = deps.store.getPullRequest(id);
           if (updated && (!existing || existing.headSha !== updated.headSha)) changed.push(updated);
         } catch (error) {
-          if (!existing) throw error;
+          if (!existing) {
+            inventoryComplete = false;
+            failedNewCount += 1;
+            detailError ??= errorMessage(error);
+            return;
+          }
           deps.store.upsertPullRequest({ ...existing, buckets });
         }
       });
 
       if (inventoryComplete) deps.store.closeMissingPullRequests(host, new Set(found.keys()));
-      status.pullRequestCount = found.size;
-      status.syncedAt = now();
+      const succeededCount = found.size - failedNewCount;
+      if (detailError) status.error ??= detailError;
+      status.pullRequestCount = succeededCount;
+      if (succeededCount > 0 || !status.error) status.syncedAt = now();
       return { status, changed };
     } catch (error) {
       status.error = errorMessage(error);

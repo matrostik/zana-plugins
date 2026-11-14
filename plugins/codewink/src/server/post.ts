@@ -121,11 +121,11 @@ export function createPoster(deps: { store: Store; github: GitHubClient }) {
     const findings = deps.store.listFindings(review.id).filter((finding) => wanted.has(finding.id) && !finding.dismissed);
     if (findings.length === 0 && input.event === 'COMMENT' && !input.body?.trim()) throw new Error('Select at least one finding or write a message to post');
 
-    const files = await deps.github.listFiles(ref);
+    const files = findings.length > 0 && pull.head.sha === review.headSha ? await deps.github.listFiles(ref) : [];
     const modelCount = deps.store.listRuns(review.id).filter((run) => run.status === 'completed').length;
     const payload = buildReviewPayload({
       findings,
-      files: pull.head.sha === review.headSha ? files : [],
+      files,
       modelCount,
       summary: findings.length > 0 ? review.consensusSummary ?? review.summary : null,
       extraBody: input.body

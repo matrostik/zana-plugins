@@ -113,12 +113,14 @@ async function setup(
     projects?: Array<{ id: string; name: string; path?: string }>;
     run?: CommandRunner;
     git?: GitRunner;
+    onFetch?: (defaultFetch: FetchLike) => FetchLike;
   } = {}
 ) {
   const state = { headSha: 'sha1' };
   const github = githubFixture(state);
+  const fetchImpl = options.onFetch ? options.onFetch(github.fetch as unknown as FetchLike) : (github.fetch as unknown as FetchLike);
   const host = createFakeHost({ reply: options.reply ?? reply, consumeApproval: options.consumeApproval, settings: options.settings, projects: options.projects });
-  await createCodewinkPlugin(host.zcc, { run: options.run ?? run, git: options.git, fetch: github.fetch as unknown as FetchLike, pollMs: 10 });
+  await createCodewinkPlugin(host.zcc, { run: options.run ?? run, git: options.git, fetch: fetchImpl, pollMs: 10 });
   return { host, github, state };
 }
 
@@ -427,8 +429,10 @@ describe('codewink server', () => {
     expect(github.calls.filter((call) => call.method === 'POST')).toHaveLength(1);
 
     state.headSha = 'sha2';
+    const callsBeforeStalePost = seen.length;
     await expect(host.callRpc('approvalBinding', { reviewId, event: 'APPROVE' })).rejects.toThrow(/new commits/);
     await expect(host.callRpc('post', { reviewId, findingIds: [], event: 'REQUEST_CHANGES', approvalToken: 'tok' })).rejects.toThrow(/new commits/);
+    expect(seen).toHaveLength(callsBeforeStalePost);
   });
 
   it('fails closed when the host cannot verify approvals', async () => {
@@ -835,5 +839,27 @@ describe('codewink settings', () => {
 
     expect(result.status).toBe('stale');
     expect(result.error).toContain('Review is stale: head commit changed during review');
+  });
+
+  it('preserves lastSyncAt and exposes host error on failed refresh', async () => {
+    let failViewer = false;
+    const { host } = await setup({
+      onFetch: (defaultFetch) => (url, init) => {
+        if (failViewer && url.endsWith('/user')) {
+          return Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, text: async () => JSON.stringify({ message: 'GitHub outage' }) });
+        }
+        return defaultFetch(url, init);
+      }
+    });
+    await host.callRpc('addRepo', { repo: 'acme/api' });
+    await host.callRpc('refresh');
+    const firstOverview = (await host.callRpc('overview')) as Overview;
+    expect(firstOverview.lastSyncAt).toBeTypeOf('number');
+
+    failViewer = true;
+    await host.callRpc('refresh');
+    const failedOverview = (await host.callRpc('overview')) as Overview;
+    expect(failedOverview.lastSyncAt).toBe(firstOverview.lastSyncAt);
+    expect(failedOverview.hosts[0].error).toContain('GitHub outage');
   });
 });

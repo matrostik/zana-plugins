@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRealtime, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import type { ModelChoice, PrBucket } from '../server/types.ts';
 import { errorText, relativeTime } from './format.ts';
@@ -64,18 +64,30 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
   const noRemote = overview?.projectRepos?.length === 0;
   const mode: Mode = chosenMode ?? (noRemote ? 'local' : 'pr');
 
+  const loadSeq = useRef(0);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const autoSyncRef = useRef<boolean | undefined>(overview?.autoSyncEnabled);
+  autoSyncRef.current = overview?.autoSyncEnabled;
+
   const load = useCallback(() => {
+    const seq = ++loadSeq.current;
     // Models come from `config` when the overview omits them or fails; a config failure is shown unless an overview error already is.
     const loadConfigModels = () =>
       rpc
         .call('config')
         .then((configValue) => {
+          if (loadSeq.current !== seq) return;
           setModels((configValue as ConfigSnapshot).models);
           setModelsLoaded(true);
         })
-        .catch((cause) => setError((current) => current ?? errorText(cause)));
+        .catch((cause) => {
+          if (loadSeq.current !== seq) return;
+          setError((current) => current ?? errorText(cause));
+        });
     (projectId ? rpc.call('overview', { projectId }) : rpc.call('overview'))
       .then((value) => {
+        if (loadSeq.current !== seq) return;
         const nextOverview = value as Overview;
         setOverview(nextOverview);
         setError(null);
@@ -87,6 +99,7 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
         }
       })
       .catch((cause) => {
+        if (loadSeq.current !== seq) return;
         setError(errorText(cause));
         void loadConfigModels();
       });
@@ -99,7 +112,13 @@ function CodewinkPanelContent({ pluginId, projectId }: PanelProps) {
     let lastCheckedAt = 0;
     let inFlight = false;
     const resume = () => {
-      if (document.visibilityState === 'hidden' || inFlight || Date.now() - lastCheckedAt < FOCUS_SYNC_THROTTLE_MS) return;
+      if (
+        document.visibilityState === 'hidden'
+        || inFlight
+        || modeRef.current === 'local'
+        || autoSyncRef.current === false
+        || Date.now() - lastCheckedAt < FOCUS_SYNC_THROTTLE_MS
+      ) return;
       lastCheckedAt = Date.now();
       inFlight = true;
       void rpc.call('refresh').then(load).catch((cause) => setError(errorText(cause))).finally(() => { inFlight = false; });

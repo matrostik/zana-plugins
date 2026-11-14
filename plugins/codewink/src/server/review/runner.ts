@@ -62,8 +62,10 @@ export function looksLikeValidReview(text: string): boolean {
     if (!json) return false;
     const data = JSON.parse(json) as Record<string, unknown>;
     const hasSummary = typeof data.summary === 'string' && data.summary.trim().length > 0;
-    const hasScore = typeof data.riskScore === 'number' || (typeof data.riskScore === 'string' && !Number.isNaN(Number(data.riskScore)));
-    return typeof data === 'object' && data !== null && hasSummary && Boolean(hasScore);
+    const hasScore =
+      (typeof data.riskScore === 'number' && Number.isFinite(data.riskScore))
+      || (typeof data.riskScore === 'string' && data.riskScore.trim() !== '' && Number.isFinite(Number(data.riskScore)));
+    return typeof data === 'object' && data !== null && hasSummary && hasScore;
   } catch {
     return false;
   }

@@ -164,16 +164,15 @@ export function createGitHubClient(tokens: TokenResolver, fetchImpl: FetchLike =
       const pageSize = Math.min(Math.max(1, maxResults), PAGE_SIZE);
       const maxPages = Math.min(10, Math.ceil(maxResults / pageSize));
       for (let page = 1; page <= maxPages; page++) {
-        const perPage = Math.min(pageSize, maxResults - items.length);
         const result = await request<{ items?: GhSearchItem[]; incomplete_results?: boolean; total_count?: number }>(
           host,
           'GET',
-          `/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`
+          `/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${pageSize}&page=${page}`
         );
         const batch = result.items ?? [];
         items.push(...batch);
         if (result.incomplete_results) complete = false;
-        const reachedEnd = batch.length < perPage || (typeof result.total_count === 'number' && items.length >= result.total_count);
+        const reachedEnd = batch.length < pageSize || (typeof result.total_count === 'number' && items.length >= result.total_count);
         if (reachedEnd || items.length >= maxResults) return { items: items.slice(0, maxResults), complete: complete && reachedEnd };
       }
       return { items: items.slice(0, maxResults), complete: false };
@@ -218,7 +217,7 @@ export function createGitHubClient(tokens: TokenResolver, fetchImpl: FetchLike =
           'GET',
           `${repoPath(repo)}/contents/${encodedPath}?ref=${encodeURIComponent(gitRef)}`
         );
-        if (!file?.content || file.encoding !== 'base64') return null;
+        if (typeof file?.content !== 'string' || file.encoding !== 'base64') return null;
         return Buffer.from(file.content, 'base64').toString('utf8');
       } catch (error) {
         if (error instanceof GitHubError && error.status === 404) return null;
