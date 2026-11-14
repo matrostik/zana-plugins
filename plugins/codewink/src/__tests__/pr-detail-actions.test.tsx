@@ -104,6 +104,37 @@ describe('PrDetail loading and setup', () => {
     expect(screen.queryByRole('heading', { name: 'First wins' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Second change' })).toBeTruthy();
   });
+
+  it('clears banner messages and ignores late startReview responses after switching PRs', async () => {
+    let rejectStart!: (error: Error) => void;
+    const pr1 = detail('completed');
+    const pr2 = detail('completed');
+    pr2.pr = { ...pr2.pr, id: 'github.com/acme/api#2', number: 2, title: 'Second change' };
+    const call = vi.fn(async (method: string, args?: { prId?: string }) => {
+      if (method === 'detail') return args?.prId?.endsWith('#2') ? pr2 : pr1;
+      if (method === 'refreshPullRequest') return null;
+      if (method === 'startReview') {
+        return new Promise((_resolve, reject) => {
+          rejectStart = reject;
+        });
+      }
+      throw new Error(`unexpected rpc ${method}`);
+    });
+
+    const view = render(
+      <PrDetail rpc={{ call }} pluginId="codewink" prId="github.com/acme/api#1" defaultModels={[{ providerId: 'cursor', model: 'a' }]} hasModels onOpenSettings={() => undefined} />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-review' }));
+    view.rerender(
+      <PrDetail rpc={{ call }} pluginId="codewink" prId="github.com/acme/api#2" defaultModels={[{ providerId: 'cursor', model: 'a' }]} hasModels onOpenSettings={() => undefined} />
+    );
+    expect(await screen.findByRole('heading', { name: 'Second change' })).toBeTruthy();
+
+    await act(async () => {
+      rejectStart(new Error('old pr failure'));
+    });
+    expect(screen.queryByText('old pr failure')).toBeNull();
+  });
 });
 
 describe('PrDetail review actions', () => {

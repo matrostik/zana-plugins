@@ -201,6 +201,9 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     log: zcc.log
   });
 
+  let lastSyncAt = (await zcc.storage.kv.get<number>('lastSyncAt')) ?? 0;
+  let lastAutoSyncAttemptAt = 0;
+
   async function runSync() {
     const result = await sync.syncAll();
     await notifyOutdated();
@@ -229,18 +232,22 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
       await reviews.startReview(parsePrId(pr.id), { trigger: 'auto' }).catch((error) => zcc.log.warn(`codewink: auto-review of ${pr.id} failed: ${errorMessage(error)}`));
       pendingAutoReviewPrIds.delete(id);
     }
-    await zcc.storage.kv.set('lastSyncAt', now());
+    if (result.hosts.length === 0 || result.hosts.some((host) => (host.syncedAt !== null && host.syncedAt > lastSyncAt) || !host.error)) {
+      const syncedAt = now();
+      lastSyncAt = syncedAt;
+      await zcc.storage.kv.set('lastSyncAt', syncedAt);
+    }
     publish(CHANGED_EVENT, { sync: true });
     return result;
   }
 
-  let lastSyncAt = (await zcc.storage.kv.get<number>('lastSyncAt')) ?? 0;
   zcc.background.schedule(SYNC_TICK_CRON, async () => {
     const currentSettings = await codewinkSettings.load();
     if (!currentSettings.autoSyncEnabled) return;
     const minutes = currentSettings.syncIntervalMinutes;
-    if (sync.isSyncing() || now() - lastSyncAt < minutes * 60_000) return;
-    lastSyncAt = now();
+    const currentNow = now();
+    if (sync.isSyncing() || currentNow - Math.max(lastSyncAt, lastAutoSyncAttemptAt) < minutes * 60_000) return;
+    lastAutoSyncAttemptAt = currentNow;
     await runSync().catch((error) => zcc.log.warn(`codewink: sync failed: ${errorMessage(error)}`));
   });
 
@@ -404,10 +411,7 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
     return detail;
   });
 
-  zcc.rpc.method('refresh', async () => {
-    lastSyncAt = now();
-    return runSync();
-  });
+  zcc.rpc.method('refresh', () => runSync());
 
   zcc.rpc.method('refreshPullRequest', (args) => refreshPullRequest(parsePrId(asString(asRecord(args), 'prId'))));
 
@@ -486,6 +490,7 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
       const review = store.getReview(reviewId);
       if (!review) throw new Error('Review not found');
       const headSha = await poster.currentHeadSha(review.prId);
+      if (headSha !== review.headSha) throw new StaleReviewError(review.headSha, headSha);
       const token = asString(record, 'approvalToken');
       if (!token || !(await consume({ token, binding: approvalBinding(reviewId, event, headSha) }))) {
         throw new Error('Approval required: confirm in the Zana dialog, and re-review if the pull request changed.');

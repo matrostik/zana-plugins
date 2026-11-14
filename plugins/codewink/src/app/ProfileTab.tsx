@@ -73,7 +73,8 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
     setName(selected?.name ?? '');
   }, [saved, selectedId, selected?.name, creating]);
 
-  const isDirty = creating || draft.trim() !== saved || name.trim() !== (selected?.name ?? '');
+  const editorDisabled = !creating && !selected;
+  const isDirty = creating || (!editorDisabled && (draft.trim() !== saved || name.trim() !== (selected?.name ?? '')));
   const maxChars = config.maxInstructionsChars;
   const isTooLong = draft.length > maxChars;
   const defaultId = config.settings.defaultPromptId;
@@ -132,13 +133,14 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
           <option value="">Built-in prompt only</option>
           {prompts.map((prompt) => <option key={prompt.id} value={prompt.id}>{prompt.name}</option>)}
         </select></label>
-        <label className="cn-field cn-prompt-library-wide"><span>Prompt name</span><input className="cn-input" aria-label="Prompt name" value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <label className="cn-field cn-prompt-library-wide"><span>Prompt name</span><input className="cn-input" aria-label="Prompt name" value={name} disabled={editorDisabled} onChange={(event) => setName(event.target.value)} /></label>
         <label className="cn-field cn-prompt-library-wide"><span>Instructions</span>
         <textarea
           className="cn-textarea cn-instructions"
           aria-label="Custom review instructions"
           aria-describedby="cn-instructions-count"
           value={draft}
+          disabled={editorDisabled}
           onChange={(event) => setDraft(event.target.value)}
         />
         </label>
@@ -152,7 +154,7 @@ function InstructionsSection({ rpc, config, onChanged }: { rpc: Rpc; config: Con
             Save instructions
           </button>
           {!creating && selected ? <button type="button" className="cn-btn" disabled={selected.id === defaultId} title={selected.id === defaultId ? 'Choose another default before deleting' : undefined} onClick={deleteSelected}>Delete prompt</button> : null}
-          <button type="button" className="cn-btn" disabled={draft === config.defaultInstructions} onClick={() => setDraft(config.defaultInstructions)}>
+          <button type="button" className="cn-btn" disabled={editorDisabled || draft === config.defaultInstructions} onClick={() => setDraft(config.defaultInstructions)}>
             Reset to default
           </button>
           <span id="cn-instructions-count" className={isTooLong ? 'cn-small cn-badge-danger' : 'cn-muted cn-small'}>

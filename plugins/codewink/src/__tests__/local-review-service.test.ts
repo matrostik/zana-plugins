@@ -489,6 +489,35 @@ describe('local reviews', () => {
     expect(harness.spawned.at(-1)?.args.permissionMode).toBe('full');
   });
 
+  it('requires confirmation before fixing a staged review when the live checkout differs, and detects separate sibling worktrees', async () => {
+    const harness = createHarness();
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');
+    sh(harness.repo, 'add', 'a.ts');
+    const stagedReview = await harness.start('staged');
+    await harness.settled();
+    writeFileSync(join(harness.repo, 'a.ts'), 'const a = 99;\n');
+
+    const agent = { providerId: 'cursor', model: 'fix-model', permissionMode: 'edit' };
+    const confirm = await harness.local.fix(stagedReview.id, [], false, agent);
+    expect(confirm).toEqual({ needsConfirmation: true, reason: 'The live checkout differs from the reviewed selection.' });
+
+    const forced = await harness.local.fix(stagedReview.id, [], true, agent);
+    expect(forced).toMatchObject({ needsConfirmation: false });
+    expect(String(harness.spawned.at(-1)!.args.prompt)).toContain(`The change is in this thread's working directory (${harness.repo}).`);
+
+    const siblingWorktree = `${harness.repo}-wt`;
+    dirs.push(siblingWorktree);
+    sh(harness.repo, 'worktree', 'add', '-q', '-b', 'sibling-wt', siblingWorktree);
+    writeFileSync(join(siblingWorktree, 'a.ts'), 'const a = 3;\n');
+    const wtReview = await harness.start('uncommitted', { worktreePath: siblingWorktree });
+    await harness.settled();
+    const wtFix = await harness.local.fix(wtReview.id, [], false, agent);
+    expect(wtFix).toMatchObject({ needsConfirmation: false });
+    expect(String(harness.spawned.at(-1)!.args.prompt)).toContain(
+      `Work only inside ${siblingWorktree}. It is a separate git worktree from this thread's directory`
+    );
+  });
+
   it('persists fix runs, ignores initial idle on spawn, handles stop failures safely, reconciles, and deletes with review', async () => {
     const harness = createHarness();
     writeFileSync(join(harness.repo, 'a.ts'), 'const a = 2;\n');

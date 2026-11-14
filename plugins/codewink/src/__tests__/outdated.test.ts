@@ -77,4 +77,35 @@ describe('outdated notifications', () => {
     expect(store.latestReview(pr.id)?.id).toBe(latest.id);
     expect(store.latestReviewsByPr().get(pr.id)?.id).toBe(latest.id);
   });
+
+  it('continues notifying remaining PRs when one PR notification fails', async () => {
+    const db = createSqliteDatabase();
+    const store = createStore(db, () => 100);
+    const pr1 = detail('completed').pr;
+    const pr2 = { ...pr1, id: 'github.com/acme/api#2', number: 2, headSha: 'sha-old-2' };
+    store.upsertPullRequest(pr1);
+    store.upsertPullRequest(pr2);
+    for (const pr of [pr1, pr2]) {
+      const review = store.createReview({ prId: pr.id, headSha: pr.headSha, trigger: 'manual' });
+      store.completeReview(review.id, { summary: 'Done', consensusSummary: null, hasRequirements: false, scores: EMPTY_SCORES });
+      store.upsertPullRequest({ ...pr, headSha: `${pr.headSha}-new` });
+    }
+    const delivered: string[] = [];
+    const warnings: string[] = [];
+    const notify = createOutdatedNotifier({
+      store,
+      projectForPr: async (pr) => (pr.number === 1 ? Promise.reject(new Error('lookup failed')) : 'project'),
+      push: async ({ comments }) => {
+        delivered.push(comments);
+        return { id: String(delivered.length) };
+      },
+      warn: (message) => warnings.push(message)
+    });
+
+    await notify();
+
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]).toContain('#2');
+    expect(warnings).toEqual([expect.stringContaining('lookup failed')]);
+  });
 });

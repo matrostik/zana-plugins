@@ -295,7 +295,7 @@ function renderFiles(files: ChangedFile[]): string {
   return files
     .map((file) => {
       const patch = escapeFences(annotateDiffWithLineNumbers(file.patch ?? ''));
-      return `File: ${escapeFences(file.path)}\nStatus: ${file.status}\nChanges: +${file.additions} -${file.deletions}\n\nDiff:\n\`\`\`diff\n${patch}\n\`\`\`\n`;
+      return `File: ${sanitizeUntrusted(file.path, 300)}\nStatus: ${file.status}\nChanges: +${file.additions} -${file.deletions}\n\nDiff:\n\`\`\`diff\n${patch}\n\`\`\`\n`;
     })
     .join('\n---\n');
 }
@@ -574,7 +574,7 @@ Confirm HEAD is ${input.headSha.slice(0, 12)}.`
     : input.findings.slice(0, 40);
 
   const findingLines = findingsList
-    .map((finding) => `- [${finding.severity}] ${finding.category} ${finding.file}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
+    .map((finding) => `- [${finding.severity}] ${finding.category} ${sanitizeUntrusted(finding.file, 200)}${finding.line ? `:${finding.line}` : ''} — ${sanitizeUntrusted(finding.description, 400)}`)
     .join('\n');
   const findingHeader = input.focusOnFindings
     ? `Focus on the following ${findingsList.length} selected finding(s). Verify each against the code:`

@@ -113,6 +113,7 @@ export interface ReviewTarget {
   /** Gathers context and resolves the workspace. Returns null when the review was cancelled or superseded. */
   prepare(review: ReviewRow, config: ReviewConfig, signal: AbortSignal): Promise<PreparedReview | null>;
   afterComplete(): Promise<void>;
+  onCleanup?(): void;
 }
 
 async function cleanupExistingCoordinators(deps: ReviewServiceDeps, prId: string): Promise<void> {
@@ -302,7 +303,7 @@ async function executeReviewModels(
     runs.map(async ({ model, run }, index): Promise<ReviewModelOutcome | null> => {
       deps.store.updateRun(run.id, { status: 'running' });
       const environment: SpawnEnvironment | undefined = workspace.environment?.kind === 'worktree'
-        ? { ...workspace.environment, branchSlug: `${workspace.environment.branchSlug}-${run.id.slice(0, 6)}-${index}` }
+        ? { ...workspace.environment, branchSlug: `${workspace.environment.branchSlug ?? 'codewink-review'}-${run.id.slice(0, 6)}-${index}` }
         : workspace.environment;
       try {
         const permissionMode = pickReviewPermissionMode(await deps.providerPermissionModes(model.providerId).catch(() => undefined));
@@ -340,11 +341,19 @@ async function executeReviewModels(
   );
 }
 
-function recordFindings(deps: ReviewServiceDeps, reviewId: string, succeeded: ReviewModelOutcome[]): ReturnType<typeof clusterIssues> {
+function markCancelled(deps: ReviewServiceDeps, reviewId: string, coordinatorThreadId: string | null): void {
+  deps.store.setReviewStatus(reviewId, 'cancelled', 'Cancelled');
+  queueCoordinatorNotification(deps, coordinatorThreadId, 'Review was cancelled.');
+}
+
+function clusterReviewIssues(succeeded: ReviewModelOutcome[]): ReturnType<typeof clusterIssues> {
   const tagged: TaggedIssue[] = succeeded.flatMap(({ model, analysis }) =>
     analysis.issues.map((issue, index) => ({ ...issue, id: `${modelLabel(model)}:${index}`, model: modelLabel(model) }))
   );
-  const clusters = clusterIssues(tagged, succeeded.length);
+  return clusterIssues(tagged, succeeded.length);
+}
+
+function saveFindings(deps: ReviewServiceDeps, reviewId: string, clusters: ReturnType<typeof clusterIssues>): void {
   deps.store.replaceFindings(
     reviewId,
     clusters.map((cluster) => ({
@@ -358,7 +367,6 @@ function recordFindings(deps: ReviewServiceDeps, reviewId: string, succeeded: Re
       confidence: cluster.confidence
     }))
   );
-  return clusters;
 }
 
 async function buildConsensusSummary(
@@ -401,6 +409,40 @@ async function sendReviewNotification(
     ...(subject.url ? [subject.url] : [])
   ].join('\n');
   await deps.notify({ projectId, text }).catch((error) => deps.log.warn(`codewink: inbox push failed: ${errorMessage(error)}`));
+}
+
+interface FinalizeReviewContext {
+  target: ReviewTarget;
+  subject: ReviewSubject;
+  review: ReviewRow;
+  prepared: PreparedReview;
+  models: ModelChoice[];
+  succeeded: ReviewModelOutcome[];
+  coordinatorThreadId: string | null;
+  signal: AbortSignal;
+}
+
+async function finalizeReview(deps: ReviewServiceDeps, context: FinalizeReviewContext): Promise<void> {
+  const { target, subject, review, prepared, models, succeeded, coordinatorThreadId, signal } = context;
+  const clusters = clusterReviewIssues(succeeded);
+  const consensusSummary = await buildConsensusSummary(deps, clusters, succeeded);
+  if (signal.aborted) {
+    markCancelled(deps, review.id, coordinatorThreadId);
+    return;
+  }
+  saveFindings(deps, review.id, clusters);
+  deps.store.completeReview(review.id, {
+    summary: succeeded[0].analysis.summary,
+    consensusSummary,
+    hasRequirements: prepared.hasRequirements,
+    scores: aggregateScores(succeeded.map(({ analysis }) => analysis))
+  });
+  if (coordinatorThreadId) {
+    const completionText = formatCoordinatorCompletionMessage(subject, deps.store.getReview(review.id)!, succeeded, clusters);
+    queueCoordinatorNotification(deps, coordinatorThreadId, completionText);
+  }
+  await target.afterComplete();
+  if (!target.quiet) await sendReviewNotification(deps, subject, review.id, prepared.workspace.projectId, succeeded, clusters, models.length);
 }
 
 export function createReviewService(deps: ReviewServiceDeps) {
@@ -468,53 +510,55 @@ export function createReviewService(deps: ReviewServiceDeps) {
     return pullRequestTarget(pr, item);
   }
 
+  function cleanupTarget(reviewId: string, item: QueuedReview): void {
+    try {
+      const review = deps.store.getReview(reviewId);
+      if (review) targetFor(review, item).onCleanup?.();
+    } catch (error) {
+      deps.log.warn(`codewink: cleanup for review ${reviewId} failed: ${errorMessage(error)}`);
+    }
+  }
+
   async function runReview(item: QueuedReview, signal: AbortSignal): Promise<void> {
     const review = deps.store.getReview(item.reviewId);
     if (!review) return;
     const target = targetFor(review, item);
-    const { subject } = target;
-    deps.store.setReviewStatus(review.id, 'running');
-    changed({ prId: subject.id, reviewId: review.id });
-
     let coordinatorThreadId: string | null = null;
-    const config = await deps.config();
-    const prepared = await target.prepare(review, config, signal);
-    if (!prepared) return;
-    if (config.showReviewsOnAgentsBoard && !target.quiet) {
-      coordinatorThreadId = await setupCoordinator(deps, subject, review, prepared.workspace.projectId, item.models, changed);
+    try {
+      const { subject } = target;
+      deps.store.setReviewStatus(review.id, 'running');
+      changed({ prId: subject.id, reviewId: review.id });
+
+      const config = await deps.config();
+      const prepared = await target.prepare(review, config, signal);
+      if (!prepared) return;
+      if (config.showReviewsOnAgentsBoard && !target.quiet) {
+        coordinatorThreadId = await setupCoordinator(deps, subject, review, prepared.workspace.projectId, item.models, changed);
+        if (signal.aborted) {
+          markCancelled(deps, review.id, coordinatorThreadId);
+          return;
+        }
+      }
+      const outcomes = await executeReviewModels(deps, subject, review, item.models, prepared, config, signal, changed);
+      if (signal.aborted) {
+        markCancelled(deps, review.id, coordinatorThreadId);
+        return;
+      }
+      const succeeded = outcomes.filter((outcome): outcome is ReviewModelOutcome => outcome !== null);
+      if (succeeded.length === 0) {
+        const errors = deps.store.listRuns(review.id).map((run) => run.error).filter(Boolean);
+        deps.store.setReviewStatus(review.id, 'failed', errors[0] ?? 'Every model failed');
+        queueCoordinatorNotification(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
+        return;
+      }
+      await finalizeReview(deps, { target, subject, review, prepared, models: item.models, succeeded, coordinatorThreadId, signal });
+    } finally {
+      target.onCleanup?.();
     }
+  }
 
-    const outcomes = await executeReviewModels(deps, subject, review, item.models, prepared, config, signal, changed);
-
-    if (signal.aborted) {
-      deps.store.setReviewStatus(review.id, 'cancelled', 'Cancelled');
-      queueCoordinatorNotification(deps, coordinatorThreadId, 'Review was cancelled.');
-      return;
-    }
-    const succeeded = outcomes.filter((outcome): outcome is ReviewModelOutcome => outcome !== null);
-    if (succeeded.length === 0) {
-      const errors = deps.store.listRuns(review.id).map((run) => run.error).filter(Boolean);
-      deps.store.setReviewStatus(review.id, 'failed', errors[0] ?? 'Every model failed');
-      queueCoordinatorNotification(deps, coordinatorThreadId, `Code review failed. Errors:\n${errors.join('\n')}`);
-      return;
-    }
-
-    const clusters = recordFindings(deps, review.id, succeeded);
-    const consensusSummary = await buildConsensusSummary(deps, clusters, succeeded);
-    deps.store.completeReview(review.id, {
-      summary: succeeded[0].analysis.summary,
-      consensusSummary,
-      hasRequirements: prepared.hasRequirements,
-      scores: aggregateScores(succeeded.map(({ analysis }) => analysis))
-    });
-
-    if (coordinatorThreadId) {
-      const completionText = formatCoordinatorCompletionMessage(subject, deps.store.getReview(review.id)!, succeeded, clusters);
-      queueCoordinatorNotification(deps, coordinatorThreadId, completionText);
-    }
-
-    await target.afterComplete();
-    if (!target.quiet) await sendReviewNotification(deps, subject, review.id, prepared.workspace.projectId, succeeded, clusters, item.models.length);
+  function kickPump(): void {
+    void pump().catch((error) => deps.log.warn(`codewink: review queue failed: ${errorMessage(error)}`));
   }
 
   async function pump(): Promise<void> {
@@ -536,7 +580,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
           active.delete(item.reviewId);
           const review = deps.store.getReview(item.reviewId);
           changed({ prId: review?.prId, reviewId: item.reviewId, status: review?.status });
-          void pump();
+          kickPump();
         });
     }
   }
@@ -553,7 +597,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
   function enqueueReview(review: ReviewRow, models: ModelChoice[]): void {
     queue.push({ reviewId: review.id, models, trigger: review.trigger });
     changed({ prId: review.prId, reviewId: review.id });
-    void pump();
+    kickPump();
   }
 
   /** Refreshes the PR from GitHub, records a queued review for its head commit, and schedules it. */
@@ -581,7 +625,8 @@ export function createReviewService(deps: ReviewServiceDeps) {
     cancelReview(reviewId: string): boolean {
       const queuedIndex = queue.findIndex((item) => item.reviewId === reviewId);
       if (queuedIndex !== -1) {
-        queue.splice(queuedIndex, 1);
+        const [item] = queue.splice(queuedIndex, 1);
+        cleanupTarget(reviewId, item);
         deps.store.setReviewStatus(reviewId, 'cancelled', 'Cancelled');
         changed({ reviewId });
         return true;
@@ -596,7 +641,7 @@ export function createReviewService(deps: ReviewServiceDeps) {
 
     async dispose(): Promise<void> {
       for (const controller of active.values()) controller.abort();
-      queue.length = 0;
+      for (const item of queue.splice(0)) cleanupTarget(item.reviewId, item);
     }
   };
 }

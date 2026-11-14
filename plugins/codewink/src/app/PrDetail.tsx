@@ -49,6 +49,7 @@ function DiffView({ rpc, prId }: { rpc: Rpc; prId: string }) {
   useEffect(() => {
     let cancelled = false;
     setFiles(null);
+    setError(null);
     rpc
       .call('diff', { prId })
       .then((value) => !cancelled && setFiles(value as ChangedFile[]))
@@ -139,6 +140,8 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const [findingSelectionCustomized, setFindingSelectionCustomized] = useState(false);
   const initializedReviewId = useRef<string | null>(null);
   const prevFindingsPosted = useRef<Map<string, number | null>>(new Map());
+  const currentPrIdRef = useRef(prId);
+  currentPrIdRef.current = prId;
 
   const navigate: ReturnType<typeof useZccNavigate> | undefined = useZccNavigate() ?? undefined;
 
@@ -177,8 +180,11 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   useEffect(() => {
     setDetail(null);
+    setBusy(null);
     setNotice(null);
     setPickerOpen(false);
+    setEvent('COMMENT');
+    setMessage('');
     initializedReviewId.current = null;
     prevFindingsPosted.current = new Map();
     load();
@@ -186,7 +192,7 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   useEffect(() => {
     let cancelled = false;
     void rpc.call('refreshPullRequest', { prId })
-      .then(() => { if (!cancelled) load(); })
+      .then(() => { if (!cancelled) load(); } )
       .catch((cause) => { if (!cancelled) setNotice({ kind: 'error', text: `Could not check for new commits: ${errorText(cause)}` }); });
     return () => { cancelled = true; };
   }, [rpc, prId, load]);
@@ -204,14 +210,15 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
   const now = useNow(isActive(detail?.review?.status) || (detail?.runs.some((run) => isActive(run.status)) ?? false));
 
   const act = async (label: string, fn: () => Promise<void>) => {
+    const startedPrId = currentPrIdRef.current;
     setBusy(label);
     setNotice(null);
     try {
       await fn();
     } catch (cause) {
-      setNotice({ kind: 'error', text: errorText(cause) });
+      if (currentPrIdRef.current === startedPrId) setNotice({ kind: 'error', text: errorText(cause) });
     } finally {
-      setBusy(null);
+      if (currentPrIdRef.current === startedPrId) setBusy(null);
     }
   };
 
@@ -234,8 +241,10 @@ export function PrDetail(props: { rpc: Rpc; pluginId: string; prId: string; defa
 
   const startReview = (models?: ModelChoice[], rerun = false) =>
     act('review', async () => {
+      const startedPrId = pr.id;
       setPickerOpen(false);
-      const accepted = await rpc.call('startReview', { prId: pr.id, ...(models ? { models } : {}), ...(rerun && review?.promptSnapshot ? { rerunReviewId: review.id } : promptId !== undefined ? { promptId } : {}) }) as ReviewRow;
+      const accepted = await rpc.call('startReview', { prId: startedPrId, ...(models ? { models } : {}), ...(rerun && review?.promptSnapshot ? { rerunReviewId: review.id } : promptId !== undefined ? { promptId } : {}) }) as ReviewRow;
+      if (currentPrIdRef.current !== startedPrId) return;
       ++requestSeq.current;
       setDetail((current) => current && accepted?.id ? { ...current, review: { ...accepted, stale: accepted.headSha !== current.pr.headSha }, runs: [], findings: [], posted: [], latestAttempt: undefined } : current);
       setSelectedFindingIds(new Set());

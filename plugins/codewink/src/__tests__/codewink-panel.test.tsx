@@ -72,6 +72,22 @@ describe('CodewinkPanel', () => {
     expect(sdk.call.mock.calls.filter(([method]) => method === 'refresh')).toHaveLength(1);
   });
 
+  it('skips redundant focus sync in local mode and when autoSyncEnabled is false', async () => {
+    answer({ overview: overview({ autoSyncEnabled: false, models: [] }), localTargets: { locations: [], scopes: ['uncommitted'], hasModels: true }, refresh: null });
+    render(<CodewinkPanel pluginId="codewink" />);
+    await screen.findByText('Select a pull request to see its review.');
+    fireEvent.focus(window);
+    expect(sdk.call.mock.calls.filter(([method]) => method === 'refresh')).toHaveLength(0);
+
+    cleanup();
+    localStorage.setItem('codewink.mode', 'local');
+    answer({ overview: overview({ autoSyncEnabled: true, models: [] }), localTargets: { locations: [], scopes: ['uncommitted'], hasModels: true }, refresh: null });
+    render(<CodewinkPanel pluginId="codewink" />);
+    await screen.findByText('Select a checkout to review its local changes.');
+    fireEvent.focus(window);
+    expect(sdk.call.mock.calls.filter(([method]) => method === 'refresh')).toHaveLength(0);
+  });
+
   it('skips redundant config calls when overview includes models and renders activeFixes badge', async () => {
     const models = [{ providerId: 'codex', model: 'gpt-5' }];
     answer({
@@ -179,6 +195,27 @@ describe('CodewinkPanel', () => {
 
 describe('CodewinkPanel in a project tab', () => {
   const repo = (owner: string, watched: boolean) => ({ id: `github.com/${owner}/api`, host: 'github.com', owner, name: 'api', watched });
+
+  it('ignores stale overview responses after switching projects', async () => {
+    let resolveP1!: (value: Overview) => void;
+    const p1Promise = new Promise<Overview>((resolve) => { resolveP1 = resolve; });
+    sdk.call.mockImplementation(async (method: string, args?: { projectId?: string }) => {
+      if (method === 'overview') {
+        if (args?.projectId === 'p1') return p1Promise;
+        return overview({ prs: [{ ...PR, id: 'github.com/acme/api#2', number: 2, title: 'Project 2 PR', review: null }], projectRepos: [repo('acme', true)] });
+      }
+      if (method === 'localTargets') return { locations: [], scopes: [], hasModels: true };
+      return null;
+    });
+
+    const { rerender } = render(<CodewinkPanel pluginId="codewink" projectId="p1" />);
+    rerender(<CodewinkPanel pluginId="codewink" projectId="p2" />);
+    expect(await screen.findByRole('button', { name: /Project 2 PR/ })).toBeTruthy();
+
+    resolveP1(overview({ prs: [{ ...PR, title: 'Stale P1 PR', review: null }], projectRepos: [repo('acme', true)] }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Project 2 PR/ })).toBeTruthy());
+    expect(screen.queryByRole('button', { name: /Stale P1 PR/ })).toBeNull();
+  });
 
   it('asks for the project overview and offers to watch each unwatched repository', async () => {
     answer({ overview: overview({ prs: [], hasWatchedRepos: false, projectRepos: [repo('acme', false), repo('me', true)] }), config: { models: [] }, addRepo: null, refresh: null });

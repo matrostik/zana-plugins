@@ -154,19 +154,26 @@ export function settingsFromHostValues(values: HostSettingValues): CodewinkSetti
 
 export function createSettingsStore(deps: { kv: KvLike; readHostValues: () => Promise<HostSettingValues> }) {
   let cached: CodewinkSettings | null = null;
+  let loading: Promise<CodewinkSettings> | null = null;
   let writeChain: Promise<void> = Promise.resolve();
 
   async function load(): Promise<CodewinkSettings> {
     if (cached) return cached;
-    const stored = await deps.kv.get(SETTINGS_KEY);
-    if (stored && (await deps.kv.get(SETTINGS_MIGRATED_KEY))) {
-      cached = applySettingsPatch(DEFAULT_SETTINGS, stored);
+    if (loading) return loading;
+    loading = (async () => {
+      const stored = await deps.kv.get(SETTINGS_KEY);
+      if (stored && (await deps.kv.get(SETTINGS_MIGRATED_KEY))) {
+        cached = applySettingsPatch(DEFAULT_SETTINGS, stored);
+        return cached;
+      }
+      cached = settingsFromHostValues(await deps.readHostValues());
+      await deps.kv.set(SETTINGS_KEY, cached);
+      await deps.kv.set(SETTINGS_MIGRATED_KEY, true);
       return cached;
-    }
-    cached = settingsFromHostValues(await deps.readHostValues());
-    await deps.kv.set(SETTINGS_KEY, cached);
-    await deps.kv.set(SETTINGS_MIGRATED_KEY, true);
-    return cached;
+    })().finally(() => {
+      loading = null;
+    });
+    return loading;
   }
 
   return {
