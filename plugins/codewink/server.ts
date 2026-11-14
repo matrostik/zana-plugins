@@ -232,7 +232,7 @@ export default async function createCodewinkPlugin(zcc: ZccPluginApi, deps: Code
       await reviews.startReview(parsePrId(pr.id), { trigger: 'auto' }).catch((error) => zcc.log.warn(`codewink: auto-review of ${pr.id} failed: ${errorMessage(error)}`));
       pendingAutoReviewPrIds.delete(id);
     }
-    if (result.hosts.length === 0 || result.hosts.some((host) => host.syncedAt !== null || !host.error)) {
+    if (result.hosts.length === 0 || result.hosts.some((host) => (host.syncedAt !== null && host.syncedAt > lastSyncAt) || !host.error)) {
       const syncedAt = now();
       lastSyncAt = syncedAt;
       await zcc.storage.kv.set('lastSyncAt', syncedAt);
