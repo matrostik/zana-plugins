@@ -1,0 +1,81 @@
+import type { TimeRangeBounds } from '../shared/types.ts';
+
+export { formatUsd, formatTokens } from '../shared/format.ts';
+
+export function formatRelativeTime(timestampMs: number | null | undefined, nowMs: number = Date.now()): string {
+  if (!timestampMs) return 'never';
+  const diffSec = Math.max(0, Math.floor((nowMs - timestampMs) / 1000));
+  if (diffSec < 10) return 'just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
+
+export function formatCountdown(isoOrMs: string | number | null | undefined, nowMs: number = Date.now()): string {
+  if (!isoOrMs) return 'No reset time reported';
+  const targetMs = typeof isoOrMs === 'number' ? isoOrMs : Date.parse(isoOrMs);
+  if (!Number.isFinite(targetMs)) return String(isoOrMs);
+  const diffMs = targetMs - nowMs;
+  if (diffMs <= 0) return 'Resetting shortly';
+  const mins = Math.floor(diffMs / 60_000);
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hrs >= 24) {
+    const days = Math.floor(hrs / 24);
+    return `Resets in ${days}d ${hrs % 24}h`;
+  }
+  if (hrs > 0) return `Resets in ${hrs}h ${remMins}m`;
+  return `Resets in ${Math.max(1, remMins)}m`;
+}
+
+export function formatShortLocalDateTime(msOrIso: string | number): string {
+  const dt = new Date(msOrIso);
+  if (Number.isNaN(dt.getTime())) return String(msOrIso);
+  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+    ' ' +
+    dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+export function formatRangeBoundarySummary(bounds: TimeRangeBounds | undefined): string | null {
+  if (!bounds) return null;
+  if (bounds.range === 'all') return `Local TZ (${bounds.timezone}) · All indexed history`;
+  const startText = formatShortLocalDateTime(bounds.startMs);
+  const endText = bounds.endMs !== null ? formatShortLocalDateTime(bounds.endMs) : 'Now';
+  return `Local TZ (${bounds.timezone}) · ${startText} → ${endText}`;
+}
+
+export function providerBadgeCode(providerId: string): string {
+  const lower = providerId.toLowerCase();
+  const clean = providerId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (lower.includes('claude')) return 'CC';
+  if (lower.includes('codex') || lower.includes('openai')) return 'OX';
+  if (lower.includes('cursor')) return 'CU';
+  if (lower.includes('antigravity') || lower.includes('gemini')) return 'AG';
+  if (lower.includes('opencode')) return 'OC';
+  if (lower.includes('openrouter')) return 'OR';
+  return (clean.slice(0, 2) || 'AI').padEnd(2, '·');
+}
+
+const PROVIDER_COLOR_MAP: Record<string, string> = {
+  'claude-code': '#6366f1',
+  'anthropic-api': '#6366f1',
+  codex: '#10b981',
+  'openai-api': '#10b981',
+  cursor: '#06b6d4',
+  antigravity: '#8b5cf6',
+  openrouter: '#f59e0b',
+  opencode: '#06b6d4',
+  local: '#64748b'
+};
+
+export function providerColor(providerId: string): string {
+  const key = providerId.toLowerCase();
+  if (PROVIDER_COLOR_MAP[key]) return PROVIDER_COLOR_MAP[key];
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  const palette = ['#6366f1', '#10b981', '#06b6d4', '#8b5cf6', '#f59e0b', '#ec4899'];
+  return palette[Math.abs(hash) % palette.length];
+}

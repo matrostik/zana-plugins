@@ -1,0 +1,3 @@
+# Model identifiers in the original pricing tests; verified false positives, not credentials.
+1a4ae0bd29ff45b6353433a1b999fa4001be4e29:plugins/ai-usage-monitor/src/__tests__/pricing.test.ts:generic-api-key:29
+1a4ae0bd29ff45b6353433a1b999fa4001be4e29:plugins/ai-usage-monitor/src/__tests__/pricing.test.ts:generic-api-key:45

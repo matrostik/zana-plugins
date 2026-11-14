@@ -20,6 +20,28 @@ const NATIVE_STEPS: NativeSetupState[] = [
   'session_ready'
 ];
 
+function ReloadSpinner({ label, spinning = true }: { label?: string; spinning?: boolean }) {
+  return (
+    <svg
+      className={spinning ? 'agy-spinner' : undefined}
+      width="12"
+      height="12"
+      style={{ width: 12, height: 12, flexShrink: 0, display: 'inline-block' }}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      aria-hidden={label ? undefined : true}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+    >
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
+      <path d="M13.5 2.5v2.75H10.75" />
+    </svg>
+  );
+}
+
 function useRuntimeActions(
   rpc: ReturnType<typeof useRpc>,
   setStatus: (s: DoctorStatusResult) => void,
@@ -286,8 +308,10 @@ function SubscriptionUsage({ status }: { status: DoctorStatusResult | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestVersion = useRef(0);
+  const lastOkRef = useRef<NativeUsageResult | null>(null);
   useEffect(() => {
     requestVersion.current++;
+    lastOkRef.current = null;
     setResult(null); setError(null); setBusy(false);
     return () => { requestVersion.current++; };
   }, [status?.authMethod, status?.configuredAuthType, status?.executable, status?.authenticated, status?.credentialId]);
@@ -297,17 +321,45 @@ function SubscriptionUsage({ status }: { status: DoctorStatusResult | null }) {
     setError(null);
     try {
       const next = await rpc.call('usage:status') as NativeUsageResult;
-      if (version === requestVersion.current) setResult(next);
+      if (version !== requestVersion.current) return;
+      if (next.usage.status === 'ok') {
+        lastOkRef.current = next;
+        setResult(next);
+        setError(null);
+      } else if (next.usage.status === 'unauthenticated' || next.usage.status === 'not_installed') {
+        lastOkRef.current = null;
+        setResult(next);
+        setError(null);
+      } else if (lastOkRef.current) {
+        setResult(lastOkRef.current);
+        setError(next.usage.message || 'Usage is unavailable. Verify your Google sign-in and try again.');
+      } else {
+        setResult(next);
+      }
     }
     catch (err: any) { if (version === requestVersion.current) setError(err?.message || 'Could not check subscription usage.'); }
     finally { if (version === requestVersion.current) setBusy(false); }
   };
   return (
     <div className="agy-usage-card">
-      <h4>Subscription usage</h4>
+      <div className="agy-usage-header">
+        <h4>Subscription usage</h4>
+        {busy && (
+          <span
+            className="agy-refresh-badge"
+            role="status"
+            aria-label="Refreshing subscription usage"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+          >
+            <ReloadSpinner />
+            <span>Refreshing...</span>
+          </span>
+        )}
+      </div>
       <p className="agy-desc">Plan: {status?.tierName || 'not yet verified'}</p>
-      <button type="button" className="agy-btn" onClick={checkUsage} disabled={busy || !status?.authenticated}>
-        {busy ? 'Checking usage...' : 'Check subscription usage'}
+      <button type="button" className="agy-btn agy-btn-with-icon" onClick={checkUsage} disabled={busy || !status?.authenticated}>
+        {busy && <ReloadSpinner />}
+        <span>{busy ? 'Checking usage...' : result?.usage.status === 'ok' ? 'Refresh subscription usage' : 'Check subscription usage'}</span>
       </button>
       {error && <p role="status" className="agy-desc agy-desc-error">{error}</p>}
       {result?.usage.status === 'ok' && <>
@@ -469,54 +521,67 @@ export default definePluginApp((app) => {
   });
 });
 
+const PROVIDER_ANTIGRAVITY_STYLES = `
+  .agy-account-panel { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; overflow: auto; }
+  .agy-account-panel h2 { font-size: 16px; margin: 0; }
+  .agy-account-panel .agy-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .agy-settings-panel { display: flex; flex-direction: column; gap: 16px; max-width: 680px; }
+  .agy-status-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-default, #2a2a2a); background: var(--bg-surface, #141414); }
+  .agy-status-header { display: flex; flex-direction: column; gap: 10px; }
+  .agy-status-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .agy-status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .agy-status-indicator.ready { background: var(--success, #22c55e); }
+  .agy-status-indicator.warning { background: var(--warning, #eab308); }
+  .agy-status-indicator.checking { background: var(--accent, #3b82f6); animation: agy-pulse 1s infinite alternate; }
+  .agy-status-label { font-weight: 600; font-size: 14px; }
+  .agy-version-tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--bg-subtle, #222); color: var(--fg-muted, #888); }
+  .agy-backend-badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-weight: 500; }
+  .agy-state-pill { font-size: 11px; padding: 1px 7px; border-radius: 4px; font-weight: 500; }
+  .agy-state-pill.state-session_ready { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+  .agy-state-pill.state-authenticated { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+  .agy-state-pill.state-sign_in_required { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+  .agy-state-pill.state-runtime_launches { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+  .agy-state-pill.state-runtime_missing { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+  .agy-actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .agy-btn { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border-default, #333); background: var(--bg-subtle, #1f1f1f); color: var(--fg-default, #eee); cursor: pointer; }
+  .agy-btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
+  .agy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .agy-btn-primary { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: #fff; }
+  .agy-spinner { width: 12px; height: 12px; display: inline-block; flex-shrink: 0; animation: agy-spin 0.85s linear infinite; }
+  .agy-refresh-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+  .agy-readiness-steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+  .agy-readiness-step { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--bg-subtle, #1a1a1a); color: var(--fg-muted, #666); border: 1px solid transparent; }
+  .agy-readiness-step.passed { color: var(--fg-muted, #888); border-color: var(--border-subtle, #2a2a2a); }
+  .agy-readiness-step.active { color: #fff; background: var(--border-default, #333); font-weight: 600; border-color: var(--accent, #3b82f6); }
+  .agy-desc { font-size: 12px; color: var(--fg-muted, #999); margin: 0; line-height: 1.5; }
+  .agy-desc-error { color: var(--error, #f87171); }
+  .agy-desc-note { color: var(--accent, #60a5fa); font-size: 11px; }
+  .agy-command-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 6px; background: var(--bg-input, #0d0d0d); border: 1px solid var(--border-subtle, #222); font-family: monospace; font-size: 11px; margin-top: 6px; }
+  .agy-command-text { word-break: break-all; }
+  .agy-models-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .agy-usage-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px solid var(--border-subtle, #333); border-radius: 6px; margin: 12px 0; }
+  .agy-usage-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+  .agy-usage-card h4 { margin: 0; }
+  .agy-usage-list { padding-left: 20px; font-size: 12px; line-height: 1.7; margin: 0; }
+  .agy-steps-card { padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-subtle, #222); background: var(--bg-card, #111); }
+  .agy-steps-title { font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: var(--fg-default, #ddd); }
+  .agy-steps-list { margin: 0; padding-left: 18px; font-size: 12px; color: var(--fg-muted, #888); line-height: 1.6; }
+  @keyframes agy-pulse { 0% { opacity: 0.4; } 100% { opacity: 1; } }
+  @keyframes agy-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+`;
+
 function ensureStyles() {
   if (typeof document === 'undefined') return;
   const id = 'antigravity-provider-styles';
-  if (document.getElementById(id)) return;
+  const existing = document.getElementById(id);
+  if (existing) {
+    if (existing.textContent !== PROVIDER_ANTIGRAVITY_STYLES) {
+      existing.textContent = PROVIDER_ANTIGRAVITY_STYLES;
+    }
+    return;
+  }
   const style = document.createElement('style');
   style.id = id;
-  style.textContent = `
-    .agy-account-panel { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; overflow: auto; }
-    .agy-account-panel h2 { font-size: 16px; margin: 0; }
-    .agy-account-panel .agy-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .agy-settings-panel { display: flex; flex-direction: column; gap: 16px; max-width: 680px; }
-    .agy-status-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-default, #2a2a2a); background: var(--bg-surface, #141414); }
-    .agy-status-header { display: flex; flex-direction: column; gap: 10px; }
-    .agy-status-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .agy-status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .agy-status-indicator.ready { background: var(--success, #22c55e); }
-    .agy-status-indicator.warning { background: var(--warning, #eab308); }
-    .agy-status-indicator.checking { background: var(--accent, #3b82f6); animation: agy-pulse 1s infinite alternate; }
-    .agy-status-label { font-weight: 600; font-size: 14px; }
-    .agy-version-tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--bg-subtle, #222); color: var(--fg-muted, #888); }
-    .agy-backend-badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-weight: 500; }
-    .agy-state-pill { font-size: 11px; padding: 1px 7px; border-radius: 4px; font-weight: 500; }
-    .agy-state-pill.state-session_ready { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-    .agy-state-pill.state-authenticated { background: rgba(234, 179, 8, 0.15); color: #facc15; }
-    .agy-state-pill.state-sign_in_required { background: rgba(234, 179, 8, 0.15); color: #facc15; }
-    .agy-state-pill.state-runtime_launches { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-    .agy-state-pill.state-runtime_missing { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .agy-actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-    .agy-btn { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border-default, #333); background: var(--bg-subtle, #1f1f1f); color: var(--fg-default, #eee); cursor: pointer; }
-    .agy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .agy-btn-primary { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: #fff; }
-    .agy-readiness-steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
-    .agy-readiness-step { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--bg-subtle, #1a1a1a); color: var(--fg-muted, #666); border: 1px solid transparent; }
-    .agy-readiness-step.passed { color: var(--fg-muted, #888); border-color: var(--border-subtle, #2a2a2a); }
-    .agy-readiness-step.active { color: #fff; background: var(--border-default, #333); font-weight: 600; border-color: var(--accent, #3b82f6); }
-    .agy-desc { font-size: 12px; color: var(--fg-muted, #999); margin: 0; line-height: 1.5; }
-    .agy-desc-error { color: var(--error, #f87171); }
-    .agy-desc-note { color: var(--accent, #60a5fa); font-size: 11px; }
-    .agy-command-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 6px; background: var(--bg-input, #0d0d0d); border: 1px solid var(--border-subtle, #222); font-family: monospace; font-size: 11px; margin-top: 6px; }
-    .agy-command-text { word-break: break-all; }
-    .agy-models-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-    .agy-usage-card { padding: 12px; border: 1px solid var(--border-subtle, #333); border-radius: 6px; margin: 12px 0; }
-    .agy-usage-card h4 { margin: 0 0 8px; }
-    .agy-usage-list { padding-left: 20px; font-size: 12px; line-height: 1.7; }
-    .agy-steps-card { padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-subtle, #222); background: var(--bg-card, #111); }
-    .agy-steps-title { font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: var(--fg-default, #ddd); }
-    .agy-steps-list { margin: 0; padding-left: 18px; font-size: 12px; color: var(--fg-muted, #888); line-height: 1.6; }
-    @keyframes agy-pulse { 0% { opacity: 0.4; } 100% { opacity: 1; } }
-  `;
+  style.textContent = PROVIDER_ANTIGRAVITY_STYLES;
   document.head.appendChild(style);
 }
