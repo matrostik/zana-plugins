@@ -7,14 +7,30 @@ const FIELDS = [
   'tone',
   'customPrompt',
   'dictionary',
-  'inputLanguage'
+  'inputLanguage',
+  'micDeviceId',
+  'micLabel',
+  'soundCuesEnabled',
+  'soundCuesVolume'
 ] as const;
 type Values = Record<string, unknown>;
 type Store = { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> };
 
 function preferences(value: unknown): Values {
   const source = value && typeof value === 'object' ? value as Values : {};
-  return Object.fromEntries(FIELDS.filter((field) => typeof source[field] === 'string').map((field) => [field, source[field]]));
+  const entries: Array<[string, string]> = [];
+  for (const field of FIELDS) {
+    const raw = source[field];
+    if (typeof raw === 'string') {
+      entries.push([field, raw]);
+    } else if (
+      (field === 'soundCuesEnabled' && typeof raw === 'boolean') ||
+      (field === 'soundCuesVolume' && typeof raw === 'number' && Number.isFinite(raw))
+    ) {
+      entries.push([field, String(raw)]);
+    }
+  }
+  return Object.fromEntries(entries);
 }
 
 export function createSettingsStore(kv: Store, readHost: () => Promise<Values>) {

@@ -24,6 +24,24 @@ describe('normalizeSettings', () => {
     expect(settings.tone).toBe('conversational');
   });
 
+  it('normalizes mic selection, sound cue toggle, and chime volume with defaults', () => {
+    const defaults = normalizeSettings({});
+    expect(defaults.micDeviceId).toBe('default');
+    expect(defaults.soundCuesEnabled).toBe(true);
+    expect(defaults.soundCuesVolume).toBe(75);
+
+    const custom = normalizeSettings({
+      micDeviceId: 'usb-yeti',
+      micLabel: 'Blue Yeti',
+      soundCuesEnabled: 'false',
+      soundCuesVolume: '125'
+    });
+    expect(custom.micDeviceId).toBe('usb-yeti');
+    expect(custom.micLabel).toBe('Blue Yeti');
+    expect(custom.soundCuesEnabled).toBe(false);
+    expect(custom.soundCuesVolume).toBe(100);
+  });
+
   it('trims keys and model names', () => {
     const settings = normalizeSettings({ openaiApiKey: '  sk-test  ', llmModel: ' gpt-5.4-nano ' });
     expect(settings.keys.openai).toBe('sk-test');

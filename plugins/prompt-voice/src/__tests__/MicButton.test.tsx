@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { MicButton } from '../app/MicButton.tsx';
 import { useDictation } from '../app/useDictation.ts';
 import { RecordingError, type RecordedAudio, type RecordingSession } from "../app/recorder.ts";
+import { resetSoundCueContext } from "../app/soundCues.ts";
 
 const fakes = vi.hoisted(() => ({
   updateText: vi.fn(),
@@ -29,6 +30,7 @@ function fakeSession(): RecordingSession {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  resetSoundCueContext();
 });
 
 describe('MicButton', () => {
@@ -78,7 +80,7 @@ describe('MicButton', () => {
     await screen.findByText(/recording/i);
     fireEvent.click(screen.getByRole('button', { name: /cancel recording/i }));
     expect(session.cancel).toHaveBeenCalled();
-    expect(fakes.call).not.toHaveBeenCalled();
+    expect(fakes.call).not.toHaveBeenCalledWith(TRANSCRIBE, expect.anything());
   });
   it('records on the first click, transcribes on the second, and appends to the draft', async () => {
     const session = fakeSession();
@@ -109,7 +111,7 @@ describe('MicButton', () => {
     fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
 
     expect((await screen.findByRole("alert")).textContent).toContain("Microphone access was denied");
-    expect(fakes.call).not.toHaveBeenCalled();
+    expect(fakes.call).not.toHaveBeenCalledWith(TRANSCRIBE, expect.anything());
   });
 
   it('waits for a pending start instead of leaving the microphone open', async () => {
@@ -225,5 +227,199 @@ describe('MicButton', () => {
       resolveStart(session);
     });
     expect(session.cancel).toHaveBeenCalled();
+  });
+
+  it('uses cached micDeviceId and sound cue preferences for composer dictation', async () => {
+    const map = new Map<string, string>();
+    map.set(
+      'zcc:prompt-voice:audio-prefs:v1',
+      JSON.stringify({ micDeviceId: 'airpods-pro', soundCuesEnabled: 'true', soundCuesVolume: '60' })
+    );
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => { map.set(k, v); },
+      removeItem: (k: string) => { map.delete(k); },
+      clear: () => { map.clear(); }
+    });
+    const startOsc = vi.fn();
+    vi.stubGlobal('AudioContext', class {
+      state = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      createOscillator = () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: startOsc,
+        stop: vi.fn()
+      });
+      createGain = () => ({
+        gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn()
+      });
+    });
+
+    try {
+      const order: string[] = [];
+      const session = fakeSession();
+      const startSession = vi.fn(async () => {
+        order.push('startSession');
+        return session;
+      });
+      fakes.call.mockResolvedValue({
+        ok: true, status: 'ok', rawText: 'hi', text: 'mic test', sttProvider: 'system', llmProvider: 'none', llmModel: null
+      });
+
+      render(<MicButton startSession={startSession} />);
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(startSession).toHaveBeenCalledWith({ deviceId: 'airpods-pro' }));
+      expect(startOsc).toHaveBeenCalled();
+      expect(order).toEqual(['startSession']);
+      expect(startOsc.mock.invocationCallOrder[0]).toBeLessThan(startSession.mock.invocationCallOrder[0]);
+
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('fetches saved mic preferences from server on mount when localStorage cache is empty', async () => {
+    const map = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => { map.set(k, v); },
+      removeItem: (k: string) => { map.delete(k); },
+      clear: () => { map.clear(); }
+    });
+
+    try {
+      const session = fakeSession();
+      const startSession = vi.fn(async () => session);
+      fakes.call.mockImplementation(async (method: string) => {
+        if (method === 'promptVoice.settings.get') {
+          return { micDeviceId: 'cold-usb-mic', soundCuesEnabled: 'false', soundCuesVolume: '30' };
+        }
+        return { ok: true, status: 'ok', text: 'cold start' };
+      });
+
+      render(<MicButton startSession={startSession} />);
+      await waitFor(() => expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.get'));
+      await waitFor(() => expect(map.get('zcc:prompt-voice:audio-prefs:v1')).toContain('cold-usb-mic'));
+
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(startSession).toHaveBeenCalledWith({ deviceId: 'cold-usb-mic' }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('plays the stop cue only after session.stop resolves', async () => {
+    const startOsc = vi.fn();
+    vi.stubGlobal('AudioContext', class {
+      state = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      createOscillator = () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: startOsc,
+        stop: vi.fn()
+      });
+      createGain = () => ({
+        gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn()
+      });
+    });
+    try {
+      const events: string[] = [];
+      let resolveStop!: (audio: RecordedAudio) => void;
+      const session: RecordingSession = {
+        stop: vi.fn(() => new Promise<RecordedAudio>((resolve) => {
+          resolveStop = (audio) => { events.push('stopResolved'); resolve(audio); };
+        })),
+        cancel: vi.fn()
+      };
+      fakes.call.mockResolvedValue({ ok: true, status: 'ok', text: 'clean tail' });
+      render(<MicButton startSession={async () => session} />);
+
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(screen.getByRole('button', { name: BUTTON_NAME }).getAttribute('aria-pressed')).toBe('true'));
+      const callsBeforeStop = startOsc.mock.calls.length;
+
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(session.stop).toHaveBeenCalledTimes(1));
+      expect(startOsc.mock.calls.length).toBe(callsBeforeStop);
+
+      resolveStop({ base64: 'YWJj', mimeType: 'audio/webm' });
+      await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
+      expect(events).toEqual(['stopResolved']);
+      expect(startOsc.mock.calls.length).toBeGreaterThan(callsBeforeStop);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('preserves server-loaded preferences when localStorage throws and avoids clobbering mid-session snapshot', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('SecurityError'); },
+      setItem: () => { throw new Error('SecurityError'); }
+    });
+    const startOsc = vi.fn();
+    vi.stubGlobal('AudioContext', class {
+      state = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      createOscillator = () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: startOsc,
+        stop: vi.fn()
+      });
+      createGain = () => ({
+        gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn()
+      });
+    });
+    try {
+      let resolveSettings!: (v: unknown) => void;
+      const session = fakeSession();
+      const startSession = vi.fn(async () => session);
+      fakes.call.mockImplementation((method: string) => {
+        if (method === 'promptVoice.settings.get') {
+          return new Promise((resolve) => { resolveSettings = resolve; });
+        }
+        return Promise.resolve({ ok: true, status: 'ok', text: 'first' });
+      });
+
+      render(<MicButton startSession={startSession} />);
+      // Start first dictation before settings.get resolves
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(startSession).toHaveBeenCalledTimes(1));
+
+      // Resolve settings.get mid-session with soundCuesEnabled=false
+      await act(async () => {
+        resolveSettings({ micDeviceId: 'studio-usb', soundCuesEnabled: 'false', soundCuesVolume: '20' });
+      });
+      const callsDuringStart = startOsc.mock.calls.length;
+      // Stopping first session still uses the session-start snapshot (enabled=true)
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
+      expect(startOsc.mock.calls.length).toBeGreaterThan(callsDuringStart);
+
+      // Dismiss completion notice, then start second dictation (falls back to serverPrefsRef)
+      fireEvent.click(screen.getByText(/added to draft/i));
+      const callsBeforeSecond = startOsc.mock.calls.length;
+      fireEvent.click(screen.getByRole('button', { name: BUTTON_NAME }));
+      await waitFor(() => expect(startSession).toHaveBeenLastCalledWith({ deviceId: 'studio-usb' }));
+      expect(startOsc.mock.calls.length).toBe(callsBeforeSecond);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

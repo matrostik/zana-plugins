@@ -4,6 +4,8 @@ import { useComposer, useComposerView, useRpc } from '@zana-ai/zcc-plugin-sdk/ap
 import {
   AVAILABLE_MODELS_METHOD,
   REPHRASE_METHOD,
+  SETTINGS_GET_METHOD,
+  SETTINGS_UPDATE_METHOD,
   STATUS_METHOD,
   TRANSCRIBE_METHOD,
   type AvailableModelsResponse,
@@ -15,7 +17,10 @@ import {
   type TranscribeResponse
 } from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
-import { defaultStartSession, type RecordingSession } from './recorder.ts';
+import { DEFAULT_MIC_DEVICE_ID, type AudioPreferences } from '../shared/audioPreferences.ts';
+import { readCachedAudioPreferences, writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
+import { defaultStartSession, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
+import { playSoundCue } from './soundCues.ts';
 import { prepareAudioForUpload } from './wav.ts';
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
 
@@ -585,7 +590,7 @@ function useSafeComposerView() {
 
 export interface PromptStudioProps {
   /** Optional custom session starter for tests */
-  startSession?: () => Promise<RecordingSession>;
+  startSession?: (options?: StartRecordingOptions) => Promise<RecordingSession>;
 }
 
 export function PromptStudio({ startSession = defaultStartSession }: PromptStudioProps): React.ReactElement {
@@ -632,6 +637,9 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [audioLevel, setAudioLevel] = useState<number | null>(null);
+  const [audioPrefs, setAudioPrefs] = useState<AudioPreferences>(() => readCachedAudioPreferences());
+  const audioPrefsRef = useRef<AudioPreferences>(audioPrefs);
+  audioPrefsRef.current = audioPrefs;
   const activeSessionRef = useRef<RecordingSession | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -692,21 +700,48 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     };
   }, [rpc]);
 
-  useEffect(() => {
-    let isCurrent = true;
-    rpc
-      .call('promptVoice.settings.get')
+  const rpcRef = useRef(rpc);
+  rpcRef.current = rpc;
+  const mountedRef = useRef(true);
+  const settingsRequestIdRef = useRef(0);
+  const dictationRequestIdRef = useRef(0);
+
+  const updateAudioPrefsIfChanged = useCallback((next: AudioPreferences) => {
+    setAudioPrefs((prev) =>
+      prev.micDeviceId === next.micDeviceId &&
+      prev.micLabel === next.micLabel &&
+      prev.soundCuesEnabled === next.soundCuesEnabled &&
+      prev.soundCuesVolume === next.soundCuesVolume
+        ? prev
+        : next
+    );
+  }, []);
+
+  const loadStudioSettings = useCallback(() => {
+    const requestId = ++settingsRequestIdRef.current;
+    rpcRef.current
+      .call(SETTINGS_GET_METHOD)
       .then((res) => {
-        if (!isCurrent) return;
-        const s = (res || {}) as Record<string, string>;
-        if (s.sttProvider) setSttProvider(s.sttProvider);
-        if (s.sttModel) setSttModel(s.sttModel);
+        if (!mountedRef.current || settingsRequestIdRef.current !== requestId) return;
+        const s = (res || {}) as Record<string, unknown>;
+        if (typeof s.sttProvider === 'string' && s.sttProvider) setSttProvider(s.sttProvider);
+        if (typeof s.sttModel === 'string' && s.sttModel) setSttModel(s.sttModel);
+        if (res && typeof res === 'object') {
+          updateAudioPrefsIfChanged(writeCachedAudioPreferences(s));
+        }
       })
       .catch(() => undefined);
+  }, [updateAudioPrefsIfChanged]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadStudioSettings();
     return () => {
-      isCurrent = false;
+      mountedRef.current = false;
+      settingsRequestIdRef.current++;
+      dictationRequestIdRef.current++;
     };
-  }, [rpc]);
+  }, [loadStudioSettings]);
 
   // Fetch dynamic models catalog from host providers
   useEffect(() => {
@@ -846,7 +881,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     const targetModel = enabled ? (activeModel?.id ?? 'assistant') : '';
     setServerLlmProvider(targetProvider);
     rpc
-      .call('promptVoice.settings.update', {
+      .call(SETTINGS_UPDATE_METHOD, {
         llmProvider: targetProvider,
         llmModel: targetModel
       })
@@ -860,7 +895,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     setSttProvider(newProvider);
     setDictationError(null);
     rpc
-      .call('promptVoice.settings.update', {
+      .call(SETTINGS_UPDATE_METHOD, {
         sttProvider: newProvider
       })
       .then(() => refreshStatus())
@@ -873,7 +908,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const handleSttModelChange = (newModel: string) => {
     setSttModel(newModel);
     rpc
-      .call('promptVoice.settings.update', {
+      .call(SETTINGS_UPDATE_METHOD, {
         sttModel: newModel
       })
       .catch(() => undefined);
@@ -893,7 +928,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     if (autoCleanupEnabled) {
       setServerLlmProvider(newProviderId);
       rpc
-        .call('promptVoice.settings.update', {
+        .call(SETTINGS_UPDATE_METHOD, {
           llmProvider: newProviderId,
           llmModel: targetModelId
         })
@@ -921,7 +956,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     if (autoCleanupEnabled) {
       setServerLlmProvider(targetProvId);
       rpc
-        .call('promptVoice.settings.update', {
+        .call(SETTINGS_UPDATE_METHOD, {
           llmProvider: targetProvId,
           llmModel: targetActualModelId
         })
@@ -957,78 +992,130 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     return computeWordDiff(inputText, outputText);
   }, [inputText, outputText, showDiff]);
 
-  // ─── Voice Dictation Handler ─────────────────────────────────────────────────
-  const handleToggleDictation = async () => {
-    if (isRecording) {
-      // Stop active recording
-      setIsRecording(false);
-      setAudioLevel(null);
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      if (meterIntervalRef.current) clearInterval(meterIntervalRef.current);
+  // ─── Voice Dictation Helpers ─────────────────────────────────────────────────
+  const clearStudioTimers = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (meterIntervalRef.current) {
+      clearInterval(meterIntervalRef.current);
+      meterIntervalRef.current = null;
+    }
+  };
 
-      const session = activeSessionRef.current;
-      activeSessionRef.current = null;
-      if (!session) return;
-
-      setIsTranscribing(true);
-
-      try {
-        const audio = await prepareAudioForUpload(rpc, await session.stop());
-        const response = (await rpc.call(TRANSCRIBE_METHOD, {
-          audio: audio.base64,
-          mimeType: audio.mimeType,
-          transcriptionOnly: true
-        })) as TranscribeResponse;
-
-        if (response.ok && response.status === 'ok') {
-          setInputText((prev) => appendTranscript(prev, response.text));
-          setDictationError(null);
-        } else if (response.ok && response.status === 'no-speech') {
-          setStatusNotice('No speech detected. Try speaking closer to the microphone.');
-          setTimeout(() => setStatusNotice(null), 4000);
-        } else if (!response.ok) {
-          setStatusNotice(response.message);
-          setDictationError(response.message);
-          if (response.code === 'MISSING_KEY') {
-            setSttKeyConfigured(false);
-          }
-        }
-      } catch (err) {
-        setStatusNotice(err instanceof Error ? err.message : 'Transcription failed.');
-      } finally {
-        setIsTranscribing(false);
+  const startStudioTimers = () => {
+    clearStudioTimers();
+    timerIntervalRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    meterIntervalRef.current = setInterval(() => {
+      if (activeSessionRef.current) {
+        setAudioLevel(activeSessionRef.current.getAudioLevel?.() ?? null);
       }
-    } else {
-      // Start recording
-      setDictationError(null);
-      setStatusNotice(null);
+    }, 100);
+  };
 
-      if (sttProvider !== 'system' && !sttKeyConfigured) {
-        const provName = sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini';
-        setDictationError(`API key required for direct ${provName} speech-to-text. Switch to System (Zana Voice) below to dictate using host voice.`);
-        setStatusNotice(`API key required for ${provName}. Switch to System (Zana Voice) to dictate thoughts.`);
+  const stopAndTranscribeStudio = async (cueOpts: { enabled: boolean; volume: number }) => {
+    setIsRecording(false);
+    setAudioLevel(null);
+    clearStudioTimers();
+
+    const session = activeSessionRef.current;
+    activeSessionRef.current = null;
+    if (!session) return;
+
+    setIsTranscribing(true);
+    try {
+      const recorded = await session.stop();
+      if (!mountedRef.current) return;
+      // Play stop chime only after capture stops so it never bleeds into the recording.
+      playSoundCue('stop', cueOpts);
+      const audio = await prepareAudioForUpload(rpc, recorded);
+      const response = (await rpc.call(TRANSCRIBE_METHOD, {
+        audio: audio.base64,
+        mimeType: audio.mimeType,
+        transcriptionOnly: true
+      })) as TranscribeResponse;
+
+      if (response.ok && response.status === 'ok') {
+        playSoundCue('complete', cueOpts);
+        setInputText((prev) => appendTranscript(prev, response.text));
+        setDictationError(null);
+      } else if (response.ok && response.status === 'no-speech') {
+        setStatusNotice('No speech detected. Try speaking closer to the microphone.');
+        setTimeout(() => setStatusNotice(null), 4000);
+      } else if (!response.ok) {
+        playSoundCue('error', cueOpts);
+        setStatusNotice(response.message);
+        setDictationError(response.message);
+        if (response.code === 'MISSING_KEY') setSttKeyConfigured(false);
+      }
+    } catch (err) {
+      playSoundCue('error', cueOpts);
+      setStatusNotice(err instanceof Error ? err.message : 'Transcription failed.');
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const startStudioRecording = async (prefs: AudioPreferences, cueOpts: { enabled: boolean; volume: number }) => {
+    setDictationError(null);
+    setStatusNotice(null);
+    if (sttProvider !== 'system' && !sttKeyConfigured) {
+      playSoundCue('error', cueOpts);
+      const provName = sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini';
+      setDictationError(`API key required for direct ${provName} speech-to-text. Switch to System (Zana Voice) below to dictate using host voice.`);
+      setStatusNotice(`API key required for ${provName}. Switch to System (Zana Voice) to dictate thoughts.`);
+      return;
+    }
+
+    const opId = ++dictationRequestIdRef.current;
+    try {
+      // Play start chime before opening capture so speaker playback never enters the recording.
+      const cuePromise = playSoundCue('start', cueOpts);
+      if (cuePromise) {
+        await cuePromise;
+        if (!mountedRef.current || dictationRequestIdRef.current !== opId) return;
+      }
+      const session = await (prefs.micDeviceId !== DEFAULT_MIC_DEVICE_ID
+        ? startSession({ deviceId: prefs.micDeviceId })
+        : startSession());
+      if (!mountedRef.current || dictationRequestIdRef.current !== opId) {
+        session.cancel();
         return;
       }
+      session.onError = (err) => {
+        activeSessionRef.current = null;
+        setIsRecording(false);
+        setAudioLevel(null);
+        clearStudioTimers();
+        playSoundCue('error', cueOpts);
+        setDictationError(err.message);
+        setStatusNotice(err.message);
+      };
+      activeSessionRef.current = session;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      startStudioTimers();
+    } catch (err) {
+      playSoundCue('error', cueOpts);
+      setStatusNotice(err instanceof Error ? err.message : 'Microphone access denied.');
+    }
+  };
 
-      try {
-        const session = await startSession();
-        activeSessionRef.current = session;
-        setIsRecording(true);
-        setRecordingSeconds(0);
+  const handleSettingsClosed = useCallback(() => {
+    setSettingsOpen(false);
+    updateAudioPrefsIfChanged(readCachedAudioPreferences());
+    loadStudioSettings();
+    refreshStatus();
+  }, [loadStudioSettings, refreshStatus, updateAudioPrefsIfChanged]);
 
-        timerIntervalRef.current = setInterval(() => {
-          setRecordingSeconds((s) => s + 1);
-        }, 1000);
-
-        meterIntervalRef.current = setInterval(() => {
-          if (activeSessionRef.current) {
-            const level = activeSessionRef.current.getAudioLevel?.() ?? null;
-            setAudioLevel(level);
-          }
-        }, 100);
-      } catch (err) {
-        setStatusNotice(err instanceof Error ? err.message : 'Microphone access denied.');
-      }
+  const handleToggleDictation = async () => {
+    const prefs = audioPrefsRef.current;
+    const cueOpts = { enabled: prefs.soundCuesEnabled, volume: prefs.soundCuesVolume };
+    if (isRecording) {
+      await stopAndTranscribeStudio(cueOpts);
+    } else {
+      await startStudioRecording(prefs, cueOpts);
     }
   };
 
@@ -1170,129 +1257,14 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
           <span style={{ fontSize: 18 }}>🎙️</span>
           <span className="ps-header-title">Prompt Studio</span>
           <span className="ps-badge">Voice & AI Refinement</span>
-          {insertNotice && (
-            <span className="ps-badge" style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#86efac' }}>
-              {insertNotice}
-            </span>
-          )}
-        </div>
-
-        <div className="ps-header-actions">
-          <button
-            type="button"
-            className="ps-btn"
-            onClick={handleClearAll}
-            title="Clear current input and output"
-            disabled={!inputText && !outputText}
-          >
-            <span>🗑️</span>
-            <span>Clear</span>
-          </button>
-          <button
-            type="button"
-            className="ps-btn ps-btn-primary"
-            onClick={handleInsertIntoComposer}
-            disabled={!inputText && !outputText}
-            title="Append current text directly into Zana Composer"
-          >
-            <span>💬</span>
-            <span>Insert into Composer</span>
-          </button>
         </div>
       </header>
 
       {/* ─── Workspace Layout ───────────────────────────────────────────────── */}
-      {settingsOpen ? <StudioSettings rpc={rpc} onBack={() => setSettingsOpen(false)} /> : <div className="ps-workspace">
+      {settingsOpen ? <StudioSettings rpc={rpc} onBack={handleSettingsClosed} /> : <div className="ps-workspace">
 
         {/* ─── Left Sidebar Controls ────────────────────────────────────────── */}
         <aside className="ps-sidebar">
-
-          {/* Model Selection Card (2-Step: Provider, then Model) */}
-          <section className="ps-section">
-            <div className="ps-section-title">
-              <span>Refinement Engine</span>
-              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>
-                {activeProvider?.isComposerMatch ? '★ Composer Active' : 'AI Model'}
-              </span>
-            </div>
-
-            {/* Provider Selector */}
-            <div className="ps-field-group">
-              <label htmlFor="ps-provider-select" className="ps-field-label">
-                Provider
-              </label>
-              <select
-                id="ps-provider-select"
-                className="ps-select"
-                aria-label="Refinement provider"
-                value={activeProvider?.id ?? ''}
-                onChange={(e) => handleProviderChange(e.target.value)}
-                disabled={isRefining}
-              >
-                {providerOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.displayName}{p.isComposerMatch ? ' ★ (Composer)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Model Selector */}
-            <div className="ps-field-group">
-              <label htmlFor="ps-model-select" className="ps-field-label">
-                Model ({availableModelsForProvider.length})
-              </label>
-              <select
-                id="ps-model-select"
-                className="ps-select"
-                aria-label="Refinement model"
-                value={activeModel?.key || activeModel?.id || ''}
-                onChange={(e) => handleModelChange(e.target.value)}
-                disabled={isRefining || availableModelsForProvider.length === 0}
-              >
-                {availableModelsForProvider.map((m) => (
-                  <option key={m.key || m.id} value={m.key || m.id}>
-                    {m.label}{m.isComposerMatch ? ' ★ (Composer)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Auto-cleanup Toggle for Composer Dictations */}
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--ps-border)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, fontWeight: 500, userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  aria-label="Auto-cleanup mic dictations"
-                  checked={autoCleanupEnabled}
-                  onChange={(e) => handleToggleAutoCleanup(e.target.checked)}
-                />
-                <span>Auto-cleanup mic dictations</span>
-              </label>
-              <span style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
-                {autoCleanupEnabled
-                  ? `Composer mic cleans up using ${activeProvider?.displayName} (${activeModel?.label || activeModel?.id}).`
-                  : 'Composer mic inserts raw transcript without AI cleanup.'}
-              </span>
-            </div>
-
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ps-text-muted)', lineHeight: 1.35 }}>
-              {activeProvider?.isComposerMatch ? (
-                <span style={{ color: 'var(--accent, #3b82f6)', fontWeight: 600 }}>
-                  ★ Synced to Composer: {activeProvider.displayName} ({activeModel?.label})
-                </span>
-              ) : activeProvider?.id === 'assistant' ? (
-                'Uses the active Zana assistant agent with no extra API key required.'
-              ) : (
-                <>Using <strong>{activeProvider?.displayName}</strong> · <code>{activeModel?.id}</code></>
-              )}
-              {lastUsedModel ? (
-                <div style={{ marginTop: 3, color: 'var(--ps-text-subtle)', fontSize: 10 }}>
-                  Last refined: {lastUsedModel}
-                </div>
-              ) : null}
-            </div>
-          </section>
 
           {/* Voice Dictation Card */}
           <section className="ps-section">
@@ -1439,6 +1411,93 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 : sttKeyConfigured
                 ? `Using direct ${sttProvider === 'openai' ? 'OpenAI Whisper' : 'Google Gemini'} speech-to-text.`
                 : `⚠️ ${sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini'} requires an API key in Zana Settings. Choose System (Zana Voice) for built-in free dictation.`}
+            </div>
+          </section>
+
+          {/* Model Selection Card (2-Step: Provider, then Model) */}
+          <section className="ps-section">
+            <div className="ps-section-title">
+              <span>Refinement Engine</span>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>
+                {activeProvider?.isComposerMatch ? '★ Composer Active' : 'AI Model'}
+              </span>
+            </div>
+
+            {/* Provider Selector */}
+            <div className="ps-field-group">
+              <label htmlFor="ps-provider-select" className="ps-field-label">
+                Provider
+              </label>
+              <select
+                id="ps-provider-select"
+                className="ps-select"
+                aria-label="Refinement provider"
+                value={activeProvider?.id ?? ''}
+                onChange={(e) => handleProviderChange(e.target.value)}
+                disabled={isRefining}
+              >
+                {providerOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.displayName}{p.isComposerMatch ? ' ★ (Composer)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Model Selector */}
+            <div className="ps-field-group">
+              <label htmlFor="ps-model-select" className="ps-field-label">
+                Model ({availableModelsForProvider.length})
+              </label>
+              <select
+                id="ps-model-select"
+                className="ps-select"
+                aria-label="Refinement model"
+                value={activeModel?.key || activeModel?.id || ''}
+                onChange={(e) => handleModelChange(e.target.value)}
+                disabled={isRefining || availableModelsForProvider.length === 0}
+              >
+                {availableModelsForProvider.map((m) => (
+                  <option key={m.key || m.id} value={m.key || m.id}>
+                    {m.label}{m.isComposerMatch ? ' ★ (Composer)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Auto-cleanup Toggle for Composer Dictations */}
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--ps-border)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, fontWeight: 500, userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  aria-label="Auto-cleanup mic dictations"
+                  checked={autoCleanupEnabled}
+                  onChange={(e) => handleToggleAutoCleanup(e.target.checked)}
+                />
+                <span>Auto-cleanup mic dictations</span>
+              </label>
+              <span style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
+                {autoCleanupEnabled
+                  ? `Composer mic cleans up using ${activeProvider?.displayName} (${activeModel?.label || activeModel?.id}).`
+                  : 'Composer mic inserts raw transcript without AI cleanup.'}
+              </span>
+            </div>
+
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ps-text-muted)', lineHeight: 1.35 }}>
+              {activeProvider?.isComposerMatch ? (
+                <span style={{ color: 'var(--accent, #3b82f6)', fontWeight: 600 }}>
+                  ★ Synced to Composer: {activeProvider.displayName} ({activeModel?.label})
+                </span>
+              ) : activeProvider?.id === 'assistant' ? (
+                'Uses the active Zana assistant agent with no extra API key required.'
+              ) : (
+                <>Using <strong>{activeProvider?.displayName}</strong> · <code>{activeModel?.id}</code></>
+              )}
+              {lastUsedModel ? (
+                <div style={{ marginTop: 3, color: 'var(--ps-text-subtle)', fontSize: 10 }}>
+                  Last refined: {lastUsedModel}
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -1627,6 +1686,47 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
               />
             )}
           </section>
+
+          {/* Bottom Action Bar: Clear & Insert into Composer */}
+          <div className="ps-action-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              {insertNotice ? (
+                <span className="ps-badge" style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#86efac' }}>
+                  {insertNotice}
+                </span>
+              ) : (
+                <span style={{ color: 'var(--ps-text-muted)' }}>
+                  {outputText
+                    ? 'Ready to insert refined result into Composer'
+                    : inputText
+                    ? 'Ready to insert raw draft into Composer'
+                    : 'Draft or refine a prompt to insert into Composer'}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                className="ps-btn"
+                onClick={handleClearAll}
+                title="Clear current input and output"
+                disabled={!inputText && !outputText}
+              >
+                <span>🗑️</span>
+                <span>Clear</span>
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary"
+                onClick={handleInsertIntoComposer}
+                disabled={!inputText && !outputText}
+                title="Append current text directly into Zana Composer"
+              >
+                <span>💬</span>
+                <span>Insert into Composer</span>
+              </button>
+            </div>
+          </div>
 
         </main>
 

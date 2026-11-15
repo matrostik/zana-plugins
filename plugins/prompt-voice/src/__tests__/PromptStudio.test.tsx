@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PromptStudio } from '../app/PromptStudio.tsx';
 import type { RecordedAudio, RecordingSession } from '../app/recorder.ts';
+import { resetSoundCueContext } from '../app/soundCues.ts';
 
 const fakes = vi.hoisted(() => ({
   updateText: vi.fn(),
@@ -44,6 +45,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   storageMap.clear();
+  resetSoundCueContext();
 });
 
 describe('PromptStudio Component', () => {
@@ -639,5 +641,148 @@ describe('PromptStudio Component', () => {
       sttProvider: 'system'
     });
   });
-});
 
+  it('places Clear and Insert into Composer at the bottom of the canvas and hides them in Settings', async () => {
+    fakes.call.mockResolvedValue({});
+    const { container } = render(<PromptStudio />);
+
+    const header = container.querySelector('header.ps-header');
+    expect(header).toBeTruthy();
+    const clearAllBtn = screen.getByTitle('Clear current input and output');
+    const insertBtn = screen.getByRole('button', { name: /insert into composer/i });
+
+    // Buttons live in the bottom action bar inside <main>, not in the header
+    expect(header!.contains(clearAllBtn)).toBe(false);
+    expect(header!.contains(insertBtn)).toBe(false);
+    const main = container.querySelector('main.ps-editor-canvas');
+    expect(main!.contains(clearAllBtn)).toBe(true);
+    expect(main!.contains(insertBtn)).toBe(true);
+
+    const resultSection = screen.getByText('Result').closest('section');
+    expect(resultSection).toBeTruthy();
+    expect(
+      resultSection!.compareDocumentPosition(clearAllBtn) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    // Opening settings hides both buttons
+    fireEvent.click(screen.getByRole('button', { name: /^settings$/i }));
+    expect(screen.getByRole('heading', { name: /settings/i })).toBeTruthy();
+    expect(screen.queryByTitle('Clear current input and output')).toBeNull();
+    expect(screen.queryByRole('button', { name: /insert into composer/i })).toBeNull();
+  });
+
+  it('places Voice Dictation above Refinement Engine in the sidebar', () => {
+    fakes.call.mockResolvedValue({});
+    render(<PromptStudio />);
+
+    const dictateBtn = screen.getByRole('button', { name: /start dictation/i });
+    const refinementHeading = screen.getByText('Refinement Engine');
+    const providerSelect = screen.getByRole('combobox', { name: /refinement provider/i });
+
+    expect(
+      dictateBtn.compareDocumentPosition(refinementHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      dictateBtn.compareDocumentPosition(providerSelect) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('passes saved mic deviceId to startSession and plays sound cues during dictation', async () => {
+    const startOsc = vi.fn();
+    vi.stubGlobal('AudioContext', class {
+      state = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      createOscillator = () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: startOsc,
+        stop: vi.fn()
+      });
+      createGain = () => ({
+        gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn()
+      });
+    });
+
+    try {
+      const session = fakeSession();
+      const startSession = vi.fn(async () => session);
+      fakes.call.mockImplementation(async (method: string) => {
+        if (method === 'promptVoice.settings.get') {
+          return { micDeviceId: 'usb-yeti', soundCuesEnabled: 'true', soundCuesVolume: '80' };
+        }
+        if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'system' };
+        if (method === 'promptVoice.availableModels') return [];
+        if (method === 'promptVoice.transcribe') return { ok: true, status: 'ok', text: 'hello' };
+        return {};
+      });
+
+      render(<PromptStudio startSession={startSession} />);
+      await waitFor(() =>
+        expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.get')
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /start dictation/i }));
+      await waitFor(() => expect(startSession).toHaveBeenCalledWith({ deviceId: 'usb-yeti' }));
+      expect(startOsc).toHaveBeenCalled();
+      expect(startOsc.mock.invocationCallOrder[0]).toBeLessThan(startSession.mock.invocationCallOrder[0]);
+
+      fireEvent.click(await screen.findByRole('button', { name: /stop dictation/i }));
+      expect(await screen.findByDisplayValue('hello')).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('plays Prompt Studio stop chime only after session.stop resolves', async () => {
+    const startOsc = vi.fn();
+    vi.stubGlobal('AudioContext', class {
+      state = 'running';
+      currentTime = 0;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      createOscillator = () => ({
+        type: 'sine',
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: startOsc,
+        stop: vi.fn()
+      });
+      createGain = () => ({
+        gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+        connect: vi.fn()
+      });
+    });
+    try {
+      let resolveStop!: (audio: RecordedAudio) => void;
+      const session: RecordingSession = {
+        stop: vi.fn(() => new Promise<RecordedAudio>((resolve) => { resolveStop = resolve; })),
+        cancel: vi.fn(),
+        getAudioLevel: vi.fn(() => 0.4)
+      };
+      fakes.call.mockImplementation(async (method: string) => {
+        if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'system' };
+        if (method === 'promptVoice.availableModels') return [];
+        if (method === 'promptVoice.transcribe') return { ok: true, status: 'ok', text: 'after stop' };
+        return {};
+      });
+      render(<PromptStudio startSession={async () => session} />);
+      fireEvent.click(screen.getByRole('button', { name: /start dictation/i }));
+      const stopBtn = await screen.findByRole('button', { name: /stop dictation/i });
+      const callsBeforeStop = startOsc.mock.calls.length;
+
+      fireEvent.click(stopBtn);
+      await waitFor(() => expect(session.stop).toHaveBeenCalledTimes(1));
+      expect(startOsc.mock.calls.length).toBe(callsBeforeStop);
+
+      resolveStop({ base64: 'YWJj', mimeType: 'audio/webm' });
+      expect(await screen.findByDisplayValue('after stop')).toBeTruthy();
+      expect(startOsc.mock.calls.length).toBeGreaterThan(callsBeforeStop);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

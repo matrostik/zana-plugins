@@ -8,6 +8,8 @@ export const TRANSCRIBE_METHOD = 'promptVoice.transcribe';
 export const STATUS_METHOD = 'promptVoice.status';
 export const REPHRASE_METHOD = 'promptVoice.rephrase';
 export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
+export const SETTINGS_GET_METHOD = 'promptVoice.settings.get';
+export const SETTINGS_UPDATE_METHOD = 'promptVoice.settings.update';
 
 /** Local Whisper management. Each returns a LocalWhisperResponse. */
 export const LOCAL_WHISPER_METHODS = {
