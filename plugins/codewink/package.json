@@ -1,6 +1,6 @@
 {
   "name": "@zcc-ext/codewink",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "author": "Ros Haitovich <rhaitovich@salesforce.com>",
   "type": "module",
   "description": "AI pull request review for GitHub and GitHub Enterprise, powered by the AI providers configured in Zana.",
