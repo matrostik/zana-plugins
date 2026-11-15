@@ -100,6 +100,33 @@ describe('recorder', () => {
     }
   });
 
+  it('requests exact deviceId when a non-default mic is selected and falls back if disconnected', async () => {
+    const track = { stop: vi.fn() };
+    const stream = { getTracks: () => [track] } as unknown as MediaStream;
+    const getUserMedia = vi.fn(async () => stream);
+
+    const session1 = await startRecording(
+      { getUserMedia, createRecorder: () => fakeRecorder(), isTypeSupported: () => true },
+      { deviceId: 'usb-yeti' }
+    );
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: { deviceId: { exact: 'usb-yeti' } } });
+    session1.cancel();
+
+    const notFound = new Error('Missing');
+    notFound.name = 'OverconstrainedError';
+    const fallbackGetUserMedia = vi
+      .fn()
+      .mockRejectedValueOnce(notFound)
+      .mockResolvedValueOnce(stream);
+    const session2 = await startRecording(
+      { getUserMedia: fallbackGetUserMedia, createRecorder: () => fakeRecorder(), isTypeSupported: () => true },
+      { deviceId: 'unplugged-mic' }
+    );
+    expect(fallbackGetUserMedia).toHaveBeenNthCalledWith(1, { audio: { deviceId: { exact: 'unplugged-mic' } } });
+    expect(fallbackGetUserMedia).toHaveBeenNthCalledWith(2, { audio: true });
+    session2.cancel();
+  });
+
   it('picks the first MIME type the browser supports', () => {
     expect(pickRecorderMimeType((type) => type === 'audio/webm')).toBe('audio/webm');
     expect(pickRecorderMimeType(() => false)).toBeNull();

@@ -8,7 +8,14 @@ import type { AssistantApi } from './src/server/llm/providers.ts';
 import { resolveServerUrl } from './src/server/stt/providers.ts';
 import type { LocalWhisperManager } from './src/server/localWhisper/manager.ts';
 import { createLocalWhisperManager, registerLocalWhisperMethods } from './src/server/localWhisper/rpc.ts';
-import { AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from './src/shared/protocol.ts';
+import {
+  AVAILABLE_MODELS_METHOD,
+  REPHRASE_METHOD,
+  SETTINGS_GET_METHOD,
+  SETTINGS_UPDATE_METHOD,
+  STATUS_METHOD,
+  TRANSCRIBE_METHOD
+} from './src/shared/protocol.ts';
 
 export interface PromptVoiceDeps {
   /** Injected in tests. Defaults to the runtime's global fetch. */
@@ -35,8 +42,8 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   const store = zcc.storage?.kv ? createSettingsStore(zcc.storage.kv, () => settings.get()) : null;
   const readSettings = () => store ? store.readEffective() : settings.get() as Promise<Record<string, unknown>>;
   if (store) {
-    zcc.rpc.method('promptVoice.settings.get', () => store.readPublic());
-    zcc.rpc.method('promptVoice.settings.update', (patch) => store.update(patch));
+    zcc.rpc.method(SETTINGS_GET_METHOD, () => store.readPublic());
+    zcc.rpc.method(SETTINGS_UPDATE_METHOD, (patch) => store.update(patch));
   }
   const serverUrl = deps.serverUrl ?? resolveServerUrl();
   const assistant = deps.assistant ?? zcc.sdk?.assistant;

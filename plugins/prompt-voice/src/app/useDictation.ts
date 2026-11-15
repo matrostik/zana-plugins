@@ -1,9 +1,16 @@
 import { useComposer, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { TRANSCRIBE_METHOD, type TranscribeResponse } from '../shared/protocol.ts';
+import { DEFAULT_MIC_DEVICE_ID, parseAudioPreferences, type AudioPreferences } from '../shared/audioPreferences.ts';
+import { SETTINGS_GET_METHOD, TRANSCRIBE_METHOD, type TranscribeResponse } from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
+import {
+  readCachedAudioPreferences,
+  tryReadCachedAudioPreferences,
+  writeCachedAudioPreferences
+} from './audioPreferencesStorage.ts';
 import { dictationReducer, initialDictationState, type DictationEvent } from './dictationMachine.ts';
-import { defaultStartSession, type RecordedAudio, type RecordingSession } from './recorder.ts';
+import { defaultStartSession, type RecordedAudio, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
+import { playSoundCue } from './soundCues.ts';
 import { prepareAudioForUpload } from './wav.ts';
 
 export const UNEXPECTED_RESPONSE_MESSAGE = 'Prompt Voice returned an unexpected response. Try again.';
@@ -12,6 +19,10 @@ export const NOTICE_DISMISS_DELAY_MS = 4000;
 
 function isTranscribeResponse(value: unknown): value is TranscribeResponse {
   return typeof value === 'object' && value !== null && typeof (value as { ok?: unknown }).ok === 'boolean';
+}
+
+function isSettingsPayload(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !('ok' in value && 'status' in value);
 }
 
 type RpcClient = ReturnType<typeof useRpc>;
@@ -28,12 +39,18 @@ export function errorMessage(err: unknown): string {
   return err instanceof Error && err.message ? err.message : GENERIC_FAILURE_MESSAGE;
 }
 
+function cueOptions(prefs: AudioPreferences) {
+  return { enabled: prefs.soundCuesEnabled, volume: prefs.soundCuesVolume };
+}
+
 export function applyDictationResult(
   response: TranscribeResponse,
   composer: ComposerClient,
-  dispatch: React.Dispatch<DictationEvent>
+  dispatch: React.Dispatch<DictationEvent>,
+  prefs: AudioPreferences = readCachedAudioPreferences()
 ): void {
   if (!response.ok) {
+    playSoundCue('error', cueOptions(prefs));
     dispatch({ type: 'FAILURE', message: response.message });
     return;
   }
@@ -41,6 +58,7 @@ export function applyDictationResult(
     dispatch({ type: 'NO_SPEECH' });
     return;
   }
+  playSoundCue('complete', cueOptions(prefs));
   composer.updateText((draft) => appendTranscript(draft, response.text));
   composer.focus();
   const notice = response.refineNotice
@@ -72,7 +90,7 @@ function wireSessionCallbacks(
 
 export interface UseDictationOptions {
   /** Starts a recording. Defaults to the browser microphone; tests inject a fake. */
-  startSession?: () => Promise<RecordingSession>;
+  startSession?: (options?: StartRecordingOptions) => Promise<RecordingSession>;
   /** Duration in milliseconds before completion notice automatically disappears. Defaults to 4000ms. */
   noticeDurationMs?: number;
 }
@@ -82,15 +100,20 @@ export interface UseDictationOptions {
  * Start and recording failures are reported through `dispatch` only while the start is current.
  */
 function settleSessionStart(
-  starting: Promise<RecordingSession>,
+  starting: Promise<RecordingSession | null>,
   sessionRef: React.MutableRefObject<RecordingSession | null>,
   isCurrent: () => boolean,
   onAutoStop: () => void,
-  dispatch: React.Dispatch<DictationEvent>
+  dispatch: React.Dispatch<DictationEvent>,
+  getPrefs: () => AudioPreferences
 ): Promise<RecordingSession | null> {
-  const fail = (err: unknown) => dispatch({ type: 'FAILURE', message: errorMessage(err) });
+  const fail = (err: unknown) => {
+    playSoundCue('error', cueOptions(getPrefs()));
+    dispatch({ type: 'FAILURE', message: errorMessage(err) });
+  };
   return starting.then(
     (session) => {
+      if (!session) return null;
       const wired = wireSessionCallbacks(session, isCurrent, onAutoStop, (err) => {
         sessionRef.current = null;
         fail(err);
@@ -111,8 +134,9 @@ function settleSessionStart(
  * UI state changes go through `dispatch`; transcription stays in useDictation.
  */
 function useRecordingLifecycle(
-  startSession: () => Promise<RecordingSession>,
-  dispatch: React.Dispatch<DictationEvent>
+  startSession: (options?: StartRecordingOptions) => Promise<RecordingSession>,
+  dispatch: React.Dispatch<DictationEvent>,
+  getPrefs: () => AudioPreferences
 ) {
   const sessionRef = useRef<RecordingSession | null>(null);
   const pendingStartRef = useRef<Promise<RecordingSession | null> | null>(null);
@@ -144,15 +168,26 @@ function useRecordingLifecycle(
     return session;
   }, []);
 
-  const start = useCallback(async (onAutoStop: () => void) => {
+  const start = useCallback(async (onAutoStop: () => void, prefs: AudioPreferences) => {
     const startId = ++startIdRef.current;
     const isCurrent = () => mountedRef.current && startIdRef.current === startId;
-    const pending = settleSessionStart(startSession(), sessionRef, isCurrent, onAutoStop, dispatch);
+    // Play start chime before opening capture so speaker playback never enters the recording.
+    const cuePromise = playSoundCue('start', cueOptions(prefs));
+    const launch = async (): Promise<RecordingSession | null> => {
+      if (cuePromise) {
+        await cuePromise;
+        if (!isCurrent()) return null;
+      }
+      return await (prefs.micDeviceId !== DEFAULT_MIC_DEVICE_ID
+        ? startSession({ deviceId: prefs.micDeviceId })
+        : startSession());
+    };
+    const pending = settleSessionStart(launch(), sessionRef, isCurrent, onAutoStop, dispatch, getPrefs);
     pendingStartRef.current = pending;
     const session = await pending;
     if (session && isCurrent()) dispatch({ type: 'STARTED' });
     if (pendingStartRef.current === pending) pendingStartRef.current = null;
-  }, [dispatch, startSession]);
+  }, [dispatch, getPrefs, startSession]);
 
   const isMounted = useCallback(() => mountedRef.current, []);
 
@@ -166,11 +201,38 @@ export function useDictation({
 }: UseDictationOptions = {}) {
   const composer = useComposer();
   const rpc = useRpc();
+  const rpcRef = useRef(rpc);
+  rpcRef.current = rpc;
   const [state, dispatch] = useReducer(dictationReducer, initialDictationState);
-  const { start, takeSession, cancel, isMounted, getAudioLevel } = useRecordingLifecycle(startSession, dispatch);
+  const phaseRef = useRef(state.phase);
+  phaseRef.current = state.phase;
+  const serverPrefsRef = useRef<AudioPreferences | null>(null);
+  const activePrefsRef = useRef<AudioPreferences>(readCachedAudioPreferences());
+  const getPrefs = useCallback(() => activePrefsRef.current, []);
+  const { start, takeSession, cancel, isMounted, getAudioLevel } = useRecordingLifecycle(startSession, dispatch, getPrefs);
   const [level, setLevel] = useState<number | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [autoStopped, setAutoStopped] = useState(false);
+
+  // Sync saved audio preferences from server once on mount so cold webviews honor saved mic/cues.
+  useEffect(() => {
+    let active = true;
+    rpcRef.current
+      .call(SETTINGS_GET_METHOD)
+      .then((res) => {
+        if (!active || !isSettingsPayload(res)) return;
+        const synced = writeCachedAudioPreferences(res);
+        serverPrefsRef.current = synced;
+        // Never overwrite an active dictation session's mid-session preferences snapshot.
+        if (phaseRef.current === 'idle' || phaseRef.current === 'error') {
+          activePrefsRef.current = synced;
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (state.phase !== 'recording') {
@@ -202,6 +264,7 @@ export function useDictation({
   }, []);
 
   const finishDictation = useCallback(async () => {
+    const prefs = activePrefsRef.current;
     dispatch({ type: 'STOP' });
     const session = await takeSession();
     if (!isMounted() || !session) return;
@@ -210,23 +273,28 @@ export function useDictation({
       const audio = await session.stop();
       if (!isMounted()) return;
 
+      // Play stop chime only after capture has stopped so it cannot bleed into the recording.
+      playSoundCue('stop', cueOptions(prefs));
       const response = await requestTranscription(rpc, audio);
       if (!isMounted()) return;
 
-      applyDictationResult(response, composer, dispatch);
+      applyDictationResult(response, composer, dispatch, prefs);
     } catch (err) {
       if (!isMounted()) return;
+      playSoundCue('error', cueOptions(prefs));
       dispatch({ type: 'FAILURE', message: errorMessage(err) });
     }
   }, [composer, isMounted, rpc, takeSession]);
 
   const beginDictation = useCallback(async () => {
+    const prefs = tryReadCachedAudioPreferences() ?? serverPrefsRef.current ?? parseAudioPreferences({});
+    activePrefsRef.current = prefs;
     setAutoStopped(false);
     dispatch({ type: 'START' });
     await start(() => {
       setAutoStopped(true);
       void finishDictation();
-    });
+    }, prefs);
   }, [finishDictation, start]);
 
   const onClick = useCallback(() => {

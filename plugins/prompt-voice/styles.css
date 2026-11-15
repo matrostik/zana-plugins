@@ -347,9 +347,7 @@
   .pv-mic-spinner { animation: none; }
 }
 
-`
 
-`
 /* ==========================================================================\n   Prompt Studio - Zana Native Vertical Stack (Input Top, Output Bottom)\n   ========================================================================== */
 
 :root {
@@ -926,4 +924,262 @@
   font-size: 10px !important;
   font-family: var(--ps-mono) !important;
 }
-`
+
+/* ─── Studio Settings: Dictionary, Microphone & Sound Cues ───────────────── */
+.ps-dict-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.ps-dict-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.ps-dict-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 6px 12px;
+  background-color: var(--ps-input-bg, #0f1115);
+  border: 1px solid var(--ps-border, #2a2e37);
+  border-radius: 8px;
+  color: var(--text-primary, #e2e8f0);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  color-scheme: dark;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ps-dict-input:hover:not(:disabled) {
+  border-color: var(--ps-text-subtle, #64748b);
+}
+.ps-dict-input:focus {
+  border-color: var(--ps-accent, #3b82f6);
+  box-shadow: 0 0 0 1px var(--ps-accent, #3b82f6);
+}
+.ps-dict-input::placeholder {
+  color: var(--ps-text-subtle, #64748b);
+}
+.ps-dict-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ps-dict-add-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.ps-dict-well {
+  background-color: var(--ps-input-bg, #0f1115);
+  border: 1px solid var(--ps-border, #2a2e37);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+}
+.ps-dict-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ps-dict-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+  border-radius: 9999px;
+  background: var(--ps-panel-bg, #181b20);
+  border: 1px solid var(--ps-border, #2a2e37);
+  color: var(--text-primary, #e2e8f0);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 100%;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.ps-dict-pill:hover {
+  border-color: var(--ps-text-subtle, #64748b);
+  background: rgba(255, 255, 255, 0.04);
+}
+.ps-dict-pill-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.ps-dict-pill-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--ps-text-muted, #94a3b8);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s, color 0.15s;
+}
+.ps-dict-pill-remove:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+.ps-dict-pill-remove:focus-visible {
+  outline: 1px solid var(--ps-accent, #3b82f6);
+  outline-offset: 1px;
+}
+.ps-dict-empty {
+  font-size: 12px;
+  color: var(--ps-text-subtle, #64748b);
+}
+.ps-dict-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+}
+.ps-dict-count {
+  font-size: 11px;
+  color: var(--ps-text-muted, #94a3b8);
+}
+.ps-dict-clear-btn {
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+}
+.ps-mic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.ps-mic-row .ps-select {
+  flex: 1;
+  min-width: 0;
+}
+.ps-audio-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ps-text-muted, #94a3b8);
+  line-height: 1.4;
+}
+.ps-audio-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3fb950;
+  flex-shrink: 0;
+}
+.ps-audio-dot.warn {
+  background: #d29922;
+}
+.ps-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: var(--ps-input-bg, #0f1115);
+  border: 1px solid var(--ps-border, #2a2e37);
+}
+.ps-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ps-toggle-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #e2e8f0);
+}
+.ps-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #2d3340;
+  border: 1px solid var(--ps-border, #2a2e37);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background-color 0.16s, border-color 0.16s;
+}
+.ps-switch[aria-checked="true"] {
+  background: var(--ps-accent, #3b82f6);
+  border-color: var(--ps-accent, #3b82f6);
+}
+.ps-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.16s;
+}
+.ps-switch[aria-checked="true"]::after {
+  transform: translateX(16px);
+}
+.ps-switch:focus-visible {
+  outline: 2px solid var(--ps-accent, #3b82f6);
+  outline-offset: 2px;
+}
+.ps-volume-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: var(--ps-input-bg, #0f1115);
+  border: 1px solid var(--ps-border, #2a2e37);
+  transition: opacity 0.15s;
+}
+.ps-volume-card.disabled {
+  opacity: 0.48;
+}
+.ps-volume-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ps-volume-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ps-volume-slider {
+  flex: 1;
+  accent-color: var(--ps-accent, #3b82f6);
+  cursor: pointer;
+  height: 4px;
+}
+.ps-volume-slider:disabled {
+  cursor: not-allowed;
+}
+.ps-volume-pct {
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #e2e8f0);
+}

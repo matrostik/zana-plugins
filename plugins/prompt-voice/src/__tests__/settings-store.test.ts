@@ -20,4 +20,24 @@ describe('settings store', () => {
     await store.update({ inputLanguage: 'en' });
     expect(await store.readEffective()).toMatchObject({ inputLanguage: 'en', openaiApiKey: 'secret' });
   });
+  it('persists microphone selection, sound cue toggle, and volume', async () => {
+    const values = new Map<string, unknown>();
+    const store = createSettingsStore({
+      get: async (key) => values.get(key),
+      set: async (key, value) => { values.set(key, value); }
+    }, async () => ({}));
+
+    await store.update({
+      micDeviceId: 'usb-mic-1',
+      micLabel: 'Blue Yeti',
+      soundCuesEnabled: false,
+      soundCuesVolume: 60
+    });
+    expect(await store.readPublic()).toEqual({
+      micDeviceId: 'usb-mic-1',
+      micLabel: 'Blue Yeti',
+      soundCuesEnabled: 'false',
+      soundCuesVolume: '60'
+    });
+  });
 });

@@ -1,28 +1,16 @@
-import { defaultStartSession, type RecordingSession } from './recorder.ts';
+import { defaultStartSession, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
 import { useDictation } from './useDictation.ts';
 import type { DictationPhase } from './dictationMachine.ts';
-import styles from '../../styles.css';
+import { ensureStylesInjected } from './injectStyles.ts';
+
+export { ensureStylesInjected };
 
 export interface MicButtonProps {
   /** Starts a recording. Defaults to the browser microphone; tests inject a fake. */
-  startSession?: () => Promise<RecordingSession>;
+  startSession?: (options?: StartRecordingOptions) => Promise<RecordingSession>;
 }
 
 const BUTTON_LABEL = 'Dictation';
-const STYLE_ELEMENT_ID = 'zcc-ext-prompt-voice-styles';
-
-export function ensureStylesInjected(): void {
-  if (typeof document === 'undefined') return;
-  let styleEl = document.getElementById(STYLE_ELEMENT_ID);
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = STYLE_ELEMENT_ID;
-    document.head.appendChild(styleEl);
-  }
-  if (styleEl.textContent !== styles) {
-    styleEl.textContent = styles;
-  }
-}
 
 const PHASE_TITLES: Record<DictationPhase, string> = {
   idle: 'Start dictation',

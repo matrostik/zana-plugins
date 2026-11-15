@@ -76,13 +76,29 @@ export function browserRecorderDeps(): RecorderDeps {
 }
 
 /** Maps getUserMedia failures to codes the UI can explain. */
-async function requestMicrophone(deps: RecorderDeps): Promise<MediaStream> {
+async function requestMicrophone(deps: RecorderDeps, deviceId?: string): Promise<MediaStream> {
+  const normalizedId = deviceId && deviceId !== 'default' ? deviceId : undefined;
+  const constraints: MediaStreamConstraints = normalizedId
+    ? { audio: { deviceId: { exact: normalizedId } } }
+    : { audio: true };
+
   try {
-    return await deps.getUserMedia({ audio: true });
+    return await deps.getUserMedia(constraints);
   } catch (err) {
     const name = err instanceof Error ? err.name : '';
     if (name === 'NotAllowedError' || name === 'SecurityError') {
       throw new RecordingError('MIC_DENIED', 'Microphone access was denied. Allow it for Zana in system settings, then try again.');
+    }
+    // If a previously saved microphone is disconnected, fall back to the system default device.
+    if (normalizedId && (name === 'OverconstrainedError' || name === 'NotFoundError')) {
+      try {
+        return await deps.getUserMedia({ audio: true });
+      } catch (fallbackErr) {
+        const fallbackName = fallbackErr instanceof Error ? fallbackErr.name : '';
+        if (fallbackName === 'NotAllowedError' || fallbackName === 'SecurityError') {
+          throw new RecordingError('MIC_DENIED', 'Microphone access was denied. Allow it for Zana in system settings, then try again.');
+        }
+      }
     }
     throw new RecordingError('MIC_UNAVAILABLE', 'No microphone is available. Connect one and try again.');
   }
@@ -113,6 +129,8 @@ function setupAutoStopTimer(ms: number, onAutoStop: () => void): () => void {
 }
 
 export interface StartRecordingOptions {
+  /** Preferred input microphone device ID (`default` or omitted uses OS default). */
+  deviceId?: string;
   maxDurationMs?: number;
   /** Soft limit: recording stops automatically once this many bytes are collected. */
   maxBytes?: number;
@@ -313,14 +331,15 @@ function createRecordingSession(
  * Starts a browser microphone recording with default options. Module-level so components can use
  * it as a stable default prop without breaking hook memoization.
  */
-export const defaultStartSession = (): Promise<RecordingSession> => startRecording();
+export const defaultStartSession = (options?: StartRecordingOptions): Promise<RecordingSession> =>
+  startRecording(browserRecorderDeps(), options);
 
 /** Starts a microphone recording. Throws RecordingError when the mic is denied or missing. */
 export async function startRecording(
   deps: RecorderDeps = browserRecorderDeps(),
   options: StartRecordingOptions = {}
 ): Promise<RecordingSession> {
-  const stream = await requestMicrophone(deps);
+  const stream = await requestMicrophone(deps, options.deviceId);
   const meter = createAudioMeter(stream);
   const tracks = stream.getTracks();
   let onTrackEnded: (() => void) | undefined;

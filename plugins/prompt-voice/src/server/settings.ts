@@ -6,9 +6,14 @@ import {
   type SttProviderId,
   type ToneId
 } from '../shared/protocol.ts';
+import {
+  DICTIONARY_MAX_TERM_LENGTH,
+  DICTIONARY_MAX_TERMS,
+  parseDictionary
+} from '../shared/dictionary.ts';
+import { parseAudioPreferences } from '../shared/audioPreferences.ts';
 
-export const DICTIONARY_MAX_TERMS = 200;
-export const DICTIONARY_MAX_TERM_LENGTH = 80;
+export { DICTIONARY_MAX_TERM_LENGTH, DICTIONARY_MAX_TERMS, parseDictionary };
 export const CUSTOM_PROMPT_MAX_CHARS = 2000;
 export const DEFAULT_INPUT_LANGUAGE = 'auto';
 
@@ -24,6 +29,10 @@ export interface PromptVoiceSettings {
   customPrompt: string;
   dictionary: string[];
   inputLanguage: string;
+  micDeviceId: string;
+  micLabel: string;
+  soundCuesEnabled: boolean;
+  soundCuesVolume: number;
   keys: {
     openai: string;
     google: string;
@@ -113,19 +122,6 @@ function pickOption<T extends string>(value: unknown, options: readonly T[], fal
   return typeof value === 'string' && (options as readonly string[]).includes(value) ? (value as T) : fallback;
 }
 
-/** Splits on commas and newlines, drops empties and duplicates, and enforces the size limits. */
-export function parseDictionary(value: unknown): string[] {
-  if (typeof value !== 'string') return [];
-  const seen = new Set<string>();
-  const delimiters = /[,\n]/;
-  for (const raw of value.split(delimiters)) {
-    const term = raw.trim().slice(0, DICTIONARY_MAX_TERM_LENGTH);
-    if (term) seen.add(term);
-    if (seen.size >= DICTIONARY_MAX_TERMS) break;
-  }
-  return [...seen];
-}
-
 function normalizeLanguage(value: unknown): string {
   const trimmed = typeof value === 'string' ? value.trim() : '';
   // Providers compare against the exact `auto` sentinel, so `AUTO`/`Auto` must map to it.
@@ -143,6 +139,7 @@ function normalizeLanguage(value: unknown): string {
 
 /** Normalizes raw plugin settings once so the rest of the server never handles raw values. */
 export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSettings {
+  const audio = parseAudioPreferences(raw);
   return {
     sttProvider: pickOption(raw.sttProvider, STT_PROVIDER_IDS, 'system'),
     sttModel: asTrimmedString(raw.sttModel, 120),
@@ -152,6 +149,10 @@ export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSett
     customPrompt: asTrimmedString(raw.customPrompt, CUSTOM_PROMPT_MAX_CHARS),
     dictionary: parseDictionary(raw.dictionary),
     inputLanguage: normalizeLanguage(raw.inputLanguage),
+    micDeviceId: audio.micDeviceId,
+    micLabel: audio.micLabel,
+    soundCuesEnabled: audio.soundCuesEnabled,
+    soundCuesVolume: audio.soundCuesVolume,
     keys: {
       openai: asTrimmedString(raw.openaiApiKey, 300),
       google: asTrimmedString(raw.googleApiKey, 300),
