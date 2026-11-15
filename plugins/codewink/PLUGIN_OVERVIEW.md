@@ -14,7 +14,7 @@ Triage and AI-review GitHub pull requests in Zana Command Center using the AI pr
 - **Deep Review**: Open a visible Zana thread with the full pull request context to dig in interactively.
 - **Opt-in Auto-Review**: Per watched repository, review each new head commit automatically (drafts and your own pull requests are skipped).
 - **Project Tab**: A **CodeWink** tab inside each Zana project shows only the pull requests of the repositories that project's git remotes point at, and only its own checkouts. Unwatched project repositories get a one-click **Watch repository** prompt.
-- **Local Reviews**: Review uncommitted, staged, or branch changes in any checkout of a Zana project before a pull request exists. Reviews read an immutable snapshot commit, so your files, index, and branches are never touched.
+- **Local Reviews**: Review uncommitted, staged, branch, or selected-commit changes in any checkout of a Zana project before a pull request exists. Reviews read an immutable snapshot commit, so your files, index, and branches are never touched.
 - **CLI and Agent Tools**: `zcc codewink` from the terminal, and the `codewink_list_prs`, `codewink_get_review`, `codewink_review_pr`, and `codewink_review_local` tools for agents.
 
 ## GitHub sign-in
@@ -30,6 +30,13 @@ CodeWink is a port of the original **CodeNod 2.5.1** application: https://git.so
 Like Git Tree, this plugin installs from pre-built artifacts committed alongside the source: `server.mjs` (referenced by `zcc.server`) and `app.js` (referenced by `zcc.app`). The TypeScript sources under `src/` plus `server.ts`/`app.tsx` are the source of truth; rebuild with `zcc plugin build` and re-commit the artifacts. Run the tests with `npm test`.
 
 ## Changelog
+
+### 0.3.0
+
+- **Branch & Commit Local Review Scopes**: Review any local or remote branch (`--scope branch --branch <ref>`) without switching checkouts, or replay and review selected commits (`--scope commits --commits <sha1>,<sha2>`) with paged commit history and commit-level staleness tracking.
+- **Fix with Agent Tracking & Controls**: Live status banner showing the running provider, model, permission mode, and elapsed timer, with **Open fix thread**, **Stop fix**, completion/failure states, and persisted provider/model/mode choices.
+- **Cached Provider Model Catalog**: Shared TTL-cached provider model loading with per-provider timeouts, manual **Refresh models**, and dirty-draft preservation in the AI Model settings tab.
+- **Sync, Search & Review Hardening**: Only advance `lastSyncAt` when a host sync advances or succeeds, mark sliced GitHub PR searches incomplete when results exceed `maxResults`, share the stale-PR guard across review actions, and harden path validation and error logging.
 
 ### 0.2.2
 
