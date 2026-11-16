@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  availableModelsHandler,
   createAvailableModelsLoader,
   mergeCatalogModels,
   statusFromSettings,
@@ -151,9 +150,9 @@ describe('mergeCatalogModels', () => {
   });
 });
 
-describe('availableModelsHandler', () => {
+describe('createAvailableModelsLoader', () => {
   it('returns assistant and discovered models from host providers', async () => {
-    const res = await availableModelsHandler({
+    const loader = createAvailableModelsLoader({
       readSettings: async () => ({}),
       providers: {
         list: async () => [{ id: 'antigravity', displayName: 'Antigravity ACP' }],
@@ -162,6 +161,7 @@ describe('availableModelsHandler', () => {
         })
       }
     });
+    const res = await loader.load();
 
     expect(res).toEqual(
       expect.arrayContaining([
@@ -175,17 +175,15 @@ describe('availableModelsHandler', () => {
     );
   });
 
-  it('does not inject hardcoded Anthropic/Google/OpenAI defaults when host providers are empty or API keys exist for STT', async () => {
-    const res = await availableModelsHandler({
-      readSettings: async () => ({
-        openaiApiKey: 'sk-stt-only',
-        googleApiKey: 'g-stt-only'
-      }),
+  it('omits unconfigured direct providers when no API keys are present', async () => {
+    const loader = createAvailableModelsLoader({
+      readSettings: async () => ({}),
       providers: {
         list: async () => [],
         models: async () => ({ models: [] })
       }
     });
+    const res = await loader.load();
 
     expect(res).toEqual([
       {
@@ -196,14 +194,14 @@ describe('availableModelsHandler', () => {
     ]);
   });
 
-  it('loads host providers concurrently and isolates a timed-out provider', async () => {
+  it('loads host providers concurrently and excludes a timed-out provider from visible entries', async () => {
     let releaseHung!: () => void;
     const hungPromise = new Promise((resolve) => {
       releaseHung = () => resolve({ models: [] });
     });
 
     try {
-      const res = await availableModelsHandler({
+      const loader = createAvailableModelsLoader({
         providerTimeoutMs: 20,
         providers: {
           list: async () => [
@@ -216,28 +214,16 @@ describe('availableModelsHandler', () => {
           }
         }
       });
+      const res = await loader.load();
 
-      expect(res).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            providerId: 'fast-prov',
-            models: [{ id: 'fast-1', label: 'Fast Model' }],
-            error: null
-          }),
-          expect.objectContaining({
-            providerId: 'slow-prov',
-            models: [],
-            error: expect.stringMatching(/timed out/i)
-          })
-        ])
-      );
+      expect(res.map((p) => p.providerId)).toEqual(['fast-prov', 'assistant']);
     } finally {
       releaseHung();
     }
   });
 
-  it('orders providers and their models alphabetically by ABC', async () => {
-    const res = await availableModelsHandler({
+  it('orders host and configured direct providers and their models alphabetically by ABC', async () => {
+    const loader = createAvailableModelsLoader({
       readSettings: async () => ({
         openaiApiKey: 'sk-test',
         anthropicApiKey: 'ak-test'
@@ -265,6 +251,7 @@ describe('availableModelsHandler', () => {
         }
       }
     });
+    const res = await loader.load();
 
     const displayNames = res.map((p) => p.displayName);
     const sortedDisplayNames = [...displayNames].sort((a, b) =>
@@ -280,15 +267,14 @@ describe('availableModelsHandler', () => {
       expect(labels).toEqual(sortedLabels);
     }
   });
-});
 
-describe('createAvailableModelsLoader', () => {
   it('lists only configured direct providers even without host providers', async () => {
     const loader = createAvailableModelsLoader({ readSettings: async () => ({ openaiApiKey: 'key' }) });
     const result = await loader.load();
     expect(result.map((entry) => entry.providerId)).toContain('openai');
     expect(result.map((entry) => entry.providerId)).not.toContain('anthropic');
   });
+
   it('reuses a slow provider request across ordinary loads', async () => {
     let resolve!: (value: unknown) => void;
     const models = vi.fn(() => new Promise((done) => { resolve = done; }));
@@ -322,6 +308,7 @@ describe('createAvailableModelsLoader', () => {
     await loader.load();
     await vi.waitFor(() => expect(onModelsUpdated).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ providerId: 'slow' })])));
   });
+
   it('caches complete host catalogs and bypasses cache on refresh', async () => {
     const list = vi.fn(async () => [{ id: 'codex', displayName: 'Codex' }]);
     const models = vi.fn(async () => ({ models: [{ id: 'gpt-5', model: 'GPT-5' }] }));
@@ -443,5 +430,99 @@ describe('createAvailableModelsLoader', () => {
     const second = await loader.load();
     expect(second.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
     expect(list.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('does not block on an unresolved providers.list() past softWaitMs and publishes when list finishes', async () => {
+    let resolveList!: (list: Array<{ id: string; displayName?: string }>) => void;
+    const onModelsUpdated = vi.fn();
+    const list = vi.fn(
+      () =>
+        new Promise<Array<{ id: string; displayName?: string }>>((resolve) => {
+          resolveList = resolve;
+        })
+    );
+    const models = vi.fn(async () => ({ models: [{ id: 'ag-1', model: 'Gemini' }] }));
+
+    const loader = createAvailableModelsLoader(
+      {
+        readSettings: async () => ({ openaiApiKey: 'sk-1' }),
+        providers: { list, models },
+        providerTimeoutMs: 5000,
+        onModelsUpdated
+      },
+      { softWaitMs: 15 }
+    );
+
+    // First load returns assistant + configured direct provider after softWaitMs even while list() is pending
+    const first = await loader.load();
+    expect(first.map((p) => p.providerId)).toEqual(['openai', 'assistant']);
+
+    // Second load reuses pending list fetch without stalling or duplicating providers.list()
+    const second = await loader.load();
+    expect(second.map((p) => p.providerId)).toEqual(['openai', 'assistant']);
+    expect(list).toHaveBeenCalledTimes(1);
+
+    // When list() settles in background, host provider models are fetched and published
+    resolveList([{ id: 'antigravity', displayName: 'Antigravity' }]);
+    await vi.waitFor(() => expect(onModelsUpdated).toHaveBeenCalledTimes(1));
+    expect((onModelsUpdated.mock.calls[0]?.[0] as Array<{ providerId: string }>).map((p) => p.providerId)).toEqual([
+      'antigravity',
+      'openai',
+      'assistant'
+    ]);
+  });
+
+  it('preserves healthy cached host providers when a subsequent providers.list() fails', async () => {
+    let clock = 1000;
+    let shouldFail = false;
+    const log = { warn: vi.fn(), error: vi.fn() };
+    const list = vi.fn(async () => {
+      if (shouldFail) throw new Error('daemon restarting');
+      return [{ id: 'antigravity', displayName: 'Antigravity' }];
+    });
+    const models = vi.fn(async () => ({ models: [{ id: 'ag-1', model: 'Gemini' }] }));
+
+    const loader = createAvailableModelsLoader(
+      { providers: { list, models }, log },
+      { ttlMs: 1000, now: () => clock }
+    );
+
+    const initial = await loader.load();
+    expect(initial.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+
+    // Expire cache and simulate transient providers.list() failure
+    clock += 5000;
+    shouldFail = true;
+    const afterFailure = await loader.load();
+    expect(afterFailure.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+    expect(log.warn).toHaveBeenCalled();
+  });
+
+  it('refreshDirectEntries updates direct providers and publishes without clearing cached host providers', async () => {
+    let apiKey = '';
+    const onModelsUpdated = vi.fn();
+    const list = vi.fn(async () => [{ id: 'antigravity', displayName: 'Antigravity' }]);
+    const models = vi.fn(async () => ({ models: [{ id: 'ag-1', model: 'Gemini' }] }));
+
+    const loader = createAvailableModelsLoader({
+      readSettings: async () => (apiKey ? { openaiApiKey: apiKey } : {}),
+      providers: { list, models },
+      onModelsUpdated
+    });
+
+    const initial = await loader.load();
+    expect(initial.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+
+    apiKey = 'sk-added';
+    await loader.refreshDirectEntries();
+
+    expect(onModelsUpdated).toHaveBeenCalledTimes(1);
+    expect((onModelsUpdated.mock.calls[0]?.[0] as Array<{ providerId: string }>).map((p) => p.providerId)).toEqual([
+      'antigravity',
+      'openai',
+      'assistant'
+    ]);
+    // Host list was never re-queried
+    expect(list).toHaveBeenCalledTimes(1);
   });
 });

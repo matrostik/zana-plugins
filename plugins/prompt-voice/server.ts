@@ -44,7 +44,19 @@ type PluginUiWithProjectTab = ZccPluginApi['ui'] & {
 };
 
 const STATUS_UNAVAILABLE_MESSAGE = 'Prompt Voice status is unavailable. See the Zana log for details.';
+const API_KEY_SETTING_FIELDS = ['openaiApiKey', 'googleApiKey', 'anthropicApiKey'] as const;
 export { PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
+
+function apiKeyPresenceSignature(raw: Record<string, unknown>): string {
+  const { keys } = normalizeSettings(raw);
+  return `${Boolean(keys.openai)}:${Boolean(keys.google)}:${Boolean(keys.anthropic)}`;
+}
+
+function patchTouchesApiKeys(patch: unknown): boolean {
+  if (!patch || typeof patch !== 'object') return false;
+  const rec = patch as Record<string, unknown>;
+  return API_KEY_SETTING_FIELDS.some((field) => field in rec);
+}
 
 /**
  * Registers Prompt Voice's settings, project tab availability, and RPC methods.
@@ -69,10 +81,17 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       zcc.realtime?.publish?.(MODELS_UPDATED_EVENT, entries);
     }
   });
+  let lastApiKeySignature = await readSettings()
+    .then(apiKeyPresenceSignature)
+    .catch(() => 'false:false:false');
+
   if (store) {
     zcc.rpc.method(SETTINGS_UPDATE_METHOD, async (patch) => {
       const updated = await store.update(patch);
-      modelsLoader.invalidate();
+      if (patchTouchesApiKeys(patch)) {
+        lastApiKeySignature = apiKeyPresenceSignature(updated);
+        void modelsLoader.refreshDirectEntries();
+      }
       return updated;
     });
   }
@@ -103,7 +122,11 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   });
 
   settings.onChange?.((next) => {
-    modelsLoader.invalidate();
+    const nextSignature = apiKeyPresenceSignature(next);
+    if (nextSignature !== lastApiKeySignature) {
+      lastApiKeySignature = nextSignature;
+      void modelsLoader.refreshDirectEntries();
+    }
     zcc.realtime?.publish?.(SETTINGS_CHANGED_EVENT, normalizeVisibilitySettings(next));
   });
 

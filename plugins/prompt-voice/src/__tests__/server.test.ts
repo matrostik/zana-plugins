@@ -10,11 +10,13 @@ import {
   MODELS_UPDATED_EVENT,
   REPHRASE_METHOD,
   SETTINGS_CHANGED_EVENT,
+  SETTINGS_GET_METHOD,
+  SETTINGS_UPDATE_METHOD,
   STATUS_METHOD,
   TRANSCRIBE_METHOD
 } from '../shared/protocol.ts';
 
-function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none' }) {
+function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none' }, withKvStorage = false) {
   const methods = new Map<string, (input: unknown) => unknown>();
   const projectTabRegistrations: Array<{
     tabId: string;
@@ -22,6 +24,7 @@ function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none'
   }> = [];
   let onChangeHandler: ((next: Record<string, unknown>) => void) | undefined;
   let currentSettings = settingsValues;
+  const kvStore = new Map<string, unknown>();
   const zcc = {
     settings: {
       define: vi.fn(() => ({
@@ -32,6 +35,21 @@ function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none'
         })
       }))
     },
+    ...(withKvStorage
+      ? {
+          storage: {
+            kv: {
+              get: vi.fn(async (k: string) => kvStore.get(k)),
+              set: vi.fn(async (k: string, v: unknown) => {
+                kvStore.set(k, v);
+              }),
+              delete: vi.fn(async (k: string) => {
+                kvStore.delete(k);
+              })
+            }
+          }
+        }
+      : {}),
     rpc: {
       method: vi.fn((name: string, handler: (input: unknown) => unknown) => methods.set(name, handler))
     },
@@ -66,15 +84,6 @@ function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none'
 }
 
 describe('createPromptVoicePlugin', () => {
-  it('refreshes configured direct providers when settings change', async () => {
-    const { zcc, methods, setSettings, triggerSettingsChange } = fakeZcc();
-    await createPromptVoicePlugin(zcc as never, { localWhisper: null });
-    await methods.get(AVAILABLE_MODELS_METHOD)?.({});
-    setSettings({ openaiApiKey: 'key' });
-    triggerSettingsChange({ openaiApiKey: 'key' });
-    const result = await methods.get(AVAILABLE_MODELS_METHOD)?.({}) as Array<{ providerId: string }>;
-    expect(result.some((entry) => entry.providerId === 'openai')).toBe(true);
-  });
   it('declares keyless defaults, visibility settings, optional secret API keys, and registers RPC methods', async () => {
     const { zcc, methods } = fakeZcc();
     await createPromptVoicePlugin(zcc as never, { localWhisper: null });
@@ -136,6 +145,35 @@ describe('createPromptVoicePlugin', () => {
       showInProjects: true,
       micVisibility: 'projects'
     });
+  });
+
+  it('preserves cached host providers on non-key settings changes and updates direct models when API keys change', async () => {
+    const { zcc, methods, setSettings, triggerSettingsChange } = fakeZcc({ llmProvider: 'none' }, true);
+    await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+    expect([...methods.keys()]).toEqual(expect.arrayContaining([SETTINGS_GET_METHOD, SETTINGS_UPDATE_METHOD]));
+
+    // Initial load warms host providers once
+    await methods.get(AVAILABLE_MODELS_METHOD)?.({});
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(1);
+
+    // Updating tone / visibility / sound cues via RPC or settings.onChange does NOT re-probe host providers
+    await methods.get(SETTINGS_UPDATE_METHOD)?.({ tone: 'formal', soundCuesEnabled: false });
+    triggerSettingsChange({ showHomeWidget: false, tone: 'formal' });
+    await methods.get(AVAILABLE_MODELS_METHOD)?.({});
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(1);
+
+    // Adding an API key in host settings refreshes direct models & publishes realtime without re-probing host providers
+    const withKey = { llmProvider: 'none', openaiApiKey: 'sk-new' };
+    setSettings(withKey);
+    triggerSettingsChange(withKey);
+
+    await vi.waitFor(() =>
+      expect(zcc.realtime.publish).toHaveBeenCalledWith(
+        MODELS_UPDATED_EVENT,
+        expect.arrayContaining([expect.objectContaining({ providerId: 'openai' })])
+      )
+    );
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(1);
   });
 
   it('serves status reporting available providers without requiring keys', async () => {

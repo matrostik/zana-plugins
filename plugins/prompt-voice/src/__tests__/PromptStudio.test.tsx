@@ -1074,4 +1074,26 @@ describe('PromptStudio Component', () => {
     expect(focusWindow).toHaveBeenCalledTimes(1);
     expect(bringBack).toHaveBeenCalledTimes(1);
   });
+
+  it('reloads available models when returning from StudioSettings', async () => {
+    let modelsCall = 0;
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.availableModels') {
+        modelsCall++;
+        if (modelsCall === 1) {
+          return [{ providerId: 'assistant', displayName: 'Zana Assistant', models: [{ id: 'assistant', label: 'Default' }] }];
+        }
+        return [
+          { providerId: 'assistant', displayName: 'Zana Assistant', models: [{ id: 'assistant', label: 'Default' }] },
+          { providerId: 'openai', displayName: 'OpenAI', models: [{ id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano' }] }
+        ];
+      }
+      return {};
+    });
+    render(<PromptStudio pluginId="prompt-voice" />);
+    await waitFor(() => expect(modelsCall).toBe(1));
+    fireEvent.click(screen.getByRole('button', { name: /^settings$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back to studio/i }));
+    expect(await screen.findByRole('option', { name: 'OpenAI' })).toBeTruthy();
+  });
 });

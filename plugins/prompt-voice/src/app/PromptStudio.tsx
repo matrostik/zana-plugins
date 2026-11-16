@@ -808,6 +808,8 @@ export function PromptStudio({
             providerId: s.llmProvider,
             modelId: typeof s.llmModel === 'string' && s.llmModel ? s.llmModel : undefined
           });
+        } else if (s.llmProvider === 'none') {
+          setSavedLlmSettings(null);
         }
         if (res && typeof res === 'object') {
           updateAudioPrefsIfChanged(writeCachedAudioPreferences(s));
@@ -1271,7 +1273,8 @@ export function PromptStudio({
     updateAudioPrefsIfChanged(readCachedAudioPreferences());
     loadStudioSettings();
     refreshStatus();
-  }, [loadStudioSettings, refreshStatus, updateAudioPrefsIfChanged]);
+    loadAvailableModels();
+  }, [loadAvailableModels, loadStudioSettings, refreshStatus, updateAudioPrefsIfChanged]);
 
   const handleToggleDictation = async () => {
     const prefs = audioPrefsRef.current;

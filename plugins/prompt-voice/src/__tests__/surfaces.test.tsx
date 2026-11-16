@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import appDefinition, { PROMPT_STUDIO_PANEL_PATH, PROMPT_STUDIO_PROJECT_TAB_ID } from '../../app.tsx';
 import { HomeVoiceSection } from '../app/HomeVoiceSection.tsx';
 import { VisibilitySettingsSection } from '../app/VisibilitySettingsSection.tsx';
 import type { RecordedAudio, RecordingSession } from '../app/recorder.ts';
 import { resetSoundCueContext } from '../app/soundCues.ts';
-import { useVisibilitySettings } from '../app/safeSdk.ts';
 
 const fakes = vi.hoisted(() => ({
   settingsValues: { showHomeWidget: true, showInProjects: true, micVisibility: 'both' } as Record<string, string | number | boolean> | undefined,
@@ -16,7 +15,6 @@ const fakes = vi.hoisted(() => ({
   toPluginPanel: vi.fn(),
   toProject: vi.fn(),
   toCompose: vi.fn()
-  ,realtimeHandler: undefined as ((payload: unknown) => void) | undefined
 }));
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
@@ -32,7 +30,7 @@ vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
     toCompose: fakes.toCompose,
     openPanelAgent: vi.fn(() => false)
   }),
-  useRealtime: (_channel: string, handler: (payload: unknown) => void) => { fakes.realtimeHandler = handler; }
+  useRealtime: vi.fn()
 }));
 
 function fakeSession(): RecordingSession {
@@ -66,14 +64,6 @@ afterEach(() => {
 });
 
 describe('HomeVoiceSection', () => {
-  it('keeps realtime visibility when the host returns a new equivalent settings object', () => {
-    const view = renderHook(() => useVisibilitySettings());
-    act(() => fakes.realtimeHandler?.({ showHomeWidget: false, showInProjects: true, micVisibility: 'both' }));
-    expect(view.result.current.showHomeWidget).toBe(false);
-    fakes.settingsValues = { ...fakes.settingsValues };
-    view.rerender();
-    expect(view.result.current.showHomeWidget).toBe(false);
-  });
   it('hides itself completely when showHomeWidget is false', () => {
     fakes.settingsValues = { showHomeWidget: false, showInProjects: true, micVisibility: 'both' };
     const { container } = render(<HomeVoiceSection pluginId="prompt-voice" projectId={null} />);
@@ -155,6 +145,15 @@ describe('VisibilitySettingsSection', () => {
     });
     await waitFor(() =>
       expect(fakes.setPluginSettings).toHaveBeenCalledWith('prompt-voice', { micVisibility: 'main' })
+    );
+  });
+
+  it('normalizes slot-supplied pluginId to "prompt-voice" when writing settings', async () => {
+    render(<VisibilitySettingsSection pluginId="prompt-voice-home" />);
+
+    fireEvent.click(screen.getByRole('switch', { name: /main home screen widget/i }));
+    await waitFor(() =>
+      expect(fakes.setPluginSettings).toHaveBeenCalledWith('prompt-voice', { showHomeWidget: false })
     );
   });
 

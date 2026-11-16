@@ -23,13 +23,15 @@ import {
 
 export const PROMPT_VOICE_PLUGIN_ID = 'prompt-voice';
 
-function getDirectCallPluginRpc():
-  | ((pluginId: string, method: string, args?: unknown) => Promise<unknown>)
-  | undefined {
+type DirectCallPluginRpc = (pluginId: string, method: string, args?: unknown) => Promise<unknown>;
+
+export function resolvePromptVoicePluginId(_pluginId?: string): string {
+  return PROMPT_VOICE_PLUGIN_ID;
+}
+
+function getDirectCallPluginRpc(): DirectCallPluginRpc | undefined {
   try {
-    const fn = (
-      ZccAppSdk as { callPluginRpc?: (pluginId: string, method: string, args?: unknown) => Promise<unknown> }
-    ).callPluginRpc;
+    const fn = (ZccAppSdk as { callPluginRpc?: DirectCallPluginRpc }).callPluginRpc;
     return typeof fn === 'function' ? fn : undefined;
   } catch {
     return undefined;
@@ -100,17 +102,19 @@ export function usePromptVoiceRpc(slotPluginId?: string): { call<T = unknown>(me
       async call<T = unknown>(method: string, input?: unknown): Promise<T> {
         const directCall = getDirectCallPluginRpc();
         const hasInput = input !== undefined;
-
-        if (
-          slotPluginIdRef.current &&
-          slotPluginIdRef.current !== PROMPT_VOICE_PLUGIN_ID &&
-          directCall
-        ) {
+        const callDirect = async (): Promise<T> => {
+          if (!directCall) {
+            throw new Error('Prompt Voice RPC is unavailable in this environment.');
+          }
           return (
             hasInput
               ? await directCall(PROMPT_VOICE_PLUGIN_ID, method, input)
               : await directCall(PROMPT_VOICE_PLUGIN_ID, method)
           ) as T;
+        };
+
+        if (slotPluginIdRef.current && slotPluginIdRef.current !== PROMPT_VOICE_PLUGIN_ID && directCall) {
+          return callDirect();
         }
 
         const activeSlotRpc = slotRpcRef.current;
@@ -121,25 +125,13 @@ export function usePromptVoiceRpc(slotPluginId?: string): { call<T = unknown>(me
               : await activeSlotRpc.call<T>(method);
           } catch (err) {
             if (directCall && err instanceof Error && /unknown rpc/i.test(err.message)) {
-              return (
-                hasInput
-                  ? await directCall(PROMPT_VOICE_PLUGIN_ID, method, input)
-                  : await directCall(PROMPT_VOICE_PLUGIN_ID, method)
-              ) as T;
+              return callDirect();
             }
             throw err;
           }
         }
 
-        if (directCall) {
-          return (
-            hasInput
-              ? await directCall(PROMPT_VOICE_PLUGIN_ID, method, input)
-              : await directCall(PROMPT_VOICE_PLUGIN_ID, method)
-          ) as T;
-        }
-
-        throw new Error('Prompt Voice RPC is unavailable in this environment.');
+        return callDirect();
       }
     }),
     []
@@ -180,11 +172,11 @@ export function useVisibilitySettings(): PromptVoiceVisibilitySettings {
 }
 
 export async function updatePluginSettings(
-  pluginId: string,
+  pluginId: string | undefined,
   values: Record<string, string | boolean | undefined>
 ): Promise<void> {
   if (typeof setPluginSettings !== 'function') {
     throw new Error('Plugin settings API is unavailable in this environment.');
   }
-  await setPluginSettings(pluginId, values);
+  await setPluginSettings(resolvePromptVoicePluginId(pluginId), values);
 }
