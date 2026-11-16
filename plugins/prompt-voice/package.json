@@ -14,7 +14,12 @@
       "icon": "Mic"
     },
     "server": "./server.mjs",
-    "app": "./app.js"
+    "app": "./app.js",
+    "projectTab": {
+      "label": "Prompt Studio",
+      "icon": "Sparkles",
+      "global": false
+    }
   },
   "scripts": {
     "build": "node scripts/build.mjs",

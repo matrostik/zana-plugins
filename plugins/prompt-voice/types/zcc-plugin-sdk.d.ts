@@ -470,6 +470,10 @@ export type PluginSdkInbox = PluginSdk['inbox'];
           | Promise<Array<{ id: string; label: string; insertText?: string }>>;
         resolve(itemId: string): { context: string } | Promise<{ context: string }>;
       }): void;
+      registerProjectTabAvailability?(registration: {
+        tabId: string;
+        evaluate(ctx: { projectId: string }): { available: boolean; reason?: string } | Promise<{ available: boolean; reason?: string }>;
+      }): void;
     };
     readonly status: { needsConfiguration(message: string): void; configured(): void };
     readonly sdk: {
@@ -655,7 +659,7 @@ declare module '@zana-ai/zcc-plugin-sdk/app' {
     openPanelAgent(options: ZccPanelAgentOptions): boolean;
   }
   export interface ComposerView {
-    scope?: string;
+    scope?: string | { kind: string; projectId?: string | null; threadId?: string };
     layout?: 'expanded' | 'compact' | 'zen';
     draft?: { text: string; isEmpty: boolean; attachmentCount: number };
     run?: { isRunning: boolean; isSubmitting: boolean };
@@ -764,7 +768,9 @@ declare module '@zana-ai/zcc-plugin-sdk/testing/app' {
     providerIcons: Array<{ pluginId: string; generation: number; providerId: string; icon: unknown }>;
     navPanels: Array<{ id: string; title: string; component: unknown }>;
     browserToolbarActions: Array<{ id: string; title: string; component: unknown }>;
-    settingsSections: Array<{ id: string; title?: string }>;
+    settingsSections: Array<{ id: string; title?: string; description?: string; component: unknown }>;
+    projectTabs: Array<{ id: string; label: string; icon?: string; order?: number; global?: boolean; header?: string; detachable?: boolean; component: unknown }>;
+    homepageSections: Array<{ id: string; title: string; component: unknown }>;
     pendingInteractions: Array<{ id: string }>;
   };
   export function installTestPluginRuntime(options?: {

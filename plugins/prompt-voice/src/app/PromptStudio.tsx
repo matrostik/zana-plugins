@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StudioSettings } from './StudioSettings.tsx';
-import { useComposer, useComposerView, useRpc } from '@zana-ai/zcc-plugin-sdk/app';
+import type { PluginDetachedTabProps } from '@zana-ai/zcc-plugin-sdk/app';
 import {
   AVAILABLE_MODELS_METHOD,
+  MODELS_UPDATED_EVENT,
   REPHRASE_METHOD,
   SETTINGS_GET_METHOD,
   SETTINGS_UPDATE_METHOD,
   STATUS_METHOD,
   TRANSCRIBE_METHOD,
   type AvailableModelsResponse,
-  type DiscoveredModel,
   type DiscoveredProvider,
-  type LlmProviderId,
   type RephraseResponse,
   type StatusResponse,
   type TranscribeResponse
@@ -19,7 +18,17 @@ import {
 import { appendTranscript } from './appendText.ts';
 import { DEFAULT_MIC_DEVICE_ID, type AudioPreferences } from '../shared/audioPreferences.ts';
 import { readCachedAudioPreferences, writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
+import { ensureStylesInjected } from './injectStyles.ts';
 import { defaultStartSession, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
+import {
+  updatePluginSettings,
+  usePromptVoiceRpc,
+  useSafeComposer,
+  useSafeComposerView,
+  useSafeRealtime,
+  useSafeZccNavigate,
+  useVisibilitySettings
+} from './safeSdk.ts';
 import { playSoundCue } from './soundCues.ts';
 import { prepareAudioForUpload } from './wav.ts';
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
@@ -75,6 +84,11 @@ export const PROMPT_STUDIO_STYLES = `
     background: rgba(59, 130, 246, 0.15);
     color: var(--ps-accent);
     font-weight: 500;
+  }
+
+  .ps-badge-project {
+    background: rgba(34, 197, 94, 0.14);
+    color: #86efac;
   }
 
   .ps-header-actions {
@@ -413,6 +427,29 @@ export const PROMPT_STUDIO_STYLES = `
     font-size: 10px;
   }
 
+  .ps-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px 24px;
+    gap: 12px;
+  }
+
+  .ps-empty-card {
+    max-width: 440px;
+    padding: 20px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--ps-border);
+    background: var(--ps-panel-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
   @keyframes ps-spin-anim {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -462,6 +499,10 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 const STORAGE_KEY = 'zcc:prompt-voice:studio-draft:v1';
+
+export function draftStorageKey(projectId?: string): string {
+  return projectId ? `${STORAGE_KEY}:project:${projectId}` : STORAGE_KEY;
+}
 
 export interface PresetDef {
   id: string;
@@ -519,6 +560,7 @@ export interface ProviderOption {
   id: string;
   displayName: string;
   isComposerMatch?: boolean;
+  error?: string | null;
   models: DiscoveredModelOption[];
 }
 
@@ -542,30 +584,7 @@ export const STT_PROVIDER_OPTIONS: SttProviderOption[] = [
   { id: 'system', label: 'System (Zana Voice)' }
 ];
 
-const FALLBACK_PROVIDERS: ProviderOption[] = [
-  {
-    id: 'anthropic',
-    displayName: 'Anthropic',
-    models: [
-      { id: 'claude-haiku-4-5-20251001', key: 'anthropic-haiku', label: 'Claude 4.5 Haiku', providerId: 'anthropic' },
-      { id: 'claude-sonnet-5-20260201', key: 'anthropic-sonnet', label: 'Claude 5 Sonnet', providerId: 'anthropic' }
-    ]
-  },
-  {
-    id: 'google',
-    displayName: 'Google Gemini',
-    models: [
-      { id: 'gemini-2.5-flash', key: 'google-flash', label: 'Gemini 2.5 Flash', providerId: 'google' }
-    ]
-  },
-  {
-    id: 'openai',
-    displayName: 'OpenAI',
-    models: [
-      { id: 'gpt-5.4-nano', key: 'openai-fast', label: 'GPT-5.4 Nano (Fast)', providerId: 'openai' },
-      { id: 'gpt-5.6-luna', key: 'openai-smart', label: 'GPT-5.6 Luna (Smart)', providerId: 'openai' }
-    ]
-  },
+const ZANA_ASSISTANT_FALLBACK: ProviderOption[] = [
   {
     id: 'assistant',
     displayName: 'Zana Assistant',
@@ -573,36 +592,79 @@ const FALLBACK_PROVIDERS: ProviderOption[] = [
       {
         id: 'assistant',
         key: 'assistant',
-        label: 'Local / Active Thread Agent',
+        label: 'Default Assistant (Host Agent)',
         providerId: 'assistant'
       }
     ]
   }
 ];
 
-function useSafeComposerView() {
-  try {
-    return useComposerView();
-  } catch {
-    return null;
-  }
+const MODEL_RETRY_DELAYS_MS = [1500, 3000];
+
+export function PromptStudioDetachedPlaceholder({
+  focusWindow,
+  bringBack
+}: PluginDetachedTabProps): React.ReactElement {
+  ensureStylesInjected();
+  return (
+    <div className="ps-container" data-testid="ps-detached-placeholder">
+      <style>{PROMPT_STUDIO_STYLES}</style>
+      <div className="ps-empty-state">
+        <div className="ps-empty-card">
+          <span style={{ fontSize: 22 }} aria-hidden="true">🎙️</span>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>
+            Prompt Studio is open in its own window
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ps-text-muted)' }}>
+            Focus the floating window or bring Prompt Studio back to this project tab.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button type="button" className="ps-btn ps-btn-primary" onClick={focusWindow}>
+              Focus Window
+            </button>
+            <button type="button" className="ps-btn" onClick={bringBack}>
+              Bring Back
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export interface PromptStudioProps {
+  /** Plugin id supplied by host slots (`projectTab`, `navPanel`) */
+  pluginId?: string;
+  /** Present when mounted inside a Zana project (`projectTab` slot) */
+  projectId?: string;
+  /** Optional sub-path supplied by `navPanel` slot */
+  subPath?: string;
+  /** Host-supplied actions for `header: 'custom'` project tabs */
+  headerActions?: React.ReactNode;
   /** Optional custom session starter for tests */
   startSession?: (options?: StartRecordingOptions) => Promise<RecordingSession>;
 }
 
-export function PromptStudio({ startSession = defaultStartSession }: PromptStudioProps): React.ReactElement {
+export function PromptStudio({
+  pluginId,
+  projectId,
+  headerActions,
+  startSession = defaultStartSession
+}: PromptStudioProps): React.ReactElement {
+  ensureStylesInjected();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const rpc = useRpc();
-  const composer = useComposer();
+  const rpc = usePromptVoiceRpc(pluginId);
+  const composer = useSafeComposer();
   const composerView = useSafeComposerView();
+  const navigate = useSafeZccNavigate();
+  const visibility = useVisibilitySettings();
   const composerProviderId = composerView?.providerId;
   const composerFamilyId = composerView?.familyId;
+  const storageKey = draftStorageKey(projectId);
 
   // Track if user explicitly selected a model so we don't clobber it
   const userManuallySelectedModel = useRef(false);
+  const loadedStorageKeyRef = useRef<string | null>(null);
 
   // ─── Workspace State ─────────────────────────────────────────────────────────
   const [inputText, setInputText] = useState('');
@@ -611,11 +673,16 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const [isCopiedInput, setIsCopiedInput] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [insertNotice, setInsertNotice] = useState<string | null>(null);
+  const [reenablingProjectTab, setReenablingProjectTab] = useState(false);
+  const [reenableError, setReenableError] = useState<string | null>(null);
 
   // ─── Model & Status State ───────────────────────────────────────────────────
   const [discoveredProviders, setDiscoveredProviders] = useState<DiscoveredProvider[] | null>(null);
+  const [isLoadingModels, setIsLoadingModels] = useState<boolean>(true);
+  const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string>('assistant');
   const [selectedModelId, setSelectedModelId] = useState<string>('assistant');
+  const [savedLlmSettings, setSavedLlmSettings] = useState<{ providerId: string; modelId?: string } | null>(null);
   const [serverLlmProvider, setServerLlmProvider] = useState<string | null>(null);
   const [autoCleanupEnabled, setAutoCleanupEnabled] = useState(true);
   const [lastUsedModel, setLastUsedModel] = useState<string | null>(null);
@@ -645,27 +712,37 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customPromptInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load saved draft on mount
+  // Load saved draft on mount and when switching project scopes
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.inputText) setInputText(parsed.inputText);
-        if (parsed.outputText) setOutputText(parsed.outputText);
+        setInputText(typeof parsed.inputText === 'string' ? parsed.inputText : '');
+        setOutputText(typeof parsed.outputText === 'string' ? parsed.outputText : '');
         if (parsed.selectedProviderId) setSelectedProviderId(parsed.selectedProviderId);
-        if (parsed.selectedModelId) {
-          userManuallySelectedModel.current = true;
-          setSelectedModelId(parsed.selectedModelId);
-        }
+        if (parsed.selectedModelId) setSelectedModelId(parsed.selectedModelId);
+        userManuallySelectedModel.current = parsed.userManuallySelected === true;
         if (parsed.sttProvider) setSttProvider(parsed.sttProvider);
         if (parsed.sttModel) setSttModel(parsed.sttModel);
+      } else {
+        setInputText('');
+        setOutputText('');
+        userManuallySelectedModel.current = false;
       }
     } catch {
       // Ignore storage read errors
     }
-  }, []);
+    loadedStorageKeyRef.current = storageKey;
+  }, [storageKey]);
 
+  const rpcRef = useRef(rpc);
+  rpcRef.current = rpc;
+  const mountedRef = useRef(true);
+  const settingsRequestIdRef = useRef(0);
+  const dictationRequestIdRef = useRef(0);
+  const modelsRequestIdRef = useRef(0);
+  const modelsRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Apply server status to local state; shared by the mount load and post-update refresh.
   const applyStatus = useCallback((status: StatusResponse | null | undefined) => {
@@ -679,15 +756,17 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   }, []);
 
   const refreshStatus = useCallback(() => {
-    rpc
+    rpcRef.current
       .call(STATUS_METHOD)
-      .then((res) => applyStatus(res as StatusResponse))
+      .then((res) => {
+        if (mountedRef.current) applyStatus(res as StatusResponse);
+      })
       .catch(() => undefined);
-  }, [rpc, applyStatus]);
+  }, [applyStatus]);
 
   useEffect(() => {
     let isCurrent = true;
-    rpc
+    rpcRef.current
       .call(STATUS_METHOD)
       .then((res) => {
         if (isCurrent) applyStatus(res as StatusResponse);
@@ -698,13 +777,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     return () => {
       isCurrent = false;
     };
-  }, [rpc]);
-
-  const rpcRef = useRef(rpc);
-  rpcRef.current = rpc;
-  const mountedRef = useRef(true);
-  const settingsRequestIdRef = useRef(0);
-  const dictationRequestIdRef = useRef(0);
+  }, [applyStatus]);
 
   const updateAudioPrefsIfChanged = useCallback((next: AudioPreferences) => {
     setAudioPrefs((prev) =>
@@ -726,6 +799,12 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         const s = (res || {}) as Record<string, unknown>;
         if (typeof s.sttProvider === 'string' && s.sttProvider) setSttProvider(s.sttProvider);
         if (typeof s.sttModel === 'string' && s.sttModel) setSttModel(s.sttModel);
+        if (typeof s.llmProvider === 'string' && s.llmProvider && s.llmProvider !== 'none') {
+          setSavedLlmSettings({
+            providerId: s.llmProvider,
+            modelId: typeof s.llmModel === 'string' && s.llmModel ? s.llmModel : undefined
+          });
+        }
         if (res && typeof res === 'object') {
           updateAudioPrefsIfChanged(writeCachedAudioPreferences(s));
         }
@@ -733,35 +812,82 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       .catch(() => undefined);
   }, [updateAudioPrefsIfChanged]);
 
+  const clearModelsRetryTimer = useCallback(() => {
+    if (modelsRetryTimerRef.current) {
+      clearTimeout(modelsRetryTimerRef.current);
+      modelsRetryTimerRef.current = null;
+    }
+  }, []);
+
+  const loadAvailableModels = useCallback((options: { refresh?: boolean; retryAttempt?: number } = {}) => {
+    const refresh = options.refresh === true;
+    const retryAttempt = options.retryAttempt ?? 0;
+    clearModelsRetryTimer();
+    const requestId = ++modelsRequestIdRef.current;
+    setIsLoadingModels(true);
+    if (refresh || retryAttempt === 0) {
+      setModelsLoadError(null);
+    }
+
+    const scheduleRetry = () => {
+      if (!mountedRef.current || retryAttempt >= MODEL_RETRY_DELAYS_MS.length) return;
+      const delayMs = MODEL_RETRY_DELAYS_MS[retryAttempt];
+      modelsRetryTimerRef.current = setTimeout(() => {
+        if (!mountedRef.current) return;
+        loadAvailableModels({ retryAttempt: retryAttempt + 1 });
+      }, delayMs);
+    };
+
+    rpcRef.current
+      .call(AVAILABLE_MODELS_METHOD, refresh ? { refresh: true } : undefined)
+      .then((res) => {
+        if (!mountedRef.current || modelsRequestIdRef.current !== requestId) return;
+        const providers = Array.isArray(res) ? (res as AvailableModelsResponse) : [];
+        setDiscoveredProviders(providers);
+        setIsLoadingModels(false);
+        const foundHostProviders = providers.some(
+          (p) => p.providerId !== 'assistant' && Array.isArray(p.models) && p.models.length > 0
+        );
+        if (!foundHostProviders && !refresh) {
+          scheduleRetry();
+        }
+      })
+      .catch(() => {
+        if (!mountedRef.current || modelsRequestIdRef.current !== requestId) return;
+        setIsLoadingModels(false);
+        setModelsLoadError('Could not load Composer models. Using Zana Assistant.');
+        scheduleRetry();
+      });
+  }, [clearModelsRetryTimer]);
+
+  useSafeRealtime(MODELS_UPDATED_EVENT, (payload) => {
+    if (!mountedRef.current || !Array.isArray(payload)) return;
+    setDiscoveredProviders(payload as AvailableModelsResponse);
+    setIsLoadingModels(false);
+    setModelsLoadError(null);
+    clearModelsRetryTimer();
+  });
+
   useEffect(() => {
     mountedRef.current = true;
     loadStudioSettings();
+    loadAvailableModels();
     return () => {
       mountedRef.current = false;
       settingsRequestIdRef.current++;
       dictationRequestIdRef.current++;
+      modelsRequestIdRef.current++;
+      clearModelsRetryTimer();
     };
-  }, [loadStudioSettings]);
+  }, [clearModelsRetryTimer, loadAvailableModels, loadStudioSettings]);
 
-  // Fetch dynamic models catalog from host providers
-  useEffect(() => {
-    let isCurrent = true;
-    rpc
-      .call(AVAILABLE_MODELS_METHOD)
-      .then((res) => {
-        if (!isCurrent) return;
-        const providers = res as AvailableModelsResponse;
-        if (Array.isArray(providers) && providers.length > 0) {
-          setDiscoveredProviders(providers);
-        }
-      })
-      .catch(() => {
-        // Fall back gracefully to FALLBACK_PROVIDERS
-      });
-    return () => {
-      isCurrent = false;
-    };
-  }, [rpc]);
+  const hasHostProviders = useMemo(
+    () =>
+      (discoveredProviders ?? []).some(
+        (p) => p.providerId !== 'assistant' && Array.isArray(p.models) && p.models.length > 0
+      ),
+    [discoveredProviders]
+  );
 
   // Assemble provider and model list, ordered alphabetically (A-Z)
   const providerOptions: ProviderOption[] = useMemo(() => {
@@ -771,8 +897,12 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
       );
     };
 
-    if (!discoveredProviders || discoveredProviders.length === 0) {
-      const providers = FALLBACK_PROVIDERS.map((p) => {
+    const nonEmptyProviders = (discoveredProviders ?? []).filter(
+      (prov) => Array.isArray(prov.models) && prov.models.length > 0
+    );
+
+    if (nonEmptyProviders.length === 0) {
+      const providers = ZANA_ASSISTANT_FALLBACK.map((p) => {
         const isProvComposerMatch = Boolean(
           (composerProviderId && p.id.toLowerCase() === composerProviderId.toLowerCase()) ||
           (composerFamilyId && p.id.toLowerCase().includes(composerFamilyId.toLowerCase()))
@@ -791,15 +921,10 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     }
 
     const legacyAliases: Record<string, string> = {
-      'assistant:assistant': 'assistant',
-      'openai:gpt-5.4-nano': 'openai-fast',
-      'openai:gpt-5.6-luna': 'openai-smart',
-      'anthropic:claude-haiku-4-5-20251001': 'anthropic-haiku',
-      'anthropic:claude-sonnet-5-20260201': 'anthropic-sonnet',
-      'google:gemini-2.5-flash': 'google-flash'
+      'assistant:assistant': 'assistant'
     };
 
-    const providers = discoveredProviders.map((prov) => {
+    const providers = nonEmptyProviders.map((prov) => {
       const isProvComposerMatch = Boolean(
         (composerProviderId && prov.providerId.toLowerCase() === composerProviderId.toLowerCase()) ||
         (composerFamilyId && prov.providerId.toLowerCase().includes(composerFamilyId.toLowerCase()))
@@ -824,6 +949,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
         id: prov.providerId,
         displayName: prov.displayName || prov.providerId,
         isComposerMatch: isProvComposerMatch,
+        error: prov.error ?? null,
         models
       };
     });
@@ -849,30 +975,64 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     return match ?? availableModelsForProvider[0];
   }, [availableModelsForProvider, selectedModelId]);
 
-  // Auto-sync with composer if user has not explicitly picked a model
+  // Auto-sync with active composer (or saved server preference on the main screen)
+  // once host providers have loaded if user has not explicitly picked a model.
   useEffect(() => {
-    if (!userManuallySelectedModel.current && providerOptions.length > 0) {
-      const composerMatch = providerOptions.find((p) => p.isComposerMatch);
-      if (composerMatch) {
-        setSelectedProviderId(composerMatch.id);
-        if (composerMatch.models.length > 0) {
-          setSelectedModelId(composerMatch.models[0].key || composerMatch.models[0].id);
+    if (discoveredProviders === null || userManuallySelectedModel.current || providerOptions.length === 0) {
+      return;
+    }
+    const composerMatch =
+      providerOptions.find((p) => p.isComposerMatch && p.models.length > 0) ??
+      providerOptions.find((p) => p.isComposerMatch);
+    if (composerMatch) {
+      setSelectedProviderId(composerMatch.id);
+      if (composerMatch.models.length > 0) {
+        setSelectedModelId((prev) => {
+          const keepsPrevious = composerMatch.models.some((m) => m.id === prev || m.key === prev);
+          if (keepsPrevious) return prev;
+          return composerMatch.models[0].key || composerMatch.models[0].id;
+        });
+      }
+      return;
+    }
+
+    if (savedLlmSettings && savedLlmSettings.providerId !== 'assistant') {
+      const savedProvider = providerOptions.find(
+        (p) => p.id === savedLlmSettings.providerId && p.models.length > 0
+      );
+      if (savedProvider) {
+        setSelectedProviderId(savedProvider.id);
+        const matchedModel = savedLlmSettings.modelId
+          ? savedProvider.models.find((m) => m.id === savedLlmSettings.modelId || m.key === savedLlmSettings.modelId)
+          : undefined;
+        const targetModel = matchedModel ?? savedProvider.models[0];
+        if (targetModel) {
+          setSelectedModelId(targetModel.key || targetModel.id);
         }
       }
     }
-  }, [providerOptions]);
+  }, [discoveredProviders, providerOptions, savedLlmSettings]);
 
-  // Auto-save draft on change
+  // Auto-save draft on change after initial load of the active storageKey
   useEffect(() => {
+    if (loadedStorageKeyRef.current !== storageKey) return;
     try {
       localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel })
+        storageKey,
+        JSON.stringify({
+          inputText,
+          outputText,
+          selectedProviderId,
+          selectedModelId,
+          userManuallySelected: userManuallySelectedModel.current,
+          sttProvider,
+          sttModel
+        })
       );
     } catch {
       // Ignore storage write errors
     }
-  }, [inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel]);
+  }, [storageKey, inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel]);
 
   // Auto-cleanup toggle handler for composer dictations
   const handleToggleAutoCleanup = (enabled: boolean) => {
@@ -1122,7 +1282,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
   // ─── Refinement Handler ──────────────────────────────────────────────────────
   const handleRefine = async () => {
     const raw = inputText.trim();
-    if (!raw || isRefining || (selectedPresetId === 'custom' && !customPrompt.trim())) return;
+    if (!raw || isRefining || !activeModel || (selectedPresetId === 'custom' && !customPrompt.trim())) return;
 
     const activePreset = STUDIO_PRESETS.find((p) => p.id === selectedPresetId);
     const instruction = selectedPresetId === 'custom' ? customPrompt.trim() : activePreset?.prompt || 'Polish and format for clarity.';
@@ -1228,13 +1388,44 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     const textToInsert = outputText || inputText;
     if (!textToInsert) return;
 
-    try {
-      composer.updateText((draft) => appendTranscript(draft, textToInsert));
-      composer.focus();
-      setInsertNotice('Inserted into Composer!');
+    if (composer && typeof composer.updateText === 'function') {
+      try {
+        composer.updateText((draft) => appendTranscript(draft, textToInsert));
+        composer.focus?.();
+        setInsertNotice('Inserted into Composer!');
+        setTimeout(() => setInsertNotice(null), 2500);
+        return;
+      } catch {
+        // Fall through when no active thread composer is focused.
+      }
+    }
+
+    if (navigate && typeof navigate.toCompose === 'function') {
+      navigate.toCompose({ initialPrompt: textToInsert, focusPrompt: true });
+      setInsertNotice('Opened in New Thread Composer!');
       setTimeout(() => setInsertNotice(null), 2500);
-    } catch {
-      setStatusNotice('Composer focus unavailable.');
+      return;
+    }
+
+    void copyToClipboard(textToInsert).then((copied) => {
+      setStatusNotice(
+        copied
+          ? 'No active composer — copied prompt to clipboard.'
+          : 'Composer focus unavailable.'
+      );
+    });
+  };
+
+  const handleReenableProjectTab = async () => {
+    if (!pluginId) return;
+    setReenablingProjectTab(true);
+    setReenableError(null);
+    try {
+      await updatePluginSettings(pluginId, { showInProjects: true });
+    } catch (err) {
+      setReenableError(err instanceof Error ? err.message : 'Could not update plugin settings.');
+    } finally {
+      setReenablingProjectTab(false);
     }
   };
 
@@ -1247,6 +1438,48 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
     }
   }, []);
 
+  if (projectId && !visibility.showInProjects) {
+    return (
+      <div className="ps-container">
+        <style>{PROMPT_STUDIO_STYLES}</style>
+        <header className="ps-header">
+          <div className="ps-header-left">
+            <span style={{ fontSize: 18 }}>🎙️</span>
+            <span className="ps-header-title">Prompt Studio</span>
+            <span className="ps-badge ps-badge-project">Project</span>
+          </div>
+          {headerActions ? <div className="ps-header-actions">{headerActions}</div> : null}
+        </header>
+        <div className="ps-empty-state" data-testid="ps-project-hidden-notice">
+          <div className="ps-empty-card">
+            <span style={{ fontSize: 22 }} aria-hidden="true">🔇</span>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              Prompt Studio is hidden in projects
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ps-text-muted)', lineHeight: 1.45 }}>
+              You disabled the project tab in Prompt Voice plugin settings. Re-enable it anytime to use project-scoped drafts here.
+            </div>
+            {reenableError ? (
+              <div role="alert" style={{ fontSize: 11, color: '#fca5a5' }}>
+                {reenableError}
+              </div>
+            ) : null}
+            {pluginId ? (
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary"
+                disabled={reenablingProjectTab}
+                onClick={() => void handleReenableProjectTab()}
+              >
+                {reenablingProjectTab ? 'Enabling…' : 'Enable Prompt Studio in Projects'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ps-container" onKeyDown={handleKeyDown}>
       <style>{PROMPT_STUDIO_STYLES}</style>
@@ -1257,11 +1490,13 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
           <span style={{ fontSize: 18 }}>🎙️</span>
           <span className="ps-header-title">Prompt Studio</span>
           <span className="ps-badge">Voice & AI Refinement</span>
+          {projectId ? <span className="ps-badge ps-badge-project">Project</span> : null}
         </div>
+        {headerActions ? <div className="ps-header-actions">{headerActions}</div> : null}
       </header>
 
       {/* ─── Workspace Layout ───────────────────────────────────────────────── */}
-      {settingsOpen ? <StudioSettings rpc={rpc} onBack={handleSettingsClosed} /> : <div className="ps-workspace">
+      {settingsOpen ? <StudioSettings rpc={rpc} pluginId={pluginId} onBack={handleSettingsClosed} /> : <div className="ps-workspace">
 
         {/* ─── Left Sidebar Controls ────────────────────────────────────────── */}
         <aside className="ps-sidebar">
@@ -1418,8 +1653,27 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
           <section className="ps-section">
             <div className="ps-section-title">
               <span>Refinement Engine</span>
-              <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>
-                {activeProvider?.isComposerMatch ? '★ Composer Active' : 'AI Model'}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 10, color: 'var(--ps-text-muted)' }}>
+                  {isLoadingModels && !hasHostProviders
+                    ? 'Loading…'
+                    : isLoadingModels
+                    ? 'Refreshing…'
+                    : activeProvider?.isComposerMatch
+                    ? '★ Composer Active'
+                    : 'AI Model'}
+                </span>
+                <button
+                  type="button"
+                  className="ps-btn"
+                  style={{ padding: '2px 6px', fontSize: 10 }}
+                  onClick={() => loadAvailableModels({ refresh: true })}
+                  disabled={isLoadingModels || isRefining}
+                  aria-label="Refresh models"
+                  title="Reload models from Composer"
+                >
+                  {isLoadingModels ? '…' : '↻'}
+                </button>
               </span>
             </div>
 
@@ -1457,13 +1711,34 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 onChange={(e) => handleModelChange(e.target.value)}
                 disabled={isRefining || availableModelsForProvider.length === 0}
               >
-                {availableModelsForProvider.map((m) => (
-                  <option key={m.key || m.id} value={m.key || m.id}>
-                    {m.label}{m.isComposerMatch ? ' ★ (Composer)' : ''}
-                  </option>
-                ))}
+                {availableModelsForProvider.length === 0 ? (
+                  <option value="">No models available</option>
+                ) : (
+                  availableModelsForProvider.map((m) => (
+                    <option key={m.key || m.id} value={m.key || m.id}>
+                      {m.label}{m.isComposerMatch ? ' ★ (Composer)' : ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
+
+            {(activeProvider?.error || modelsLoadError) && (
+              <div
+                role="status"
+                style={{
+                  fontSize: 10.5,
+                  color: '#fde047',
+                  lineHeight: 1.35,
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  background: 'rgba(234, 179, 8, 0.1)',
+                  border: '1px solid rgba(234, 179, 8, 0.25)'
+                }}
+              >
+                {activeProvider?.error || modelsLoadError}
+              </div>
+            )}
 
             {/* Auto-cleanup Toggle for Composer Dictations */}
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--ps-border)', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1478,7 +1753,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
               </label>
               <span style={{ fontSize: 10, color: 'var(--ps-text-subtle)', lineHeight: 1.3 }}>
                 {autoCleanupEnabled
-                  ? `Composer mic cleans up using ${activeProvider?.displayName} (${activeModel?.label || activeModel?.id}).`
+                  ? `Composer mic cleans up using ${activeProvider?.displayName}${activeModel ? ` (${activeModel.label || activeModel.id})` : ''}.`
                   : 'Composer mic inserts raw transcript without AI cleanup.'}
               </span>
             </div>
@@ -1486,13 +1761,13 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
             <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ps-text-muted)', lineHeight: 1.35 }}>
               {activeProvider?.isComposerMatch ? (
                 <span style={{ color: 'var(--accent, #3b82f6)', fontWeight: 600 }}>
-                  ★ Synced to Composer: {activeProvider.displayName} ({activeModel?.label})
+                  ★ Synced to Composer: {activeProvider.displayName}{activeModel ? ` (${activeModel.label})` : ''}
                 </span>
               ) : activeProvider?.id === 'assistant' ? (
                 'Uses the active Zana assistant agent with no extra API key required.'
-              ) : (
-                <>Using <strong>{activeProvider?.displayName}</strong> · <code>{activeModel?.id}</code></>
-              )}
+              ) : activeModel ? (
+                <>Using <strong>{activeProvider?.displayName}</strong> · <code>{activeModel.id}</code></>
+              ) : null}
               {lastUsedModel ? (
                 <div style={{ marginTop: 3, color: 'var(--ps-text-subtle)', fontSize: 10 }}>
                   Last refined: {lastUsedModel}
@@ -1599,7 +1874,7 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
                 type="button"
                 className="ps-btn ps-btn-primary"
                 onClick={() => handleRefine()}
-                disabled={isRefining || !inputText.trim() || (selectedPresetId === 'custom' && !customPrompt.trim())}
+                disabled={isRefining || !inputText.trim() || !activeModel || (selectedPresetId === 'custom' && !customPrompt.trim())}
                 title="Transform raw draft into polished output"
               >
                 <span>{isRefining ? '⏳' : '⚡'}</span>
@@ -1745,9 +2020,9 @@ export function PromptStudio({ startSession = defaultStartSession }: PromptStudi
           )}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span>Engine: {activeProvider?.displayName} · {activeModel?.label}</span>
+          <span>Engine: {activeProvider?.displayName} · {activeModel?.label ?? 'No model'}</span>
           <span className="ps-pill">
-            Mic cleanup: {autoCleanupEnabled ? `${activeProvider?.displayName} (${activeModel?.label || activeModel?.id})` : 'Off (Raw)'}
+            Mic cleanup: {autoCleanupEnabled ? `${activeProvider?.displayName}${activeModel ? ` (${activeModel.label || activeModel.id})` : ''}` : 'Off (Raw)'}
           </span>
           {activeProvider?.isComposerMatch && (
             <span className="ps-pill" style={{ color: 'var(--accent, #3b82f6)' }}>

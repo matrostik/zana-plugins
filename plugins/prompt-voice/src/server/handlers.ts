@@ -12,7 +12,6 @@ import type {
   AvailableModelsResponse,
   DiscoveredModel,
   DiscoveredProvider,
-  RephraseFailure,
   RephraseRequest,
   RephraseResponse,
   StatusResponse,
@@ -26,13 +25,21 @@ export interface HandlerDeps extends PipelineDeps {
 }
 
 export interface AvailableModelsDeps {
-  readSettings: () => Promise<Record<string, unknown>>;
+  readSettings?: () => Promise<Record<string, unknown>>;
   providers?: {
     list(args?: unknown): Promise<Array<{ id: string; available?: boolean; displayName?: string }>>;
     models(args: { providerId: string }): Promise<unknown>;
   };
   log?: PipelineLogger;
+  providerTimeoutMs?: number;
+  onModelsUpdated?: (entries: AvailableModelsResponse) => void;
 }
+
+const DEFAULT_PROVIDER_MODELS_TIMEOUT_MS = 12_000;
+const DEFAULT_SOFT_WAIT_MS = 1_500;
+const DEFAULT_COMPLETE_CACHE_TTL_MS = 5 * 60_000;
+const DEFAULT_INCOMPLETE_CACHE_TTL_MS = 5_000;
+const DEFAULT_TIMEOUT_COOLDOWN_MS = 60_000;
 
 const INTERNAL_ERROR_MESSAGE = 'Dictation failed unexpectedly. See the Zana log for details.';
 
@@ -125,13 +132,13 @@ export function statusFromSettings(raw: Record<string, unknown>, availableProvid
 export function mergeCatalogModels(catalog: unknown): DiscoveredModel[] {
   if (!catalog || typeof catalog !== 'object') return [];
   const rec = catalog as {
-    models?: Array<{ id?: string; model?: string; label?: string }>;
-    selectedOnlyModels?: Array<{ id?: string; model?: string; label?: string }>;
+    models?: Array<{ id?: string; model?: string; label?: string; displayName?: string }>;
+    selectedOnlyModels?: Array<{ id?: string; model?: string; label?: string; displayName?: string }>;
   };
   const seen = new Map<string, DiscoveredModel>();
-  const add = (item?: { id?: string; model?: string; label?: string }) => {
+  const add = (item?: { id?: string; model?: string; label?: string; displayName?: string }) => {
     if (!item || !item.id || typeof item.id !== 'string') return;
-    const label = item.label || item.model || item.id;
+    const label = item.label || item.displayName || item.model || item.id;
     if (!seen.has(item.id)) {
       seen.set(item.id, { id: item.id, label });
     }
@@ -143,120 +150,338 @@ export function mergeCatalogModels(catalog: unknown): DiscoveredModel[] {
   );
 }
 
-/** RPC `promptVoice.availableModels`. Discovers available providers and models from Zana host, ordered alphabetically. */
-export async function availableModelsHandler(deps: AvailableModelsDeps): Promise<AvailableModelsResponse> {
-  const result: AvailableModelsResponse = [
-    {
-      providerId: 'assistant',
-      displayName: 'Zana Assistant',
-      models: [{ id: 'assistant', label: 'Default Assistant (Host Agent)' }]
-    }
-  ];
+function createAssistantEntry(): DiscoveredProvider {
+  return {
+    providerId: 'assistant',
+    displayName: 'Zana Assistant',
+    models: [{ id: 'assistant', label: 'Default Assistant (Host Agent)' }]
+  };
+}
 
-  let rawSettings: Record<string, unknown> = {};
-  try {
-    rawSettings = await deps.readSettings();
-  } catch {
-    // Non-fatal
-  }
-  const settings = normalizeSettings(rawSettings);
-  const seenProviderIds = new Set<string>(['assistant']);
-
-  if (deps.providers) {
-    try {
-      const rawList = await deps.providers.list();
-      const availableList = Array.isArray(rawList)
-        ? rawList.filter((p) => p && typeof p.id === 'string' && p.available !== false)
-        : [];
-
-      for (const provider of availableList) {
-        if (seenProviderIds.has(provider.id)) continue;
-        seenProviderIds.add(provider.id);
-
-        let models: DiscoveredModel[] = [];
-        let errorDetail: string | null = null;
-        try {
-          const catalog = await deps.providers.models({ providerId: provider.id });
-          models = mergeCatalogModels(catalog);
-          if (catalog && typeof catalog === 'object' && 'modelLoadError' in catalog) {
-            const err = (catalog as { modelLoadError?: { detail?: string; code?: string } }).modelLoadError;
-            if (err) errorDetail = err.detail ?? err.code ?? null;
-          }
-        } catch (err) {
-          errorDetail = describeUnexpectedFailure(err, provider.id);
-        }
-
-        result.push({
-          providerId: provider.id,
-          displayName: provider.displayName ?? provider.id,
-          models,
-          error: errorDetail
-        });
-      }
-    } catch (err) {
-      deps.log?.warn?.(`Provider list unavailable: ${describeUnexpectedFailure(err, 'Zana providers')}`);
-    }
-  }
-
-  // Fallback direct providers configured in Prompt Voice settings (Anthropic / Google / OpenAI)
-  const directFallbacks: Array<{
-    providerId: string;
-    displayName: string;
-    keyName: ApiKeyName;
-    models: DiscoveredModel[];
-  }> = [
-    {
-      providerId: 'anthropic',
-      displayName: 'Anthropic',
-      keyName: 'anthropic',
-      models: [
-        { id: 'claude-haiku-4-5-20251001', label: 'Claude 4.5 Haiku' },
-        { id: 'claude-sonnet-5-20260201', label: 'Claude 5 Sonnet' }
-      ]
-    },
-    {
-      providerId: 'google',
-      displayName: 'Google Gemini',
-      keyName: 'google',
-      models: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }]
-    },
-    {
-      providerId: 'openai',
-      displayName: 'OpenAI',
-      keyName: 'openai',
-      models: [
-        { id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano (Fast)' },
-        { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (Smart)' }
-      ]
-    }
-  ];
-
-  for (const direct of directFallbacks) {
-    if (!seenProviderIds.has(direct.providerId)) {
-      const hasKey = Boolean(settings.keys[direct.keyName]);
-      if (hasKey || result.length === 1) {
-        seenProviderIds.add(direct.providerId);
-        result.push({
-          providerId: direct.providerId,
-          displayName: direct.displayName,
-          models: direct.models,
-          error: hasKey ? null : 'API key not configured in Prompt Voice settings.'
-        });
-      }
-    }
-  }
-
-  // Sort models in each provider alphabetically (A-Z) by label
-  for (const prov of result) {
+function sortAvailableModelsResponse(entries: AvailableModelsResponse): AvailableModelsResponse {
+  for (const prov of entries) {
     prov.models.sort((a, b) =>
       (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base', numeric: true })
     );
   }
-
-  // Sort providers alphabetically (A-Z) by displayName
-  result.sort((a, b) =>
-    (a.displayName || a.providerId).localeCompare(b.displayName || b.providerId, undefined, { sensitivity: 'base', numeric: true })
+  entries.sort((a, b) =>
+    (a.displayName || a.providerId).localeCompare(b.displayName || b.providerId, undefined, {
+      sensitivity: 'base',
+      numeric: true
+    })
   );
+  return entries;
+}
 
-  return result;
+async function listActiveHostProviders(
+  deps: AvailableModelsDeps
+): Promise<Array<{ id: string; displayName?: string }>> {
+  if (!deps.providers) return [];
+  try {
+    const rawList = await deps.providers.list();
+    const seenIds = new Set<string>(['assistant']);
+    const uniqueProviders: Array<{ id: string; displayName?: string }> = [];
+    if (!Array.isArray(rawList)) return uniqueProviders;
+    for (const provider of rawList) {
+      if (!provider || typeof provider.id !== 'string' || provider.available === false) continue;
+      if (seenIds.has(provider.id)) continue;
+      seenIds.add(provider.id);
+      uniqueProviders.push(provider);
+    }
+    return uniqueProviders;
+  } catch (err) {
+    deps.log?.warn?.(`Provider list unavailable: ${describeUnexpectedFailure(err, 'Zana providers')}`);
+    return [];
+  }
+}
+
+async function fetchProviderCatalogEntry(
+  provider: { id: string; displayName?: string },
+  providersApi: NonNullable<AvailableModelsDeps['providers']>,
+  timeoutMs: number
+): Promise<{ entry: DiscoveredProvider; timedOut: boolean }> {
+  const displayName = provider.displayName ?? provider.id;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const outcome = await Promise.race([
+      providersApi.models({ providerId: provider.id }).then(
+        (catalog) => ({ kind: 'ok' as const, catalog }),
+        (error: unknown) => ({ kind: 'error' as const, error })
+      ),
+      new Promise<{ kind: 'timeout' }>((resolve) => {
+        timer = setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
+      })
+    ]);
+
+    if (outcome.kind === 'timeout') {
+      return {
+        entry: {
+          providerId: provider.id,
+          displayName,
+          models: [],
+          error: `Timed out loading models for ${displayName}.`
+        },
+        timedOut: true
+      };
+    }
+
+    if (outcome.kind === 'error') {
+      return {
+        entry: {
+          providerId: provider.id,
+          displayName,
+          models: [],
+          error: describeUnexpectedFailure(outcome.error, provider.id)
+        },
+        timedOut: false
+      };
+    }
+
+    const catalog = outcome.catalog;
+    const models = mergeCatalogModels(catalog);
+    let errorDetail: string | null = null;
+    if (catalog && typeof catalog === 'object' && 'modelLoadError' in catalog) {
+      const err = (catalog as { modelLoadError?: { detail?: string; code?: string } | null }).modelLoadError;
+      if (err) errorDetail = err.detail ?? err.code ?? null;
+    }
+
+    return {
+      entry: {
+        providerId: provider.id,
+        displayName,
+        models,
+        error: errorDetail
+      },
+      timedOut: false
+    };
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** RPC `promptVoice.availableModels`. Discovers available Zana host/Composer providers and models, ordered alphabetically. */
+export async function availableModelsHandler(deps: AvailableModelsDeps): Promise<AvailableModelsResponse> {
+  const result: AvailableModelsResponse = [createAssistantEntry()];
+  const timeoutMs = deps.providerTimeoutMs ?? DEFAULT_PROVIDER_MODELS_TIMEOUT_MS;
+  const uniqueProviders = await listActiveHostProviders(deps);
+
+  if (deps.providers && uniqueProviders.length > 0) {
+    const fetched = await Promise.all(
+      uniqueProviders.map((provider) => fetchProviderCatalogEntry(provider, deps.providers!, timeoutMs))
+    );
+    for (const { entry } of fetched) {
+      result.push(entry);
+    }
+  }
+
+  return sortAvailableModelsResponse(result);
+}
+
+export interface AvailableModelsLoaderOptions {
+  ttlMs?: number;
+  incompleteTtlMs?: number;
+  timeoutCooldownMs?: number;
+  softWaitMs?: number;
+  now?: () => number;
+}
+
+interface CachedProviderState {
+  entry: DiscoveredProvider;
+  fetchedAt: number;
+  timedOut: boolean;
+}
+
+async function waitWithSoftDeadline(promises: Promise<void>[], softWaitMs: number): Promise<boolean> {
+  if (promises.length === 0) return false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.all(promises).then(() => false),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(true), softWaitMs);
+      })
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
+ * Caches discovered Composer providers/models per provider, avoids stalling on a single
+ * hung provider bridge past `softWaitMs`, and publishes late arrivals via `onModelsUpdated`.
+ */
+export function createAvailableModelsLoader(
+  deps: AvailableModelsDeps,
+  options: AvailableModelsLoaderOptions = {}
+) {
+  const ttlMs = options.ttlMs ?? DEFAULT_COMPLETE_CACHE_TTL_MS;
+  const incompleteTtlMs = options.incompleteTtlMs ?? DEFAULT_INCOMPLETE_CACHE_TTL_MS;
+  const timeoutCooldownMs = options.timeoutCooldownMs ?? DEFAULT_TIMEOUT_COOLDOWN_MS;
+  const timeoutMs = deps.providerTimeoutMs ?? DEFAULT_PROVIDER_MODELS_TIMEOUT_MS;
+  const softWaitMs = Math.min(options.softWaitMs ?? DEFAULT_SOFT_WAIT_MS, timeoutMs);
+  const now = options.now ?? Date.now;
+
+  const providerStates = new Map<string, CachedProviderState>();
+  const pendingFetches = new Map<string, { generation: number; promise: Promise<void> }>();
+  let activeProviderIds = new Set<string>();
+  let cacheSummary: { at: number; complete: boolean; hasHostProviders: boolean } | null = null;
+  let inFlightLoad: Promise<AvailableModelsResponse> | null = null;
+  let generation = 0;
+
+  function buildVisibleEntries(): AvailableModelsResponse {
+    const visible: AvailableModelsResponse = [createAssistantEntry()];
+    for (const id of activeProviderIds) {
+      const state = providerStates.get(id);
+      if (state && state.entry.models.length > 0) {
+        visible.push(state.entry);
+      }
+    }
+    return sortAvailableModelsResponse(visible);
+  }
+
+  function updateCacheSummary(at: number): void {
+    let hasHostProviders = false;
+    let allClean = activeProviderIds.size > 0;
+    for (const id of activeProviderIds) {
+      const state = providerStates.get(id);
+      if (!state) {
+        allClean = false;
+        continue;
+      }
+      if (state.entry.models.length > 0) hasHostProviders = true;
+      if (state.entry.error || state.entry.models.length === 0) allClean = false;
+    }
+    cacheSummary = hasHostProviders ? { at, complete: allClean, hasHostProviders: true } : null;
+  }
+
+  function launchProviderFetch(
+    provider: { id: string; displayName?: string },
+    fetchGeneration: number,
+    isEarlyReturnRef: { current: boolean }
+  ): Promise<void> {
+    const existing = pendingFetches.get(provider.id);
+    if (existing && existing.generation === fetchGeneration) {
+      return existing.promise;
+    }
+
+    const promise = fetchProviderCatalogEntry(provider, deps.providers!, timeoutMs)
+      .then(({ entry, timedOut }) => {
+        if (fetchGeneration !== generation) return;
+        const settledAt = now();
+        providerStates.set(provider.id, { entry, fetchedAt: settledAt, timedOut });
+        if (entry.models.length === 0 && entry.error) {
+          deps.log?.warn?.(`Excluding provider ${entry.providerId} (no models): ${entry.error}`);
+        }
+        updateCacheSummary(settledAt);
+        if (isEarlyReturnRef.current && entry.models.length > 0 && activeProviderIds.has(provider.id)) {
+          deps.onModelsUpdated?.(buildVisibleEntries());
+        }
+      })
+      .finally(() => {
+        const current = pendingFetches.get(provider.id);
+        if (current && current.promise === promise) {
+          pendingFetches.delete(provider.id);
+        }
+      });
+
+    pendingFetches.set(provider.id, { generation: fetchGeneration, promise });
+    return promise;
+  }
+
+  async function fetchCatalog(fetchGeneration: number, refresh: boolean): Promise<AvailableModelsResponse> {
+    const uniqueProviders = await listActiveHostProviders(deps);
+    if (fetchGeneration !== generation) {
+      return buildVisibleEntries();
+    }
+
+    activeProviderIds = new Set(uniqueProviders.map((p) => p.id));
+    for (const id of providerStates.keys()) {
+      if (!activeProviderIds.has(id)) {
+        providerStates.delete(id);
+      }
+    }
+
+    const currentTime = now();
+    const waitPromises: Promise<void>[] = [];
+    const earlyReturnRef = { current: false };
+    const hadHostProviders = cacheSummary?.hasHostProviders === true;
+
+    if (deps.providers) {
+      for (const provider of uniqueProviders) {
+        const state = providerStates.get(provider.id);
+        if (!refresh && state) {
+          const age = currentTime - state.fetchedAt;
+          const isHealthy = state.entry.models.length > 0 && !state.entry.error;
+          if (isHealthy && age < ttlMs) continue;
+          if (state.timedOut && age < timeoutCooldownMs) continue;
+        }
+
+        const promise = launchProviderFetch(provider, fetchGeneration, earlyReturnRef);
+        // Once healthy providers are cached, re-probe previously timed-out providers in background only.
+        const isBackgroundReprobe = !refresh && hadHostProviders && state?.timedOut === true;
+        if (!isBackgroundReprobe) {
+          waitPromises.push(promise);
+        }
+      }
+    }
+
+    const timedOutWaiting = await waitWithSoftDeadline(waitPromises, softWaitMs);
+    if (timedOutWaiting) {
+      earlyReturnRef.current = true;
+    }
+
+    if (fetchGeneration === generation) {
+      updateCacheSummary(now());
+    }
+    return buildVisibleEntries();
+  }
+
+  function hasFreshSnapshot(): boolean {
+    if (!cacheSummary) return false;
+    const currentTime = now();
+    const age = currentTime - cacheSummary.at;
+    const maxAge = cacheSummary.complete ? ttlMs : incompleteTtlMs;
+    if (age < maxAge) return true;
+
+    // Even after incompleteTtlMs, keep serving cached providers immediately if incomplete ones are in timeout cooldown.
+    if (cacheSummary.hasHostProviders && activeProviderIds.size > 0) {
+      for (const id of activeProviderIds) {
+        const state = providerStates.get(id);
+        if (!state) return false;
+        const itemAge = currentTime - state.fetchedAt;
+        const isHealthy = state.entry.models.length > 0 && !state.entry.error;
+        const inHealthyWindow = isHealthy && itemAge < ttlMs;
+        const inTimeoutCooldown = state.timedOut && itemAge < timeoutCooldownMs;
+        if (!inHealthyWindow && !inTimeoutCooldown) return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  return {
+    async load(opts: { refresh?: boolean } = {}): Promise<AvailableModelsResponse> {
+      const refresh = opts.refresh === true;
+      if (!refresh && hasFreshSnapshot()) {
+        return buildVisibleEntries();
+      }
+      if (!refresh && inFlightLoad) {
+        return inFlightLoad;
+      }
+      const fetchGeneration = ++generation;
+      const promise = fetchCatalog(fetchGeneration, refresh).finally(() => {
+        if (inFlightLoad === promise) inFlightLoad = null;
+      });
+      inFlightLoad = promise;
+      return promise;
+    },
+    invalidate() {
+      generation++;
+      providerStates.clear();
+      pendingFetches.clear();
+      activeProviderIds.clear();
+      cacheSummary = null;
+      inFlightLoad = null;
+    }
+  };
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { availableModelsHandler, mergeCatalogModels, statusFromSettings, transcribeHandler } from '../server/handlers.ts';
+import {
+  availableModelsHandler,
+  createAvailableModelsLoader,
+  mergeCatalogModels,
+  statusFromSettings,
+  transcribeHandler
+} from '../server/handlers.ts';
 import { PromptVoiceError } from '../server/errors.ts';
 
 const VALID_REQUEST = { audio: Buffer.from('audio').toString('base64'), mimeType: 'audio/webm' };
@@ -169,6 +175,67 @@ describe('availableModelsHandler', () => {
     );
   });
 
+  it('does not inject hardcoded Anthropic/Google/OpenAI defaults when host providers are empty or API keys exist for STT', async () => {
+    const res = await availableModelsHandler({
+      readSettings: async () => ({
+        openaiApiKey: 'sk-stt-only',
+        googleApiKey: 'g-stt-only'
+      }),
+      providers: {
+        list: async () => [],
+        models: async () => ({ models: [] })
+      }
+    });
+
+    expect(res).toEqual([
+      {
+        providerId: 'assistant',
+        displayName: 'Zana Assistant',
+        models: [{ id: 'assistant', label: 'Default Assistant (Host Agent)' }]
+      }
+    ]);
+  });
+
+  it('loads host providers concurrently and isolates a timed-out provider', async () => {
+    let releaseHung!: () => void;
+    const hungPromise = new Promise((resolve) => {
+      releaseHung = () => resolve({ models: [] });
+    });
+
+    try {
+      const res = await availableModelsHandler({
+        providerTimeoutMs: 20,
+        providers: {
+          list: async () => [
+            { id: 'slow-prov', displayName: 'Slow Provider' },
+            { id: 'fast-prov', displayName: 'Fast Provider' }
+          ],
+          models: async ({ providerId }) => {
+            if (providerId === 'slow-prov') return hungPromise;
+            return { models: [{ id: 'fast-1', model: 'Fast Model' }] };
+          }
+        }
+      });
+
+      expect(res).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            providerId: 'fast-prov',
+            models: [{ id: 'fast-1', label: 'Fast Model' }],
+            error: null
+          }),
+          expect.objectContaining({
+            providerId: 'slow-prov',
+            models: [],
+            error: expect.stringMatching(/timed out/i)
+          })
+        ])
+      );
+    } finally {
+      releaseHung();
+    }
+  });
+
   it('orders providers and their models alphabetically by ABC', async () => {
     const res = await availableModelsHandler({
       readSettings: async () => ({
@@ -212,5 +279,130 @@ describe('availableModelsHandler', () => {
       );
       expect(labels).toEqual(sortedLabels);
     }
+  });
+});
+
+describe('createAvailableModelsLoader', () => {
+  it('caches complete host catalogs and bypasses cache on refresh', async () => {
+    const list = vi.fn(async () => [{ id: 'codex', displayName: 'Codex' }]);
+    const models = vi.fn(async () => ({ models: [{ id: 'gpt-5', model: 'GPT-5' }] }));
+    let clock = 1000;
+    const loader = createAvailableModelsLoader({ providers: { list, models } }, { now: () => clock });
+
+    await loader.load();
+    await loader.load();
+    expect(list).toHaveBeenCalledTimes(1);
+
+    await loader.load({ refresh: true });
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache empty host provider list so retries discover newly ready providers', async () => {
+    let ready = false;
+    const list = vi.fn(async () => (ready ? [{ id: 'claude-code', displayName: 'Claude Code' }] : []));
+    const models = vi.fn(async () => ({ models: [{ id: 'claude-sonnet', model: 'Claude Sonnet' }] }));
+    const loader = createAvailableModelsLoader({ providers: { list, models } });
+
+    const first = await loader.load();
+    expect(first.map((p) => p.providerId)).toEqual(['assistant']);
+
+    ready = true;
+    const second = await loader.load();
+    expect(second.map((p) => p.providerId)).toEqual(['claude-code', 'assistant']);
+  });
+
+  it('omits providers that have no models and uses short incomplete TTL so they can appear once ready', async () => {
+    let codexReady = false;
+    const list = vi.fn(async () => [
+      { id: 'antigravity', displayName: 'Antigravity' },
+      { id: 'codex', displayName: 'Codex' }
+    ]);
+    const models = vi.fn(async ({ providerId }: { providerId: string }) => {
+      if (providerId === 'codex') {
+        return codexReady ? { models: [{ id: 'gpt-5-codex', model: 'GPT-5 Codex' }] } : { models: [] };
+      }
+      return { models: [{ id: 'gemini-2.5-pro', model: 'Gemini 2.5 Pro' }] };
+    });
+    let clock = 1000;
+    const loader = createAvailableModelsLoader(
+      { providers: { list, models } },
+      { now: () => clock, incompleteTtlMs: 5000, ttlMs: 300_000 }
+    );
+
+    const first = await loader.load();
+    expect(first.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+
+    codexReady = true;
+    clock += 6000;
+    const second = await loader.load();
+    expect(second.map((p) => p.providerId)).toEqual(['antigravity', 'codex', 'assistant']);
+  });
+
+  it('returns ready providers at softWaitMs without blocking on a slow provider and publishes late arrivals via onModelsUpdated', async () => {
+    let resolveSlow!: (catalog: unknown) => void;
+    const onModelsUpdated = vi.fn();
+    const list = vi.fn(async () => [
+      { id: 'fast-prov', displayName: 'Fast Provider' },
+      { id: 'slow-prov', displayName: 'Slow Provider' }
+    ]);
+    const models = vi.fn(({ providerId }: { providerId: string }) => {
+      if (providerId === 'slow-prov') {
+        return new Promise((resolve) => {
+          resolveSlow = resolve;
+        });
+      }
+      return Promise.resolve({ models: [{ id: 'fast-m1', model: 'Fast Model' }] });
+    });
+
+    const loader = createAvailableModelsLoader(
+      { providers: { list, models }, providerTimeoutMs: 5000, onModelsUpdated },
+      { softWaitMs: 25 }
+    );
+
+    const initial = await loader.load();
+    expect(initial.map((p) => p.providerId)).toEqual(['fast-prov', 'assistant']);
+    expect(onModelsUpdated).not.toHaveBeenCalled();
+
+    resolveSlow({ models: [{ id: 'slow-m1', model: 'Slow Model' }] });
+    await vi.waitFor(() => expect(onModelsUpdated).toHaveBeenCalledTimes(1));
+
+    const updated = onModelsUpdated.mock.calls[0]?.[0] as Array<{ providerId: string }>;
+    expect(updated.map((p) => p.providerId)).toEqual(['fast-prov', 'slow-prov', 'assistant']);
+
+    const cached = await loader.load();
+    expect(cached.map((p) => p.providerId)).toEqual(['fast-prov', 'slow-prov', 'assistant']);
+  });
+
+  it('places a timed-out provider in cooldown so subsequent loads return healthy cached providers immediately', async () => {
+    let clock = 1000;
+    const log = { warn: vi.fn(), error: vi.fn() };
+    const list = vi.fn(async () => [
+      { id: 'antigravity', displayName: 'Antigravity' },
+      { id: 'hermes', displayName: 'Hermes Agent' }
+    ]);
+    const models = vi.fn(({ providerId }: { providerId: string }) => {
+      if (providerId === 'hermes') {
+        return new Promise(() => undefined);
+      }
+      return Promise.resolve({ models: [{ id: 'gemini-3', model: 'Gemini 3' }] });
+    });
+
+    const loader = createAvailableModelsLoader(
+      { providers: { list, models }, providerTimeoutMs: 30, log },
+      { softWaitMs: 15, incompleteTtlMs: 5000, timeoutCooldownMs: 60_000, now: () => clock }
+    );
+
+    const first = await loader.load();
+    expect(first.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+
+    // Wait for hermes timeout to settle in background
+    await vi.waitFor(() => expect(log.warn).toHaveBeenCalledTimes(1));
+
+    // Even well past incompleteTtlMs, cached antigravity is served without re-probing timed-out hermes
+    clock += 20_000;
+    const callsBefore = list.mock.calls.length;
+    const second = await loader.load();
+    expect(second.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+    expect(list.mock.calls.length).toBe(callsBefore);
   });
 });

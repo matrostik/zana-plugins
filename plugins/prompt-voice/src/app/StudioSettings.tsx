@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LocalWhisperSettings } from './LocalWhisperSettings.tsx';
+import { VisibilitySettingsSection } from './VisibilitySettingsSection.tsx';
 import {
   DEFAULT_MIC_DEVICE_ID,
   DEFAULT_SOUND_CUES_ENABLED,
@@ -314,7 +315,7 @@ function SettingField({
   );
 }
 
-export function StudioSettings({ rpc, onBack }: { rpc: Rpc; onBack: () => void }) {
+export function StudioSettings({ rpc, onBack, pluginId }: { rpc: Rpc; onBack: () => void; pluginId?: string }) {
   ensureStylesInjected();
   const [values, setValues] = useState<Settings>({});
   const [status, setStatus] = useState('Loading…');
@@ -376,6 +377,11 @@ export function StudioSettings({ rpc, onBack }: { rpc: Rpc; onBack: () => void }
               {category === 'Voice & transcription' && <LocalWhisperSettings rpc={rpc} sttProvider={values.sttProvider ?? defaults.sttProvider} llmProvider={values.llmProvider} onApplyPreset={save} />}
             </React.Fragment>
           ))}
+          {pluginId ? (
+            <section className="ps-pane" style={{ flex: 'none', padding: 14 }}>
+              <VisibilitySettingsSection pluginId={pluginId} />
+            </section>
+          ) : null}
         </div>
       </main>
     </div>

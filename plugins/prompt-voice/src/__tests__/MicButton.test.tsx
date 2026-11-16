@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { MicButton } from '../app/MicButton.tsx';
 import { useDictation } from '../app/useDictation.ts';
@@ -9,12 +9,19 @@ import { resetSoundCueContext } from "../app/soundCues.ts";
 const fakes = vi.hoisted(() => ({
   updateText: vi.fn(),
   focus: vi.fn(),
-  call: vi.fn()
+  call: vi.fn(),
+  settingsValues: { showHomeWidget: true, showInProjects: true, micVisibility: 'both' } as Record<string, unknown>,
+  composerView: null as { scope?: { kind?: string; projectId?: string | null } } | null,
+  zccContext: { projectId: null as string | null }
 }));
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
   useComposer: () => ({ updateText: fakes.updateText, focus: fakes.focus }),
-  useRpc: () => ({ call: fakes.call })
+  useRpc: () => ({ call: fakes.call }),
+  useSettings: () => ({ values: fakes.settingsValues, loading: false }),
+  useComposerView: () => fakes.composerView,
+  useZccContext: () => fakes.zccContext,
+  useRealtime: () => undefined
 }));
 
 const BUTTON_NAME = 'Dictation';
@@ -26,6 +33,12 @@ function fakeSession(): RecordingSession {
     cancel: vi.fn(() => undefined)
   };
 }
+
+beforeEach(() => {
+  fakes.settingsValues = { showHomeWidget: true, showInProjects: true, micVisibility: 'both' };
+  fakes.composerView = null;
+  fakes.zccContext = { projectId: null };
+});
 
 afterEach(() => {
   cleanup();
@@ -421,5 +434,41 @@ describe('MicButton', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('hides composer mic when micVisibility is off without firing settings RPC', () => {
+    fakes.settingsValues = { micVisibility: 'off' };
+    fakes.composerView = { scope: { kind: 'project', projectId: 'proj-1' } };
+
+    render(<MicButton />);
+    expect(screen.queryByRole('button', { name: BUTTON_NAME })).toBeNull();
+    expect(fakes.call).not.toHaveBeenCalled();
+  });
+
+  it('renders composer mic only in project scope when micVisibility is projects', () => {
+    fakes.settingsValues = { micVisibility: 'projects' };
+    fakes.composerView = { scope: { kind: 'global', projectId: null } };
+    fakes.zccContext = { projectId: 'proj-1' };
+
+    const view = render(<MicButton />);
+    expect(screen.queryByRole('button', { name: BUTTON_NAME })).toBeNull();
+    expect(fakes.call).not.toHaveBeenCalled();
+
+    fakes.composerView = { scope: { kind: 'project', projectId: 'proj-1' } };
+    view.rerender(<MicButton />);
+    expect(screen.getByRole('button', { name: BUTTON_NAME })).toBeTruthy();
+  });
+
+  it('renders composer mic only on main screen when micVisibility is main', () => {
+    fakes.settingsValues = { micVisibility: 'main' };
+    fakes.composerView = { scope: { kind: 'project', projectId: 'proj-1' } };
+
+    const view = render(<MicButton />);
+    expect(screen.queryByRole('button', { name: BUTTON_NAME })).toBeNull();
+    expect(fakes.call).not.toHaveBeenCalled();
+
+    fakes.composerView = { scope: { kind: 'global', projectId: null } };
+    view.rerender(<MicButton />);
+    expect(screen.getByRole('button', { name: BUTTON_NAME })).toBeTruthy();
   });
 });

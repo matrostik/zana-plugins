@@ -1,19 +1,47 @@
 import { describe, expect, it, vi } from 'vitest';
-import createPromptVoicePlugin from '../../server.ts';
+import createPromptVoicePlugin, { PROMPT_STUDIO_PROJECT_TAB_ID } from '../../server.ts';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LocalWhisperManager } from '../server/localWhisper/manager.ts';
-import { AVAILABLE_MODELS_METHOD, LOCAL_WHISPER_METHODS, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD } from '../shared/protocol.ts';
+import {
+  AVAILABLE_MODELS_METHOD,
+  LOCAL_WHISPER_METHODS,
+  MODELS_UPDATED_EVENT,
+  REPHRASE_METHOD,
+  SETTINGS_CHANGED_EVENT,
+  STATUS_METHOD,
+  TRANSCRIBE_METHOD
+} from '../shared/protocol.ts';
 
 function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none' }) {
   const methods = new Map<string, (input: unknown) => unknown>();
+  const projectTabRegistrations: Array<{
+    tabId: string;
+    evaluate(ctx: { projectId: string }): Promise<{ available: boolean; reason?: string }>;
+  }> = [];
+  let onChangeHandler: ((next: Record<string, unknown>) => void) | undefined;
+  let currentSettings = settingsValues;
   const zcc = {
     settings: {
-      define: vi.fn(() => ({ get: async () => settingsValues, onChange: vi.fn() }))
+      define: vi.fn(() => ({
+        get: vi.fn(async () => currentSettings),
+        onChange: vi.fn((cb: (next: Record<string, unknown>) => void) => {
+          onChangeHandler = cb;
+          return () => undefined;
+        })
+      }))
     },
     rpc: {
       method: vi.fn((name: string, handler: (input: unknown) => unknown) => methods.set(name, handler))
+    },
+    ui: {
+      registerProjectTabAvailability: vi.fn((reg: typeof projectTabRegistrations[number]) => {
+        projectTabRegistrations.push(reg);
+      })
+    },
+    realtime: {
+      publish: vi.fn()
     },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     sdk: {
@@ -28,16 +56,25 @@ function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none'
       }
     }
   };
-  return { zcc, methods };
+  return {
+    zcc,
+    methods,
+    projectTabRegistrations,
+    setSettings: (next: Record<string, unknown>) => { currentSettings = next; },
+    triggerSettingsChange: (next: Record<string, unknown>) => { onChangeHandler?.(next); }
+  };
 }
 
 describe('createPromptVoicePlugin', () => {
-  it('declares keyless defaults, optional secret API keys, and registers RPC methods', async () => {
+  it('declares keyless defaults, visibility settings, optional secret API keys, and registers RPC methods', async () => {
     const { zcc, methods } = fakeZcc();
     await createPromptVoicePlugin(zcc as never, { localWhisper: null });
     expect(zcc.settings.define).toHaveBeenCalledWith(
       expect.objectContaining({
         tone: expect.objectContaining({ default: 'conversational' }),
+        showHomeWidget: expect.objectContaining({ default: true }),
+        showInProjects: expect.objectContaining({ default: true }),
+        micVisibility: expect.objectContaining({ default: 'both' }),
         openaiApiKey: expect.objectContaining({ secret: true }),
         googleApiKey: expect.objectContaining({ secret: true }),
         anthropicApiKey: expect.objectContaining({ secret: true })
@@ -46,6 +83,50 @@ describe('createPromptVoicePlugin', () => {
     expect([...methods.keys()].sort()).toEqual(
       [AVAILABLE_MODELS_METHOD, REPHRASE_METHOD, STATUS_METHOD, TRANSCRIBE_METHOD, ...Object.values(LOCAL_WHISPER_METHODS)].sort()
     );
+  });
+
+  it('registers project tab availability gated by showInProjects and fails open on error', async () => {
+    const { zcc, projectTabRegistrations, setSettings } = fakeZcc({ showInProjects: true });
+    await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+    expect(projectTabRegistrations).toHaveLength(1);
+    const registration = projectTabRegistrations[0]!;
+    expect(registration.tabId).toBe(PROMPT_STUDIO_PROJECT_TAB_ID);
+
+    await expect(registration.evaluate({ projectId: 'proj-1' })).resolves.toEqual({ available: true });
+
+    setSettings({ showInProjects: false });
+    await expect(registration.evaluate({ projectId: 'proj-1' })).resolves.toEqual({
+      available: false,
+      reason: 'Hidden in Prompt Voice plugin settings.'
+    });
+
+    setSettings({ showInProjects: 'false' });
+    await expect(registration.evaluate({ projectId: 'proj-1' })).resolves.toEqual({
+      available: false,
+      reason: 'Hidden in Prompt Voice plugin settings.'
+    });
+
+    const settingsInstance = zcc.settings.define.mock.results[0]?.value as { get: ReturnType<typeof vi.fn> };
+    settingsInstance.get.mockRejectedValueOnce(new Error('storage offline'));
+    await expect(registration.evaluate({ projectId: 'proj-1' })).resolves.toEqual({ available: true });
+    expect(zcc.log.warn).toHaveBeenCalled();
+  });
+
+  it('publishes normalized visibility updates on settings.onChange', async () => {
+    const { zcc, triggerSettingsChange } = fakeZcc();
+    await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+
+    triggerSettingsChange({
+      showHomeWidget: false,
+      showInProjects: 'true',
+      micVisibility: 'projects'
+    });
+
+    expect(zcc.realtime.publish).toHaveBeenCalledWith(SETTINGS_CHANGED_EVENT, {
+      showHomeWidget: false,
+      showInProjects: true,
+      micVisibility: 'projects'
+    });
   });
 
   it('serves status reporting available providers without requiring keys', async () => {
@@ -63,9 +144,12 @@ describe('createPromptVoicePlugin', () => {
     );
   });
 
-  it('serves availableModels querying dynamic providers and models', async () => {
+  it('warms availableModels at startup and supports refresh', async () => {
     const { zcc, methods } = fakeZcc();
     await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+    // Startup warmup should already have initiated discovery before the first RPC call
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(1);
+
     const available = (await methods.get(AVAILABLE_MODELS_METHOD)?.({})) as Array<{
       providerId: string;
       displayName: string;
@@ -86,6 +170,48 @@ describe('createPromptVoicePlugin', () => {
         })
       ])
     );
+
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(1);
+    await methods.get(AVAILABLE_MODELS_METHOD)?.({});
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(1);
+    await methods.get(AVAILABLE_MODELS_METHOD)?.({ refresh: true });
+    expect(zcc.sdk.providers.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('publishes MODELS_UPDATED_EVENT when background warmup finishes a slow provider after soft wait', async () => {
+    vi.useFakeTimers();
+    try {
+      const { zcc, methods } = fakeZcc();
+      let resolveSlow!: (catalog: { models: Array<{ id: string; model: string }> }) => void;
+      zcc.sdk.providers.list.mockResolvedValue([
+        { id: 'antigravity', displayName: 'Antigravity' },
+        { id: 'slow-acp', displayName: 'Slow ACP' }
+      ]);
+      zcc.sdk.providers.models.mockImplementation(({ providerId }: { providerId: string }) => {
+        if (providerId === 'slow-acp') {
+          return new Promise<{ models: Array<{ id: string; model: string }> }>((resolve) => {
+            resolveSlow = resolve;
+          });
+        }
+        return Promise.resolve({ models: [{ id: 'ag-1', model: 'Gemini' }] });
+      });
+
+      await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+      await vi.advanceTimersByTimeAsync(1500);
+
+      const initial = (await methods.get(AVAILABLE_MODELS_METHOD)?.({})) as Array<{ providerId: string }>;
+      expect(initial.map((p) => p.providerId)).toEqual(['antigravity', 'assistant']);
+
+      resolveSlow({ models: [{ id: 'slow-1', model: 'Slow Model' }] });
+      await vi.waitFor(() =>
+        expect(zcc.realtime.publish).toHaveBeenCalledWith(
+          MODELS_UPDATED_EVENT,
+          expect.arrayContaining([expect.objectContaining({ providerId: 'slow-acp' })])
+        )
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('dispatches rephrase RPC', async () => {
