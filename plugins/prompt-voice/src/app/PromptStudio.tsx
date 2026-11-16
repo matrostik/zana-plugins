@@ -664,7 +664,7 @@ export function PromptStudio({
 
   // Track if user explicitly selected a model so we don't clobber it
   const userManuallySelectedModel = useRef(false);
-  const loadedStorageKeyRef = useRef<string | null>(null);
+  const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
   // ─── Workspace State ─────────────────────────────────────────────────────────
   const [inputText, setInputText] = useState('');
@@ -720,20 +720,24 @@ export function PromptStudio({
         const parsed = JSON.parse(saved);
         setInputText(typeof parsed.inputText === 'string' ? parsed.inputText : '');
         setOutputText(typeof parsed.outputText === 'string' ? parsed.outputText : '');
-        if (parsed.selectedProviderId) setSelectedProviderId(parsed.selectedProviderId);
-        if (parsed.selectedModelId) setSelectedModelId(parsed.selectedModelId);
+        setSelectedProviderId(parsed.selectedProviderId || 'assistant');
+        setSelectedModelId(parsed.selectedModelId || 'assistant');
         userManuallySelectedModel.current = parsed.userManuallySelected === true;
-        if (parsed.sttProvider) setSttProvider(parsed.sttProvider);
-        if (parsed.sttModel) setSttModel(parsed.sttModel);
+        setSttProvider(parsed.sttProvider || 'system');
+        setSttModel(parsed.sttModel || '');
       } else {
         setInputText('');
         setOutputText('');
+        setSelectedProviderId('assistant');
+        setSelectedModelId('assistant');
+        setSttProvider('system');
+        setSttModel('');
         userManuallySelectedModel.current = false;
       }
     } catch {
       // Ignore storage read errors
     }
-    loadedStorageKeyRef.current = storageKey;
+    setLoadedStorageKey(storageKey);
   }, [storageKey]);
 
   const rpcRef = useRef(rpc);
@@ -1015,7 +1019,7 @@ export function PromptStudio({
 
   // Auto-save draft on change after initial load of the active storageKey
   useEffect(() => {
-    if (loadedStorageKeyRef.current !== storageKey) return;
+    if (loadedStorageKey !== storageKey) return;
     try {
       localStorage.setItem(
         storageKey,
@@ -1032,7 +1036,7 @@ export function PromptStudio({
     } catch {
       // Ignore storage write errors
     }
-  }, [storageKey, inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel]);
+  }, [loadedStorageKey, storageKey, inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel]);
 
   // Auto-cleanup toggle handler for composer dictations
   const handleToggleAutoCleanup = (enabled: boolean) => {

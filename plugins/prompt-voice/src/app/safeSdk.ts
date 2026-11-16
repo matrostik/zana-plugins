@@ -163,11 +163,12 @@ export function useSafeRealtime(channel: string, handler: (payload: unknown) => 
 export function useVisibilitySettings(): PromptVoiceVisibilitySettings {
   const settings = useSafeSettings();
   const hostValues = settings?.values;
+  const hostVisibility = normalizeVisibilitySettings(hostValues);
   const [realtimeOverride, setRealtimeOverride] = useState<PromptVoiceVisibilitySettings | null>(null);
 
   useEffect(() => {
     setRealtimeOverride(null);
-  }, [hostValues]);
+  }, [hostVisibility.showHomeWidget, hostVisibility.showInProjects, hostVisibility.micVisibility]);
 
   useSafeRealtime(SETTINGS_CHANGED_EVENT, (payload) => {
     if (payload && typeof payload === 'object') {
@@ -175,7 +176,7 @@ export function useVisibilitySettings(): PromptVoiceVisibilitySettings {
     }
   });
 
-  return realtimeOverride ?? normalizeVisibilitySettings(hostValues);
+  return realtimeOverride ?? hostVisibility;
 }
 
 export async function updatePluginSettings(

@@ -158,6 +158,20 @@ function createAssistantEntry(): DiscoveredProvider {
   };
 }
 
+const DIRECT_MODELS: Array<{ key: ApiKeyName; entry: DiscoveredProvider }> = [
+  { key: 'anthropic', entry: { providerId: 'anthropic', displayName: 'Anthropic', models: [
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude 4.5 Haiku' },
+    { id: 'claude-sonnet-5-20260201', label: 'Claude 5 Sonnet' }
+  ] } },
+  { key: 'google', entry: { providerId: 'google', displayName: 'Google Gemini', models: [
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }
+  ] } },
+  { key: 'openai', entry: { providerId: 'openai', displayName: 'OpenAI', models: [
+    { id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano (Fast)' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (Smart)' }
+  ] } }
+];
+
 function sortAvailableModelsResponse(entries: AvailableModelsResponse): AvailableModelsResponse {
   for (const prov of entries) {
     prov.models.sort((a, b) =>
@@ -324,6 +338,7 @@ export function createAvailableModelsLoader(
   const providerStates = new Map<string, CachedProviderState>();
   const pendingFetches = new Map<string, { generation: number; promise: Promise<void> }>();
   let activeProviderIds = new Set<string>();
+  let directEntries: DiscoveredProvider[] = [];
   let cacheSummary: { at: number; complete: boolean; hasHostProviders: boolean } | null = null;
   let inFlightLoad: Promise<AvailableModelsResponse> | null = null;
   let generation = 0;
@@ -335,6 +350,9 @@ export function createAvailableModelsLoader(
       if (state && state.entry.models.length > 0) {
         visible.push(state.entry);
       }
+    }
+    for (const entry of directEntries) {
+      if (!visible.some((item) => item.providerId === entry.providerId)) visible.push(entry);
     }
     return sortAvailableModelsResponse(visible);
   }
@@ -390,9 +408,18 @@ export function createAvailableModelsLoader(
 
   async function fetchCatalog(fetchGeneration: number, refresh: boolean): Promise<AvailableModelsResponse> {
     const uniqueProviders = await listActiveHostProviders(deps);
+    let direct: DiscoveredProvider[] = [];
+    try {
+      const settings = normalizeSettings(await deps.readSettings?.() ?? {});
+      direct = DIRECT_MODELS.filter(({ key }) => Boolean(settings.keys[key])).map(({ entry }) => entry);
+    } catch (error) {
+      deps.log?.warn?.(`Could not load direct provider settings: ${describeUnexpectedFailure(error, 'settings')}`);
+    }
     if (fetchGeneration !== generation) {
       return buildVisibleEntries();
     }
+
+    directEntries = direct;
 
     activeProviderIds = new Set(uniqueProviders.map((p) => p.id));
     for (const id of providerStates.keys()) {
@@ -416,9 +443,10 @@ export function createAvailableModelsLoader(
           if (state.timedOut && age < timeoutCooldownMs) continue;
         }
 
-        const promise = launchProviderFetch(provider, fetchGeneration, earlyReturnRef);
         // Once healthy providers are cached, re-probe previously timed-out providers in background only.
         const isBackgroundReprobe = !refresh && hadHostProviders && state?.timedOut === true;
+        const publicationRef = isBackgroundReprobe ? { current: true } : earlyReturnRef;
+        const promise = launchProviderFetch(provider, fetchGeneration, publicationRef);
         if (!isBackgroundReprobe) {
           waitPromises.push(promise);
         }
@@ -468,7 +496,7 @@ export function createAvailableModelsLoader(
       if (!refresh && inFlightLoad) {
         return inFlightLoad;
       }
-      const fetchGeneration = ++generation;
+      const fetchGeneration = refresh ? ++generation : generation;
       const promise = fetchCatalog(fetchGeneration, refresh).finally(() => {
         if (inFlightLoad === promise) inFlightLoad = null;
       });
@@ -480,6 +508,7 @@ export function createAvailableModelsLoader(
       providerStates.clear();
       pendingFetches.clear();
       activeProviderIds.clear();
+      directEntries = [];
       cacheSummary = null;
       inFlightLoad = null;
     }

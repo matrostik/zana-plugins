@@ -66,6 +66,15 @@ function fakeZcc(settingsValues: Record<string, unknown> = { llmProvider: 'none'
 }
 
 describe('createPromptVoicePlugin', () => {
+  it('refreshes configured direct providers when settings change', async () => {
+    const { zcc, methods, setSettings, triggerSettingsChange } = fakeZcc();
+    await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+    await methods.get(AVAILABLE_MODELS_METHOD)?.({});
+    setSettings({ openaiApiKey: 'key' });
+    triggerSettingsChange({ openaiApiKey: 'key' });
+    const result = await methods.get(AVAILABLE_MODELS_METHOD)?.({}) as Array<{ providerId: string }>;
+    expect(result.some((entry) => entry.providerId === 'openai')).toBe(true);
+  });
   it('declares keyless defaults, visibility settings, optional secret API keys, and registers RPC methods', async () => {
     const { zcc, methods } = fakeZcc();
     await createPromptVoicePlugin(zcc as never, { localWhisper: null });

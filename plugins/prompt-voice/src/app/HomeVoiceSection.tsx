@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_MIC_DEVICE_ID, type AudioPreferences } from '../shared/audioPreferences.ts';
 import {
   SETTINGS_GET_METHOD,
+  PROMPT_STUDIO_PANEL_PATH,
+  PROMPT_STUDIO_PROJECT_TAB_ID,
   STATUS_METHOD,
   TRANSCRIBE_METHOD,
   type StatusResponse,
@@ -108,11 +110,11 @@ function HomeVoiceSectionInner({
 
   const openStudio = useCallback(() => {
     if (projectId && typeof navigate?.toProject === 'function') {
-      navigate.toProject(projectId, { tabId: 'prompt-studio' });
+      navigate.toProject(projectId, { tabId: PROMPT_STUDIO_PROJECT_TAB_ID });
       return;
     }
     if (typeof navigate?.toPluginPanel === 'function') {
-      navigate.toPluginPanel('prompt-studio');
+      navigate.toPluginPanel(PROMPT_STUDIO_PANEL_PATH);
     }
   }, [navigate, projectId]);
 

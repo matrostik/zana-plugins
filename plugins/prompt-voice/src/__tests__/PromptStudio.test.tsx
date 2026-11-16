@@ -1007,8 +1007,11 @@ describe('PromptStudio Component', () => {
     const view = render(<PromptStudio projectId="proj-a" />);
     expect((screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement).value).toBe('Alpha project prompt');
 
+    const writes = vi.spyOn(localStorage, 'setItem');
     view.rerender(<PromptStudio projectId="proj-b" />);
     expect((screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement).value).toBe('Beta project prompt');
+    expect(writes.mock.calls.filter(([key, value]) => key === draftStorageKey('proj-b') && JSON.parse(value).inputText === 'Alpha project prompt')).toHaveLength(0);
+    writes.mockRestore();
 
     // Switching back verifies proj-a draft was not overwritten by proj-b during switch
     view.rerender(<PromptStudio projectId="proj-a" />);

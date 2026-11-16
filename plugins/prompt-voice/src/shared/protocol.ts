@@ -181,3 +181,5 @@ export interface RephraseFailure {
 }
 
 export type RephraseResponse = RephraseSuccess | RephraseFailure;
+export const PROMPT_STUDIO_PANEL_PATH = 'prompt-studio';
+export const PROMPT_STUDIO_PROJECT_TAB_ID = 'prompt-studio';

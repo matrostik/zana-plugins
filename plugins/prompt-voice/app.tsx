@@ -4,8 +4,8 @@ import { MicButton, ensureStylesInjected } from './src/app/MicButton.tsx';
 import { PromptStudio, PromptStudioDetachedPlaceholder } from './src/app/PromptStudio.tsx';
 import { VisibilitySettingsSection } from './src/app/VisibilitySettingsSection.tsx';
 
-export const PROMPT_STUDIO_PANEL_PATH = 'prompt-studio';
-export const PROMPT_STUDIO_PROJECT_TAB_ID = 'prompt-studio';
+import { PROMPT_STUDIO_PANEL_PATH, PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
+export { PROMPT_STUDIO_PANEL_PATH, PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
 
 interface CommandPaletteContextLike {
   projectId?: string | null;
@@ -29,7 +29,7 @@ export default definePluginApp((app) => {
 
   // Dedicated Prompt Studio global navigation screen
   app.slots.navPanel?.({
-    id: 'prompt-studio',
+    id: PROMPT_STUDIO_PANEL_PATH,
     title: 'Prompt Studio',
     icon: 'Sparkles',
     path: PROMPT_STUDIO_PANEL_PATH,

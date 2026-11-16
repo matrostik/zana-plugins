@@ -11,6 +11,7 @@ import { createLocalWhisperManager, registerLocalWhisperMethods } from './src/se
 import {
   AVAILABLE_MODELS_METHOD,
   MODELS_UPDATED_EVENT,
+  PROMPT_STUDIO_PROJECT_TAB_ID,
   REPHRASE_METHOD,
   SETTINGS_CHANGED_EVENT,
   SETTINGS_GET_METHOD,
@@ -43,7 +44,7 @@ type PluginUiWithProjectTab = ZccPluginApi['ui'] & {
 };
 
 const STATUS_UNAVAILABLE_MESSAGE = 'Prompt Voice status is unavailable. See the Zana log for details.';
-export const PROMPT_STUDIO_PROJECT_TAB_ID = 'prompt-studio';
+export { PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
 
 /**
  * Registers Prompt Voice's settings, project tab availability, and RPC methods.
@@ -56,7 +57,6 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   const readSettings = () => store ? store.readEffective() : settings.get() as Promise<Record<string, unknown>>;
   if (store) {
     zcc.rpc.method(SETTINGS_GET_METHOD, () => store.readPublic());
-    zcc.rpc.method(SETTINGS_UPDATE_METHOD, (patch) => store.update(patch));
   }
   const serverUrl = deps.serverUrl ?? resolveServerUrl();
   const assistant = deps.assistant ?? zcc.sdk?.assistant;
@@ -69,6 +69,13 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       zcc.realtime?.publish?.(MODELS_UPDATED_EVENT, entries);
     }
   });
+  if (store) {
+    zcc.rpc.method(SETTINGS_UPDATE_METHOD, async (patch) => {
+      const updated = await store.update(patch);
+      modelsLoader.invalidate();
+      return updated;
+    });
+  }
   const localWhisper = deps.localWhisper !== undefined ? deps.localWhisper : await createLocalWhisperManager(zcc, fetchImpl);
   registerLocalWhisperMethods(zcc, localWhisper);
   // Stops the server this plugin started; a user-run server is never touched.
@@ -96,6 +103,7 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   });
 
   settings.onChange?.((next) => {
+    modelsLoader.invalidate();
     zcc.realtime?.publish?.(SETTINGS_CHANGED_EVENT, normalizeVisibilitySettings(next));
   });
 

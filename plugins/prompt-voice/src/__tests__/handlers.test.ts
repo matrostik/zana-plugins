@@ -283,6 +283,45 @@ describe('availableModelsHandler', () => {
 });
 
 describe('createAvailableModelsLoader', () => {
+  it('lists only configured direct providers even without host providers', async () => {
+    const loader = createAvailableModelsLoader({ readSettings: async () => ({ openaiApiKey: 'key' }) });
+    const result = await loader.load();
+    expect(result.map((entry) => entry.providerId)).toContain('openai');
+    expect(result.map((entry) => entry.providerId)).not.toContain('anthropic');
+  });
+  it('reuses a slow provider request across ordinary loads', async () => {
+    let resolve!: (value: unknown) => void;
+    const models = vi.fn(() => new Promise((done) => { resolve = done; }));
+    const loader = createAvailableModelsLoader(
+      { providers: { list: async () => [{ id: 'slow' }], models }, providerTimeoutMs: 1000 },
+      { softWaitMs: 10 }
+    );
+    await loader.load();
+    await loader.load();
+    expect(models).toHaveBeenCalledTimes(1);
+    resolve({ models: [{ id: 'model', model: 'Model' }] });
+    await vi.waitFor(async () => expect((await loader.load()).some((p) => p.providerId === 'slow')).toBe(true));
+  });
+
+  it('publishes a recovered background provider', async () => {
+    let clock = 0;
+    let recovered = false;
+    const onModelsUpdated = vi.fn();
+    const models = vi.fn(({ providerId }: { providerId: string }) => {
+      if (providerId === 'slow' && !recovered) return new Promise(() => undefined);
+      return Promise.resolve({ models: [{ id: 'model', model: 'Model' }] });
+    });
+    const loader = createAvailableModelsLoader(
+      { providers: { list: async () => [{ id: 'fast' }, { id: 'slow' }], models }, providerTimeoutMs: 20, onModelsUpdated },
+      { softWaitMs: 5, incompleteTtlMs: 10, timeoutCooldownMs: 30, now: () => clock }
+    );
+    await loader.load();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    recovered = true;
+    clock = 100;
+    await loader.load();
+    await vi.waitFor(() => expect(onModelsUpdated).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ providerId: 'slow' })])));
+  });
   it('caches complete host catalogs and bypasses cache on refresh', async () => {
     const list = vi.fn(async () => [{ id: 'codex', displayName: 'Codex' }]);
     const models = vi.fn(async () => ({ models: [{ id: 'gpt-5', model: 'GPT-5' }] }));
