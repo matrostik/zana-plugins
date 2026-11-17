@@ -15,13 +15,44 @@ describe('normalizeSettings', () => {
     expect(settings.tone).toBe('conversational');
     expect(settings.inputLanguage).toBe('auto');
     expect(settings.keys).toEqual({ openai: '', google: '', anthropic: '' });
+    expect(settings.showHomeWidget).toBe(true);
+    expect(settings.showInProjects).toBe(true);
+    expect(settings.micVisibility).toBe('both');
   });
 
   it('falls back to defaults for unknown select values', () => {
-    const settings = normalizeSettings({ sttProvider: 'unknown-engine', llmProvider: 'unknown-llm', tone: 'pirate' });
+    const settings = normalizeSettings({
+      sttProvider: 'unknown-engine',
+      llmProvider: 'unknown-llm',
+      tone: 'pirate',
+      micVisibility: 'sidebar'
+    });
     expect(settings.sttProvider).toBe('system');
     expect(settings.llmProvider).toBe('assistant');
     expect(settings.tone).toBe('conversational');
+    expect(settings.micVisibility).toBe('both');
+  });
+
+  it('normalizes surface visibility settings from booleans and strings', () => {
+    const disabled = normalizeSettings({
+      showHomeWidget: false,
+      showInProjects: 'false',
+      micVisibility: 'projects'
+    });
+    expect(disabled.showHomeWidget).toBe(false);
+    expect(disabled.showInProjects).toBe(false);
+    expect(disabled.micVisibility).toBe('projects');
+
+    const mainOnly = normalizeSettings({
+      showHomeWidget: 'true',
+      showInProjects: false,
+      micVisibility: 'main'
+    });
+    expect(mainOnly.showHomeWidget).toBe(true);
+    expect(mainOnly.showInProjects).toBe(false);
+    expect(mainOnly.micVisibility).toBe('main');
+
+    expect(normalizeSettings({ micVisibility: 'off' }).micVisibility).toBe('off');
   });
 
   it('normalizes mic selection, sound cue toggle, and chime volume with defaults', () => {

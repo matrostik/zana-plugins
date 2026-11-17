@@ -11,6 +11,11 @@ export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 export const SETTINGS_GET_METHOD = 'promptVoice.settings.get';
 export const SETTINGS_UPDATE_METHOD = 'promptVoice.settings.update';
 
+/** Realtime channel published when host-owned plugin settings change. */
+export const SETTINGS_CHANGED_EVENT = 'promptVoice:settingsChanged';
+/** Realtime channel published when background provider model discovery updates the catalog. */
+export const MODELS_UPDATED_EVENT = 'promptVoice:modelsUpdated';
+
 /** Local Whisper management. Each returns a LocalWhisperResponse. */
 export const LOCAL_WHISPER_METHODS = {
   state: 'promptVoice.localWhisper.state',
@@ -146,6 +151,10 @@ export interface DiscoveredProvider {
   error?: string | null;
 }
 
+export interface AvailableModelsRequest {
+  refresh?: boolean;
+}
+
 export type AvailableModelsResponse = DiscoveredProvider[];
 
 export interface RephraseRequest {
@@ -172,3 +181,5 @@ export interface RephraseFailure {
 }
 
 export type RephraseResponse = RephraseSuccess | RephraseFailure;
+export const PROMPT_STUDIO_PANEL_PATH = 'prompt-studio';
+export const PROMPT_STUDIO_PROJECT_TAB_ID = 'prompt-studio';

@@ -1,22 +1,44 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { PromptStudio } from '../app/PromptStudio.tsx';
+import { PromptStudio, PromptStudioDetachedPlaceholder, draftStorageKey } from '../app/PromptStudio.tsx';
 import type { RecordedAudio, RecordingSession } from '../app/recorder.ts';
 import { resetSoundCueContext } from '../app/soundCues.ts';
+import { MODELS_UPDATED_EVENT } from '../shared/protocol.ts';
 
 const fakes = vi.hoisted(() => ({
   updateText: vi.fn(),
   focus: vi.fn(),
+  composerAvailable: true,
   call: vi.fn(),
-  composerView: vi.fn(() => ({ providerId: 'assistant', familyId: 'assistant' }))
+  toCompose: vi.fn(),
+  toProject: vi.fn(),
+  toPluginPanel: vi.fn(),
+  setPluginSettings: vi.fn(async () => undefined),
+  settingsValues: { showHomeWidget: true, showInProjects: true, micVisibility: 'both' } as Record<string, unknown>,
+  composerView: vi.fn((): { providerId?: string; familyId?: string } => ({ providerId: 'assistant', familyId: 'assistant' })),
+  realtimeHandlers: new Map<string, (payload: unknown) => void>()
 }));
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
-  useComposer: () => ({ updateText: fakes.updateText, focus: fakes.focus }),
+  useComposer: () => {
+    if (!fakes.composerAvailable) {
+      throw new Error('useComposer requires an active thread');
+    }
+    return { updateText: fakes.updateText, focus: fakes.focus };
+  },
   useComposerView: () => fakes.composerView(),
   useRpc: () => ({ call: fakes.call }),
-  useZccNavigate: () => vi.fn()
+  useSettings: () => ({ values: fakes.settingsValues, loading: false }),
+  setPluginSettings: fakes.setPluginSettings,
+  useRealtime: (channel: string, handler: (payload: unknown) => void) => {
+    fakes.realtimeHandlers.set(channel, handler);
+  },
+  useZccNavigate: () => ({
+    toCompose: fakes.toCompose,
+    toProject: fakes.toProject,
+    toPluginPanel: fakes.toPluginPanel
+  })
 }));
 
 function fakeSession(): RecordingSession {
@@ -37,6 +59,10 @@ const fakeLocalStorage = {
 
 beforeEach(() => {
   storageMap.clear();
+  fakes.realtimeHandlers.clear();
+  fakes.composerAvailable = true;
+  fakes.settingsValues = { showHomeWidget: true, showInProjects: true, micVisibility: 'both' };
+  fakes.setPluginSettings.mockResolvedValue(undefined);
   Object.defineProperty(window, 'localStorage', { value: fakeLocalStorage, writable: true });
   Object.defineProperty(globalThis, 'localStorage', { value: fakeLocalStorage, writable: true });
 });
@@ -45,6 +71,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   storageMap.clear();
+  fakes.realtimeHandlers.clear();
   resetSoundCueContext();
 });
 
@@ -105,21 +132,35 @@ describe('PromptStudio Component', () => {
     expect(screen.getAllByText(/4 words/i).length).toBeGreaterThan(0);
   });
 
-  it('allows selecting an LLM refinement model and passes it to the server', async () => {
+  it('allows selecting a discovered Composer model and passes it to the server', async () => {
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') {
         return { llmProvider: 'assistant', sttProvider: 'system' };
       }
       if (method === 'promptVoice.availableModels') {
-        return [];
+        return [
+          {
+            providerId: 'assistant',
+            displayName: 'Zana Assistant',
+            models: [{ id: 'assistant', label: 'Default Assistant (Host Agent)' }]
+          },
+          {
+            providerId: 'claude-code',
+            displayName: 'Claude Code',
+            models: [
+              { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+              { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' }
+            ]
+          }
+        ];
       }
       if (method === 'promptVoice.rephrase') {
         return {
           ok: true,
           rawText: 'Fix bug in auth',
-          text: 'Resolve defect in authentication service using GPT-5.6.',
-          llmProvider: 'openai',
-          llmModel: 'gpt-5.6-luna',
+          text: 'Resolve defect in authentication service using Claude Opus.',
+          llmProvider: 'claude-code',
+          llmModel: 'claude-opus-4-6',
           durationMs: 140
         };
       }
@@ -127,13 +168,13 @@ describe('PromptStudio Component', () => {
     });
 
     render(<PromptStudio />);
+    await screen.findByRole('option', { name: 'Claude Code' });
+
     const providerSelect = screen.getByRole('combobox', { name: /refinement provider/i });
-    expect(providerSelect).toBeTruthy();
-    fireEvent.change(providerSelect, { target: { value: 'openai' } });
+    fireEvent.change(providerSelect, { target: { value: 'claude-code' } });
 
     const modelSelect = screen.getByRole('combobox', { name: /refinement model/i });
-    expect(modelSelect).toBeTruthy();
-    fireEvent.change(modelSelect, { target: { value: 'openai-smart' } });
+    fireEvent.change(modelSelect, { target: { value: 'claude-opus-4-6' } });
 
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
@@ -141,17 +182,21 @@ describe('PromptStudio Component', () => {
     const refineBtn = screen.getByRole('button', { name: /refine text/i });
     fireEvent.click(refineBtn);
 
-    expect(await screen.findByText('Resolve defect in authentication service using GPT-5.6.')).toBeTruthy();
+    expect(await screen.findByText('Resolve defect in authentication service using Claude Opus.')).toBeTruthy();
     expect(fakes.call).toHaveBeenCalledWith(
       'promptVoice.rephrase',
       expect.objectContaining({
-        llmProvider: 'openai',
-        llmModel: 'gpt-5.6-luna'
+        llmProvider: 'claude-code',
+        llmModel: 'claude-opus-4-6'
       })
     );
   });
 
-  it('dynamically loads host provider models and syncs with composer', async () => {
+  it('dynamically loads host provider models and syncs with composer even when auto-saved default exists', async () => {
+    storageMap.set(
+      'zcc:prompt-voice:studio-draft:v1',
+      JSON.stringify({ selectedProviderId: 'assistant', selectedModelId: 'assistant', userManuallySelected: false })
+    );
     fakes.composerView.mockReturnValue({ providerId: 'antigravity', familyId: 'gemini' });
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.availableModels') {
@@ -200,6 +245,88 @@ describe('PromptStudio Component', () => {
         llmModel: 'gemini-2.5-pro'
       })
     );
+  });
+
+  it('updates available Refinement providers/models immediately when promptVoice:modelsUpdated realtime event arrives', async () => {
+    fakes.composerView.mockReturnValue({ providerId: 'assistant', familyId: 'assistant' });
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'system' };
+      if (method === 'promptVoice.availableModels') {
+        return [
+          {
+            providerId: 'assistant',
+            displayName: 'Zana Assistant',
+            models: [{ id: 'assistant', label: 'Default Assistant' }]
+          }
+        ];
+      }
+      return {};
+    });
+
+    render(<PromptStudio />);
+    await waitFor(() => {
+      const refreshBtn = screen.getByRole('button', { name: /refresh models/i }) as HTMLButtonElement;
+      expect(refreshBtn.disabled).toBe(false);
+    });
+    expect(screen.getByRole('option', { name: /Zana Assistant/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Hermes ACP' })).toBeNull();
+
+    const handler = fakes.realtimeHandlers.get(MODELS_UPDATED_EVENT);
+    expect(handler).toBeTypeOf('function');
+
+    await act(async () => {
+      handler!([
+        {
+          providerId: 'assistant',
+          displayName: 'Zana Assistant',
+          models: [{ id: 'assistant', label: 'Default Assistant' }]
+        },
+        {
+          providerId: 'hermes',
+          displayName: 'Hermes ACP',
+          models: [{ id: 'hermes-3', label: 'Hermes 3' }]
+        }
+      ]);
+    });
+
+    expect(await screen.findByRole('option', { name: 'Hermes ACP' })).toBeTruthy();
+  });
+
+  it('restores saved llmProvider and llmModel on main screen when no composer provider is active', async () => {
+    fakes.composerView.mockReturnValue({});
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'antigravity', sttProvider: 'system' };
+      if (method === 'promptVoice.settings.get') {
+        return { llmProvider: 'antigravity', llmModel: 'gemini-3.8-flash' };
+      }
+      if (method === 'promptVoice.availableModels') {
+        return [
+          {
+            providerId: 'assistant',
+            displayName: 'Zana Assistant',
+            models: [{ id: 'assistant', label: 'Default Assistant' }]
+          },
+          {
+            providerId: 'antigravity',
+            displayName: 'Antigravity ACP',
+            models: [
+              { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+              { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' }
+            ]
+          }
+        ];
+      }
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const providerSelect = (await screen.findByRole('combobox', { name: /refinement provider/i })) as HTMLSelectElement;
+    const modelSelect = screen.getByRole('combobox', { name: /refinement model/i }) as HTMLSelectElement;
+
+    await waitFor(() => {
+      expect(providerSelect.value).toBe('antigravity');
+      expect(modelSelect.value).toBe('gemini-3.8-flash');
+    });
   });
 
   it('runs a preset refinement and displays output in bottom pane', async () => {
@@ -479,7 +606,7 @@ describe('PromptStudio Component', () => {
     expect(zedModelOptions).toEqual(['Zed Model A', 'Zed Model B']);
   });
 
-  it('orders fallback providers and models alphabetically by ABC when host models are empty', async () => {
+  it('falls back only to Zana Assistant without hardcoded Anthropic/Google/OpenAI providers when host models are empty or fail', async () => {
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
       if (method === 'promptVoice.availableModels') return [];
@@ -488,25 +615,95 @@ describe('PromptStudio Component', () => {
 
     render(<PromptStudio />);
     const providerSelect = (await screen.findByRole('combobox', { name: /refinement provider/i })) as HTMLSelectElement;
+    await waitFor(() => {
+      const refreshBtn = screen.getByRole('button', { name: /refresh models/i }) as HTMLButtonElement;
+      expect(refreshBtn.disabled).toBe(false);
+    });
     const providerOptionTexts = Array.from(providerSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
-    expect(providerOptionTexts).toEqual(['Anthropic', 'Google Gemini', 'OpenAI', 'Zana Assistant']);
+    expect(providerOptionTexts).toEqual(['Zana Assistant']);
+  });
 
-    // Check models for Anthropic
-    fireEvent.change(providerSelect, { target: { value: 'anthropic' } });
-    const modelSelect = screen.getByRole('combobox', { name: /refinement model/i }) as HTMLSelectElement;
-    const anthropicModelTexts = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
-    expect(anthropicModelTexts).toEqual(['Claude 4.5 Haiku', 'Claude 5 Sonnet']);
+  it('hides providers with no models and reveals them on manual refresh once models load', async () => {
+    let callCount = 0;
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
+      if (method === 'promptVoice.availableModels') {
+        callCount++;
+        if (callCount === 1) {
+          return [
+            {
+              providerId: 'assistant',
+              displayName: 'Zana Assistant',
+              models: [{ id: 'assistant', label: 'Default Assistant (Host Agent)' }]
+            },
+            {
+              providerId: 'codex',
+              displayName: 'Codex',
+              models: [],
+              error: 'Timed out loading models for Codex.'
+            },
+            {
+              providerId: 'empty-cli',
+              displayName: 'Empty CLI',
+              models: []
+            }
+          ];
+        }
+        return [
+          {
+            providerId: 'assistant',
+            displayName: 'Zana Assistant',
+            models: [{ id: 'assistant', label: 'Default Assistant (Host Agent)' }]
+          },
+          {
+            providerId: 'codex',
+            displayName: 'Codex',
+            models: [{ id: 'gpt-5-codex', label: 'GPT-5 Codex' }],
+            error: null
+          }
+        ];
+      }
+      return {};
+    });
 
-    // Check models for OpenAI
-    fireEvent.change(providerSelect, { target: { value: 'openai' } });
-    const openaiModelTexts = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
-    expect(openaiModelTexts).toEqual(['GPT-5.4 Nano (Fast)', 'GPT-5.6 Luna (Smart)']);
+    render(<PromptStudio />);
+    await waitFor(() => {
+      const refreshBtn = screen.getByRole('button', { name: /refresh models/i }) as HTMLButtonElement;
+      expect(refreshBtn.disabled).toBe(false);
+    });
+
+    const providerSelect = screen.getByRole('combobox', { name: /refinement provider/i }) as HTMLSelectElement;
+    expect(Array.from(providerSelect.options).map((o) => o.value)).toEqual(['assistant']);
+    expect(screen.queryByRole('option', { name: /codex/i })).toBeNull();
+    expect(screen.queryByRole('option', { name: /empty cli/i })).toBeNull();
+
+    const refreshBtn = screen.getByRole('button', { name: /refresh models/i });
+    fireEvent.click(refreshBtn);
+
+    const codexOption = await screen.findByRole('option', { name: 'Codex' });
+    expect(codexOption).toBeTruthy();
+    fireEvent.change(providerSelect, { target: { value: 'codex' } });
+    expect(await screen.findByRole('option', { name: 'GPT-5 Codex' })).toBeTruthy();
+    expect(fakes.call).toHaveBeenCalledWith('promptVoice.availableModels', { refresh: true });
   });
 
   it('controls dictation auto-cleanup setting directly from Prompt Studio', async () => {
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
-      if (method === 'promptVoice.availableModels') return [];
+      if (method === 'promptVoice.availableModels') {
+        return [
+          {
+            providerId: 'assistant',
+            displayName: 'Zana Assistant',
+            models: [{ id: 'assistant', label: 'Default Assistant' }]
+          },
+          {
+            providerId: 'antigravity',
+            displayName: 'Antigravity',
+            models: [{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }]
+          }
+        ];
+      }
       if (method === 'promptVoice.settings.update') return {};
       return {};
     });
@@ -514,6 +711,7 @@ describe('PromptStudio Component', () => {
     render(<PromptStudio />);
     const cleanupToggle = (await screen.findByRole('checkbox', { name: /auto-cleanup mic dictations/i })) as HTMLInputElement;
     expect(cleanupToggle.checked).toBe(true);
+    await screen.findByRole('option', { name: 'Antigravity' });
 
     // Toggle off
     fireEvent.click(cleanupToggle);
@@ -532,9 +730,10 @@ describe('PromptStudio Component', () => {
 
     // Changing provider while auto-cleanup is enabled updates settings
     const providerSelect = screen.getByRole('combobox', { name: /refinement provider/i });
-    fireEvent.change(providerSelect, { target: { value: 'openai' } });
+    fireEvent.change(providerSelect, { target: { value: 'antigravity' } });
     expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', expect.objectContaining({
-      llmProvider: 'openai'
+      llmProvider: 'antigravity',
+      llmModel: 'gemini-2.5-pro'
     }));
   });
 
@@ -784,5 +983,117 @@ describe('PromptStudio Component', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('renders Project badge and host headerActions when hosted inside a project', () => {
+    fakes.call.mockResolvedValue({});
+    render(
+      <PromptStudio
+        pluginId="prompt-voice"
+        projectId="proj-1"
+        headerActions={<button type="button">Pop out</button>}
+      />
+    );
+
+    expect(screen.getByText('Project')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Pop out' })).toBeTruthy();
+  });
+
+  it('isolates localStorage drafts per projectId without overwriting existing drafts', () => {
+    fakes.call.mockResolvedValue({});
+    storageMap.set(draftStorageKey('proj-a'), JSON.stringify({ inputText: 'Alpha project prompt', outputText: '' }));
+    storageMap.set(draftStorageKey('proj-b'), JSON.stringify({ inputText: 'Beta project prompt', outputText: '' }));
+
+    const view = render(<PromptStudio projectId="proj-a" />);
+    expect((screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement).value).toBe('Alpha project prompt');
+
+    const writes = vi.spyOn(localStorage, 'setItem');
+    view.rerender(<PromptStudio projectId="proj-b" />);
+    expect((screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement).value).toBe('Beta project prompt');
+    expect(writes.mock.calls.filter(([key, value]) => key === draftStorageKey('proj-b') && JSON.parse(value).inputText === 'Alpha project prompt')).toHaveLength(0);
+    writes.mockRestore();
+
+    // Switching back verifies proj-a draft was not overwritten by proj-b during switch
+    view.rerender(<PromptStudio projectId="proj-a" />);
+    expect((screen.getByPlaceholderText(/type your raw thoughts/i) as HTMLTextAreaElement).value).toBe('Alpha project prompt');
+  });
+
+  it('shows hidden-in-projects notice when showInProjects is false and re-enables via plugin settings', async () => {
+    fakes.settingsValues = { showHomeWidget: true, showInProjects: false, micVisibility: 'both' };
+    fakes.call.mockResolvedValue({});
+
+    render(<PromptStudio pluginId="prompt-voice" projectId="proj-1" />);
+    expect(screen.getByTestId('ps-project-hidden-notice')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /enable prompt studio in projects/i }));
+    await waitFor(() =>
+      expect(fakes.setPluginSettings).toHaveBeenCalledWith('prompt-voice', { showInProjects: true })
+    );
+  });
+
+  it('falls back to navigate.toCompose when inserting without an active thread composer', () => {
+    fakes.composerAvailable = false;
+    fakes.call.mockResolvedValue({});
+
+    render(<PromptStudio projectId="proj-1" />);
+    fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), {
+      target: { value: 'New thread from project studio' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /insert into composer/i }));
+
+    expect(fakes.toCompose).toHaveBeenCalledWith({
+      initialPrompt: 'New thread from project studio',
+      focusPrompt: true
+    });
+  });
+
+  it('renders surface visibility controls in StudioSettings when pluginId is supplied', () => {
+    fakes.call.mockResolvedValue({});
+    render(<PromptStudio pluginId="prompt-voice" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^settings$/i }));
+    expect(screen.getByRole('heading', { name: 'Where Prompt Voice Appears' })).toBeTruthy();
+  });
+
+  it('renders PromptStudioDetachedPlaceholder with Focus Window and Bring Back actions', () => {
+    const focusWindow = vi.fn();
+    const bringBack = vi.fn();
+
+    render(
+      <PromptStudioDetachedPlaceholder
+        pluginId="prompt-voice"
+        projectId="proj-1"
+        focusWindow={focusWindow}
+        bringBack={bringBack}
+      />
+    );
+    expect(screen.getByTestId('ps-detached-placeholder')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus Window' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bring Back' }));
+    expect(focusWindow).toHaveBeenCalledTimes(1);
+    expect(bringBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads available models when returning from StudioSettings', async () => {
+    let modelsCall = 0;
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.availableModels') {
+        modelsCall++;
+        if (modelsCall === 1) {
+          return [{ providerId: 'assistant', displayName: 'Zana Assistant', models: [{ id: 'assistant', label: 'Default' }] }];
+        }
+        return [
+          { providerId: 'assistant', displayName: 'Zana Assistant', models: [{ id: 'assistant', label: 'Default' }] },
+          { providerId: 'openai', displayName: 'OpenAI', models: [{ id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano' }] }
+        ];
+      }
+      return {};
+    });
+    render(<PromptStudio pluginId="prompt-voice" />);
+    await waitFor(() => expect(modelsCall).toBe(1));
+    fireEvent.click(screen.getByRole('button', { name: /^settings$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back to studio/i }));
+    expect(await screen.findByRole('option', { name: 'OpenAI' })).toBeTruthy();
   });
 });

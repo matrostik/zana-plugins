@@ -2,6 +2,8 @@ import { defaultStartSession, type RecordingSession, type StartRecordingOptions 
 import { useDictation } from './useDictation.ts';
 import type { DictationPhase } from './dictationMachine.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
+import { useSafeComposerView, useSafeZccContext, useVisibilitySettings } from './safeSdk.ts';
+import { isMicVisibleInScope } from '../shared/visibility.ts';
 
 export { ensureStylesInjected };
 
@@ -34,9 +36,21 @@ const SR_ONLY_STYLE: React.CSSProperties = {
 
 /**
  * Composer action: oval capsule pill with red border and centered mic icon in idle.
- * Fluidly expands into the active listening pill with waveform, timer, stop, and cancel buttons.
+ * Respects configured visibility (`both` | `main` | `projects` | `off`) before mounting dictation hooks.
  */
 export function MicButton({ startSession = defaultStartSession }: MicButtonProps) {
+  const visibility = useVisibilitySettings();
+  const composerView = useSafeComposerView();
+  const zccContext = useSafeZccContext();
+
+  if (!isMicVisibleInScope(visibility.micVisibility, composerView?.scope, zccContext?.projectId)) {
+    return null;
+  }
+
+  return <MicButtonInner startSession={startSession} />;
+}
+
+function MicButtonInner({ startSession = defaultStartSession }: MicButtonProps) {
   ensureStylesInjected();
   const { phase, error, notice, onClick, cancel, clearNotice, level, seconds, autoStopped } = useDictation({ startSession });
 

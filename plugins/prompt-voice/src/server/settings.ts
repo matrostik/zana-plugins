@@ -12,6 +12,14 @@ import {
   parseDictionary
 } from '../shared/dictionary.ts';
 import { parseAudioPreferences } from '../shared/audioPreferences.ts';
+import {
+  DEFAULT_MIC_VISIBILITY,
+  DEFAULT_SHOW_HOME_WIDGET,
+  DEFAULT_SHOW_IN_PROJECTS,
+  MIC_VISIBILITY_OPTIONS,
+  normalizeVisibilitySettings,
+  type MicVisibility
+} from '../shared/visibility.ts';
 
 export { DICTIONARY_MAX_TERM_LENGTH, DICTIONARY_MAX_TERMS, parseDictionary };
 export const CUSTOM_PROMPT_MAX_CHARS = 2000;
@@ -33,6 +41,9 @@ export interface PromptVoiceSettings {
   micLabel: string;
   soundCuesEnabled: boolean;
   soundCuesVolume: number;
+  showHomeWidget: boolean;
+  showInProjects: boolean;
+  micVisibility: MicVisibility;
   keys: {
     openai: string;
     google: string;
@@ -69,6 +80,25 @@ export const API_KEY_LABELS: Readonly<Record<ApiKeyName, string>> = {
  * keys are only required for the optional direct-API providers.
  */
 export const SETTING_DESCRIPTORS = {
+  showHomeWidget: {
+    type: 'boolean' as const,
+    label: 'Show on main Home screen',
+    description: 'Show a Prompt Voice quick card on Zana’s main Home screen.',
+    default: DEFAULT_SHOW_HOME_WIDGET
+  },
+  showInProjects: {
+    type: 'boolean' as const,
+    label: 'Show Prompt Studio tab in projects',
+    description: 'Display a Prompt Studio tab inside each project.',
+    default: DEFAULT_SHOW_IN_PROJECTS
+  },
+  micVisibility: {
+    type: 'select' as const,
+    label: 'Composer mic button placement',
+    description: 'Choose where the voice dictation mic appears in composers (both, main, projects, or off).',
+    options: [...MIC_VISIBILITY_OPTIONS],
+    default: DEFAULT_MIC_VISIBILITY
+  },
   tone: {
     type: 'select' as const,
     label: 'Tone',
@@ -79,13 +109,13 @@ export const SETTING_DESCRIPTORS = {
     type: 'string' as const,
     label: 'Custom instructions',
     description: 'Used when Tone is Custom prompt.',
-    multiline: true as const,
+    multiline: true as const
   },
   dictionary: {
     type: 'string' as const,
     label: 'Personal dictionary',
     description: 'Names, acronyms, and jargon to spell correctly. One per line or comma-separated.',
-    multiline: true as const,
+    multiline: true as const
   },
   inputLanguage: {
     type: 'string' as const,
@@ -140,6 +170,7 @@ function normalizeLanguage(value: unknown): string {
 /** Normalizes raw plugin settings once so the rest of the server never handles raw values. */
 export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSettings {
   const audio = parseAudioPreferences(raw);
+  const visibility = normalizeVisibilitySettings(raw);
   return {
     sttProvider: pickOption(raw.sttProvider, STT_PROVIDER_IDS, 'system'),
     sttModel: asTrimmedString(raw.sttModel, 120),
@@ -153,6 +184,9 @@ export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSett
     micLabel: audio.micLabel,
     soundCuesEnabled: audio.soundCuesEnabled,
     soundCuesVolume: audio.soundCuesVolume,
+    showHomeWidget: visibility.showHomeWidget,
+    showInProjects: visibility.showInProjects,
+    micVisibility: visibility.micVisibility,
     keys: {
       openai: asTrimmedString(raw.openaiApiKey, 300),
       google: asTrimmedString(raw.googleApiKey, 300),
