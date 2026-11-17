@@ -487,7 +487,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Never translate the text.');
   });
 
-  it('formats dictionary terms correctly', () => {
+  it('formats dictionary terms correctly in standard and custom modes', () => {
     const prompt = buildSystemPrompt({
       tone: 'technical',
       customPrompt: '',
@@ -496,6 +496,50 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Special terms to always spell correctly:');
     expect(prompt).toContain('- Zana');
     expect(prompt).toContain('- TypeScript');
+
+    const customPrompt = buildSystemPrompt({
+      tone: 'custom',
+      customPrompt: 'Rewrite concisely.',
+      dictionary: ['Zana']
+    });
+    expect(customPrompt).toContain('- Zana');
+  });
+
+  it.each([
+    ['standard', 'well-written text'],
+    ['casual', 'everyday casual'],
+    ['conversational', 'speaking naturally'],
+    ['formal', 'polished, professional'],
+    ['technical', 'technical language']
+  ] as const)('includes concise length guard and %s tone instructions', (tone, expectedPhrase) => {
+    const prompt = buildSystemPrompt({ tone, customPrompt: '', dictionary: [] });
+    expect(prompt).toContain('Keep roughly the same length as the input');
+    expect(prompt).toContain(expectedPhrase);
+  });
+
+  it('applies preset transformation instruction while preserving tone and dictionary', () => {
+    const prompt = buildSystemPrompt({
+      tone: 'formal',
+      customPrompt: '',
+      instruction: 'Summarize the core request into crisp, high-level executive bullet points.',
+      dictionary: ['PromptVoice']
+    });
+    expect(prompt).toContain('Summarize the core request into crisp, high-level executive bullet points.');
+    expect(prompt).toContain('polished, professional');
+    expect(prompt).toContain('- PromptVoice');
+    expect(prompt).toContain('Never translate the text.');
+  });
+
+  it('builds translation prompt without Never translate constraint and preserves dictionary', () => {
+    const prompt = buildSystemPrompt({
+      tone: 'standard',
+      customPrompt: '',
+      targetLanguage: 'Spanish',
+      dictionary: ['Zana']
+    });
+    expect(prompt).toContain('Translate the user’s text naturally and accurately into Spanish.');
+    expect(prompt).not.toContain('Never translate the text.');
+    expect(prompt).toContain('- Zana');
   });
 });
 
@@ -549,5 +593,47 @@ describe('runRephrase', () => {
       })
     );
     expect(assistant.complete).toHaveBeenCalled();
+  });
+
+  it('passes requested tone and preset instruction to the LLM instructions', async () => {
+    const capturedInstructions: string[] = [];
+    const assistant = {
+      complete: vi.fn(async ({ instructions }: { instructions: string }) => {
+        capturedInstructions.push(instructions);
+        return { text: '• Fixed bullet' };
+      })
+    };
+    await runRephrase(
+      { text: 'rough text', tone: 'casual' },
+      settings({ llmProvider: 'assistant' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(assistant.complete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instructions: expect.stringContaining('Keep roughly the same length as the input')
+      })
+    );
+    expect(capturedInstructions[0]).toContain('everyday casual');
+
+    await runRephrase(
+      { text: 'rough text', tone: 'formal', instruction: 'Summarize into bullets.' },
+      settings({ llmProvider: 'assistant' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(capturedInstructions[1]).toContain('Summarize into bullets.');
+
+    await runRephrase(
+      { text: 'hello world', targetLanguage: 'uk' },
+      settings({ llmProvider: 'assistant' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(capturedInstructions[2]).toContain('into Ukrainian');
+
+    const invalidLang = await runRephrase(
+      { text: 'hello world', targetLanguage: 'klingon' },
+      settings({ llmProvider: 'assistant' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(invalidLang).toEqual({ ok: false, code: 'LLM_FAILED', message: 'Unsupported target language.' });
   });
 });

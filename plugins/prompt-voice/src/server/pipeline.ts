@@ -7,13 +7,16 @@ import type { PromptVoiceSettings } from './settings.ts';
 import { cleanTranscription, isMeaningfulSpeech } from './stt/clean.ts';
 import { createSttProvider, type SttProvider } from './stt/providers.ts';
 import type { LocalWhisperEndpoint } from './stt/localWhisper.ts';
-import type {
-  LlmProviderId,
-  RefineNotice,
-  RephraseRequest,
-  RephraseResponse,
-  TranscribeNoSpeech,
-  TranscribeSuccess
+import { findTargetLanguage } from '../shared/languages.ts';
+import {
+  TONE_IDS,
+  type LlmProviderId,
+  type RefineNotice,
+  type RephraseRequest,
+  type RephraseResponse,
+  type ToneId,
+  type TranscribeNoSpeech,
+  type TranscribeSuccess
 } from '../shared/protocol.ts';
 
 export interface PipelineLogger {
@@ -128,6 +131,12 @@ export async function runDictation(
   };
 }
 
+function resolveRequestedTone(requested: unknown, fallback: ToneId): ToneId {
+  return typeof requested === 'string' && (TONE_IDS as readonly string[]).includes(requested)
+    ? (requested as ToneId)
+    : fallback;
+}
+
 /**
  * Rephrases or refines existing text directly using LLM providers.
  */
@@ -157,8 +166,8 @@ export async function runRephrase(
   const effectiveSettings: PromptVoiceSettings = {
     ...settings,
     llmProvider: effectiveProvider,
+    tone: resolveRequestedTone(request.tone, settings.tone),
     ...(request.llmModel ? { llmModel: request.llmModel } : {}),
-    ...(request.tone ? { tone: request.tone as PromptVoiceSettings['tone'] } : {}),
     ...(request.customPrompt !== undefined ? { customPrompt: request.customPrompt } : {})
   };
 
@@ -176,9 +185,17 @@ export async function runRephrase(
       };
     }
 
+    const rawTargetLanguage = typeof request.targetLanguage === 'string' ? request.targetLanguage.trim() : '';
+    const resolvedTargetLanguage = rawTargetLanguage ? findTargetLanguage(rawTargetLanguage) : undefined;
+    if (rawTargetLanguage && !resolvedTargetLanguage) {
+      return { ok: false, code: 'LLM_FAILED', message: 'Unsupported target language.' };
+    }
+    const instruction = typeof request.instruction === 'string' ? request.instruction.trim() : undefined;
     const systemPrompt = buildSystemPrompt({
       tone: effectiveSettings.tone,
       customPrompt: effectiveSettings.customPrompt,
+      ...(resolvedTargetLanguage ? { targetLanguage: resolvedTargetLanguage.label } : {}),
+      ...(instruction ? { instruction } : {}),
       dictionary: effectiveSettings.dictionary
     });
     const text = await provider.refine(systemPrompt, buildUserMessage(rawText));

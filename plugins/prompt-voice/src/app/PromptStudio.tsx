@@ -11,12 +11,15 @@ import {
   TRANSCRIBE_METHOD,
   type AvailableModelsResponse,
   type DiscoveredProvider,
+  type ImproveToneId,
   type RephraseResponse,
   type StatusResponse,
+  type ToneId,
   type TranscribeResponse
 } from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
 import { DEFAULT_MIC_DEVICE_ID, type AudioPreferences } from '../shared/audioPreferences.ts';
+import { DEFAULT_TARGET_LANGUAGE, TARGET_LANGUAGE_OPTIONS, findTargetLanguage } from '../shared/languages.ts';
 import { readCachedAudioPreferences, writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
 import { defaultStartSession, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
@@ -288,6 +291,56 @@ export const PROMPT_STUDIO_STYLES = `
     line-height: 1.3;
   }
 
+  .ps-tone-panel {
+    margin-top: 2px;
+    padding: 8px 9px;
+    border-radius: 6px;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ps-tone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--ps-text-muted);
+  }
+  .ps-tone-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .ps-tone-chip {
+    border: 1px solid var(--ps-border);
+    background: var(--ps-input-bg);
+    color: var(--ps-text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.12s, background 0.12s, color 0.12s;
+  }
+  .ps-tone-chip:hover {
+    color: var(--text-primary, #e2e8f0);
+    border-color: var(--ps-text-subtle);
+  }
+  .ps-tone-chip.active {
+    background: var(--ps-accent);
+    border-color: var(--ps-accent);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  .ps-tone-hint {
+    font-size: 10px;
+    color: var(--ps-text-muted);
+    line-height: 1.3;
+  }
+
   .ps-custom-prompt-input {
     width: 100%;
     background: var(--ps-input-bg);
@@ -504,30 +557,60 @@ export function draftStorageKey(projectId?: string): string {
   return projectId ? `${STORAGE_KEY}:project:${projectId}` : STORAGE_KEY;
 }
 
+export interface ImproveToneOption {
+  id: ImproveToneId;
+  label: string;
+  desc: string;
+}
+
+export const IMPROVE_TONES: ImproveToneOption[] = [
+  { id: 'standard', label: 'Standard', desc: 'Fix grammar & clarity while keeping your natural tone and length.' },
+  { id: 'casual', label: 'Casual', desc: 'Relaxed, everyday phrasing — natural without sounding stiff.' },
+  { id: 'conversational', label: 'Conversational', desc: 'Warm, natural, and easy to read — like speaking clearly.' },
+  { id: 'formal', label: 'Professional', desc: 'Polished, respectful phrasing for emails, PRs, or stakeholders.' },
+  { id: 'technical', label: 'Technical', desc: 'Precise, unambiguous engineering phrasing without fluff.' }
+];
+
+export function getActionButtonLabel(presetId: string, isRunning: boolean): string {
+  switch (presetId) {
+    case 'improve':
+      return isRunning ? 'Improving...' : 'Improve text';
+    case 'executive':
+      return isRunning ? 'Summarizing...' : 'Summarize';
+    case 'spec':
+      return isRunning ? 'Creating spec...' : 'Create spec';
+    case 'custom':
+      return isRunning ? 'Running...' : 'Run instructions';
+    case 'translate':
+      return isRunning ? 'Translating...' : 'Translate';
+    default:
+      return isRunning ? 'Transforming...' : 'Transform text';
+  }
+}
+
 export interface PresetDef {
   id: string;
   title: string;
   icon: string;
   desc: string;
-  prompt: string;
-  tone: 'formal' | 'casual' | 'technical' | 'conversational';
+  instruction?: string;
+  tone: ImproveToneId;
 }
 
 export const STUDIO_PRESETS: PresetDef[] = [
   {
-    id: 'polish',
-    title: 'Clean up writing',
+    id: 'improve',
+    title: 'Improve writing',
     icon: '✨',
-    desc: 'Fix punctuation, grammar, and stuttering.',
-    prompt: 'Clean up disfluencies, typos, and improve sentence flow without altering intent.',
-    tone: 'technical'
+    desc: 'Fix grammar, phrasing & punctuation without extending length.',
+    tone: 'standard'
   },
   {
     id: 'executive',
     title: 'Summarize',
     icon: '⚡',
     desc: 'Condense into punchy bullet points.',
-    prompt: 'Summarize the core request into crisp, high-level executive bullet points.',
+    instruction: 'Summarize the core request into crisp, high-level executive bullet points.',
     tone: 'formal'
   },
   {
@@ -535,16 +618,8 @@ export const STUDIO_PRESETS: PresetDef[] = [
     title: 'Create a technical spec',
     icon: '📐',
     desc: 'Format with Goals, Context, Steps.',
-    prompt: 'Transform into a structured technical spec with ## Goal, ## Architecture, and ## Implementation Steps.',
+    instruction: 'Transform into a structured technical spec with ## Goal, ## Architecture, and ## Implementation Steps.',
     tone: 'technical'
-  },
-  {
-    id: 'chat',
-    title: 'Make it conversational',
-    icon: '💬',
-    desc: 'Natural, conversational tone.',
-    prompt: 'Rephrase in a warm, polite, and helpful conversational tone.',
-    tone: 'conversational'
   }
 ];
 
@@ -691,7 +766,9 @@ export function PromptStudio({
   const [showDiff, setShowDiff] = useState(false);
 
   // ─── Refinement Controls State ───────────────────────────────────────────────
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('polish');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('improve');
+  const [selectedToneId, setSelectedToneId] = useState<ImproveToneId>('standard');
+  const [targetLanguage, setTargetLanguage] = useState<string>(DEFAULT_TARGET_LANGUAGE);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
@@ -725,6 +802,23 @@ export function PromptStudio({
         userManuallySelectedModel.current = parsed.userManuallySelected === true;
         setSttProvider(parsed.sttProvider || 'system');
         setSttModel(parsed.sttModel || '');
+        if (parsed.selectedPresetId === 'polish') {
+          setSelectedPresetId('improve');
+          setSelectedToneId('standard');
+        } else if (parsed.selectedPresetId === 'chat') {
+          setSelectedPresetId('improve');
+          setSelectedToneId('conversational');
+        } else if (typeof parsed.selectedPresetId === 'string' && (parsed.selectedPresetId === 'custom' || parsed.selectedPresetId === 'translate' || STUDIO_PRESETS.some((p) => p.id === parsed.selectedPresetId))) {
+          setSelectedPresetId(parsed.selectedPresetId);
+        } else {
+          setSelectedPresetId('improve');
+        }
+        if (typeof parsed.selectedToneId === 'string' && IMPROVE_TONES.some((t) => t.id === parsed.selectedToneId)) {
+          setSelectedToneId(parsed.selectedToneId as ImproveToneId);
+        } else if (parsed.selectedPresetId !== 'chat') {
+          setSelectedToneId('standard');
+        }
+        setTargetLanguage(findTargetLanguage(parsed.targetLanguage)?.code ?? DEFAULT_TARGET_LANGUAGE);
       } else {
         setInputText('');
         setOutputText('');
@@ -732,6 +826,9 @@ export function PromptStudio({
         setSelectedModelId('assistant');
         setSttProvider('system');
         setSttModel('');
+        setSelectedPresetId('improve');
+        setSelectedToneId('standard');
+        setTargetLanguage(DEFAULT_TARGET_LANGUAGE);
         userManuallySelectedModel.current = false;
       }
     } catch {
@@ -1032,13 +1129,16 @@ export function PromptStudio({
           selectedModelId,
           userManuallySelected: userManuallySelectedModel.current,
           sttProvider,
-          sttModel
+          sttModel,
+          selectedPresetId,
+          selectedToneId,
+          targetLanguage
         })
       );
     } catch {
       // Ignore storage write errors
     }
-  }, [loadedStorageKey, storageKey, inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel]);
+  }, [loadedStorageKey, storageKey, inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel, selectedPresetId, selectedToneId, targetLanguage]);
 
   // Auto-cleanup toggle handler for composer dictations
   const handleToggleAutoCleanup = (enabled: boolean) => {
@@ -1292,8 +1392,14 @@ export function PromptStudio({
     if (!raw || isRefining || !activeModel || (selectedPresetId === 'custom' && !customPrompt.trim())) return;
 
     const activePreset = STUDIO_PRESETS.find((p) => p.id === selectedPresetId);
-    const instruction = selectedPresetId === 'custom' ? customPrompt.trim() : activePreset?.prompt || 'Polish and format for clarity.';
-    const tone = activePreset?.tone || 'technical';
+    const isCustom = selectedPresetId === 'custom';
+    const isImprove = selectedPresetId === 'improve';
+    const isTranslate = selectedPresetId === 'translate';
+    const tone: ToneId = isCustom
+      ? 'custom'
+      : isImprove
+        ? selectedToneId
+        : activePreset?.tone || 'technical';
 
     const providerToUse = activeProvider?.id ?? 'assistant';
     const modelToUse = activeModel?.id ?? 'assistant';
@@ -1304,8 +1410,9 @@ export function PromptStudio({
     try {
       const response = (await rpc.call(REPHRASE_METHOD, {
         text: raw,
-        tone,
-        customPrompt: instruction,
+        ...(isTranslate ? { targetLanguage } : { tone }),
+        ...(isCustom ? { customPrompt: customPrompt.trim() } : {}),
+        ...(!isCustom && !isTranslate && activePreset?.instruction ? { instruction: activePreset.instruction } : {}),
         llmProvider: providerToUse,
         llmModel: modelToUse
       })) as RephraseResponse;
@@ -1375,7 +1482,9 @@ export function PromptStudio({
     if (!inputText && !outputText) return;
     setInputText('');
     setOutputText('');
-    setSelectedPresetId('polish');
+    setSelectedPresetId('improve');
+    setSelectedToneId('standard');
+    setTargetLanguage(DEFAULT_TARGET_LANGUAGE);
     setCustomPrompt('');
     setShowDiff(false);
     setStatusNotice('Studio canvas cleared.');
@@ -1786,16 +1895,43 @@ export function PromptStudio({
           <section className="ps-section">
             <div className="ps-section-title">How should we improve it?</div>
             <div className="ps-presets-list" role="radiogroup" aria-label="How should we improve it?">
-              {STUDIO_PRESETS.map((p) => (
-                <label key={p.id} className={`ps-preset-btn ${selectedPresetId === p.id ? 'active' : ''}`}>
-                  <span className="preset-title">
-                    <input type="radio" name="refinement-style" value={p.id}
-                      checked={selectedPresetId === p.id} onChange={() => setSelectedPresetId(p.id)} />
-                    {p.title}
-                  </span>
-                  <span className="preset-desc">{p.desc}</span>
-                </label>
-              ))}
+              {STUDIO_PRESETS.map((p) => {
+                const activeToneOption = IMPROVE_TONES.find((t) => t.id === selectedToneId) ?? IMPROVE_TONES[0];
+                return (
+                  <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label className={`ps-preset-btn ${selectedPresetId === p.id ? 'active' : ''}`}>
+                      <span className="preset-title">
+                        <input type="radio" name="refinement-style" value={p.id}
+                          checked={selectedPresetId === p.id} onChange={() => setSelectedPresetId(p.id)} />
+                        {p.title}
+                      </span>
+                      <span className="preset-desc">{p.desc}</span>
+                    </label>
+                    {p.id === 'improve' && selectedPresetId === 'improve' && (
+                      <div className="ps-tone-panel">
+                        <div className="ps-tone-header">
+                          <span>Tone: <strong style={{ color: 'var(--text-primary, #e2e8f0)' }}>{activeToneOption.label}</strong></span>
+                          <span style={{ color: 'var(--ps-text-subtle)' }}>Same length</span>
+                        </div>
+                        <div className="ps-tone-chips" role="group" aria-label="Improvement tone">
+                          {IMPROVE_TONES.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              className={`ps-tone-chip ${selectedToneId === t.id ? 'active' : ''}`}
+                              aria-pressed={selectedToneId === t.id}
+                              onClick={() => setSelectedToneId(t.id)}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="ps-tone-hint">{activeToneOption.desc}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               <label className={`ps-preset-btn ${selectedPresetId === 'custom' ? 'active' : ''}`}>
                 <span className="preset-title">
                   <input type="radio" name="refinement-style" value="custom"
@@ -1804,12 +1940,46 @@ export function PromptStudio({
                 </span>
                 <span className="preset-desc">Describe your own transformation.</span>
               </label>
+              {selectedPresetId === 'custom' && (
+                <textarea ref={customPromptInputRef} className="ps-custom-prompt-input"
+                  aria-label="Custom instructions" placeholder="e.g. Turn into user stories with acceptance criteria..."
+                  value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className={`ps-preset-btn ${selectedPresetId === 'translate' ? 'active' : ''}`}>
+                  <span className="preset-title">
+                    <input type="radio" name="refinement-style" value="translate"
+                      checked={selectedPresetId === 'translate'} onChange={() => setSelectedPresetId('translate')} />
+                    Translate
+                  </span>
+                  <span className="preset-desc">Translate into another language while keeping meaning.</span>
+                </label>
+                {selectedPresetId === 'translate' && (
+                  <div className="ps-tone-panel">
+                    <div className="ps-tone-header">
+                      <label htmlFor="ps-translate-lang-select">
+                        <strong style={{ color: 'var(--text-primary, #e2e8f0)' }}>Target language</strong>
+                      </label>
+                      <span style={{ color: 'var(--ps-text-subtle)' }}>Same meaning</span>
+                    </div>
+                    <select
+                      id="ps-translate-lang-select"
+                      className="ps-select"
+                      aria-label="Target language"
+                      value={targetLanguage}
+                      onChange={(e) => setTargetLanguage(e.target.value)}
+                      disabled={isRefining}
+                    >
+                      {TARGET_LANGUAGE_OPTIONS.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
-            {selectedPresetId === 'custom' && (
-              <textarea ref={customPromptInputRef} className="ps-custom-prompt-input"
-                aria-label="Custom instructions" placeholder="e.g. Turn into user stories with acceptance criteria..."
-                value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
-            )}
           </section>
 
           <button type="button" className="ps-btn" style={{ marginTop: 'auto' }} onClick={() => setSettingsOpen(true)}>Settings</button>
@@ -1871,7 +2041,15 @@ export function PromptStudio({
           {/* Middle Action Bar: Clear visual separation & quick actions */}
           <div className="ps-action-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <span className="ps-pill">⬇ Refine pipeline</span>
+              <span className="ps-pill">
+                {selectedPresetId === 'improve'
+                  ? `⬇ Improve writing · ${(IMPROVE_TONES.find((t) => t.id === selectedToneId) ?? IMPROVE_TONES[0]).label}`
+                  : selectedPresetId === 'translate'
+                    ? `⬇ Translate · ${findTargetLanguage(targetLanguage)?.label ?? targetLanguage}`
+                    : selectedPresetId === 'custom'
+                      ? '⬇ Custom instructions'
+                      : `⬇ ${STUDIO_PRESETS.find((p) => p.id === selectedPresetId)?.title ?? 'Refine pipeline'}`}
+              </span>
               <span style={{ color: 'var(--ps-text-muted)' }}>
                 {inputText.trim() ? `${inputText.trim().split(/\s+/).length} words ready` : 'Add text to get started'}
               </span>
@@ -1882,10 +2060,10 @@ export function PromptStudio({
                 className="ps-btn ps-btn-primary"
                 onClick={() => handleRefine()}
                 disabled={isRefining || !inputText.trim() || !activeModel || (selectedPresetId === 'custom' && !customPrompt.trim())}
-                title="Transform raw draft into polished output"
+                title={selectedPresetId === 'translate' ? 'Translate raw draft into the selected language' : 'Transform raw draft into output'}
               >
                 <span>{isRefining ? '⏳' : '⚡'}</span>
-                <span>{isRefining ? 'Refining...' : 'Refine text'}</span>
+                <span>{getActionButtonLabel(selectedPresetId, isRefining)}</span>
               </button>
             </div>
           </div>
@@ -1961,7 +2139,7 @@ export function PromptStudio({
             ) : (
               <textarea
                 className="ps-textarea"
-                placeholder="Polished, structured output will appear here after clicking Refine..."
+                placeholder="Your improved, structured, or translated text will appear here..."
                 value={outputText}
                 onChange={(e) => setOutputText(e.target.value)}
                 aria-label="Refined output"

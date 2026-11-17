@@ -103,7 +103,7 @@ export const SETTING_DESCRIPTORS = {
     type: 'select' as const,
     label: 'Tone',
     options: [...TONE_IDS],
-    default: 'conversational'
+    default: 'standard'
   },
   customPrompt: {
     type: 'string' as const,
@@ -176,7 +176,7 @@ export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSett
     sttModel: asTrimmedString(raw.sttModel, 120),
     llmProvider: pickOption(raw.llmProvider, LLM_PROVIDER_IDS, 'assistant'),
     llmModel: asTrimmedString(raw.llmModel, 120),
-    tone: pickOption(raw.tone, TONE_IDS, 'conversational'),
+    tone: pickOption(raw.tone, TONE_IDS, 'standard'),
     customPrompt: asTrimmedString(raw.customPrompt, CUSTOM_PROMPT_MAX_CHARS),
     dictionary: parseDictionary(raw.dictionary),
     inputLanguage: normalizeLanguage(raw.inputLanguage),
