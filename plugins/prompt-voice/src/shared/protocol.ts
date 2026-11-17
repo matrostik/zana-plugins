@@ -75,6 +75,7 @@ export type PromptVoiceErrorCode =
   | 'AUDIO_EMPTY'
   | 'AUDIO_TOO_LARGE'
   | 'AUDIO_TYPE_UNSUPPORTED'
+  | 'INVALID_REQUEST'
   | 'STT_FAILED'
   | 'LLM_FAILED'
   | 'DOWNLOAD_FAILED'

@@ -33,16 +33,13 @@ function dictionarySection(terms: string[]): string {
 
 /**
  * System prompt for the cleanup and text-improvement step.
+ * - Translation (`targetLanguage`) takes precedence over saved custom cleanup settings.
  * - Custom prompts (`tone === 'custom'`) apply the user's instructions directly.
  * - Preset transformations (`instruction`) apply the preset format + selected tone.
  * - Standard improvement/cleanup fixes grammar, phrasing, and transcription errors without extending length.
  */
 export function buildSystemPrompt(ctx: PromptContext): string {
   const dict = dictionarySection(ctx.dictionary);
-
-  if (ctx.tone === 'custom' && ctx.customPrompt) {
-    return `${ctx.customPrompt}\n\n${CUSTOM_LANGUAGE_CONSTRAINT}${dict}`;
-  }
 
   const trimmedTargetLanguage = ctx.targetLanguage?.trim();
   if (trimmedTargetLanguage) {
@@ -54,6 +51,10 @@ Rules:
 - Preserve code blocks, inline code identifiers, URLs, Markdown formatting, and special terms from the dictionary
 - If parts or all of the text are already in ${trimmedTargetLanguage}, keep them in ${trimmedTargetLanguage} and fix grammar and clarity
 - Output ONLY the translated text, with no explanations or commentary${dict}`;
+  }
+
+  if (ctx.tone === 'custom' && ctx.customPrompt) {
+    return `${ctx.customPrompt}\n\n${CUSTOM_LANGUAGE_CONSTRAINT}${dict}`;
   }
 
   const trimmedInstruction = ctx.instruction?.trim();

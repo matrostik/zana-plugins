@@ -193,7 +193,8 @@ describe('PromptStudio Component', () => {
 
     expect(await screen.findByDisplayValue('Hola mundo')).toBeTruthy();
     expect(fakes.call).toHaveBeenLastCalledWith('promptVoice.rephrase', expect.objectContaining({
-      targetLanguage: 'es'
+      targetLanguage: 'es',
+      tone: 'standard'
     }));
   });
 

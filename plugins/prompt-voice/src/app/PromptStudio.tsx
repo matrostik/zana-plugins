@@ -571,25 +571,19 @@ export const IMPROVE_TONES: ImproveToneOption[] = [
   { id: 'technical', label: 'Technical', desc: 'Precise, unambiguous engineering phrasing without fluff.' }
 ];
 
-export function getActionButtonLabel(presetId: string, isRunning: boolean): string {
-  switch (presetId) {
-    case 'improve':
-      return isRunning ? 'Improving...' : 'Improve text';
-    case 'executive':
-      return isRunning ? 'Summarizing...' : 'Summarize';
-    case 'spec':
-      return isRunning ? 'Creating spec...' : 'Create spec';
-    case 'custom':
-      return isRunning ? 'Running...' : 'Run instructions';
-    case 'translate':
-      return isRunning ? 'Translating...' : 'Translate';
-    default:
-      return isRunning ? 'Transforming...' : 'Transform text';
-  }
-}
+export const PRESET_IDS = {
+  improve: 'improve',
+  executive: 'executive',
+  spec: 'spec',
+  custom: 'custom',
+  translate: 'translate'
+} as const;
+
+export type StudioPresetId = (typeof PRESET_IDS)[keyof typeof PRESET_IDS];
+export const VALID_PRESET_IDS: ReadonlySet<string> = new Set(Object.values(PRESET_IDS));
 
 export interface PresetDef {
-  id: string;
+  id: StudioPresetId;
   title: string;
   icon: string;
   desc: string;
@@ -599,14 +593,14 @@ export interface PresetDef {
 
 export const STUDIO_PRESETS: PresetDef[] = [
   {
-    id: 'improve',
+    id: PRESET_IDS.improve,
     title: 'Improve writing',
     icon: '✨',
     desc: 'Fix grammar, phrasing & punctuation without extending length.',
     tone: 'standard'
   },
   {
-    id: 'executive',
+    id: PRESET_IDS.executive,
     title: 'Summarize',
     icon: '⚡',
     desc: 'Condense into punchy bullet points.',
@@ -614,7 +608,7 @@ export const STUDIO_PRESETS: PresetDef[] = [
     tone: 'formal'
   },
   {
-    id: 'spec',
+    id: PRESET_IDS.spec,
     title: 'Create a technical spec',
     icon: '📐',
     desc: 'Format with Goals, Context, Steps.',
@@ -622,6 +616,36 @@ export const STUDIO_PRESETS: PresetDef[] = [
     tone: 'technical'
   }
 ];
+
+export function getActionButtonLabel(presetId: string, isRunning: boolean): string {
+  switch (presetId) {
+    case PRESET_IDS.improve:
+      return isRunning ? 'Improving...' : 'Improve text';
+    case PRESET_IDS.executive:
+      return isRunning ? 'Summarizing...' : 'Summarize';
+    case PRESET_IDS.spec:
+      return isRunning ? 'Creating spec...' : 'Create spec';
+    case PRESET_IDS.custom:
+      return isRunning ? 'Running...' : 'Run instructions';
+    case PRESET_IDS.translate:
+      return isRunning ? 'Translating...' : 'Translate';
+    default:
+      return isRunning ? 'Transforming...' : 'Transform text';
+  }
+}
+
+export function getPipelineLabel(presetId: string, activeToneLabel: string, targetLanguage: string): string {
+  switch (presetId) {
+    case PRESET_IDS.improve:
+      return `\u2B07 Improve writing \u00B7 ${activeToneLabel}`;
+    case PRESET_IDS.translate:
+      return `\u2B07 Translate \u00B7 ${findTargetLanguage(targetLanguage)?.label ?? targetLanguage}`;
+    case PRESET_IDS.custom:
+      return '\u2B07 Custom instructions';
+    default:
+      return `\u2B07 ${STUDIO_PRESETS.find((p) => p.id === presetId)?.title ?? 'Refine pipeline'}`;
+  }
+}
 
 export interface DiscoveredModelOption {
   id: string;
@@ -766,7 +790,7 @@ export function PromptStudio({
   const [showDiff, setShowDiff] = useState(false);
 
   // ─── Refinement Controls State ───────────────────────────────────────────────
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('improve');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(PRESET_IDS.improve);
   const [selectedToneId, setSelectedToneId] = useState<ImproveToneId>('standard');
   const [targetLanguage, setTargetLanguage] = useState<string>(DEFAULT_TARGET_LANGUAGE);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -803,15 +827,15 @@ export function PromptStudio({
         setSttProvider(parsed.sttProvider || 'system');
         setSttModel(parsed.sttModel || '');
         if (parsed.selectedPresetId === 'polish') {
-          setSelectedPresetId('improve');
+          setSelectedPresetId(PRESET_IDS.improve);
           setSelectedToneId('standard');
         } else if (parsed.selectedPresetId === 'chat') {
-          setSelectedPresetId('improve');
+          setSelectedPresetId(PRESET_IDS.improve);
           setSelectedToneId('conversational');
-        } else if (typeof parsed.selectedPresetId === 'string' && (parsed.selectedPresetId === 'custom' || parsed.selectedPresetId === 'translate' || STUDIO_PRESETS.some((p) => p.id === parsed.selectedPresetId))) {
+        } else if (typeof parsed.selectedPresetId === 'string' && VALID_PRESET_IDS.has(parsed.selectedPresetId)) {
           setSelectedPresetId(parsed.selectedPresetId);
         } else {
-          setSelectedPresetId('improve');
+          setSelectedPresetId(PRESET_IDS.improve);
         }
         if (typeof parsed.selectedToneId === 'string' && IMPROVE_TONES.some((t) => t.id === parsed.selectedToneId)) {
           setSelectedToneId(parsed.selectedToneId as ImproveToneId);
@@ -826,7 +850,7 @@ export function PromptStudio({
         setSelectedModelId('assistant');
         setSttProvider('system');
         setSttModel('');
-        setSelectedPresetId('improve');
+        setSelectedPresetId(PRESET_IDS.improve);
         setSelectedToneId('standard');
         setTargetLanguage(DEFAULT_TARGET_LANGUAGE);
         userManuallySelectedModel.current = false;
@@ -1389,17 +1413,19 @@ export function PromptStudio({
   // ─── Refinement Handler ──────────────────────────────────────────────────────
   const handleRefine = async () => {
     const raw = inputText.trim();
-    if (!raw || isRefining || !activeModel || (selectedPresetId === 'custom' && !customPrompt.trim())) return;
+    if (!raw || isRefining || !activeModel || (selectedPresetId === PRESET_IDS.custom && !customPrompt.trim())) return;
 
     const activePreset = STUDIO_PRESETS.find((p) => p.id === selectedPresetId);
-    const isCustom = selectedPresetId === 'custom';
-    const isImprove = selectedPresetId === 'improve';
-    const isTranslate = selectedPresetId === 'translate';
-    const tone: ToneId = isCustom
-      ? 'custom'
-      : isImprove
-        ? selectedToneId
-        : activePreset?.tone || 'technical';
+    const isCustom = selectedPresetId === PRESET_IDS.custom;
+    const isImprove = selectedPresetId === PRESET_IDS.improve;
+    const isTranslate = selectedPresetId === PRESET_IDS.translate;
+    const tone: ToneId = isTranslate
+      ? 'standard'
+      : isCustom
+        ? 'custom'
+        : isImprove
+          ? selectedToneId
+          : activePreset?.tone || 'technical';
 
     const providerToUse = activeProvider?.id ?? 'assistant';
     const modelToUse = activeModel?.id ?? 'assistant';
@@ -1410,7 +1436,8 @@ export function PromptStudio({
     try {
       const response = (await rpc.call(REPHRASE_METHOD, {
         text: raw,
-        ...(isTranslate ? { targetLanguage } : { tone }),
+        tone,
+        ...(isTranslate ? { targetLanguage } : {}),
         ...(isCustom ? { customPrompt: customPrompt.trim() } : {}),
         ...(!isCustom && !isTranslate && activePreset?.instruction ? { instruction: activePreset.instruction } : {}),
         llmProvider: providerToUse,
@@ -1482,7 +1509,7 @@ export function PromptStudio({
     if (!inputText && !outputText) return;
     setInputText('');
     setOutputText('');
-    setSelectedPresetId('improve');
+    setSelectedPresetId(PRESET_IDS.improve);
     setSelectedToneId('standard');
     setTargetLanguage(DEFAULT_TARGET_LANGUAGE);
     setCustomPrompt('');
@@ -1549,7 +1576,7 @@ export function PromptStudio({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      setSelectedPresetId('custom');
+      setSelectedPresetId(PRESET_IDS.custom);
       setTimeout(() => customPromptInputRef.current?.focus(), 0);
     }
   }, []);
@@ -1595,6 +1622,8 @@ export function PromptStudio({
       </div>
     );
   }
+
+  const activeToneOption = IMPROVE_TONES.find((t) => t.id === selectedToneId) ?? IMPROVE_TONES[0];
 
   return (
     <div className="ps-container" onKeyDown={handleKeyDown}>
@@ -1895,9 +1924,7 @@ export function PromptStudio({
           <section className="ps-section">
             <div className="ps-section-title">How should we improve it?</div>
             <div className="ps-presets-list" role="radiogroup" aria-label="How should we improve it?">
-              {STUDIO_PRESETS.map((p) => {
-                const activeToneOption = IMPROVE_TONES.find((t) => t.id === selectedToneId) ?? IMPROVE_TONES[0];
-                return (
+              {STUDIO_PRESETS.map((p) => (
                   <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label className={`ps-preset-btn ${selectedPresetId === p.id ? 'active' : ''}`}>
                       <span className="preset-title">
@@ -1907,7 +1934,7 @@ export function PromptStudio({
                       </span>
                       <span className="preset-desc">{p.desc}</span>
                     </label>
-                    {p.id === 'improve' && selectedPresetId === 'improve' && (
+                    {p.id === PRESET_IDS.improve && selectedPresetId === PRESET_IDS.improve && (
                       <div className="ps-tone-panel">
                         <div className="ps-tone-header">
                           <span>Tone: <strong style={{ color: 'var(--text-primary, #e2e8f0)' }}>{activeToneOption.label}</strong></span>
@@ -1930,31 +1957,30 @@ export function PromptStudio({
                       </div>
                     )}
                   </div>
-                );
-              })}
-              <label className={`ps-preset-btn ${selectedPresetId === 'custom' ? 'active' : ''}`}>
+              ))}
+              <label className={`ps-preset-btn ${selectedPresetId === PRESET_IDS.custom ? 'active' : ''}`}>
                 <span className="preset-title">
-                  <input type="radio" name="refinement-style" value="custom"
-                    checked={selectedPresetId === 'custom'} onChange={() => setSelectedPresetId('custom')} />
+                  <input type="radio" name="refinement-style" value={PRESET_IDS.custom}
+                    checked={selectedPresetId === PRESET_IDS.custom} onChange={() => setSelectedPresetId(PRESET_IDS.custom)} />
                   Custom instructions
                 </span>
                 <span className="preset-desc">Describe your own transformation.</span>
               </label>
-              {selectedPresetId === 'custom' && (
+              {selectedPresetId === PRESET_IDS.custom && (
                 <textarea ref={customPromptInputRef} className="ps-custom-prompt-input"
                   aria-label="Custom instructions" placeholder="e.g. Turn into user stories with acceptance criteria..."
                   value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label className={`ps-preset-btn ${selectedPresetId === 'translate' ? 'active' : ''}`}>
+                <label className={`ps-preset-btn ${selectedPresetId === PRESET_IDS.translate ? 'active' : ''}`}>
                   <span className="preset-title">
-                    <input type="radio" name="refinement-style" value="translate"
-                      checked={selectedPresetId === 'translate'} onChange={() => setSelectedPresetId('translate')} />
+                    <input type="radio" name="refinement-style" value={PRESET_IDS.translate}
+                      checked={selectedPresetId === PRESET_IDS.translate} onChange={() => setSelectedPresetId(PRESET_IDS.translate)} />
                     Translate
                   </span>
                   <span className="preset-desc">Translate into another language while keeping meaning.</span>
                 </label>
-                {selectedPresetId === 'translate' && (
+                {selectedPresetId === PRESET_IDS.translate && (
                   <div className="ps-tone-panel">
                     <div className="ps-tone-header">
                       <label htmlFor="ps-translate-lang-select">
@@ -2042,13 +2068,7 @@ export function PromptStudio({
           <div className="ps-action-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               <span className="ps-pill">
-                {selectedPresetId === 'improve'
-                  ? `⬇ Improve writing · ${(IMPROVE_TONES.find((t) => t.id === selectedToneId) ?? IMPROVE_TONES[0]).label}`
-                  : selectedPresetId === 'translate'
-                    ? `⬇ Translate · ${findTargetLanguage(targetLanguage)?.label ?? targetLanguage}`
-                    : selectedPresetId === 'custom'
-                      ? '⬇ Custom instructions'
-                      : `⬇ ${STUDIO_PRESETS.find((p) => p.id === selectedPresetId)?.title ?? 'Refine pipeline'}`}
+                {getPipelineLabel(selectedPresetId, activeToneOption.label, targetLanguage)}
               </span>
               <span style={{ color: 'var(--ps-text-muted)' }}>
                 {inputText.trim() ? `${inputText.trim().split(/\s+/).length} words ready` : 'Add text to get started'}
@@ -2059,8 +2079,8 @@ export function PromptStudio({
                 type="button"
                 className="ps-btn ps-btn-primary"
                 onClick={() => handleRefine()}
-                disabled={isRefining || !inputText.trim() || !activeModel || (selectedPresetId === 'custom' && !customPrompt.trim())}
-                title={selectedPresetId === 'translate' ? 'Translate raw draft into the selected language' : 'Transform raw draft into output'}
+                disabled={isRefining || !inputText.trim() || !activeModel || (selectedPresetId === PRESET_IDS.custom && !customPrompt.trim())}
+                title={selectedPresetId === PRESET_IDS.translate ? 'Translate raw draft into the selected language' : 'Transform raw draft into output'}
               >
                 <span>{isRefining ? '⏳' : '⚡'}</span>
                 <span>{getActionButtonLabel(selectedPresetId, isRefining)}</span>

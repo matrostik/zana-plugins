@@ -3,7 +3,7 @@ import { describeProviderError, describeUnexpectedFailure, PromptVoiceError } fr
 import type { FetchLike } from './http.ts';
 import { createLlmProvider, resolveLlmModel, type AssistantApi } from './llm/providers.ts';
 import { buildSystemPrompt, buildUserMessage } from './llm/prompts.ts';
-import type { PromptVoiceSettings } from './settings.ts';
+import { CUSTOM_PROMPT_MAX_CHARS, type PromptVoiceSettings } from './settings.ts';
 import { cleanTranscription, isMeaningfulSpeech } from './stt/clean.ts';
 import { createSttProvider, type SttProvider } from './stt/providers.ts';
 import type { LocalWhisperEndpoint } from './stt/localWhisper.ts';
@@ -168,7 +168,7 @@ export async function runRephrase(
     llmProvider: effectiveProvider,
     tone: resolveRequestedTone(request.tone, settings.tone),
     ...(request.llmModel ? { llmModel: request.llmModel } : {}),
-    ...(request.customPrompt !== undefined ? { customPrompt: request.customPrompt } : {})
+    ...(request.customPrompt !== undefined ? { customPrompt: request.customPrompt.trim().slice(0, CUSTOM_PROMPT_MAX_CHARS) } : {})
   };
 
   const model = resolveLlmModel(effectiveSettings);
@@ -188,9 +188,12 @@ export async function runRephrase(
     const rawTargetLanguage = typeof request.targetLanguage === 'string' ? request.targetLanguage.trim() : '';
     const resolvedTargetLanguage = rawTargetLanguage ? findTargetLanguage(rawTargetLanguage) : undefined;
     if (rawTargetLanguage && !resolvedTargetLanguage) {
-      return { ok: false, code: 'LLM_FAILED', message: 'Unsupported target language.' };
+      return { ok: false, code: 'INVALID_REQUEST', message: 'Unsupported target language.' };
     }
-    const instruction = typeof request.instruction === 'string' ? request.instruction.trim() : undefined;
+    const rawInstruction = typeof request.instruction === 'string'
+      ? request.instruction.trim().slice(0, CUSTOM_PROMPT_MAX_CHARS)
+      : '';
+    const instruction = rawInstruction || undefined;
     const systemPrompt = buildSystemPrompt({
       tone: effectiveSettings.tone,
       customPrompt: effectiveSettings.customPrompt,

@@ -634,6 +634,42 @@ describe('runRephrase', () => {
       settings({ llmProvider: 'assistant' }),
       { fetch: vi.fn(), log: logger(), assistant }
     );
-    expect(invalidLang).toEqual({ ok: false, code: 'LLM_FAILED', message: 'Unsupported target language.' });
+    expect(invalidLang).toEqual({ ok: false, code: 'INVALID_REQUEST', message: 'Unsupported target language.' });
+  });
+
+  it('gives targetLanguage precedence over saved custom tone and customPrompt', async () => {
+    let capturedInstructions = '';
+    const assistant = {
+      complete: vi.fn(async ({ instructions }: { instructions: string }) => {
+        capturedInstructions = instructions;
+        return { text: 'Hola mundo' };
+      })
+    };
+    const result = await runRephrase(
+      { text: 'Hello world', targetLanguage: 'es' },
+      settings({ llmProvider: 'assistant', tone: 'custom', customPrompt: 'Always reply in German.' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(result).toEqual(expect.objectContaining({ ok: true, text: 'Hola mundo' }));
+    expect(capturedInstructions).toContain('into Spanish');
+    expect(capturedInstructions).not.toContain('Always reply in German.');
+  });
+
+  it('caps instruction length at CUSTOM_PROMPT_MAX_CHARS', async () => {
+    let capturedInstructions = '';
+    const assistant = {
+      complete: vi.fn(async ({ instructions }: { instructions: string }) => {
+        capturedInstructions = instructions;
+        return { text: 'Done' };
+      })
+    };
+    const longInstruction = 'A'.repeat(2000) + 'TAIL_SHOULD_BE_DROPPED';
+    await runRephrase(
+      { text: 'raw text', tone: 'formal', instruction: longInstruction },
+      settings({ llmProvider: 'assistant' }),
+      { fetch: vi.fn(), log: logger(), assistant }
+    );
+    expect(capturedInstructions).toContain('A'.repeat(2000));
+    expect(capturedInstructions).not.toContain('TAIL_SHOULD_BE_DROPPED');
   });
 });
