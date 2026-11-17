@@ -12,7 +12,7 @@ describe('normalizeSettings', () => {
     const settings = normalizeSettings({});
     expect(settings.sttProvider).toBe('system');
     expect(settings.llmProvider).toBe('assistant');
-    expect(settings.tone).toBe('conversational');
+    expect(settings.tone).toBe('standard');
     expect(settings.inputLanguage).toBe('auto');
     expect(settings.keys).toEqual({ openai: '', google: '', anthropic: '' });
     expect(settings.showHomeWidget).toBe(true);
@@ -29,7 +29,7 @@ describe('normalizeSettings', () => {
     });
     expect(settings.sttProvider).toBe('system');
     expect(settings.llmProvider).toBe('assistant');
-    expect(settings.tone).toBe('conversational');
+    expect(settings.tone).toBe('standard');
     expect(settings.micVisibility).toBe('both');
   });
 
@@ -71,6 +71,10 @@ describe('normalizeSettings', () => {
     expect(custom.micLabel).toBe('Blue Yeti');
     expect(custom.soundCuesEnabled).toBe(false);
     expect(custom.soundCuesVolume).toBe(100);
+  });
+
+  it.each(['standard', 'casual', 'conversational', 'formal', 'technical', 'custom'])('preserves valid tone %s', (tone) => {
+    expect(normalizeSettings({ tone }).tone).toBe(tone);
   });
 
   it('trims keys and model names', () => {

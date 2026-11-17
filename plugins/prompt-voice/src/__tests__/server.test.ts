@@ -89,7 +89,7 @@ describe('createPromptVoicePlugin', () => {
     await createPromptVoicePlugin(zcc as never, { localWhisper: null });
     expect(zcc.settings.define).toHaveBeenCalledWith(
       expect.objectContaining({
-        tone: expect.objectContaining({ default: 'conversational' }),
+        tone: expect.objectContaining({ default: 'standard' }),
         showHomeWidget: expect.objectContaining({ default: true }),
         showInProjects: expect.objectContaining({ default: true }),
         micVisibility: expect.objectContaining({ default: 'both' }),

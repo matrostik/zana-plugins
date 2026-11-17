@@ -100,7 +100,7 @@ describe('PromptStudio Component', () => {
     fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'A draft' } });
     fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
     expect(fakes.call.mock.calls.filter(([method]) => method === 'promptVoice.rephrase')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: /refine text/i }));
+    fireEvent.click(screen.getByRole('button', { name: /summarize/i }));
     expect(await screen.findByDisplayValue('A summary')).toBeTruthy();
     expect(fakes.call).toHaveBeenCalledWith('promptVoice.rephrase', expect.objectContaining({ tone: 'formal' }));
   });
@@ -111,15 +111,110 @@ describe('PromptStudio Component', () => {
     render(<PromptStudio />);
     fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'A draft' } });
     fireEvent.click(screen.getByRole('radio', { name: /custom instructions/i }));
-    const refine = screen.getByRole('button', { name: /refine text/i }) as HTMLButtonElement;
-    expect(refine.disabled).toBe(true);
+    const customBtn = screen.getByRole('button', { name: /run instructions/i }) as HTMLButtonElement;
+    expect(customBtn.disabled).toBe(true);
     fireEvent.change(screen.getByRole('textbox', { name: /custom instructions/i }), { target: { value: 'Make a poem' } });
     fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
-    fireEvent.click(refine);
+    fireEvent.click(screen.getByRole('button', { name: /summarize/i }));
     expect(await screen.findByDisplayValue('Done')).toBeTruthy();
     expect(fakes.call).toHaveBeenCalledWith('promptVoice.rephrase', expect.objectContaining({
-      tone: 'formal', customPrompt: expect.not.stringContaining('Make a poem')
+      tone: 'formal',
+      instruction: expect.stringContaining('Summarize')
     }));
+    const payload = fakes.call.mock.calls.find(([m]) => m === 'promptVoice.rephrase')?.[1] as Record<string, unknown>;
+    expect(payload.customPrompt).toBeUndefined();
+  });
+
+  it('defaults to Improve writing with Standard tone and switches among Casual, Conversational, Professional, and Technical chips', async () => {
+    fakes.call.mockImplementation(async (method: string) => method === 'promptVoice.rephrase'
+      ? { ok: true, text: 'Clean English text.' } : []);
+    render(<PromptStudio />);
+
+    const improveRadio = screen.getByRole('radio', { name: /improve writing/i }) as HTMLInputElement;
+    expect(improveRadio.checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Standard' }).getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'helo world' } });
+    fireEvent.click(screen.getByRole('button', { name: /improve text/i }));
+    expect(await screen.findByDisplayValue('Clean English text.')).toBeTruthy();
+    expect(fakes.call).toHaveBeenLastCalledWith('promptVoice.rephrase', expect.objectContaining({
+      tone: 'standard'
+    }));
+
+    const chipPairs: Array<[string, string]> = [
+      ['Casual', 'casual'],
+      ['Conversational', 'conversational'],
+      ['Professional', 'formal'],
+      ['Technical', 'technical']
+    ];
+    for (const [label, expectedTone] of chipPairs) {
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed')).toBe('true');
+      fireEvent.click(screen.getByRole('button', { name: /improve text/i }));
+      await waitFor(() =>
+        expect(fakes.call).toHaveBeenLastCalledWith('promptVoice.rephrase', expect.objectContaining({
+          tone: expectedTone
+        }))
+      );
+    }
+
+    // Switching to Summarize hides the tone chips; switching back restores them
+    fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
+    expect(screen.queryByRole('group', { name: /improvement tone/i })).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /improve writing/i }));
+    expect(screen.getByRole('group', { name: /improvement tone/i })).toBeTruthy();
+  });
+
+  it('migrates legacy polish and chat presets from saved drafts', () => {
+    fakes.call.mockResolvedValue({});
+    storageMap.set(draftStorageKey(), JSON.stringify({ selectedPresetId: 'chat' }));
+    render(<PromptStudio />);
+    expect((screen.getByRole('radio', { name: /improve writing/i }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Conversational' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('places Translate as the last option with a language dropdown and sends targetLanguage', async () => {
+    fakes.call.mockImplementation(async (method: string) => method === 'promptVoice.rephrase'
+      ? { ok: true, text: 'Hola mundo' } : []);
+    render(<PromptStudio />);
+
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+    expect(radios[radios.length - 1]?.value).toBe('translate');
+    expect(screen.queryByRole('combobox', { name: /target language/i })).toBeNull();
+
+    fireEvent.click(radios[radios.length - 1]!);
+    const langSelect = screen.getByRole('combobox', { name: /target language/i }) as HTMLSelectElement;
+    expect(langSelect.value).toBe('en');
+    expect(screen.queryByRole('option', { name: /detect automatically/i })).toBeNull();
+
+    fireEvent.change(langSelect, { target: { value: 'es' } });
+    fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'Hello world' } });
+    fireEvent.click(screen.getByRole('button', { name: /translate/i }));
+
+    expect(await screen.findByDisplayValue('Hola mundo')).toBeTruthy();
+    expect(fakes.call).toHaveBeenLastCalledWith('promptVoice.rephrase', expect.objectContaining({
+      targetLanguage: 'es',
+      tone: 'standard'
+    }));
+  });
+
+  it('updates the primary action button label dynamically per selected mode', () => {
+    fakes.call.mockResolvedValue({});
+    render(<PromptStudio />);
+
+    expect(screen.getByRole('button', { name: /improve text/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
+    expect(screen.getByRole('button', { name: /summarize/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('radio', { name: /create a technical spec/i }));
+    expect(screen.getByRole('button', { name: /create spec/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('radio', { name: /custom instructions/i }));
+    expect(screen.getByRole('button', { name: /run instructions/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('radio', { name: /translate/i }));
+    expect(screen.getByRole('button', { name: /translate/i })).toBeTruthy();
   });
 
   it('renders vertical canvas and allows typing raw input', () => {
@@ -179,7 +274,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
 
-    const refineBtn = screen.getByRole('button', { name: /refine text/i });
+    const refineBtn = screen.getByRole('button', { name: /improve text/i });
     fireEvent.click(refineBtn);
 
     expect(await screen.findByText('Resolve defect in authentication service using Claude Opus.')).toBeTruthy();
@@ -234,7 +329,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Write a quick spec' } });
 
-    const refineBtn = screen.getByRole('button', { name: /refine text/i });
+    const refineBtn = screen.getByRole('button', { name: /improve text/i });
     fireEvent.click(refineBtn);
 
     expect(await screen.findByText('Refined spec by Antigravity')).toBeTruthy();
@@ -351,7 +446,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /refine text/i }));
+    fireEvent.click(screen.getByRole('button', { name: /improve text/i }));
 
     expect(await screen.findByText('Resolve defect in authentication service.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /view diff/i })).toBeTruthy();
@@ -380,7 +475,7 @@ describe('PromptStudio Component', () => {
     const textarea = screen.getByPlaceholderText(/type your raw thoughts/i);
     fireEvent.change(textarea, { target: { value: 'Fix bug in auth' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /refine text/i }));
+    fireEvent.click(screen.getByRole('button', { name: /improve text/i }));
     const diffBtn = await screen.findByRole('button', { name: /view diff/i });
     fireEvent.click(diffBtn);
 

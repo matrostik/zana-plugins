@@ -76,3 +76,20 @@ export const INPUT_LANGUAGE_OPTIONS: readonly InputLanguageOption[] = [
   { code: 'vi', label: 'Vietnamese' },
   { code: 'cy', label: 'Welsh' }
 ];
+
+export const DEFAULT_TARGET_LANGUAGE = 'en';
+
+/** Target languages available for translation (excludes the auto-detect sentinel). */
+export const TARGET_LANGUAGE_OPTIONS: readonly InputLanguageOption[] = INPUT_LANGUAGE_OPTIONS.filter(
+  (lang) => lang.code !== 'auto'
+);
+
+/** Resolves a language code or label to a supported target language option. */
+export function findTargetLanguage(value: unknown): InputLanguageOption | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  return TARGET_LANGUAGE_OPTIONS.find(
+    (lang) => lang.code.toLowerCase() === trimmed || lang.label.toLowerCase() === trimmed
+  );
+}

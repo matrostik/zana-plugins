@@ -15,7 +15,7 @@ import {
   parseDictionary
 } from '../shared/dictionary.ts';
 import { INPUT_LANGUAGE_OPTIONS } from '../shared/languages.ts';
-import { SETTINGS_GET_METHOD, SETTINGS_UPDATE_METHOD } from '../shared/protocol.ts';
+import { SETTINGS_GET_METHOD, SETTINGS_UPDATE_METHOD, TONE_IDS } from '../shared/protocol.ts';
 import type { AudioInputDevice } from './audioDevices.ts';
 import { writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
@@ -42,15 +42,26 @@ const sections: Record<string, Field[]> = {
     }
   ],
   'Prompt Voice': [
-    { key: 'tone', label: 'Cleanup tone', options: ['conversational', 'formal', 'casual', 'technical', 'custom'] },
+    {
+      key: 'tone',
+      label: 'Cleanup tone',
+      options: [...TONE_IDS],
+      help: 'Fixes grammar and clarity in the original language without extending text length.'
+    },
     { key: 'customPrompt', label: 'Custom cleanup instructions', multiline: true }
   ],
   'Connections': []
 };
 
-const defaults: Settings = { sttProvider: 'system', inputLanguage: 'auto', tone: 'conversational' };
+const defaults: Settings = { sttProvider: 'system', inputLanguage: 'auto', tone: 'standard' };
 const names: Record<string, string> = {
   ...Object.fromEntries(INPUT_LANGUAGE_OPTIONS.map((lang) => [lang.code, lang.label])),
+  standard: 'Standard (Fix & clarify)',
+  casual: 'Casual',
+  conversational: 'Conversational',
+  formal: 'Professional',
+  technical: 'Technical',
+  custom: 'Custom',
   system: 'Zana voice',
   none: 'Off',
   assistant: 'Zana assistant',

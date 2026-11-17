@@ -65,8 +65,9 @@ export type SttProviderId = (typeof STT_PROVIDER_IDS)[number] | string;
 export const LLM_PROVIDER_IDS = ['none', 'anthropic', 'google', 'openai', 'assistant'] as const;
 export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number] | string;
 
-export const TONE_IDS = ['formal', 'casual', 'technical', 'conversational', 'custom'] as const;
+export const TONE_IDS = ['standard', 'casual', 'conversational', 'formal', 'technical', 'custom'] as const;
 export type ToneId = (typeof TONE_IDS)[number];
+export type ImproveToneId = Exclude<ToneId, 'custom'>;
 
 /** Stable error codes. The UI maps these to messages; `message` is already user-safe. */
 export type PromptVoiceErrorCode =
@@ -74,6 +75,7 @@ export type PromptVoiceErrorCode =
   | 'AUDIO_EMPTY'
   | 'AUDIO_TOO_LARGE'
   | 'AUDIO_TYPE_UNSUPPORTED'
+  | 'INVALID_REQUEST'
   | 'STT_FAILED'
   | 'LLM_FAILED'
   | 'DOWNLOAD_FAILED'
@@ -160,6 +162,10 @@ export type AvailableModelsResponse = DiscoveredProvider[];
 export interface RephraseRequest {
   text: string;
   tone?: ToneId | string;
+  /** Preset transformation instruction (e.g. Summarize or Technical Spec), separate from customPrompt. */
+  instruction?: string;
+  /** Target language code or name when translating text in Prompt Studio. */
+  targetLanguage?: string;
   customPrompt?: string;
   llmProvider?: LlmProviderId;
   llmModel?: string;

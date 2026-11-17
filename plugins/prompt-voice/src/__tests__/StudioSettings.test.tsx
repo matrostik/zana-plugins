@@ -278,6 +278,28 @@ describe('StudioSettings', () => {
     expect(micSelect.value).toBe('default');
   });
 
+  it('defaults Cleanup tone to Standard (Fix & clarify) and offers Casual, Conversational, Professional, and Technical', async () => {
+    const { call } = setup({});
+    const toneSelect = (await screen.findByLabelText(/cleanup tone/i)) as HTMLSelectElement;
+    await waitFor(() => expect(toneSelect.value).toBe('standard'));
+
+    const optionLabels = Array.from(toneSelect.options).map((o) => o.textContent);
+    expect(optionLabels).toEqual([
+      'Standard (Fix & clarify)',
+      'Casual',
+      'Conversational',
+      'Professional',
+      'Technical',
+      'Custom'
+    ]);
+
+    fireEvent.change(toneSelect, { target: { value: 'formal' } });
+    expect(call).toHaveBeenCalledWith(
+      'promptVoice.settings.update',
+      expect.objectContaining({ tone: 'formal' })
+    );
+  });
+
   it('registers plugin stylesheet element on render and keeps settings styles in styles.css', () => {
     setup({});
     expect(document.getElementById('zcc-ext-prompt-voice-styles')).toBeTruthy();
