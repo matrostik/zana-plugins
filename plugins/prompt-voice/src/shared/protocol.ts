@@ -10,11 +10,18 @@ export const REPHRASE_METHOD = 'promptVoice.rephrase';
 export const AVAILABLE_MODELS_METHOD = 'promptVoice.availableModels';
 export const SETTINGS_GET_METHOD = 'promptVoice.settings.get';
 export const SETTINGS_UPDATE_METHOD = 'promptVoice.settings.update';
+export const HISTORY_LIST_METHOD = 'promptVoice.history.list';
+export const HISTORY_STAR_METHOD = 'promptVoice.history.star';
+export const HISTORY_DELETE_METHOD = 'promptVoice.history.delete';
+export const HISTORY_CLEAR_METHOD = 'promptVoice.history.clear';
+export const HISTORY_PROJECTS_METHOD = 'promptVoice.history.projects';
 
 /** Realtime channel published when host-owned plugin settings change. */
 export const SETTINGS_CHANGED_EVENT = 'promptVoice:settingsChanged';
 /** Realtime channel published when background provider model discovery updates the catalog. */
 export const MODELS_UPDATED_EVENT = 'promptVoice:modelsUpdated';
+/** Realtime channel published when activity history or its recording settings change. */
+export const HISTORY_CHANGED_EVENT = 'promptVoice:historyChanged';
 
 /** Local Whisper management. Each returns a LocalWhisperResponse. */
 export const LOCAL_WHISPER_METHODS = {
@@ -69,6 +76,12 @@ export const TONE_IDS = ['standard', 'casual', 'conversational', 'formal', 'tech
 export type ToneId = (typeof TONE_IDS)[number];
 export type ImproveToneId = Exclude<ToneId, 'custom'>;
 
+export const ACTIVITY_KINDS = ['dictation', 'dictation_cleanup', 'refinement'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+export const ACTIVITY_SOURCES = ['composer', 'home', 'studio'] as const;
+export type ActivitySource = (typeof ACTIVITY_SOURCES)[number];
+
 /** Stable error codes. The UI maps these to messages; `message` is already user-safe. */
 export type PromptVoiceErrorCode =
   | 'MISSING_KEY'
@@ -94,6 +107,16 @@ export interface TranscribeRequest {
   language?: string;
   /** Skip automatic cleanup for Studio's editable input draft. */
   transcriptionOnly?: boolean;
+  /** Surface that initiated the dictation (for activity history). */
+  source?: ActivitySource;
+  /** Active Zana project id when available. */
+  projectId?: string | null;
+  /** Active Zana thread id when dictated in a thread composer. */
+  threadId?: string | null;
+  /** Recording duration in milliseconds when measured by the client. */
+  audioDurationMs?: number;
+  /** Existing history entry id to update when appending dictation to an active Studio draft. */
+  historyEntryId?: string | null;
 }
 
 /** Set when transcription succeeded but LLM cleanup did not; the raw text is still returned. */
@@ -111,6 +134,8 @@ export interface TranscribeSuccess {
   llmProvider: LlmProviderId;
   llmModel: string | null;
   refineNotice?: RefineNotice;
+  /** History entry id created or updated for this dictation, when history is enabled. */
+  historyEntryId?: string | null;
 }
 
 export interface TranscribeNoSpeech {
@@ -169,6 +194,14 @@ export interface RephraseRequest {
   customPrompt?: string;
   llmProvider?: LlmProviderId;
   llmModel?: string;
+  /** Surface that initiated the refinement (defaults to `studio`). */
+  source?: ActivitySource;
+  /** Active Zana project id when available. */
+  projectId?: string | null;
+  /** Studio preset identifier (improve, executive, spec, custom, translate). */
+  presetId?: string;
+  /** Existing history entry id to coalesce into when refining an active Studio draft. */
+  historyEntryId?: string | null;
 }
 
 export interface RephraseSuccess {
@@ -178,6 +211,8 @@ export interface RephraseSuccess {
   llmProvider: LlmProviderId;
   llmModel: string | null;
   durationMs: number;
+  /** History entry id created or updated for this refinement, when history is enabled. */
+  historyEntryId?: string | null;
 }
 
 export interface RephraseFailure {
@@ -187,5 +222,88 @@ export interface RephraseFailure {
 }
 
 export type RephraseResponse = RephraseSuccess | RephraseFailure;
+
+export interface HistoryEntry {
+  id: string;
+  kind: ActivityKind;
+  source: ActivitySource;
+  createdAt: number;
+  projectId: string | null;
+  threadId: string | null;
+  rawText: string;
+  outputText: string;
+  sttProvider: string | null;
+  sttModel: string | null;
+  llmProvider: string | null;
+  llmModel: string | null;
+  presetId: string | null;
+  tone: string | null;
+  targetLanguage: string | null;
+  customPrompt: string | null;
+  audioDurationMs: number | null;
+  processingDurationMs: number | null;
+  refineNotice: RefineNotice | null;
+  starred: boolean;
+}
+
+export type HistoryTypeFilter = 'all' | 'dictation' | 'refinement';
+
+export interface HistoryListRequest {
+  query?: string;
+  type?: HistoryTypeFilter;
+  source?: ActivitySource | 'all';
+  projectId?: string | null;
+  starredOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface HistoryListResponse {
+  entries: HistoryEntry[];
+  total: number;
+  hasMore: boolean;
+  historyEnabled: boolean;
+  storageAvailable: boolean;
+}
+
+export interface HistoryStarRequest {
+  id: string;
+  starred: boolean;
+}
+
+export interface HistoryStarResponse {
+  ok: boolean;
+  entry?: HistoryEntry;
+}
+
+export interface HistoryDeleteRequest {
+  id: string;
+}
+
+export interface HistoryDeleteResponse {
+  ok: boolean;
+  deleted: boolean;
+}
+
+export interface HistoryClearRequest {
+  projectId?: string | null;
+  includeStarred?: boolean;
+}
+
+export interface HistoryClearResponse {
+  ok: boolean;
+  deletedCount: number;
+}
+
+export interface HistoryProjectOption {
+  id: string;
+  name: string;
+}
+
+export interface HistoryProjectsResponse {
+  projects: HistoryProjectOption[];
+}
+
 export const PROMPT_STUDIO_PANEL_PATH = 'prompt-studio';
 export const PROMPT_STUDIO_PROJECT_TAB_ID = 'prompt-studio';
+export const PROMPT_STUDIO_HISTORY_SUBPATH = 'history';

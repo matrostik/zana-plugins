@@ -14,8 +14,23 @@ import {
   formatDictionary,
   parseDictionary
 } from '../shared/dictionary.ts';
+import {
+  DEFAULT_HISTORY_ENABLED,
+  DEFAULT_HISTORY_MAX_DAYS,
+  DEFAULT_HISTORY_MAX_ENTRIES,
+  HISTORY_MAX_DAYS_OPTIONS,
+  HISTORY_MAX_ENTRIES_OPTIONS,
+  parseHistoryPreferences,
+  type HistoryPreferences
+} from '../shared/historyPreferences.ts';
 import { INPUT_LANGUAGE_OPTIONS } from '../shared/languages.ts';
-import { SETTINGS_GET_METHOD, SETTINGS_UPDATE_METHOD, TONE_IDS } from '../shared/protocol.ts';
+import {
+  HISTORY_CLEAR_METHOD,
+  SETTINGS_GET_METHOD,
+  SETTINGS_UPDATE_METHOD,
+  TONE_IDS,
+  type HistoryClearResponse
+} from '../shared/protocol.ts';
 import type { AudioInputDevice } from './audioDevices.ts';
 import { writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
@@ -207,6 +222,224 @@ function AudioFeedbackSection({ values, onSave }: { values: Settings; onSave: (p
   );
 }
 
+function formatMaxEntriesLabel(count: number): string {
+  return count === 0 ? 'Unlimited' : `${count.toLocaleString()} entries`;
+}
+
+function formatMaxDaysLabel(days: number): string {
+  if (days === 0) return 'Forever';
+  if (days === 365) return '1 year';
+  return `${days} days`;
+}
+
+function withCurrentOption(options: readonly number[], current: number): number[] {
+  return options.includes(current) ? [...options] : [...options, current];
+}
+
+function HistoryRecordingToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <div className="ps-toggle-card">
+      <div className="ps-toggle-copy">
+        <span id="ps-history-enabled-label" className="ps-toggle-title">Save activity history</span>
+        <small style={{ color: 'var(--ps-text-muted)' }}>
+          Store text and metadata from dictations and Prompt Studio refinements locally. Audio recordings are never saved.
+        </small>
+      </div>
+      <button
+        type="button"
+        className="ps-switch"
+        role="switch"
+        aria-checked={enabled}
+        aria-labelledby="ps-history-enabled-label"
+        onClick={onToggle}
+      />
+    </div>
+  );
+}
+
+function HistoryRetentionControls({ prefs, onSave }: { prefs: HistoryPreferences; onSave: (patch: Settings) => void }) {
+  const entryOptions = useMemo(() => withCurrentOption(HISTORY_MAX_ENTRIES_OPTIONS, prefs.historyMaxEntries), [prefs.historyMaxEntries]);
+  const dayOptions = useMemo(() => withCurrentOption(HISTORY_MAX_DAYS_OPTIONS, prefs.historyMaxDays), [prefs.historyMaxDays]);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+      <label className="ps-field-group">
+        <span className="ps-field-label">Maximum entries</span>
+        <select
+          className="ps-select"
+          aria-label="Maximum history entries"
+          value={String(prefs.historyMaxEntries)}
+          onChange={(e) => onSave({ historyMaxEntries: e.target.value })}
+        >
+          {entryOptions.map((opt) => (
+            <option key={opt} value={String(opt)}>{formatMaxEntriesLabel(opt)}</option>
+          ))}
+        </select>
+        <small style={{ color: 'var(--ps-text-muted)' }}>Starred entries are exempt from automatic pruning.</small>
+      </label>
+
+      <label className="ps-field-group">
+        <span className="ps-field-label">Retention period</span>
+        <select
+          className="ps-select"
+          aria-label="History retention period"
+          value={String(prefs.historyMaxDays)}
+          onChange={(e) => onSave({ historyMaxDays: e.target.value })}
+        >
+          {dayOptions.map((opt) => (
+            <option key={opt} value={String(opt)}>{formatMaxDaysLabel(opt)}</option>
+          ))}
+        </select>
+        <small style={{ color: 'var(--ps-text-muted)' }}>Older non-starred entries are pruned automatically.</small>
+      </label>
+    </div>
+  );
+}
+
+function ClearHistoryConfirmDialog({
+  includeStarred,
+  clearing,
+  onIncludeStarredChange,
+  onCancel,
+  onConfirm
+}: {
+  includeStarred: boolean;
+  clearing: boolean;
+  onIncludeStarredChange: (checked: boolean) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="alertdialog"
+      aria-label="Confirm clear activity history"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        padding: '10px 12px',
+        borderRadius: 6,
+        background: 'rgba(239, 68, 68, 0.1)',
+        border: '1px solid rgba(239, 68, 68, 0.35)'
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <strong style={{ fontSize: 12 }}>Clear all activity history?</strong>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, cursor: 'pointer' }}>
+          <input type="checkbox" checked={includeStarred} onChange={(e) => onIncludeStarredChange(e.target.checked)} />
+          <span>Also delete starred entries</span>
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" className="ps-btn" disabled={clearing} onClick={onCancel}>Cancel</button>
+        <button type="button" className="ps-btn ps-btn-danger" disabled={clearing} onClick={onConfirm}>
+          {clearing ? 'Clearing…' : 'Confirm clear'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HistoryClearControl({ rpc }: { rpc: Rpc }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [includeStarred, setIncludeStarred] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearNotice, setClearNotice] = useState<string | null>(null);
+
+  const handleClearHistory = async () => {
+    setClearing(true);
+    setClearNotice(null);
+    try {
+      const res = (await rpc.call(HISTORY_CLEAR_METHOD, { includeStarred })) as HistoryClearResponse | undefined;
+      setConfirmOpen(false);
+      setIncludeStarred(false);
+      if (!res?.ok) {
+        setClearNotice('History storage is unavailable.');
+      } else {
+        setClearNotice(
+          res.deletedCount === 0
+            ? 'No matching history entries to clear.'
+            : `Cleared ${res.deletedCount} history ${res.deletedCount === 1 ? 'entry' : 'entries'}.`
+        );
+      }
+    } catch {
+      setClearNotice('Could not clear history.');
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4, borderTop: '1px solid var(--ps-border)' }}>
+      {!confirmOpen ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <small style={{ color: 'var(--ps-text-muted)' }}>
+            Remove stored dictation and refinement history from this machine.
+          </small>
+          <button
+            type="button"
+            className="ps-btn ps-btn-danger"
+            onClick={() => {
+              setIncludeStarred(false);
+              setConfirmOpen(true);
+            }}
+          >
+            Clear history
+          </button>
+        </div>
+      ) : (
+        <ClearHistoryConfirmDialog
+          includeStarred={includeStarred}
+          clearing={clearing}
+          onIncludeStarredChange={setIncludeStarred}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => void handleClearHistory()}
+        />
+      )}
+      {clearNotice ? (
+        <div role="status" style={{ fontSize: 11.5, color: 'var(--ps-text-muted)' }}>{clearNotice}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function HistoryPrivacySection({
+  rpc,
+  values,
+  onSave
+}: {
+  rpc: Rpc;
+  values: Settings;
+  onSave: (patch: Settings) => void;
+}) {
+  const prefs = useMemo(() => parseHistoryPreferences(values), [values]);
+  const handleReset = () =>
+    onSave({
+      historyEnabled: String(DEFAULT_HISTORY_ENABLED),
+      historyMaxEntries: String(DEFAULT_HISTORY_MAX_ENTRIES),
+      historyMaxDays: String(DEFAULT_HISTORY_MAX_DAYS)
+    });
+
+  return (
+    <section className="ps-pane" style={{ flex: 'none' }} aria-labelledby="ps-history-privacy-title">
+      <div className="ps-pane-header">
+        <h2 id="ps-history-privacy-title" className="ps-pane-title" style={{ margin: 0 }}>History &amp; Privacy</h2>
+        <button type="button" className="ps-btn" onClick={handleReset}>Reset</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14 }}>
+        <HistoryRecordingToggle
+          enabled={prefs.historyEnabled}
+          onToggle={() => onSave({ historyEnabled: String(!prefs.historyEnabled) })}
+        />
+        <HistoryRetentionControls prefs={prefs} onSave={onSave} />
+        <HistoryClearControl rpc={rpc} />
+      </div>
+    </section>
+  );
+}
+
 function DictionaryTermList({
   terms,
   atLimit,
@@ -371,6 +604,7 @@ export function StudioSettings({ rpc, onBack, pluginId }: { rpc: Rpc; onBack: ()
           </div>
           <div style={{ color: 'var(--ps-text-muted)', fontSize: 11 }}><span role="status">{status}</span>{failedPatch && <button className="ps-btn" onClick={() => save(failedPatch)}>Retry</button>}</div>
           <AudioFeedbackSection values={values} onSave={save} />
+          <HistoryPrivacySection rpc={rpc} values={values} onSave={save} />
           {Object.entries(sections).map(([category, fields]) => (
             <React.Fragment key={category}>
               <section className="ps-pane" style={{ flex: 'none' }}>

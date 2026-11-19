@@ -61,6 +61,7 @@ beforeEach(() => {
   storageMap.clear();
   fakes.realtimeHandlers.clear();
   fakes.composerAvailable = true;
+  fakes.composerView.mockReturnValue({ providerId: 'assistant', familyId: 'assistant' });
   fakes.settingsValues = { showHomeWidget: true, showInProjects: true, micVisibility: 'both' };
   fakes.setPluginSettings.mockResolvedValue(undefined);
   Object.defineProperty(window, 'localStorage', { value: fakeLocalStorage, writable: true });
@@ -125,14 +126,15 @@ describe('PromptStudio Component', () => {
     expect(payload.customPrompt).toBeUndefined();
   });
 
-  it('defaults to Improve writing with Standard tone and switches among Casual, Conversational, Professional, and Technical chips', async () => {
+  it('defaults to Improve writing with Standard tone and switches among Casual, Conversational, Professional, and Technical tones via dropdown', async () => {
     fakes.call.mockImplementation(async (method: string) => method === 'promptVoice.rephrase'
       ? { ok: true, text: 'Clean English text.' } : []);
     render(<PromptStudio />);
 
     const improveRadio = screen.getByRole('radio', { name: /improve writing/i }) as HTMLInputElement;
     expect(improveRadio.checked).toBe(true);
-    expect(screen.getByRole('button', { name: 'Standard' }).getAttribute('aria-pressed')).toBe('true');
+    const toneSelect = screen.getByRole('combobox', { name: /improvement tone/i }) as HTMLSelectElement;
+    expect(toneSelect.value).toBe('standard');
 
     fireEvent.change(screen.getByPlaceholderText(/type your raw thoughts/i), { target: { value: 'helo world' } });
     fireEvent.click(screen.getByRole('button', { name: /improve text/i }));
@@ -141,15 +143,16 @@ describe('PromptStudio Component', () => {
       tone: 'standard'
     }));
 
-    const chipPairs: Array<[string, string]> = [
+    const tonePairs: Array<[string, string]> = [
       ['Casual', 'casual'],
       ['Conversational', 'conversational'],
       ['Professional', 'formal'],
       ['Technical', 'technical']
     ];
-    for (const [label, expectedTone] of chipPairs) {
-      fireEvent.click(screen.getByRole('button', { name: label }));
-      expect(screen.getByRole('button', { name: label }).getAttribute('aria-pressed')).toBe('true');
+    for (const [label, expectedTone] of tonePairs) {
+      expect(screen.getByRole('option', { name: label })).toBeTruthy();
+      fireEvent.change(toneSelect, { target: { value: expectedTone } });
+      expect(toneSelect.value).toBe(expectedTone);
       fireEvent.click(screen.getByRole('button', { name: /improve text/i }));
       await waitFor(() =>
         expect(fakes.call).toHaveBeenLastCalledWith('promptVoice.rephrase', expect.objectContaining({
@@ -158,11 +161,12 @@ describe('PromptStudio Component', () => {
       );
     }
 
-    // Switching to Summarize hides the tone chips; switching back restores them
+    // Switching to Summarize hides the tone dropdown; switching back restores it
     fireEvent.click(screen.getByRole('radio', { name: /summarize/i }));
-    expect(screen.queryByRole('group', { name: /improvement tone/i })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /improvement tone/i })).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: /improve writing/i }));
-    expect(screen.getByRole('group', { name: /improvement tone/i })).toBeTruthy();
+    const restoredToneSelect = screen.getByRole('combobox', { name: /improvement tone/i }) as HTMLSelectElement;
+    expect(restoredToneSelect.value).toBe('technical');
   });
 
   it('migrates legacy polish and chat presets from saved drafts', () => {
@@ -170,7 +174,7 @@ describe('PromptStudio Component', () => {
     storageMap.set(draftStorageKey(), JSON.stringify({ selectedPresetId: 'chat' }));
     render(<PromptStudio />);
     expect((screen.getByRole('radio', { name: /improve writing/i }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByRole('button', { name: 'Conversational' }).getAttribute('aria-pressed')).toBe('true');
+    expect((screen.getByRole('combobox', { name: /improvement tone/i }) as HTMLSelectElement).value).toBe('conversational');
   });
 
   it('places Translate as the last option with a language dropdown and sends targetLanguage', async () => {
@@ -659,7 +663,12 @@ describe('PromptStudio Component', () => {
     expect((await screen.findAllByText(/copied/i)).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('orders providers and models alphabetically by ABC in selector dropdowns', async () => {
+  it('orders providers alphabetically and models from cheapest to most expensive, defaulting to cheapest', async () => {
+    storageMap.set(
+      'zcc:prompt-voice:studio-draft:v1',
+      JSON.stringify({ selectedProviderId: 'codex', selectedModelId: 'gpt-5.4-pro', userManuallySelected: false })
+    );
+    fakes.composerView.mockReturnValue({ providerId: 'codex', familyId: 'openai' });
     fakes.call.mockImplementation(async (method: string) => {
       if (method === 'promptVoice.status') return { llmProvider: 'assistant' };
       if (method === 'promptVoice.availableModels') {
@@ -673,9 +682,20 @@ describe('PromptStudio Component', () => {
             ]
           },
           {
+            providerId: 'codex',
+            displayName: 'Codex',
+            models: [
+              { id: 'gpt-5.4-pro', label: 'GPT-5.4 Pro' },
+              { id: 'gpt-5.4', label: 'GPT-5.4' },
+              { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+              { id: 'gpt-5.4-nano', label: 'GPT-5.4 Nano' }
+            ]
+          },
+          {
             providerId: 'antigravity',
             displayName: 'Antigravity ACP',
             models: [
+              { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
               { id: 'ag2', label: 'Pro Model' },
               { id: 'ag1', label: 'Flash Model' }
             ]
@@ -688,14 +708,24 @@ describe('PromptStudio Component', () => {
     render(<PromptStudio />);
     const providerSelect = (await screen.findByRole('combobox', { name: /refinement provider/i })) as HTMLSelectElement;
     const providerOptionTexts = Array.from(providerSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
-    expect(providerOptionTexts).toEqual(['Antigravity ACP', 'Zed AI']);
+    expect(providerOptionTexts).toEqual(['Antigravity ACP', 'Codex', 'Zed AI']);
 
-    // Check models for Antigravity ACP (first provider)
+    // Synced to Codex and auto-defaults to cheapest model (GPT-5.4 Nano), overriding non-manual expensive draft
     const modelSelect = screen.getByRole('combobox', { name: /refinement model/i }) as HTMLSelectElement;
-    const modelOptionTexts = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
-    expect(modelOptionTexts).toEqual(['Flash Model', 'Pro Model']);
+    await waitFor(() => {
+      expect(providerSelect.value).toBe('codex');
+      expect(modelSelect.value).toBe('gpt-5.4-nano');
+    });
+    const codexModelOptions = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(codexModelOptions).toEqual(['GPT-5.4 Nano', 'GPT-5.4 Mini', 'GPT-5.4', 'GPT-5.4 Pro']);
 
-    // Switch to Zed AI
+    // Switch to Antigravity ACP -> orders cheapest to most expensive and selects Flash Model
+    fireEvent.change(providerSelect, { target: { value: 'antigravity' } });
+    const agModelOptions = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
+    expect(agModelOptions).toEqual(['Flash Model', 'Pro Model', 'Claude Opus 4.6']);
+    expect(modelSelect.value).toBe('ag1');
+
+    // Switch to Zed AI -> equal-tier models fall back to alphabetical order
     fireEvent.change(providerSelect, { target: { value: 'zed' } });
     const zedModelOptions = Array.from(modelSelect.options).map((o) => o.textContent?.trim().replace(/ ★.*$/, ''));
     expect(zedModelOptions).toEqual(['Zed Model A', 'Zed Model B']);
@@ -936,7 +966,7 @@ describe('PromptStudio Component', () => {
     });
   });
 
-  it('places Clear and Insert into Composer at the bottom of the canvas and hides them in Settings', async () => {
+  it('leaves only one Clear button at the bottom of the canvas (with Insert into Composer) and hides them in Settings', async () => {
     fakes.call.mockResolvedValue({});
     const { container } = render(<PromptStudio />);
 
@@ -944,6 +974,9 @@ describe('PromptStudio Component', () => {
     expect(header).toBeTruthy();
     const clearAllBtn = screen.getByTitle('Clear current input and output');
     const insertBtn = screen.getByRole('button', { name: /insert into composer/i });
+
+    expect(screen.queryByTitle('Clear input')).toBeNull();
+    expect(screen.getAllByRole('button', { name: /clear/i })).toHaveLength(1);
 
     // Buttons live in the bottom action bar inside <main>, not in the header
     expect(header!.contains(clearAllBtn)).toBe(false);

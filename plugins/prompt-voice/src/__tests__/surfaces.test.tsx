@@ -4,8 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import appDefinition, { PROMPT_STUDIO_PANEL_PATH, PROMPT_STUDIO_PROJECT_TAB_ID } from '../../app.tsx';
 import { HomeVoiceSection } from '../app/HomeVoiceSection.tsx';
 import { VisibilitySettingsSection } from '../app/VisibilitySettingsSection.tsx';
+import { consumePendingStudioTab } from '../app/historyNavigation.ts';
 import type { RecordedAudio, RecordingSession } from '../app/recorder.ts';
 import { resetSoundCueContext } from '../app/soundCues.ts';
+import { PROMPT_STUDIO_HISTORY_SUBPATH } from '../shared/protocol.ts';
 
 const fakes = vi.hoisted(() => ({
   settingsValues: { showHomeWidget: true, showInProjects: true, micVisibility: 'both' } as Record<string, string | number | boolean> | undefined,
@@ -83,12 +85,26 @@ describe('HomeVoiceSection', () => {
     expect(fakes.toProject).toHaveBeenCalledWith('proj-42', { tabId: 'prompt-studio' });
   });
 
-  it('quick-dictates audio and opens a new thread composer with the transcript', async () => {
+  it('opens History directly from the Home card for global and project scopes', async () => {
+    const { rerender } = render(<HomeVoiceSection pluginId="prompt-voice" projectId={null} />);
+    expect(await screen.findByText('Zana Voice')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /^history$/i }));
+    expect(fakes.toPluginPanel).toHaveBeenCalledWith('prompt-studio', { subPath: PROMPT_STUDIO_HISTORY_SUBPATH });
+    expect(consumePendingStudioTab()).toBe('history');
+
+    rerender(<HomeVoiceSection pluginId="prompt-voice" projectId="proj-42" />);
+    fireEvent.click(screen.getByRole('button', { name: /^history$/i }));
+    expect(fakes.toProject).toHaveBeenCalledWith('proj-42', { tabId: 'prompt-studio' });
+    expect(consumePendingStudioTab()).toBe('history');
+  });
+
+  it('quick-dictates audio with home metadata and opens a new thread composer with the transcript', async () => {
     const session = fakeSession();
     render(
       <HomeVoiceSection
         pluginId="prompt-voice"
-        projectId={null}
+        projectId="proj-home"
         startSession={async () => session}
       />
     );
@@ -101,6 +117,13 @@ describe('HomeVoiceSection', () => {
       expect(fakes.toCompose).toHaveBeenCalledWith({
         initialPrompt: 'Ship the project tab today',
         focusPrompt: true
+      })
+    );
+    expect(fakes.rpcCall).toHaveBeenCalledWith(
+      'promptVoice.transcribe',
+      expect.objectContaining({
+        source: 'home',
+        projectId: 'proj-home'
       })
     );
   });
@@ -212,13 +235,19 @@ describe('app.tsx slot registrations', () => {
 
     const openGlobal = commandPaletteActions.find((a) => a.id === 'open-prompt-studio');
     const openProject = commandPaletteActions.find((a) => a.id === 'open-prompt-studio-project');
+    const openHistory = commandPaletteActions.find((a) => a.id === 'open-prompt-studio-history');
     expect(openGlobal).toBeTruthy();
     expect(openProject).toBeTruthy();
+    expect(openHistory).toBeTruthy();
 
     const toPluginPanel = vi.fn(() => true);
     const toProject = vi.fn(() => true);
     openGlobal!.run({ toPluginPanel });
     expect(toPluginPanel).toHaveBeenCalledWith(PROMPT_STUDIO_PANEL_PATH);
+
+    openHistory!.run({ toPluginPanel });
+    expect(toPluginPanel).toHaveBeenCalledWith(PROMPT_STUDIO_PANEL_PATH, { subPath: PROMPT_STUDIO_HISTORY_SUBPATH });
+    expect(consumePendingStudioTab()).toBe('history');
 
     expect(openProject!.isAvailable?.({ projectId: null })).toBe(false);
     expect(openProject!.isAvailable?.({ projectId: 'proj-9' })).toBe(true);

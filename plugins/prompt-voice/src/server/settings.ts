@@ -12,6 +12,7 @@ import {
   parseDictionary
 } from '../shared/dictionary.ts';
 import { parseAudioPreferences } from '../shared/audioPreferences.ts';
+import { parseHistoryPreferences } from '../shared/historyPreferences.ts';
 import {
   DEFAULT_MIC_VISIBILITY,
   DEFAULT_SHOW_HOME_WIDGET,
@@ -41,6 +42,9 @@ export interface PromptVoiceSettings {
   micLabel: string;
   soundCuesEnabled: boolean;
   soundCuesVolume: number;
+  historyEnabled: boolean;
+  historyMaxEntries: number;
+  historyMaxDays: number;
   showHomeWidget: boolean;
   showInProjects: boolean;
   micVisibility: MicVisibility;
@@ -170,6 +174,7 @@ function normalizeLanguage(value: unknown): string {
 /** Normalizes raw plugin settings once so the rest of the server never handles raw values. */
 export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSettings {
   const audio = parseAudioPreferences(raw);
+  const history = parseHistoryPreferences(raw);
   const visibility = normalizeVisibilitySettings(raw);
   return {
     sttProvider: pickOption(raw.sttProvider, STT_PROVIDER_IDS, 'system'),
@@ -184,6 +189,9 @@ export function normalizeSettings(raw: Record<string, unknown>): PromptVoiceSett
     micLabel: audio.micLabel,
     soundCuesEnabled: audio.soundCuesEnabled,
     soundCuesVolume: audio.soundCuesVolume,
+    historyEnabled: history.historyEnabled,
+    historyMaxEntries: history.historyMaxEntries,
+    historyMaxDays: history.historyMaxDays,
     showHomeWidget: visibility.showHomeWidget,
     showInProjects: visibility.showInProjects,
     micVisibility: visibility.micVisibility,

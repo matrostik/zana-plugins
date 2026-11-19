@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createAvailableModelsLoader,
   mergeCatalogModels,
+  rephraseHandler,
   statusFromSettings,
   transcribeHandler
 } from '../server/handlers.ts';
+import type { HistoryStore } from '../server/historyStore.ts';
 import { PromptVoiceError } from '../server/errors.ts';
 
 const VALID_REQUEST = { audio: Buffer.from('audio').toString('base64'), mimeType: 'audio/webm' };
@@ -19,6 +21,23 @@ function deps(
     fetch: fetchImpl as unknown as typeof fetch,
     log: { warn: vi.fn((_message: string) => undefined), error: vi.fn((_message: string) => undefined) }
   };
+}
+
+function stubHistoryStore() {
+  const record = vi.fn(() => ({ id: 'entry-1' }));
+  const store = {
+    record,
+    coalesceDictation: vi.fn(() => ({ id: 'entry-1' })),
+    coalesceRefinement: vi.fn(() => ({ id: 'entry-1' })),
+    list: vi.fn(),
+    getById: vi.fn(),
+    setStarred: vi.fn(),
+    delete: vi.fn(),
+    clear: vi.fn(),
+    prune: vi.fn(),
+    listProjectIds: vi.fn(() => [])
+  } as unknown as HistoryStore;
+  return { store, record };
 }
 
 describe('transcribeHandler', () => {
@@ -91,6 +110,85 @@ describe('transcribeHandler', () => {
     };
     const result = await transcribeHandler(VALID_REQUEST, { ...deps({}), readSettings });
     expect(result).toEqual({ ok: false, code: 'INTERNAL', message: 'settings unavailable' });
+  });
+
+  it('skips saving dictation history when historyEnabled is disabled while transcription is pending', async () => {
+    let historyEnabled = true;
+    const { store, record } = stubHistoryStore();
+    let resolveStt!: (res: Response) => void;
+    const fetchImpl = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveStt = resolve;
+        })
+    );
+    const handlerDeps = {
+      ...deps({}, fetchImpl as never),
+      readSettings: async () => ({ llmProvider: 'none', historyEnabled }),
+      historyStore: store
+    };
+
+    const pending = transcribeHandler(VALID_REQUEST, handlerDeps);
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    historyEnabled = false;
+    resolveStt(Response.json({ text: 'private note' }));
+
+    const result = await pending;
+    expect(result).toMatchObject({ ok: true, status: 'ok', text: 'private note' });
+    expect('historyEntryId' in result).toBe(false);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('skips saving dictation history and logs a warning if re-reading settings fails after transcription', async () => {
+    let calls = 0;
+    const { store, record } = stubHistoryStore();
+    const handlerDeps = {
+      ...deps({}),
+      readSettings: async () => {
+        calls++;
+        if (calls === 2) throw new Error('settings store locked');
+        return { llmProvider: 'none', historyEnabled: true };
+      },
+      historyStore: store
+    };
+
+    const result = await transcribeHandler(VALID_REQUEST, handlerDeps);
+    expect(result).toMatchObject({ ok: true, status: 'ok', text: 'hello' });
+    expect('historyEntryId' in result).toBe(false);
+    expect(record).not.toHaveBeenCalled();
+    expect(handlerDeps.log.warn).toHaveBeenCalledWith(expect.stringMatching(/skipping history save/i));
+  });
+});
+
+describe('rephraseHandler', () => {
+  it('skips saving refinement history when historyEnabled is disabled while rephrase is pending', async () => {
+    let historyEnabled = true;
+    const { store, record } = stubHistoryStore();
+    let resolveComplete!: (res: { text: string }) => void;
+    const assistant = {
+      complete: vi.fn(
+        () =>
+          new Promise<{ text: string }>((resolve) => {
+            resolveComplete = resolve;
+          })
+      )
+    };
+    const handlerDeps = {
+      ...deps({}),
+      readSettings: async () => ({ llmProvider: 'assistant', historyEnabled }),
+      assistant,
+      historyStore: store
+    };
+
+    const pending = rephraseHandler({ text: 'raw draft', llmProvider: 'assistant' }, handlerDeps);
+    await vi.waitFor(() => expect(assistant.complete).toHaveBeenCalledTimes(1));
+    historyEnabled = false;
+    resolveComplete({ text: 'refined draft' });
+
+    const result = await pending;
+    expect(result).toMatchObject({ ok: true, text: 'refined draft' });
+    expect('historyEntryId' in result).toBe(false);
+    expect(record).not.toHaveBeenCalled();
   });
 });
 
@@ -222,7 +320,7 @@ describe('createAvailableModelsLoader', () => {
     }
   });
 
-  it('orders host and configured direct providers and their models alphabetically by ABC', async () => {
+  it('orders providers alphabetically and models from cheapest to most expensive', async () => {
     const loader = createAvailableModelsLoader({
       readSettings: async () => ({
         openaiApiKey: 'sk-test',
@@ -244,8 +342,10 @@ describe('createAvailableModelsLoader', () => {
           }
           return {
             models: [
-              { id: 'ag-2', model: 'Gemini 2.5 Pro' },
-              { id: 'ag-1', model: 'Gemini 2.5 Flash' }
+              { id: 'claude-opus-4-6', model: 'Claude Opus 4.6' },
+              { id: 'gemini-2.5-pro', model: 'Gemini 2.5 Pro' },
+              { id: 'gemini-2.5-flash', model: 'Gemini 2.5 Flash' },
+              { id: 'gemini-2.5-flash-lite', model: 'Gemini 2.5 Flash Lite' }
             ]
           };
         }
@@ -259,13 +359,16 @@ describe('createAvailableModelsLoader', () => {
     );
     expect(displayNames).toEqual(sortedDisplayNames);
 
-    for (const prov of res) {
-      const labels = prov.models.map((m) => m.label);
-      const sortedLabels = [...labels].sort((a, b) =>
-        a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
-      );
-      expect(labels).toEqual(sortedLabels);
-    }
+    const antigravity = res.find((p) => p.providerId === 'antigravity');
+    expect(antigravity?.models.map((m) => m.label)).toEqual([
+      'Gemini 2.5 Flash Lite',
+      'Gemini 2.5 Flash',
+      'Gemini 2.5 Pro',
+      'Claude Opus 4.6'
+    ]);
+
+    const zed = res.find((p) => p.providerId === 'zed-ai');
+    expect(zed?.models.map((m) => m.label)).toEqual(['Zed Alpha', 'Zed Beta']);
   });
 
   it('lists only configured direct providers even without host providers', async () => {

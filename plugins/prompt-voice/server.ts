@@ -2,6 +2,15 @@ import type { ZccPluginApi } from '@zana-ai/zcc-plugin-sdk/server';
 import { describeUnexpectedFailure } from './src/server/errors.ts';
 import { normalizeSettings, SETTING_DESCRIPTORS } from './src/server/settings.ts';
 import { createSettingsStore } from './src/server/settingsStore.ts';
+import { createHistoryStore, type HistoryStore } from './src/server/historyStore.ts';
+import {
+  clearHistoryHandler,
+  deleteHistoryHandler,
+  listHistoryHandler,
+  listHistoryProjectsHandler,
+  starHistoryHandler,
+  type HistoryChangeEvent
+} from './src/server/historyHandlers.ts';
 import { createAvailableModelsLoader, rephraseHandler, statusFromSettings, transcribeHandler } from './src/server/handlers.ts';
 import type { FetchLike } from './src/server/http.ts';
 import type { AssistantApi } from './src/server/llm/providers.ts';
@@ -10,6 +19,12 @@ import type { LocalWhisperManager } from './src/server/localWhisper/manager.ts';
 import { createLocalWhisperManager, registerLocalWhisperMethods } from './src/server/localWhisper/rpc.ts';
 import {
   AVAILABLE_MODELS_METHOD,
+  HISTORY_CHANGED_EVENT,
+  HISTORY_CLEAR_METHOD,
+  HISTORY_DELETE_METHOD,
+  HISTORY_LIST_METHOD,
+  HISTORY_PROJECTS_METHOD,
+  HISTORY_STAR_METHOD,
   MODELS_UPDATED_EVENT,
   PROMPT_STUDIO_PROJECT_TAB_ID,
   REPHRASE_METHOD,
@@ -28,6 +43,8 @@ export interface PromptVoiceDeps {
   assistant?: AssistantApi;
   /** Injected in tests; `null` disables Local Whisper. Defaults to a manager for this machine. */
   localWhisper?: LocalWhisperManager | null;
+  /** Injected in tests; `null` disables history persistence. Defaults to `zcc.storage.database()`. */
+  historyStore?: HistoryStore | null;
   providers?: {
     list(args?: unknown): Promise<Array<{ id: string; available?: boolean; displayName?: string }>>;
     models(args: { providerId: string }): Promise<unknown>;
@@ -45,6 +62,7 @@ type PluginUiWithProjectTab = ZccPluginApi['ui'] & {
 
 const STATUS_UNAVAILABLE_MESSAGE = 'Prompt Voice status is unavailable. See the Zana log for details.';
 const API_KEY_SETTING_FIELDS = ['openaiApiKey', 'googleApiKey', 'anthropicApiKey'] as const;
+const HISTORY_RETENTION_FIELDS = ['historyMaxEntries', 'historyMaxDays'] as const;
 export { PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
 
 function apiKeyPresenceSignature(raw: Record<string, unknown>): string {
@@ -52,14 +70,25 @@ function apiKeyPresenceSignature(raw: Record<string, unknown>): string {
   return `${Boolean(keys.openai)}:${Boolean(keys.google)}:${Boolean(keys.anthropic)}`;
 }
 
-function patchTouchesApiKeys(patch: unknown): boolean {
+function patchTouchesFields(patch: unknown, fields: readonly string[]): boolean {
   if (!patch || typeof patch !== 'object') return false;
   const rec = patch as Record<string, unknown>;
-  return API_KEY_SETTING_FIELDS.some((field) => field in rec);
+  return fields.some((field) => field in rec);
+}
+
+function initHistoryStore(zcc: ZccPluginApi, injected: HistoryStore | null | undefined): HistoryStore | null {
+  if (injected !== undefined) return injected;
+  if (typeof zcc.storage?.database !== 'function') return null;
+  try {
+    return createHistoryStore(zcc.storage.database());
+  } catch (err) {
+    zcc.log.warn(`Activity history unavailable: ${describeUnexpectedFailure(err, 'Prompt Voice history')}`);
+    return null;
+  }
 }
 
 /**
- * Registers Prompt Voice's settings, project tab availability, and RPC methods.
+ * Registers Prompt Voice's settings, project tab availability, activity history, and RPC methods.
  * Speech and cleanup run here on the server, by default through Zana host voice transcription and the Zana assistant.
  */
 export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: PromptVoiceDeps = {}): Promise<void> {
@@ -67,6 +96,11 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   const fetchImpl: FetchLike = deps.fetch ?? fetch;
   const store = zcc.storage?.kv ? createSettingsStore(zcc.storage.kv, () => settings.get()) : null;
   const readSettings = () => store ? store.readEffective() : settings.get() as Promise<Record<string, unknown>>;
+  const historyStore = initHistoryStore(zcc, deps.historyStore);
+  const onHistoryChanged = (event: HistoryChangeEvent) => {
+    zcc.realtime?.publish?.(HISTORY_CHANGED_EVENT, event);
+  };
+
   if (store) {
     zcc.rpc.method(SETTINGS_GET_METHOD, () => store.readPublic());
   }
@@ -88,9 +122,24 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
   if (store) {
     zcc.rpc.method(SETTINGS_UPDATE_METHOD, async (patch) => {
       const updated = await store.update(patch);
-      if (patchTouchesApiKeys(patch)) {
+      if (patchTouchesFields(patch, API_KEY_SETTING_FIELDS)) {
         lastApiKeySignature = apiKeyPresenceSignature(updated);
         void modelsLoader.refreshDirectEntries();
+      }
+      if (historyStore && patchTouchesFields(patch, HISTORY_RETENTION_FIELDS)) {
+        try {
+          const normalized = normalizeSettings(updated);
+          const removed = historyStore.prune({
+            maxEntries: normalized.historyMaxEntries,
+            maxDays: normalized.historyMaxDays
+          });
+          if (removed > 0) onHistoryChanged({ action: 'pruned' });
+        } catch (err) {
+          zcc.log.warn(`Could not prune activity history: ${describeUnexpectedFailure(err, 'Prompt Voice history')}`);
+        }
+      }
+      if (patchTouchesFields(patch, ['historyEnabled'])) {
+        onHistoryChanged({ action: 'settingsChanged' });
       }
       return updated;
     });
@@ -137,7 +186,9 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       log: zcc.log,
       serverUrl,
       assistant,
-      localWhisper: localWhisper ?? undefined
+      localWhisper: localWhisper ?? undefined,
+      historyStore,
+      onHistoryChanged
     })
   );
 
@@ -147,9 +198,24 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
       fetch: fetchImpl,
       log: zcc.log,
       serverUrl,
-      assistant
+      assistant,
+      historyStore,
+      onHistoryChanged
     })
   );
+
+  const historyRpcDeps = {
+    historyStore,
+    readSettings,
+    listProjects: zcc.sdk?.projects?.list ? () => zcc.sdk.projects.list() : undefined,
+    onHistoryChanged,
+    log: zcc.log
+  };
+  zcc.rpc.method(HISTORY_LIST_METHOD, (args) => listHistoryHandler(args, historyRpcDeps));
+  zcc.rpc.method(HISTORY_STAR_METHOD, (args) => starHistoryHandler(args, historyRpcDeps));
+  zcc.rpc.method(HISTORY_DELETE_METHOD, (args) => deleteHistoryHandler(args, historyRpcDeps));
+  zcc.rpc.method(HISTORY_CLEAR_METHOD, (args) => clearHistoryHandler(args, historyRpcDeps));
+  zcc.rpc.method(HISTORY_PROJECTS_METHOD, () => listHistoryProjectsHandler(historyRpcDeps));
 
   zcc.rpc.method(STATUS_METHOD, async () => {
     let raw: Record<string, unknown>;

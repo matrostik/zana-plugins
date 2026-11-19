@@ -11,7 +11,10 @@ const FIELDS = [
   'micDeviceId',
   'micLabel',
   'soundCuesEnabled',
-  'soundCuesVolume'
+  'soundCuesVolume',
+  'historyEnabled',
+  'historyMaxEntries',
+  'historyMaxDays'
 ] as const;
 type Values = Record<string, unknown>;
 type Store = { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> };
@@ -24,8 +27,10 @@ function preferences(value: unknown): Values {
     if (typeof raw === 'string') {
       entries.push([field, raw]);
     } else if (
-      (field === 'soundCuesEnabled' && typeof raw === 'boolean') ||
-      (field === 'soundCuesVolume' && typeof raw === 'number' && Number.isFinite(raw))
+      ((field === 'soundCuesEnabled' || field === 'historyEnabled') && typeof raw === 'boolean') ||
+      ((field === 'soundCuesVolume' || field === 'historyMaxEntries' || field === 'historyMaxDays') &&
+        typeof raw === 'number' &&
+        Number.isFinite(raw))
     ) {
       entries.push([field, String(raw)]);
     }

@@ -300,6 +300,65 @@ describe('StudioSettings', () => {
     );
   });
 
+  it('manages History & Privacy toggle, retention limits, and clear history with starred protection', async () => {
+    const call = vi.fn(async (method: string) => {
+      if (method === 'promptVoice.settings.get') {
+        return { historyEnabled: 'true', historyMaxEntries: '500', historyMaxDays: '90' };
+      }
+      if (method === 'promptVoice.history.clear') {
+        return { ok: true, deletedCount: 4 };
+      }
+      return {};
+    });
+    render(<StudioSettings rpc={{ call }} onBack={vi.fn()} />);
+
+    const saveToggle = await screen.findByRole('switch', { name: /save activity history/i });
+    await waitFor(() => expect(saveToggle.getAttribute('aria-checked')).toBe('true'));
+
+    fireEvent.click(saveToggle);
+    expect(call).toHaveBeenCalledWith(
+      'promptVoice.settings.update',
+      expect.objectContaining({ historyEnabled: 'false' })
+    );
+
+    const maxEntriesSelect = screen.getByLabelText(/maximum history entries/i) as HTMLSelectElement;
+    fireEvent.change(maxEntriesSelect, { target: { value: '2000' } });
+    expect(call).toHaveBeenCalledWith(
+      'promptVoice.settings.update',
+      expect.objectContaining({ historyMaxEntries: '2000' })
+    );
+
+    const maxDaysSelect = screen.getByLabelText(/history retention period/i) as HTMLSelectElement;
+    fireEvent.change(maxDaysSelect, { target: { value: '30' } });
+    expect(call).toHaveBeenCalledWith(
+      'promptVoice.settings.update',
+      expect.objectContaining({ historyMaxDays: '30' })
+    );
+
+    // Clear history dialog defaults to protecting starred entries
+    fireEvent.click(screen.getByRole('button', { name: 'Clear history' }));
+    const checkbox = screen.getByRole('checkbox', { name: /also delete starred entries/i }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm clear' }));
+
+    await waitFor(() =>
+      expect(call).toHaveBeenCalledWith('promptVoice.history.clear', {
+        includeStarred: false
+      })
+    );
+    expect(await screen.findByText(/cleared 4 history entries/i)).toBeTruthy();
+
+    // Clear again including starred entries
+    fireEvent.click(screen.getByRole('button', { name: 'Clear history' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /also delete starred entries/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm clear' }));
+    await waitFor(() =>
+      expect(call).toHaveBeenCalledWith('promptVoice.history.clear', {
+        includeStarred: true
+      })
+    );
+  });
+
   it('registers plugin stylesheet element on render and keeps settings styles in styles.css', () => {
     setup({});
     expect(document.getElementById('zcc-ext-prompt-voice-styles')).toBeTruthy();

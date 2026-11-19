@@ -1,6 +1,12 @@
 import { decodeAudioRequest, type AudioInput } from './audio.ts';
 import { describeUnexpectedFailure, PromptVoiceError } from './errors.ts';
 import {
+  recordDictationHistory,
+  recordRefinementHistory,
+  type HistoryChangeEvent
+} from './historyHandlers.ts';
+import type { HistoryStore } from './historyStore.ts';
+import {
   LLM_PROVIDER_KEYS,
   normalizeSettings,
   STT_PROVIDER_KEYS,
@@ -8,6 +14,8 @@ import {
   type PromptVoiceSettings
 } from './settings.ts';
 import { runDictation, runRephrase, type PipelineDeps, type PipelineLogger } from './pipeline.ts';
+import { parseHistoryPreferences } from '../shared/historyPreferences.ts';
+import { compareModelsCheapestFirst, sortModelsCheapestFirst } from '../shared/modelSorting.ts';
 import type {
   AvailableModelsResponse,
   DiscoveredModel,
@@ -22,6 +30,8 @@ import type {
 
 export interface HandlerDeps extends PipelineDeps {
   readSettings: () => Promise<Record<string, unknown>>;
+  historyStore?: HistoryStore | null;
+  onHistoryChanged?: (event: HistoryChangeEvent) => void;
 }
 
 export interface HostProviderInfo {
@@ -70,6 +80,23 @@ function settingsForRequest(raw: Record<string, unknown>, request: { language?: 
   return normalizeSettings({ ...raw, inputLanguage: language });
 }
 
+/** Re-reads history privacy/retention settings right before persisting so mid-flight toggles are respected. */
+async function resolveLatestHistorySettings(
+  executionSettings: PromptVoiceSettings,
+  deps: HandlerDeps
+): Promise<PromptVoiceSettings | null> {
+  if (!deps.historyStore) return null;
+  try {
+    const latestHistory = parseHistoryPreferences(await deps.readSettings());
+    return { ...executionSettings, ...latestHistory };
+  } catch (err) {
+    deps.log.warn(
+      `Skipping history save because current settings could not be verified: ${describeUnexpectedFailure(err, 'Prompt Voice settings')}`
+    );
+    return null;
+  }
+}
+
 /** RPC `promptVoice.transcribe`. Validates audio, runs the pipeline, and maps every outcome to the envelope. */
 export async function transcribeHandler(request: unknown, deps: HandlerDeps): Promise<TranscribeResponse> {
   const requestRecord = asRequest(request);
@@ -81,15 +108,26 @@ export async function transcribeHandler(request: unknown, deps: HandlerDeps): Pr
   }
 
   try {
+    const startedAt = Date.now();
     const settings = settingsForRequest(await deps.readSettings(), requestRecord);
     if (requestRecord.transcriptionOnly === true) settings.llmProvider = 'none';
-    return await runDictation(audio, settings, {
+    const response = await runDictation(audio, settings, {
       fetch: deps.fetch,
       log: deps.log,
       serverUrl: deps.serverUrl,
       assistant: deps.assistant,
       localWhisper: deps.localWhisper
     });
+    if (response.ok && response.status === 'ok') {
+      const historySettings = await resolveLatestHistorySettings(settings, deps);
+      const historyEntryId = historySettings
+        ? recordDictationHistory(requestRecord, response, historySettings, Date.now() - startedAt, deps)
+        : null;
+      if (historyEntryId) {
+        return { ...response, historyEntryId };
+      }
+    }
+    return response;
   } catch (err) {
     return failureResponse(err, deps.log);
   }
@@ -100,12 +138,22 @@ export async function rephraseHandler(request: unknown, deps: HandlerDeps): Prom
   const req = (request && typeof request === 'object' ? request : {}) as RephraseRequest;
   try {
     const settings = normalizeSettings(await deps.readSettings());
-    return await runRephrase(req, settings, {
+    const response = await runRephrase(req, settings, {
       fetch: deps.fetch,
       log: deps.log,
       serverUrl: deps.serverUrl,
       assistant: deps.assistant
     });
+    if (response.ok) {
+      const historySettings = await resolveLatestHistorySettings(settings, deps);
+      const historyEntryId = historySettings
+        ? recordRefinementHistory(req, response, historySettings, deps)
+        : null;
+      if (historyEntryId) {
+        return { ...response, historyEntryId };
+      }
+    }
+    return response;
   } catch (err) {
     const failure = failureResponse(err, deps.log);
     return { ok: false, code: failure.code, message: failure.message };
@@ -134,7 +182,7 @@ export function statusFromSettings(raw: Record<string, unknown>, availableProvid
   };
 }
 
-/** Union of catalog models and selected-only entries, keyed by model id and sorted alphabetically. */
+/** Union of catalog models and selected-only entries, keyed by model id and sorted cheapest-first. */
 export function mergeCatalogModels(catalog: unknown): DiscoveredModel[] {
   if (!catalog || typeof catalog !== 'object') return [];
   const rec = catalog as {
@@ -151,9 +199,7 @@ export function mergeCatalogModels(catalog: unknown): DiscoveredModel[] {
   };
   for (const m of rec.models ?? []) add(m);
   for (const m of rec.selectedOnlyModels ?? []) add(m);
-  return Array.from(seen.values()).sort((a, b) =>
-    (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base', numeric: true })
-  );
+  return sortModelsCheapestFirst(Array.from(seen.values()));
 }
 
 function createAssistantEntry(): DiscoveredProvider {
@@ -180,9 +226,7 @@ const DIRECT_MODELS: Array<{ key: ApiKeyName; entry: DiscoveredProvider }> = [
 
 function sortAvailableModelsResponse(entries: AvailableModelsResponse): AvailableModelsResponse {
   for (const prov of entries) {
-    prov.models.sort((a, b) =>
-      (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base', numeric: true })
-    );
+    prov.models.sort(compareModelsCheapestFirst);
   }
   entries.sort((a, b) =>
     (a.displayName || a.providerId).localeCompare(b.displayName || b.providerId, undefined, {
