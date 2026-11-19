@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ZccNavigate } from '@zana-ai/zcc-plugin-sdk/app';
 import { DEFAULT_MIC_DEVICE_ID, type AudioPreferences } from '../shared/audioPreferences.ts';
 import {
+  PROMPT_STUDIO_HISTORY_SUBPATH,
   PROMPT_STUDIO_PANEL_PATH,
   PROMPT_STUDIO_PROJECT_TAB_ID,
   SETTINGS_GET_METHOD,
@@ -11,6 +12,7 @@ import {
   type TranscribeResponse
 } from '../shared/protocol.ts';
 import { readCachedAudioPreferences, writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
+import { requestPendingStudioTab } from './historyNavigation.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
 import { defaultStartSession, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
 import { usePromptVoiceRpc, useSafeZccNavigate, useVisibilitySettings } from './safeSdk.ts';
@@ -89,6 +91,7 @@ async function runHomeStopAndTranscribe(
   prefs: AudioPreferences,
   navigate: ZccNavigate | null,
   mountedRef: React.MutableRefObject<boolean>,
+  meta: { projectId: string | null; audioDurationMs?: number },
   callbacks: { setNotice: (v: string | null) => void; setError: (v: string | null) => void }
 ): Promise<void> {
   const cueOpts = { enabled: prefs.soundCuesEnabled, volume: prefs.soundCuesVolume };
@@ -99,7 +102,10 @@ async function runHomeStopAndTranscribe(
   const audio = await prepareAudioForUpload(rpc, recorded);
   const response = (await rpc.call(TRANSCRIBE_METHOD, {
     audio: audio.base64,
-    mimeType: audio.mimeType
+    mimeType: audio.mimeType,
+    source: 'home',
+    ...(meta.projectId ? { projectId: meta.projectId } : {}),
+    ...(typeof meta.audioDurationMs === 'number' ? { audioDurationMs: meta.audioDurationMs } : {})
   })) as TranscribeResponse;
   if (!mountedRef.current) return;
 
@@ -147,13 +153,15 @@ async function openHomeRecordingSession(
 function useHomeQuickDictation(
   rpc: RpcClient,
   navigate: ZccNavigate | null,
-  startSession: StartSessionFn
+  startSession: StartSessionFn,
+  projectId: string | null
 ) {
   const [phase, setPhase] = useState<DictationPhase>('idle');
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const sessionRef = useRef<RecordingSession | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const requestIdRef = useRef(0);
   const prefsRef = useRef<AudioPreferences>(readCachedAudioPreferences());
   const { sttProvider, llmProvider } = useHomeVoiceMetadata(rpc, prefsRef);
@@ -172,6 +180,9 @@ function useHomeQuickDictation(
   const stopAndTranscribe = useCallback(async () => {
     const session = sessionRef.current;
     sessionRef.current = null;
+    const startedAt = recordingStartedAtRef.current;
+    recordingStartedAtRef.current = null;
+    const audioDurationMs = startedAt !== null ? Math.max(0, Date.now() - startedAt) : undefined;
     if (!session) {
       setPhase('idle');
       return;
@@ -179,7 +190,15 @@ function useHomeQuickDictation(
     const prefs = prefsRef.current;
     setPhase('transcribing');
     try {
-      await runHomeStopAndTranscribe(session, rpc, prefs, navigate, mountedRef, { setNotice, setError });
+      await runHomeStopAndTranscribe(
+        session,
+        rpc,
+        prefs,
+        navigate,
+        mountedRef,
+        { projectId, audioDurationMs },
+        { setNotice, setError }
+      );
     } catch (err) {
       if (!mountedRef.current) return;
       playSoundCue('error', { enabled: prefs.soundCuesEnabled, volume: prefs.soundCuesVolume });
@@ -187,7 +206,7 @@ function useHomeQuickDictation(
     } finally {
       if (mountedRef.current) setPhase('idle');
     }
-  }, [navigate, rpc]);
+  }, [navigate, projectId, rpc]);
 
   const start = useCallback(async () => {
     setError(null);
@@ -206,6 +225,7 @@ function useHomeQuickDictation(
       if (!session) return;
       session.onError = (err) => {
         sessionRef.current = null;
+        recordingStartedAtRef.current = null;
         if (!mountedRef.current) return;
         playSoundCue('error', cueOpts);
         setError(err.message);
@@ -215,6 +235,7 @@ function useHomeQuickDictation(
         if (mountedRef.current) void stopAndTranscribe();
       };
       sessionRef.current = session;
+      recordingStartedAtRef.current = Date.now();
       setPhase('recording');
     } catch (err) {
       if (!mountedRef.current) return;
@@ -226,6 +247,7 @@ function useHomeQuickDictation(
 
   const cancel = useCallback(() => {
     requestIdRef.current++;
+    recordingStartedAtRef.current = null;
     sessionRef.current?.cancel();
     sessionRef.current = null;
     setPhase('idle');
@@ -239,13 +261,15 @@ function HomeVoiceActionBar({
   formattedTime,
   onToggleDictate,
   onCancel,
-  onOpenStudio
+  onOpenStudio,
+  onOpenHistory
 }: {
   phase: DictationPhase;
   formattedTime: string;
   onToggleDictate: () => void;
   onCancel: () => void;
   onOpenStudio: () => void;
+  onOpenHistory: () => void;
 }): React.ReactElement {
   const buttonLabel =
     phase === 'starting'
@@ -271,9 +295,14 @@ function HomeVoiceActionBar({
           Cancel
         </button>
       ) : (
-        <button type="button" className="ps-btn" onClick={onOpenStudio}>
-          Open Prompt Studio
-        </button>
+        <>
+          <button type="button" className="ps-btn" onClick={onOpenStudio}>
+            Open Prompt Studio
+          </button>
+          <button type="button" className="ps-btn" onClick={onOpenHistory}>
+            History
+          </button>
+        </>
       )}
     </div>
   );
@@ -299,14 +328,24 @@ function HomeVoiceSectionInner({
   ensureStylesInjected();
   const rpc = usePromptVoiceRpc(pluginId);
   const navigate = useSafeZccNavigate();
-  const state = useHomeQuickDictation(rpc, navigate, startSession);
+  const state = useHomeQuickDictation(rpc, navigate, startSession, projectId);
 
   const openStudio = useCallback(() => {
+    requestPendingStudioTab('studio');
     if (projectId && typeof navigate?.toProject === 'function') {
       navigate.toProject(projectId, { tabId: PROMPT_STUDIO_PROJECT_TAB_ID });
       return;
     }
     navigate?.toPluginPanel?.(PROMPT_STUDIO_PANEL_PATH);
+  }, [navigate, projectId]);
+
+  const openHistory = useCallback(() => {
+    requestPendingStudioTab('history');
+    if (projectId && typeof navigate?.toProject === 'function') {
+      navigate.toProject(projectId, { tabId: PROMPT_STUDIO_PROJECT_TAB_ID });
+      return;
+    }
+    navigate?.toPluginPanel?.(PROMPT_STUDIO_PANEL_PATH, { subPath: PROMPT_STUDIO_HISTORY_SUBPATH });
   }, [navigate, projectId]);
 
   const handleToggleDictate = () => {
@@ -338,6 +377,7 @@ function HomeVoiceSectionInner({
           onToggleDictate={handleToggleDictate}
           onCancel={state.cancel}
           onOpenStudio={openStudio}
+          onOpenHistory={openHistory}
         />
       </div>
       {state.notice ? <div role="status" className="ps-home-status">{state.notice}</div> : null}

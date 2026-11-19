@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { StudioSettings } from './StudioSettings.tsx';
+import { HistoryView } from './HistoryView.tsx';
 import type { PluginDetachedTabProps } from '@zana-ai/zcc-plugin-sdk/app';
 import {
   AVAILABLE_MODELS_METHOD,
   MODELS_UPDATED_EVENT,
+  PROMPT_STUDIO_HISTORY_SUBPATH,
   REPHRASE_METHOD,
   SETTINGS_GET_METHOD,
   SETTINGS_UPDATE_METHOD,
@@ -11,6 +13,7 @@ import {
   TRANSCRIBE_METHOD,
   type AvailableModelsResponse,
   type DiscoveredProvider,
+  type HistoryEntry,
   type ImproveToneId,
   type RephraseResponse,
   type StatusResponse,
@@ -18,9 +21,16 @@ import {
   type TranscribeResponse
 } from '../shared/protocol.ts';
 import { appendTranscript } from './appendText.ts';
+import { copyToClipboard } from './clipboard.ts';
 import { DEFAULT_MIC_DEVICE_ID, type AudioPreferences } from '../shared/audioPreferences.ts';
 import { DEFAULT_TARGET_LANGUAGE, TARGET_LANGUAGE_OPTIONS, findTargetLanguage } from '../shared/languages.ts';
+import { sortModelsCheapestFirst } from '../shared/modelSorting.ts';
 import { readCachedAudioPreferences, writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
+import {
+  consumePendingStudioTab,
+  subscribeStudioTabRequests,
+  type StudioTabId
+} from './historyNavigation.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
 import { defaultStartSession, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
 import {
@@ -29,12 +39,14 @@ import {
   useSafeComposer,
   useSafeComposerView,
   useSafeRealtime,
+  useSafeZccContext,
   useSafeZccNavigate,
   useVisibilitySettings
 } from './safeSdk.ts';
 import { playSoundCue } from './soundCues.ts';
 import { prepareAudioForUpload } from './wav.ts';
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
+import { resolveDictationScope } from './useDictation.ts';
 
 // ─── Inline CSS Styles for Native Look & Feel ──────────────────────────────────
 export const PROMPT_STUDIO_STYLES = `
@@ -65,12 +77,44 @@ export const PROMPT_STUDIO_STYLES = `
     border-bottom: 1px solid var(--ps-border);
     background-color: var(--ps-panel-bg);
     flex-shrink: 0;
+    gap: 12px;
   }
 
   .ps-header-left {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+  }
+
+  .ps-header-nav {
+    display: inline-flex;
+    align-items: center;
+    background: var(--ps-input-bg);
+    border: 1px solid var(--ps-border);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .ps-header-tab {
+    border: none;
+    background: transparent;
+    color: var(--ps-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .ps-header-tab:hover {
+    color: var(--text-primary, #e2e8f0);
+  }
+  .ps-header-tab.active {
+    background: rgba(59, 130, 246, 0.22);
+    color: var(--text-primary, #e2e8f0);
+    font-weight: 600;
   }
 
   .ps-header-title {
@@ -98,6 +142,19 @@ export const PROMPT_STUDIO_STYLES = `
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .ps-overwrite-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(59, 130, 246, 0.12);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.35);
+    font-size: 12px;
+    flex-shrink: 0;
   }
 
   .ps-btn {
@@ -308,33 +365,6 @@ export const PROMPT_STUDIO_STYLES = `
     font-size: 10.5px;
     color: var(--ps-text-muted);
   }
-  .ps-tone-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-  .ps-tone-chip {
-    border: 1px solid var(--ps-border);
-    background: var(--ps-input-bg);
-    color: var(--ps-text-muted);
-    font-size: 11px;
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: border-color 0.12s, background 0.12s, color 0.12s;
-  }
-  .ps-tone-chip:hover {
-    color: var(--text-primary, #e2e8f0);
-    border-color: var(--ps-text-subtle);
-  }
-  .ps-tone-chip.active {
-    background: var(--ps-accent);
-    border-color: var(--ps-accent);
-    color: #ffffff;
-    font-weight: 600;
-  }
   .ps-tone-hint {
     font-size: 10px;
     color: var(--ps-text-muted);
@@ -513,43 +543,6 @@ export const PROMPT_STUDIO_STYLES = `
     animation: ps-spin-anim 1.2s linear infinite;
   }
 `;
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  if (!text) return false;
-
-  // 1. Modern Async Clipboard API
-  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Async clipboard failed or permission denied, fallback
-    }
-  }
-
-  // 2. Synchronous execCommand fallback
-  if (typeof document !== 'undefined') {
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'fixed';
-      textarea.style.top = '-9999px';
-      textarea.style.left = '-9999px';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const success = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      if (success) return true;
-    } catch {
-      // execCommand failed
-    }
-  }
-
-  return false;
-}
 
 const STORAGE_KEY = 'zcc:prompt-voice:studio-draft:v1';
 
@@ -744,18 +737,32 @@ export interface PromptStudioProps {
   startSession?: (options?: StartRecordingOptions) => Promise<RecordingSession>;
 }
 
+function resolveInitialTab(subPath?: string): StudioTabId {
+  const pending = consumePendingStudioTab();
+  if (pending) return pending;
+  if (subPath && subPath.replace(/^\/+/, '').toLowerCase() === PROMPT_STUDIO_HISTORY_SUBPATH) {
+    return 'history';
+  }
+  return 'studio';
+}
+
 export function PromptStudio({
   pluginId,
   projectId,
+  subPath,
   headerActions,
   startSession = defaultStartSession
 }: PromptStudioProps): React.ReactElement {
   ensureStylesInjected();
+  const [activeTab, setActiveTab] = useState<StudioTabId>(() => resolveInitialTab(subPath));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingLoadEntry, setPendingLoadEntry] = useState<HistoryEntry | null>(null);
   const rpc = usePromptVoiceRpc(pluginId);
   const composer = useSafeComposer();
   const composerView = useSafeComposerView();
+  const zccContext = useSafeZccContext();
   const navigate = useSafeZccNavigate();
+  const activeThreadId = resolveDictationScope(composerView?.scope, zccContext).threadId;
   const visibility = useVisibilitySettings();
   const composerProviderId = composerView?.providerId;
   const composerFamilyId = composerView?.familyId;
@@ -768,6 +775,12 @@ export function PromptStudio({
   // ─── Workspace State ─────────────────────────────────────────────────────────
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
+  const [studioHistoryId, setStudioHistoryId] = useState<string | null>(null);
+  const studioHistoryIdRef = useRef<string | null>(null);
+  const updateStudioHistoryId = useCallback((nextId: string | null) => {
+    studioHistoryIdRef.current = nextId;
+    setStudioHistoryId(nextId);
+  }, []);
   const [isCopiedOutput, setIsCopiedOutput] = useState(false);
   const [isCopiedInput, setIsCopiedInput] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -809,9 +822,24 @@ export function PromptStudio({
   const audioPrefsRef = useRef<AudioPreferences>(audioPrefs);
   audioPrefsRef.current = audioPrefs;
   const activeSessionRef = useRef<RecordingSession | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customPromptInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (subPath && subPath.replace(/^\/+/, '').toLowerCase() === PROMPT_STUDIO_HISTORY_SUBPATH) {
+      setSettingsOpen(false);
+      setActiveTab('history');
+    }
+  }, [subPath]);
+
+  useEffect(() => {
+    return subscribeStudioTabRequests((tab) => {
+      setSettingsOpen(false);
+      setActiveTab(tab);
+    });
+  }, []);
 
   // Load saved draft on mount and when switching project scopes
   useEffect(() => {
@@ -819,8 +847,17 @@ export function PromptStudio({
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setInputText(typeof parsed.inputText === 'string' ? parsed.inputText : '');
-        setOutputText(typeof parsed.outputText === 'string' ? parsed.outputText : '');
+        const loadedInput = typeof parsed.inputText === 'string' ? parsed.inputText : '';
+        const loadedOutput = typeof parsed.outputText === 'string' ? parsed.outputText : '';
+        const savedHistoryId =
+          (loadedInput.trim() || loadedOutput.trim()) &&
+          typeof parsed.historyEntryId === 'string' &&
+          parsed.historyEntryId.trim()
+            ? parsed.historyEntryId.trim()
+            : null;
+        setInputText(loadedInput);
+        setOutputText(loadedOutput);
+        updateStudioHistoryId(savedHistoryId);
         setSelectedProviderId(parsed.selectedProviderId || 'assistant');
         setSelectedModelId(parsed.selectedModelId || 'assistant');
         userManuallySelectedModel.current = parsed.userManuallySelected === true;
@@ -846,6 +883,7 @@ export function PromptStudio({
       } else {
         setInputText('');
         setOutputText('');
+        updateStudioHistoryId(null);
         setSelectedProviderId('assistant');
         setSelectedModelId('assistant');
         setSttProvider('system');
@@ -859,7 +897,7 @@ export function PromptStudio({
       // Ignore storage read errors
     }
     setLoadedStorageKey(storageKey);
-  }, [storageKey]);
+  }, [storageKey, updateStudioHistoryId]);
 
   const rpcRef = useRef(rpc);
   rpcRef.current = rpc;
@@ -1016,7 +1054,7 @@ export function PromptStudio({
     [discoveredProviders]
   );
 
-  // Assemble provider and model list, ordered alphabetically (A-Z)
+  // Assemble provider list (A-Z) and each provider's models (cheapest to most expensive)
   const providerOptions: ProviderOption[] = useMemo(() => {
     const sortAlphabetically = <T,>(items: T[], getText: (item: T) => string): T[] => {
       return [...items].sort((a, b) =>
@@ -1034,7 +1072,7 @@ export function PromptStudio({
           (composerProviderId && p.id.toLowerCase() === composerProviderId.toLowerCase()) ||
           (composerFamilyId && p.id.toLowerCase().includes(composerFamilyId.toLowerCase()))
         );
-        const sortedModels = sortAlphabetically(p.models, (m) => m.label || m.id).map((m) => ({
+        const sortedModels = sortModelsCheapestFirst(p.models).map((m) => ({
           ...m,
           isComposerMatch: isProvComposerMatch
         }));
@@ -1057,10 +1095,7 @@ export function PromptStudio({
         (composerFamilyId && prov.providerId.toLowerCase().includes(composerFamilyId.toLowerCase()))
       );
 
-      const models: DiscoveredModelOption[] = sortAlphabetically(
-        prov.models,
-        (m) => m.label || m.id
-      ).map((m) => {
+      const models: DiscoveredModelOption[] = sortModelsCheapestFirst(prov.models).map((m) => {
         const fullKey = `${prov.providerId}:${m.id}`;
         const key = legacyAliases[fullKey] ?? m.id;
         return {
@@ -1114,11 +1149,7 @@ export function PromptStudio({
     if (composerMatch) {
       setSelectedProviderId(composerMatch.id);
       if (composerMatch.models.length > 0) {
-        setSelectedModelId((prev) => {
-          const keepsPrevious = composerMatch.models.some((m) => m.id === prev || m.key === prev);
-          if (keepsPrevious) return prev;
-          return composerMatch.models[0].key || composerMatch.models[0].id;
-        });
+        setSelectedModelId(composerMatch.models[0].key || composerMatch.models[0].id);
       }
       return;
     }
@@ -1140,6 +1171,16 @@ export function PromptStudio({
     }
   }, [discoveredProviders, providerOptions, savedLlmSettings]);
 
+  // Reset active history linkage once both panes are cleared so the next draft starts a new activity
+  useEffect(() => {
+    if (loadedStorageKey !== storageKey) return;
+    if (!inputText.trim() && !outputText.trim() && !isRecording && !isTranscribing && !isRefining) {
+      if (studioHistoryIdRef.current !== null) {
+        updateStudioHistoryId(null);
+      }
+    }
+  }, [loadedStorageKey, storageKey, inputText, outputText, isRecording, isTranscribing, isRefining, updateStudioHistoryId]);
+
   // Auto-save draft on change after initial load of the active storageKey
   useEffect(() => {
     if (loadedStorageKey !== storageKey) return;
@@ -1149,6 +1190,7 @@ export function PromptStudio({
         JSON.stringify({
           inputText,
           outputText,
+          historyEntryId: studioHistoryId,
           selectedProviderId,
           selectedModelId,
           userManuallySelected: userManuallySelectedModel.current,
@@ -1162,7 +1204,7 @@ export function PromptStudio({
     } catch {
       // Ignore storage write errors
     }
-  }, [loadedStorageKey, storageKey, inputText, outputText, selectedProviderId, selectedModelId, sttProvider, sttModel, selectedPresetId, selectedToneId, targetLanguage]);
+  }, [loadedStorageKey, storageKey, inputText, outputText, studioHistoryId, selectedProviderId, selectedModelId, sttProvider, sttModel, selectedPresetId, selectedToneId, targetLanguage]);
 
   // Auto-cleanup toggle handler for composer dictations
   const handleToggleAutoCleanup = (enabled: boolean) => {
@@ -1311,6 +1353,9 @@ export function PromptStudio({
 
     const session = activeSessionRef.current;
     activeSessionRef.current = null;
+    const startedAt = recordingStartedAtRef.current;
+    recordingStartedAtRef.current = null;
+    const audioDurationMs = startedAt !== null ? Math.max(0, Date.now() - startedAt) : undefined;
     if (!session) return;
 
     setIsTranscribing(true);
@@ -1323,11 +1368,19 @@ export function PromptStudio({
       const response = (await rpc.call(TRANSCRIBE_METHOD, {
         audio: audio.base64,
         mimeType: audio.mimeType,
-        transcriptionOnly: true
+        transcriptionOnly: true,
+        source: 'studio',
+        ...(projectId ? { projectId } : {}),
+        ...(activeThreadId ? { threadId: activeThreadId } : {}),
+        ...(typeof audioDurationMs === 'number' ? { audioDurationMs } : {}),
+        ...(studioHistoryIdRef.current ? { historyEntryId: studioHistoryIdRef.current } : {})
       })) as TranscribeResponse;
 
       if (response.ok && response.status === 'ok') {
         playSoundCue('complete', cueOpts);
+        if (typeof response.historyEntryId === 'string' && response.historyEntryId) {
+          updateStudioHistoryId(response.historyEntryId);
+        }
         setInputText((prev) => appendTranscript(prev, response.text));
         setDictationError(null);
       } else if (response.ok && response.status === 'no-speech') {
@@ -1375,6 +1428,7 @@ export function PromptStudio({
       }
       session.onError = (err) => {
         activeSessionRef.current = null;
+        recordingStartedAtRef.current = null;
         setIsRecording(false);
         setAudioLevel(null);
         clearStudioTimers();
@@ -1383,6 +1437,7 @@ export function PromptStudio({
         setStatusNotice(err.message);
       };
       activeSessionRef.current = session;
+      recordingStartedAtRef.current = Date.now();
       setIsRecording(true);
       setRecordingSeconds(0);
       startStudioTimers();
@@ -1441,10 +1496,18 @@ export function PromptStudio({
         ...(isCustom ? { customPrompt: customPrompt.trim() } : {}),
         ...(!isCustom && !isTranslate && activePreset?.instruction ? { instruction: activePreset.instruction } : {}),
         llmProvider: providerToUse,
-        llmModel: modelToUse
+        llmModel: modelToUse,
+        source: 'studio',
+        presetId: selectedPresetId,
+        ...(projectId ? { projectId } : {}),
+        ...(activeThreadId ? { threadId: activeThreadId } : {}),
+        ...(studioHistoryIdRef.current ? { historyEntryId: studioHistoryIdRef.current } : {})
       })) as RephraseResponse;
 
       if (response.ok) {
+        if (typeof response.historyEntryId === 'string' && response.historyEntryId) {
+          updateStudioHistoryId(response.historyEntryId);
+        }
         setOutputText(response.text);
         setLastUsedModel(
           `${activeProvider?.displayName || providerToUse}: ${response.llmModel || modelToUse}`
@@ -1507,6 +1570,7 @@ export function PromptStudio({
 
   const handleClearAll = () => {
     if (!inputText && !outputText) return;
+    updateStudioHistoryId(null);
     setInputText('');
     setOutputText('');
     setSelectedPresetId(PRESET_IDS.improve);
@@ -1527,8 +1591,7 @@ export function PromptStudio({
     setTimeout(() => setStatusNotice(null), 2500);
   };
 
-  const handleInsertIntoComposer = () => {
-    const textToInsert = outputText || inputText;
+  const insertTextIntoComposer = useCallback((textToInsert: string) => {
     if (!textToInsert) return;
 
     if (composer && typeof composer.updateText === 'function') {
@@ -1536,7 +1599,9 @@ export function PromptStudio({
         composer.updateText((draft) => appendTranscript(draft, textToInsert));
         composer.focus?.();
         setInsertNotice('Inserted into Composer!');
+        setStatusNotice('Inserted into Composer!');
         setTimeout(() => setInsertNotice(null), 2500);
+        setTimeout(() => setStatusNotice(null), 2500);
         return;
       } catch {
         // Fall through when no active thread composer is focused.
@@ -1546,7 +1611,9 @@ export function PromptStudio({
     if (navigate && typeof navigate.toCompose === 'function') {
       navigate.toCompose({ initialPrompt: textToInsert, focusPrompt: true });
       setInsertNotice('Opened in New Thread Composer!');
+      setStatusNotice('Opened in New Thread Composer!');
       setTimeout(() => setInsertNotice(null), 2500);
+      setTimeout(() => setStatusNotice(null), 2500);
       return;
     }
 
@@ -1557,7 +1624,54 @@ export function PromptStudio({
           : 'Composer focus unavailable.'
       );
     });
+  }, [composer, navigate]);
+
+  const handleInsertIntoComposer = () => {
+    insertTextIntoComposer(outputText || inputText);
   };
+
+  const applyHistoryEntryToStudio = useCallback((entry: HistoryEntry) => {
+    updateStudioHistoryId(null);
+    setInputText(entry.rawText);
+    setOutputText(
+      entry.kind === 'refinement' || entry.outputText !== entry.rawText ? entry.outputText : ''
+    );
+    if (entry.kind === 'refinement' || entry.presetId || entry.targetLanguage || entry.customPrompt) {
+      const nextPreset =
+        entry.presetId && VALID_PRESET_IDS.has(entry.presetId)
+          ? entry.presetId
+          : entry.targetLanguage
+            ? PRESET_IDS.translate
+            : entry.tone === 'custom'
+              ? PRESET_IDS.custom
+              : PRESET_IDS.improve;
+      setSelectedPresetId(nextPreset);
+      if (entry.tone && IMPROVE_TONES.some((t) => t.id === entry.tone)) {
+        setSelectedToneId(entry.tone as ImproveToneId);
+      }
+      if (entry.targetLanguage) {
+        setTargetLanguage(findTargetLanguage(entry.targetLanguage)?.code ?? DEFAULT_TARGET_LANGUAGE);
+      }
+      setCustomPrompt(entry.customPrompt ?? '');
+    }
+    setShowDiff(false);
+    setPendingLoadEntry(null);
+    setSettingsOpen(false);
+    setActiveTab('studio');
+    setStatusNotice('Loaded entry into Studio.');
+    setTimeout(() => setStatusNotice(null), 2500);
+  }, [updateStudioHistoryId]);
+
+  const handleLoadFromHistory = useCallback(
+    (entry: HistoryEntry) => {
+      if (inputText.trim() || outputText.trim()) {
+        setPendingLoadEntry(entry);
+        return;
+      }
+      applyHistoryEntryToStudio(entry);
+    },
+    [applyHistoryEntryToStudio, inputText, outputText]
+  );
 
   const handleReenableProjectTab = async () => {
     if (!pluginId) return;
@@ -1576,6 +1690,8 @@ export function PromptStudio({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
+      setSettingsOpen(false);
+      setActiveTab('studio');
       setSelectedPresetId(PRESET_IDS.custom);
       setTimeout(() => customPromptInputRef.current?.focus(), 0);
     }
@@ -1625,11 +1741,19 @@ export function PromptStudio({
 
   const activeToneOption = IMPROVE_TONES.find((t) => t.id === selectedToneId) ?? IMPROVE_TONES[0];
 
+  const handleSelectTab = (tab: StudioTabId) => {
+    setPendingLoadEntry(null);
+    if (settingsOpen) {
+      handleSettingsClosed();
+    }
+    setActiveTab(tab);
+  };
+
   return (
     <div className="ps-container" onKeyDown={handleKeyDown}>
       <style>{PROMPT_STUDIO_STYLES}</style>
 
-      {/* ─── Studio Header (Simplified, No Name Input) ──────────────────────── */}
+      {/* ─── Studio Header with Studio | History Tabs & Settings ────────────── */}
       <header className="ps-header">
         <div className="ps-header-left">
           <span style={{ fontSize: 18 }}>🎙️</span>
@@ -1637,11 +1761,77 @@ export function PromptStudio({
           <span className="ps-badge">Voice & AI Refinement</span>
           {projectId ? <span className="ps-badge ps-badge-project">Project</span> : null}
         </div>
-        {headerActions ? <div className="ps-header-actions">{headerActions}</div> : null}
+        <div className="ps-header-actions">
+          <nav className="ps-header-nav" role="tablist" aria-label="Prompt Studio views">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!settingsOpen && activeTab === 'studio'}
+              className={`ps-header-tab ${!settingsOpen && activeTab === 'studio' ? 'active' : ''}`}
+              onClick={() => handleSelectTab('studio')}
+            >
+              Studio
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!settingsOpen && activeTab === 'history'}
+              className={`ps-header-tab ${!settingsOpen && activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => handleSelectTab('history')}
+            >
+              History
+            </button>
+          </nav>
+          <button
+            type="button"
+            className={`ps-btn ${settingsOpen ? 'ps-btn-primary' : ''}`}
+            aria-pressed={settingsOpen}
+            onClick={() => {
+              setPendingLoadEntry(null);
+              if (settingsOpen) handleSettingsClosed();
+              else setSettingsOpen(true);
+            }}
+          >
+            Settings
+          </button>
+          {headerActions}
+        </div>
       </header>
 
+      {pendingLoadEntry ? (
+        <div className="ps-overwrite-banner" role="alertdialog" aria-label="Confirm overwrite studio draft">
+          <span>Replace your current Studio draft with this history entry?</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="ps-btn" onClick={() => setPendingLoadEntry(null)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="ps-btn ps-btn-primary"
+              onClick={() => applyHistoryEntryToStudio(pendingLoadEntry)}
+            >
+              Replace Draft
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* ─── Workspace Layout ───────────────────────────────────────────────── */}
-      {settingsOpen ? <StudioSettings rpc={rpc} pluginId={pluginId} onBack={handleSettingsClosed} /> : <div className="ps-workspace">
+      {settingsOpen ? (
+        <StudioSettings rpc={rpc} pluginId={pluginId} onBack={handleSettingsClosed} />
+      ) : activeTab === 'history' ? (
+        <HistoryView
+          rpc={rpc}
+          projectId={projectId}
+          onLoadIntoStudio={handleLoadFromHistory}
+          onInsertIntoComposer={insertTextIntoComposer}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onStatusNotice={(msg) => {
+            setStatusNotice(msg);
+            setTimeout(() => setStatusNotice((curr) => (curr === msg ? null : curr)), 2500);
+          }}
+        />
+      ) : <div className="ps-workspace">
 
         {/* ─── Left Sidebar Controls ────────────────────────────────────────── */}
         <aside className="ps-sidebar">
@@ -1937,22 +2127,25 @@ export function PromptStudio({
                     {p.id === PRESET_IDS.improve && selectedPresetId === PRESET_IDS.improve && (
                       <div className="ps-tone-panel">
                         <div className="ps-tone-header">
-                          <span>Tone: <strong style={{ color: 'var(--text-primary, #e2e8f0)' }}>{activeToneOption.label}</strong></span>
+                          <label htmlFor="ps-improve-tone-select">
+                            <strong style={{ color: 'var(--text-primary, #e2e8f0)' }}>Tone</strong>
+                          </label>
                           <span style={{ color: 'var(--ps-text-subtle)' }}>Same length</span>
                         </div>
-                        <div className="ps-tone-chips" role="group" aria-label="Improvement tone">
+                        <select
+                          id="ps-improve-tone-select"
+                          className="ps-select"
+                          aria-label="Improvement tone"
+                          value={selectedToneId}
+                          onChange={(e) => setSelectedToneId(e.target.value as ImproveToneId)}
+                          disabled={isRefining}
+                        >
                           {IMPROVE_TONES.map((t) => (
-                            <button
-                              key={t.id}
-                              type="button"
-                              className={`ps-tone-chip ${selectedToneId === t.id ? 'active' : ''}`}
-                              aria-pressed={selectedToneId === t.id}
-                              onClick={() => setSelectedToneId(t.id)}
-                            >
+                            <option key={t.id} value={t.id}>
                               {t.label}
-                            </button>
+                            </option>
                           ))}
-                        </div>
+                        </select>
                         <div className="ps-tone-hint">{activeToneOption.desc}</div>
                       </div>
                     )}
@@ -2007,8 +2200,6 @@ export function PromptStudio({
               </div>
             </div>
           </section>
-
-          <button type="button" className="ps-btn" style={{ marginTop: 'auto' }} onClick={() => setSettingsOpen(true)}>Settings</button>
         </aside>
 
         {/* ─── Main Editor Canvas (Dual Pane Vertical Layout) ────────────────── */}
@@ -2042,16 +2233,6 @@ export function PromptStudio({
                   aria-label="Copy raw input"
                 >
                   {isCopiedInput ? '✅ Copied' : '📋 Copy'}
-                </button>
-                <button
-                  type="button"
-                  className="ps-btn"
-                  style={{ padding: '3px 8px', fontSize: 11 }}
-                  onClick={() => setInputText('')}
-                  disabled={!inputText}
-                  title="Clear input"
-                >
-                  Clear
                 </button>
               </div>
             </div>

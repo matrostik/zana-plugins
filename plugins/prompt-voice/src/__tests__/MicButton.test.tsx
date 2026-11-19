@@ -11,8 +11,8 @@ const fakes = vi.hoisted(() => ({
   focus: vi.fn(),
   call: vi.fn(),
   settingsValues: { showHomeWidget: true, showInProjects: true, micVisibility: 'both' } as Record<string, unknown>,
-  composerView: null as { scope?: { kind?: string; projectId?: string | null } } | null,
-  zccContext: { projectId: null as string | null }
+  composerView: null as { scope?: { kind?: string; projectId?: string | null; threadId?: string | null }; threadId?: string | null } | null,
+  zccContext: { projectId: null as string | null, threadId: null as string | null }
 }));
 
 vi.mock('@zana-ai/zcc-plugin-sdk/app', () => ({
@@ -37,7 +37,7 @@ function fakeSession(): RecordingSession {
 beforeEach(() => {
   fakes.settingsValues = { showHomeWidget: true, showInProjects: true, micVisibility: 'both' };
   fakes.composerView = null;
-  fakes.zccContext = { projectId: null };
+  fakes.zccContext = { projectId: null, threadId: null };
 });
 
 afterEach(() => {
@@ -109,10 +109,61 @@ describe('MicButton', () => {
     fireEvent.click(button);
 
     await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
-    expect(fakes.call).toHaveBeenCalledWith(TRANSCRIBE, { audio: 'YWJj', mimeType: 'audio/webm' });
+    expect(fakes.call).toHaveBeenCalledWith(
+      TRANSCRIBE,
+      expect.objectContaining({ audio: 'YWJj', mimeType: 'audio/webm', source: 'composer' })
+    );
     const applyUpdate = fakes.updateText.mock.calls[0]?.[0] as (draft: string) => string;
     expect(applyUpdate('Draft')).toBe('Draft hello there');
     expect(fakes.focus).toHaveBeenCalled();
+  });
+
+  it('attaches projectId and threadId metadata when dictating inside a project thread composer', async () => {
+    fakes.composerView = { scope: { kind: 'project', projectId: 'proj-9', threadId: 'thread-55' } };
+    fakes.zccContext = { projectId: 'proj-9', threadId: 'thread-55' };
+    const session = fakeSession();
+    fakes.call.mockResolvedValue({
+      ok: true, status: 'ok', rawText: 'hi', text: 'scoped text', sttProvider: 'system', llmProvider: 'none', llmModel: null
+    });
+    render(<MicButton startSession={async () => session} />);
+    const button = screen.getByRole('button', { name: BUTTON_NAME });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
+    fireEvent.click(button);
+
+    await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
+    expect(fakes.call).toHaveBeenCalledWith(
+      TRANSCRIBE,
+      expect.objectContaining({
+        audio: 'YWJj',
+        mimeType: 'audio/webm',
+        source: 'composer',
+        projectId: 'proj-9',
+        threadId: 'thread-55'
+      })
+    );
+  });
+
+  it('does not leak zccContext projectId or threadId when composer scope is explicitly global', async () => {
+    fakes.composerView = { scope: { kind: 'global', projectId: null } };
+    fakes.zccContext = { projectId: 'proj-9', threadId: 'thread-55' };
+    const session = fakeSession();
+    fakes.call.mockResolvedValue({
+      ok: true, status: 'ok', rawText: 'hi', text: 'global text', sttProvider: 'system', llmProvider: 'none', llmModel: null
+    });
+    render(<MicButton startSession={async () => session} />);
+    const button = screen.getByRole('button', { name: BUTTON_NAME });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
+    fireEvent.click(button);
+
+    await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
+    const payload = fakes.call.mock.calls.find(([method]) => method === TRANSCRIBE)?.[1] as Record<string, unknown>;
+    expect(payload).toMatchObject({ audio: 'YWJj', mimeType: 'audio/webm', source: 'composer' });
+    expect(payload.projectId).toBeUndefined();
+    expect(payload.threadId).toBeUndefined();
   });
 
   it('shows the microphone error when recording cannot start', async () => {
@@ -448,7 +499,7 @@ describe('MicButton', () => {
   it('renders composer mic only in project scope when micVisibility is projects', () => {
     fakes.settingsValues = { micVisibility: 'projects' };
     fakes.composerView = { scope: { kind: 'global', projectId: null } };
-    fakes.zccContext = { projectId: 'proj-1' };
+    fakes.zccContext = { projectId: 'proj-1', threadId: null };
 
     const view = render(<MicButton />);
     expect(screen.queryByRole('button', { name: BUTTON_NAME })).toBeNull();

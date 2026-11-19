@@ -10,6 +10,7 @@ import {
 } from './audioPreferencesStorage.ts';
 import { dictationReducer, initialDictationState, type DictationEvent } from './dictationMachine.ts';
 import { defaultStartSession, type RecordedAudio, type RecordingSession, type StartRecordingOptions } from './recorder.ts';
+import { useSafeComposerView, useSafeZccContext } from './safeSdk.ts';
 import { playSoundCue } from './soundCues.ts';
 import { prepareAudioForUpload } from './wav.ts';
 
@@ -28,9 +29,68 @@ function isSettingsPayload(value: unknown): value is Record<string, unknown> {
 type RpcClient = ReturnType<typeof useRpc>;
 type ComposerClient = ReturnType<typeof useComposer>;
 
-async function requestTranscription(rpc: RpcClient, recorded: RecordedAudio): Promise<TranscribeResponse> {
+interface DictationMetadata {
+  projectId?: string;
+  threadId?: string;
+  audioDurationMs?: number;
+}
+
+type ComposerScopeValue =
+  | string
+  | { kind?: string; projectId?: string | null; threadId?: string | null }
+  | null
+  | undefined;
+
+/**
+ * Resolves project/thread metadata for a dictation.
+ * An explicit composer scope is authoritative: global composers or scopes with `projectId: null`
+ * do not inherit an unrelated project/thread from the surrounding Zana context.
+ */
+export function resolveDictationScope(
+  scope: ComposerScopeValue,
+  zccContext: { projectId?: string | null; threadId?: string | null } | null
+): { projectId?: string; threadId?: string } {
+  if (scope === null || scope === undefined) {
+    return {
+      projectId: zccContext?.projectId || undefined,
+      threadId: zccContext?.threadId || undefined
+    };
+  }
+  if (scope === 'global' || (typeof scope === 'object' && scope.kind === 'global')) {
+    const obj = typeof scope === 'object' ? scope : null;
+    return {
+      projectId: obj?.projectId || undefined,
+      threadId: obj?.threadId || undefined
+    };
+  }
+  if (typeof scope === 'object') {
+    const hasProject = 'projectId' in scope && scope.projectId !== undefined;
+    const hasThread = 'threadId' in scope && scope.threadId !== undefined;
+    return {
+      projectId: (hasProject ? scope.projectId : zccContext?.projectId) || undefined,
+      threadId: (hasThread ? scope.threadId : zccContext?.threadId) || undefined
+    };
+  }
+  return {
+    projectId: zccContext?.projectId || undefined,
+    threadId: zccContext?.threadId || undefined
+  };
+}
+
+async function requestTranscription(
+  rpc: RpcClient,
+  recorded: RecordedAudio,
+  meta: DictationMetadata
+): Promise<TranscribeResponse> {
   const audio = await prepareAudioForUpload(rpc, recorded);
-  const value = await rpc.call(TRANSCRIBE_METHOD, { audio: audio.base64, mimeType: audio.mimeType });
+  const value = await rpc.call(TRANSCRIBE_METHOD, {
+    audio: audio.base64,
+    mimeType: audio.mimeType,
+    source: 'composer',
+    ...(meta.projectId ? { projectId: meta.projectId } : {}),
+    ...(meta.threadId ? { threadId: meta.threadId } : {}),
+    ...(typeof meta.audioDurationMs === 'number' ? { audioDurationMs: meta.audioDurationMs } : {})
+  });
   if (!isTranscribeResponse(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE);
   return value;
 }
@@ -200,6 +260,8 @@ export function useDictation({
   noticeDurationMs = NOTICE_DISMISS_DELAY_MS
 }: UseDictationOptions = {}) {
   const composer = useComposer();
+  const composerView = useSafeComposerView();
+  const zccContext = useSafeZccContext();
   const rpc = useRpc();
   const rpcRef = useRef(rpc);
   rpcRef.current = rpc;
@@ -208,11 +270,15 @@ export function useDictation({
   phaseRef.current = state.phase;
   const serverPrefsRef = useRef<AudioPreferences | null>(null);
   const activePrefsRef = useRef<AudioPreferences>(readCachedAudioPreferences());
+  const recordingStartedAtRef = useRef<number | null>(null);
   const getPrefs = useCallback(() => activePrefsRef.current, []);
   const { start, takeSession, cancel, isMounted, getAudioLevel } = useRecordingLifecycle(startSession, dispatch, getPrefs);
   const [level, setLevel] = useState<number | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [autoStopped, setAutoStopped] = useState(false);
+
+  const contextRef = useRef<{ projectId?: string; threadId?: string }>({});
+  contextRef.current = resolveDictationScope(composerView?.scope, zccContext);
 
   // Sync saved audio preferences from server once on mount so cold webviews honor saved mic/cues.
   useEffect(() => {
@@ -241,6 +307,7 @@ export function useDictation({
       return;
     }
     const startedAt = Date.now();
+    recordingStartedAtRef.current = startedAt;
     const update = () => {
       setLevel(getAudioLevel());
       setSeconds(Math.floor((Date.now() - startedAt) / 1000));
@@ -265,6 +332,9 @@ export function useDictation({
 
   const finishDictation = useCallback(async () => {
     const prefs = activePrefsRef.current;
+    const startedAt = recordingStartedAtRef.current;
+    recordingStartedAtRef.current = null;
+    const audioDurationMs = startedAt !== null ? Math.max(0, Date.now() - startedAt) : undefined;
     dispatch({ type: 'STOP' });
     const session = await takeSession();
     if (!isMounted() || !session) return;
@@ -275,7 +345,10 @@ export function useDictation({
 
       // Play stop chime only after capture has stopped so it cannot bleed into the recording.
       playSoundCue('stop', cueOptions(prefs));
-      const response = await requestTranscription(rpc, audio);
+      const response = await requestTranscription(rpc, audio, {
+        ...contextRef.current,
+        audioDurationMs
+      });
       if (!isMounted()) return;
 
       applyDictationResult(response, composer, dispatch, prefs);

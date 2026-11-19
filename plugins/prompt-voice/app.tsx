@@ -1,16 +1,21 @@
 import { definePluginApp } from '@zana-ai/zcc-plugin-sdk/app';
 import { HomeVoiceSection } from './src/app/HomeVoiceSection.tsx';
+import { requestPendingStudioTab } from './src/app/historyNavigation.ts';
 import { MicButton, ensureStylesInjected } from './src/app/MicButton.tsx';
 import { PromptStudio, PromptStudioDetachedPlaceholder } from './src/app/PromptStudio.tsx';
 import { VisibilitySettingsSection } from './src/app/VisibilitySettingsSection.tsx';
 
-import { PROMPT_STUDIO_PANEL_PATH, PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
+import {
+  PROMPT_STUDIO_HISTORY_SUBPATH,
+  PROMPT_STUDIO_PANEL_PATH,
+  PROMPT_STUDIO_PROJECT_TAB_ID
+} from './src/shared/protocol.ts';
 export { PROMPT_STUDIO_PANEL_PATH, PROMPT_STUDIO_PROJECT_TAB_ID } from './src/shared/protocol.ts';
 
 interface CommandPaletteContextLike {
   projectId?: string | null;
   navigate?: (path: string) => void;
-  toPluginPanel?: (path: string) => boolean;
+  toPluginPanel?: (path: string, options?: { subPath?: string; replace?: boolean }) => boolean;
   toProject?: (projectId: string, options?: { tabId?: string }) => boolean;
 }
 
@@ -70,11 +75,27 @@ export default definePluginApp((app) => {
     title: 'Prompt Studio: Open Canvas',
     isAvailable: () => true,
     run: (ctx: CommandPaletteContextLike) => {
+      requestPendingStudioTab('studio');
       if (typeof ctx.toPluginPanel === 'function') {
         ctx.toPluginPanel(PROMPT_STUDIO_PANEL_PATH);
         return;
       }
       ctx.navigate?.(`/${PROMPT_STUDIO_PANEL_PATH}`);
+    }
+  });
+
+  // Command palette: open Prompt Studio History tab
+  app.slots.commandPaletteAction?.({
+    id: 'open-prompt-studio-history',
+    title: 'Prompt Studio: Open History',
+    isAvailable: () => true,
+    run: (ctx: CommandPaletteContextLike) => {
+      requestPendingStudioTab('history');
+      if (typeof ctx.toPluginPanel === 'function') {
+        ctx.toPluginPanel(PROMPT_STUDIO_PANEL_PATH, { subPath: PROMPT_STUDIO_HISTORY_SUBPATH });
+        return;
+      }
+      ctx.navigate?.(`/${PROMPT_STUDIO_PANEL_PATH}/${PROMPT_STUDIO_HISTORY_SUBPATH}`);
     }
   });
 
