@@ -145,6 +145,27 @@ describe('MicButton', () => {
     );
   });
 
+  it('does not leak zccContext projectId or threadId when composer scope is explicitly global', async () => {
+    fakes.composerView = { scope: { kind: 'global', projectId: null } };
+    fakes.zccContext = { projectId: 'proj-9', threadId: 'thread-55' };
+    const session = fakeSession();
+    fakes.call.mockResolvedValue({
+      ok: true, status: 'ok', rawText: 'hi', text: 'global text', sttProvider: 'system', llmProvider: 'none', llmModel: null
+    });
+    render(<MicButton startSession={async () => session} />);
+    const button = screen.getByRole('button', { name: BUTTON_NAME });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
+    fireEvent.click(button);
+
+    await waitFor(() => expect(fakes.updateText).toHaveBeenCalledTimes(1));
+    const payload = fakes.call.mock.calls.find(([method]) => method === TRANSCRIBE)?.[1] as Record<string, unknown>;
+    expect(payload).toMatchObject({ audio: 'YWJj', mimeType: 'audio/webm', source: 'composer' });
+    expect(payload.projectId).toBeUndefined();
+    expect(payload.threadId).toBeUndefined();
+  });
+
   it('shows the microphone error when recording cannot start', async () => {
     const startSession = vi.fn(async () => {
       throw new Error('Microphone access was denied. Allow it for Zana in system settings, then try again.');

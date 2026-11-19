@@ -3,54 +3,72 @@ export interface SortableModel {
   label?: string;
 }
 
+export const MODEL_COST_RANK = {
+  FREE_OR_LOCAL: 0,
+  NANO: 10,
+  FLASH_LITE: 12,
+  MINI: 20,
+  SPARK: 22,
+  FLASH: 25,
+  LIGHTWEIGHT: 28,
+  OPEN_WEIGHT: 32,
+  HAIKU: 35,
+  REASONING_MINI: 42,
+  NEUTRAL_DEFAULT: 50,
+  STANDARD_GPT: 60,
+  CODEX: 62,
+  PRO: 65,
+  SONNET: 70,
+  REASONING_FULL: 75,
+  FLAGSHIP_PRO: 85,
+  OPUS: 95
+} as const;
+
+interface ModelCostRule {
+  readonly pattern: RegExp;
+  readonly rank: number;
+}
+
+/**
+ * Ordered from most specific overrides (e.g. `o3-mini`, `gpt-5.4-pro`, `flash-lite`)
+ * to broader family fallbacks so more specific tiers always win.
+ */
+const MODEL_COST_RULES: readonly ModelCostRule[] = [
+  { pattern: /(?:^|[:\s-])free(?=$|[\s)\]])|\bollama\b|\b:local\b/, rank: MODEL_COST_RANK.FREE_OR_LOCAL },
+  { pattern: /\bnano\b/, rank: MODEL_COST_RANK.NANO },
+  { pattern: /\bflash[- ]?lite\b/, rank: MODEL_COST_RANK.FLASH_LITE },
+  { pattern: /\bo[134][- ]mini\b/, rank: MODEL_COST_RANK.REASONING_MINI },
+  { pattern: /\bmini\b/, rank: MODEL_COST_RANK.MINI },
+  { pattern: /\bspark\b/, rank: MODEL_COST_RANK.SPARK },
+  { pattern: /\bflash\b/, rank: MODEL_COST_RANK.FLASH },
+  { pattern: /\b(?:lite|light|micro|tiny|small|instant)\b/, rank: MODEL_COST_RANK.LIGHTWEIGHT },
+  { pattern: /\bhaiku\b/, rank: MODEL_COST_RANK.HAIKU },
+  { pattern: /\bopus\b/, rank: MODEL_COST_RANK.OPUS },
+  { pattern: /\b(?:codex[- ]max|ultra|heavy|max)\b/, rank: MODEL_COST_RANK.FLAGSHIP_PRO },
+  { pattern: /\b(?:gpt|o[134])[a-z0-9.-]*[- ]pro\b/, rank: MODEL_COST_RANK.FLAGSHIP_PRO },
+  { pattern: /\bsonnet\b/, rank: MODEL_COST_RANK.SONNET },
+  { pattern: /\b(?:o1|o3|o4)\b/, rank: MODEL_COST_RANK.REASONING_FULL },
+  { pattern: /\bpro\b/, rank: MODEL_COST_RANK.PRO },
+  { pattern: /\bcodex\b/, rank: MODEL_COST_RANK.CODEX },
+  { pattern: /\bgpt[- ]?\d/, rank: MODEL_COST_RANK.STANDARD_GPT },
+  { pattern: /\bdeepseek[- ]?(?:r1|reasoner)\b/, rank: MODEL_COST_RANK.REASONING_MINI },
+  { pattern: /\b(?:deepseek|llama|qwen|gemma|mistral)\b/, rank: MODEL_COST_RANK.OPEN_WEIGHT }
+];
+
 /**
  * Estimates a relative cost tier for a model based on its identifier and display label
  * so models can be ordered from cheapest/fastest to most expensive/capable.
  *
- * Lower score = cheaper. Unrecognized models receive a neutral mid-score (50) and
+ * Lower score = cheaper. Unrecognized models receive a neutral mid-score and
  * fall back to alphabetical + numeric tie-breaking.
  */
 export function estimateModelCostRank(model: SortableModel): number {
   const raw = `${model.id} ${model.label ?? ''}`.toLowerCase();
   const text = raw.replace(/[_/]+/g, ' ');
-
-  // 1. Free / local models
-  if (/(?:^|[:\s-])free(?=$|[\s)\]])/.test(text) || /\bollama\b|\b:local\b/.test(text)) {
-    return 0;
+  for (const rule of MODEL_COST_RULES) {
+    if (rule.pattern.test(text)) return rule.rank;
   }
-
-  // 2. Ultra-low-cost tiers (nano, flash-lite)
-  if (/\bnano\b/.test(text)) return 10;
-  if (/\bflash[- ]?lite\b/.test(text)) return 12;
-
-  // 3. Reasoning mini models (costlier than standard mini/flash, cheaper than full reasoning)
-  if (/\bo[134][- ]mini\b/.test(text)) return 42;
-
-  // 4. Budget / lightweight tiers
-  if (/\bmini\b/.test(text)) return 20;
-  if (/\bspark\b/.test(text)) return 22;
-  if (/\bflash\b/.test(text)) return 25;
-  if (/\b(?:lite|light|micro|tiny|small|instant)\b/.test(text)) return 28;
-  if (/\bhaiku\b/.test(text)) return 35;
-
-  // 5. Most expensive flagship tiers (checked before base names so e.g. gpt-5.4-pro / codex-max wins)
-  if (/\bopus\b/.test(text)) return 95;
-  if (/\b(?:codex[- ]max|ultra|heavy|max)\b/.test(text)) return 85;
-  if (/\b(?:gpt|o[134])[a-z0-9.-]*[- ]pro\b/.test(text)) return 85;
-
-  // 6. Standard / mid-tier models
-  if (/\bsonnet\b/.test(text)) return 70;
-  if (/\b(?:o1|o3|o4)\b/.test(text)) return 75;
-  if (/\bpro\b/.test(text)) return 65;
-  if (/\bcodex\b/.test(text)) return 62;
-  if (/\bgpt[- ]?\d/.test(text)) return 60;
-
-  // 7. Open-weight / lower-cost hosted models when no size/tier keyword matched above
-  if (/\bdeepseek[- ]?(?:r1|reasoner)\b/.test(text)) return 42;
-  if (/\b(?:deepseek|llama|qwen|gemma|mistral)\b/.test(text)) return 32;
-
-  // 8. Neutral fallback for unrecognized models
-  return 50;
+  return MODEL_COST_RANK.NEUTRAL_DEFAULT;
 }
 
 export function compareModelsCheapestFirst<T extends SortableModel>(a: T, b: T): number {

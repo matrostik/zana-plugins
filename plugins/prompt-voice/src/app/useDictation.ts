@@ -35,6 +35,48 @@ interface DictationMetadata {
   audioDurationMs?: number;
 }
 
+type ComposerScopeValue =
+  | string
+  | { kind?: string; projectId?: string | null; threadId?: string | null }
+  | null
+  | undefined;
+
+/**
+ * Resolves project/thread metadata for a dictation.
+ * An explicit composer scope is authoritative: global composers or scopes with `projectId: null`
+ * do not inherit an unrelated project/thread from the surrounding Zana context.
+ */
+export function resolveDictationScope(
+  scope: ComposerScopeValue,
+  zccContext: { projectId?: string | null; threadId?: string | null } | null
+): { projectId?: string; threadId?: string } {
+  if (scope === null || scope === undefined) {
+    return {
+      projectId: zccContext?.projectId || undefined,
+      threadId: zccContext?.threadId || undefined
+    };
+  }
+  if (scope === 'global' || (typeof scope === 'object' && scope.kind === 'global')) {
+    const obj = typeof scope === 'object' ? scope : null;
+    return {
+      projectId: obj?.projectId || undefined,
+      threadId: obj?.threadId || undefined
+    };
+  }
+  if (typeof scope === 'object') {
+    const hasProject = 'projectId' in scope && scope.projectId !== undefined;
+    const hasThread = 'threadId' in scope && scope.threadId !== undefined;
+    return {
+      projectId: (hasProject ? scope.projectId : zccContext?.projectId) || undefined,
+      threadId: (hasThread ? scope.threadId : zccContext?.threadId) || undefined
+    };
+  }
+  return {
+    projectId: zccContext?.projectId || undefined,
+    threadId: zccContext?.threadId || undefined
+  };
+}
+
 async function requestTranscription(
   rpc: RpcClient,
   recorded: RecordedAudio,
@@ -235,14 +277,8 @@ export function useDictation({
   const [seconds, setSeconds] = useState(0);
   const [autoStopped, setAutoStopped] = useState(false);
 
-  const scope = composerView?.scope;
-  const scopeProjectId = scope && typeof scope === 'object' ? scope.projectId : undefined;
-  const scopeThreadId = scope && typeof scope === 'object' ? scope.threadId : undefined;
   const contextRef = useRef<{ projectId?: string; threadId?: string }>({});
-  contextRef.current = {
-    projectId: scopeProjectId || zccContext?.projectId || undefined,
-    threadId: scopeThreadId || zccContext?.threadId || undefined
-  };
+  contextRef.current = resolveDictationScope(composerView?.scope, zccContext);
 
   // Sync saved audio preferences from server once on mount so cold webviews honor saved mic/cues.
   useEffect(() => {

@@ -39,12 +39,14 @@ import {
   useSafeComposer,
   useSafeComposerView,
   useSafeRealtime,
+  useSafeZccContext,
   useSafeZccNavigate,
   useVisibilitySettings
 } from './safeSdk.ts';
 import { playSoundCue } from './soundCues.ts';
 import { prepareAudioForUpload } from './wav.ts';
 import { computeWordDiff, type DiffToken } from './textDiff.ts';
+import { resolveDictationScope } from './useDictation.ts';
 
 // ─── Inline CSS Styles for Native Look & Feel ──────────────────────────────────
 export const PROMPT_STUDIO_STYLES = `
@@ -758,7 +760,9 @@ export function PromptStudio({
   const rpc = usePromptVoiceRpc(pluginId);
   const composer = useSafeComposer();
   const composerView = useSafeComposerView();
+  const zccContext = useSafeZccContext();
   const navigate = useSafeZccNavigate();
+  const activeThreadId = resolveDictationScope(composerView?.scope, zccContext).threadId;
   const visibility = useVisibilitySettings();
   const composerProviderId = composerView?.providerId;
   const composerFamilyId = composerView?.familyId;
@@ -1367,6 +1371,7 @@ export function PromptStudio({
         transcriptionOnly: true,
         source: 'studio',
         ...(projectId ? { projectId } : {}),
+        ...(activeThreadId ? { threadId: activeThreadId } : {}),
         ...(typeof audioDurationMs === 'number' ? { audioDurationMs } : {}),
         ...(studioHistoryIdRef.current ? { historyEntryId: studioHistoryIdRef.current } : {})
       })) as TranscribeResponse;
@@ -1495,6 +1500,7 @@ export function PromptStudio({
         source: 'studio',
         presetId: selectedPresetId,
         ...(projectId ? { projectId } : {}),
+        ...(activeThreadId ? { threadId: activeThreadId } : {}),
         ...(studioHistoryIdRef.current ? { historyEntryId: studioHistoryIdRef.current } : {})
       })) as RephraseResponse;
 

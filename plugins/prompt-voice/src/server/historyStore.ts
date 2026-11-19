@@ -435,6 +435,7 @@ function buildCoalescedRefinementEntry(existing: HistoryEntry, input: RecordHist
     kind: sttProvider ? 'dictation_cleanup' : 'refinement',
     createdAt: resolveTimestamp(input.createdAt, now),
     projectId: nullableText(input.projectId) ?? existing.projectId,
+    threadId: nullableText(input.threadId) ?? existing.threadId,
     rawText:
       existing.kind === 'dictation' && nullableText(input.rawText)
         ? input.rawText

@@ -23,6 +23,12 @@ const SEARCH_DEBOUNCE_MS = 180;
 
 export type HistoryRpcClient = { call<T = unknown>(method: string, input?: unknown): Promise<T> };
 
+interface RealtimeHistoryPayload {
+  action?: 'recorded' | 'starred' | 'deleted' | 'cleared' | 'pruned' | 'settingsChanged';
+  id?: string;
+  starred?: boolean;
+}
+
 function useHistoryFilters(projectId?: string) {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -70,34 +76,47 @@ function useHistoryFilters(projectId?: string) {
   };
 }
 
-function useHistoryMutations({
-  rpcRef,
-  starredOnly,
-  projectId,
-  scopeMode,
-  setEntries,
-  setTotal,
-  refresh,
-  onStatusNotice
-}: {
-  rpcRef: MutableRefObject<HistoryRpcClient>;
-  starredOnly: boolean;
-  projectId?: string;
-  scopeMode: 'project' | 'all';
-  setEntries: Dispatch<SetStateAction<HistoryEntry[]>>;
-  setTotal: Dispatch<SetStateAction<number>>;
-  refresh: () => Promise<void>;
-  onStatusNotice?: (message: string) => void;
-}) {
-  const [clearing, setClearing] = useState(false);
+function useHistoryProjects(rpcRef: MutableRefObject<HistoryRpcClient>) {
+  const [projects, setProjects] = useState<HistoryProjectOption[]>([]);
 
-  const toggleStar = useCallback(async (entry: HistoryEntry) => {
+  const loadProjects = useCallback(() => {
+    rpcRef.current
+      .call<HistoryProjectsResponse>(HISTORY_PROJECTS_METHOD)
+      .then((res) => {
+        if (res && Array.isArray(res.projects)) setProjects(res.projects);
+      })
+      .catch(() => undefined);
+  }, [rpcRef]);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  const projectNameById = useMemo(
+    () => new Map(projects.map((p) => [p.id, p.name])),
+    [projects]
+  );
+
+  return { projects, projectNameById, loadProjects };
+}
+
+function useStarHistoryEntry(
+  rpcRef: MutableRefObject<HistoryRpcClient>,
+  starredOnly: boolean,
+  setEntries: Dispatch<SetStateAction<HistoryEntry[]>>,
+  setTotal: Dispatch<SetStateAction<number>>,
+  onStatusNotice?: (message: string) => void
+) {
+  return useCallback(async (entry: HistoryEntry) => {
     try {
       const res = await rpcRef.current.call<HistoryStarResponse>(HISTORY_STAR_METHOD, {
         id: entry.id,
         starred: !entry.starred
       });
-      if (!res?.ok || !res.entry) return;
+      if (!res?.ok || !res.entry) {
+        onStatusNotice?.('Could not update star status.');
+        return;
+      }
       if (starredOnly && !res.entry.starred) {
         setEntries((prev) => prev.filter((item) => item.id !== entry.id));
         setTotal((t) => Math.max(0, t - 1));
@@ -108,44 +127,63 @@ function useHistoryMutations({
       onStatusNotice?.('Could not update star status.');
     }
   }, [onStatusNotice, rpcRef, setEntries, setTotal, starredOnly]);
+}
 
-  const deleteEntry = useCallback(async (entry: HistoryEntry) => {
+function useDeleteHistoryEntry(
+  rpcRef: MutableRefObject<HistoryRpcClient>,
+  setEntries: Dispatch<SetStateAction<HistoryEntry[]>>,
+  setTotal: Dispatch<SetStateAction<number>>,
+  onStatusNotice?: (message: string) => void
+) {
+  return useCallback(async (entry: HistoryEntry) => {
     try {
       const res = await rpcRef.current.call<HistoryDeleteResponse>(HISTORY_DELETE_METHOD, { id: entry.id });
-      if (res?.ok && res.deleted) {
-        setEntries((prev) => prev.filter((item) => item.id !== entry.id));
-        setTotal((t) => Math.max(0, t - 1));
-        onStatusNotice?.('History entry deleted.');
+      if (!res?.ok || !res.deleted) {
+        onStatusNotice?.('Could not delete history entry.');
+        return;
       }
+      setEntries((prev) => prev.filter((item) => item.id !== entry.id));
+      setTotal((t) => Math.max(0, t - 1));
+      onStatusNotice?.('History entry deleted.');
     } catch {
       onStatusNotice?.('Could not delete history entry.');
     }
   }, [onStatusNotice, rpcRef, setEntries, setTotal]);
+}
+
+function useClearHistory(
+  rpcRef: MutableRefObject<HistoryRpcClient>,
+  effectiveProjectId: string | null,
+  refresh: () => Promise<void>,
+  onStatusNotice?: (message: string) => void
+) {
+  const [clearing, setClearing] = useState(false);
 
   const clearHistory = useCallback(async (includeStarred: boolean) => {
     setClearing(true);
     try {
-      const clearProjectId = projectId && scopeMode === 'project' ? projectId : null;
       const res = await rpcRef.current.call<HistoryClearResponse>(HISTORY_CLEAR_METHOD, {
-        projectId: clearProjectId,
+        projectId: effectiveProjectId,
         includeStarred
       });
-      if (res?.ok) {
-        onStatusNotice?.(
-          res.deletedCount === 0
-            ? 'No matching entries were cleared.'
-            : `Cleared ${res.deletedCount} history ${res.deletedCount === 1 ? 'entry' : 'entries'}.`
-        );
-        await refresh();
+      if (!res?.ok) {
+        onStatusNotice?.('Could not clear history.');
+        return;
       }
+      onStatusNotice?.(
+        res.deletedCount === 0
+          ? 'No matching entries were cleared.'
+          : `Cleared ${res.deletedCount} history ${res.deletedCount === 1 ? 'entry' : 'entries'}.`
+      );
+      await refresh();
     } catch {
       onStatusNotice?.('Could not clear history.');
     } finally {
       setClearing(false);
     }
-  }, [onStatusNotice, projectId, refresh, rpcRef, scopeMode]);
+  }, [effectiveProjectId, onStatusNotice, refresh, rpcRef]);
 
-  return { clearing, toggleStar, deleteEntry, clearHistory };
+  return { clearing, clearHistory };
 }
 
 function useHistoryListLoader(
@@ -169,7 +207,7 @@ function useHistoryListLoader(
   const requestIdRef = useRef(0);
 
   const fetchEntries = useCallback(
-    async (opts: { offset?: number; append?: boolean } = {}) => {
+    async (opts: { offset?: number; limit?: number; append?: boolean } = {}) => {
       const requestId = ++requestIdRef.current;
       const append = opts.append === true;
       if (append) setLoadingMore(true);
@@ -183,7 +221,7 @@ function useHistoryListLoader(
           source: queryParams.source,
           projectId: queryParams.projectId,
           starredOnly: queryParams.starredOnly,
-          limit: PAGE_SIZE,
+          limit: opts.limit ?? PAGE_SIZE,
           offset: opts.offset ?? 0
         });
         if (requestIdRef.current !== requestId) return;
@@ -212,6 +250,54 @@ function useHistoryListLoader(
   };
 }
 
+function useHistoryRealtimeSync({
+  entriesRef,
+  starredOnly,
+  setEntries,
+  setTotal,
+  fetchEntries,
+  loadProjects
+}: {
+  entriesRef: MutableRefObject<HistoryEntry[]>;
+  starredOnly: boolean;
+  setEntries: Dispatch<SetStateAction<HistoryEntry[]>>;
+  setTotal: Dispatch<SetStateAction<number>>;
+  fetchEntries: (opts?: { offset?: number; limit?: number; append?: boolean }) => Promise<void>;
+  loadProjects: () => void;
+}) {
+  useSafeRealtime(HISTORY_CHANGED_EVENT, (raw) => {
+    const event = (raw && typeof raw === 'object' ? raw : {}) as RealtimeHistoryPayload;
+    const loadedLimit = Math.max(PAGE_SIZE, entriesRef.current.length);
+
+    if (event.action === 'deleted' && typeof event.id === 'string') {
+      if (!entriesRef.current.some((item) => item.id === event.id)) return;
+      setEntries((prev) => prev.filter((item) => item.id !== event.id));
+      setTotal((t) => Math.max(0, t - 1));
+      return;
+    }
+    if (event.action === 'starred' && typeof event.id === 'string' && typeof event.starred === 'boolean') {
+      const exists = entriesRef.current.some((item) => item.id === event.id);
+      if (starredOnly && event.starred && !exists) {
+        void fetchEntries({ offset: 0, limit: loadedLimit, append: false });
+      } else if (exists && starredOnly && !event.starred) {
+        setEntries((prev) => prev.filter((item) => item.id !== event.id));
+        setTotal((t) => Math.max(0, t - 1));
+      } else if (exists) {
+        setEntries((prev) => prev.map((item) => (item.id === event.id ? { ...item, starred: event.starred! } : item)));
+      }
+      return;
+    }
+    if (event.action === 'settingsChanged') {
+      void fetchEntries({ offset: 0, limit: loadedLimit, append: false });
+      return;
+    }
+    void fetchEntries({ offset: 0, limit: loadedLimit, append: false });
+    if (!event.action || event.action === 'recorded' || event.action === 'cleared' || event.action === 'pruned') {
+      loadProjects();
+    }
+  });
+}
+
 /** Manages activity history fetching, filter state, project names, realtime refreshes, and mutations. */
 export function useHistoryEntries({
   rpc,
@@ -225,7 +311,7 @@ export function useHistoryEntries({
   const rpcRef = useRef(rpc);
   rpcRef.current = rpc;
   const filters = useHistoryFilters(projectId);
-  const [projects, setProjects] = useState<HistoryProjectOption[]>([]);
+  const { projects, projectNameById, loadProjects } = useHistoryProjects(rpcRef);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const list = useHistoryListLoader(rpcRef, {
@@ -235,51 +321,33 @@ export function useHistoryEntries({
     projectId: filters.effectiveProjectId,
     starredOnly: filters.starredOnly
   });
-
-  const loadProjects = useCallback(() => {
-    rpcRef.current
-      .call<HistoryProjectsResponse>(HISTORY_PROJECTS_METHOD)
-      .then((res) => { if (res && Array.isArray(res.projects)) setProjects(res.projects); })
-      .catch(() => undefined);
-  }, []);
+  const entriesRef = useRef(list.entries);
+  entriesRef.current = list.entries;
 
   const refresh = useCallback(() => list.fetchEntries({ offset: 0, append: false }), [list.fetchEntries]);
-
   useEffect(() => { void refresh(); }, [refresh]);
-  useEffect(() => { loadProjects(); }, [loadProjects]);
-  useSafeRealtime(HISTORY_CHANGED_EVENT, () => {
-    void refresh();
-    loadProjects();
-  });
 
-  const mutations = useHistoryMutations({
-    rpcRef,
+  useHistoryRealtimeSync({
+    entriesRef,
     starredOnly: filters.starredOnly,
-    projectId,
-    scopeMode: filters.scopeMode,
     setEntries: list.setEntries,
     setTotal: list.setTotal,
-    refresh,
-    onStatusNotice
+    fetchEntries: list.fetchEntries,
+    loadProjects
   });
+
+  const toggleStar = useStarHistoryEntry(rpcRef, filters.starredOnly, list.setEntries, list.setTotal, onStatusNotice);
+  const deleteEntry = useDeleteHistoryEntry(rpcRef, list.setEntries, list.setTotal, onStatusNotice);
+  const { clearing, clearHistory } = useClearHistory(rpcRef, filters.effectiveProjectId, refresh, onStatusNotice);
 
   const selectedEntry = useMemo(
     () => (list.entries.length === 0 ? null : list.entries.find((e) => e.id === selectedId) ?? list.entries[0]),
     [list.entries, selectedId]
   );
 
-  const projectNameById = useMemo(
-    () => new Map(projects.map((p) => [p.id, p.name])),
-    [projects]
-  );
-
   return {
-    ...filters,
-    ...list,
-    ...mutations,
-    projects,
-    projectNameById,
-    selectedEntry,
-    setSelectedId
+    ...filters, ...list,
+    clearing, toggleStar, deleteEntry, clearHistory,
+    projects, projectNameById, selectedEntry, setSelectedId
   };
 }

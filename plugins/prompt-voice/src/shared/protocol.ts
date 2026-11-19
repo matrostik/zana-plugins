@@ -198,6 +198,8 @@ export interface RephraseRequest {
   source?: ActivitySource;
   /** Active Zana project id when available. */
   projectId?: string | null;
+  /** Active Zana thread id when available. */
+  threadId?: string | null;
   /** Studio preset identifier (improve, executive, spec, custom, translate). */
   presetId?: string;
   /** Existing history entry id to coalesce into when refining an active Studio draft. */

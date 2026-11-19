@@ -24,6 +24,7 @@ import {
 export interface HistoryChangeEvent {
   action: 'recorded' | 'starred' | 'deleted' | 'cleared' | 'pruned' | 'settingsChanged';
   id?: string;
+  starred?: boolean;
 }
 
 export interface HistoryRpcDeps {
@@ -119,6 +120,7 @@ export function recordRefinementHistory(
       kind: 'refinement',
       source: resolveActivitySource(request.source, 'studio'),
       projectId: nullableString(request.projectId),
+      threadId: nullableString(request.threadId),
       rawText: result.rawText,
       outputText: result.text,
       llmProvider: result.llmProvider === 'none' ? null : result.llmProvider,
@@ -188,7 +190,7 @@ export function starHistoryHandler(args: unknown, deps: HistoryRpcDeps): History
   try {
     const entry = deps.historyStore.setStarred(id, req.starred);
     if (!entry) return { ok: false };
-    deps.onHistoryChanged?.({ action: 'starred', id: entry.id });
+    deps.onHistoryChanged?.({ action: 'starred', id: entry.id, starred: entry.starred });
     return { ok: true, entry };
   } catch (err) {
     deps.log.warn(`Could not update starred state in activity history: ${describeUnexpectedFailure(err, 'Prompt Voice history')}`);

@@ -88,12 +88,16 @@ describe('HistoryView', () => {
   });
 
   it('groups entries by date, inspects details, toggles word diff, and opens thread links', async () => {
-    const todayEntry = makeEntry({ id: 'e-today', createdAt: Date.now() - 120_000 });
+    const now = new Date();
+    const todayTimestamp = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 1).getTime();
+    const yesterdayTimestamp = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0).getTime();
+
+    const todayEntry = makeEntry({ id: 'e-today', createdAt: todayTimestamp });
     const yesterdayEntry = makeEntry({
       id: 'e-yesterday',
       kind: 'refinement',
       source: 'studio',
-      createdAt: Date.now() - 28 * 3_600_000,
+      createdAt: yesterdayTimestamp,
       threadId: null,
       rawText: 'draft notes',
       outputText: 'Polished notes.',
@@ -229,14 +233,95 @@ describe('HistoryView', () => {
     );
   });
 
-  it('shows paused banner when historyEnabled is false and refreshes on realtime historyChanged events', async () => {
+  it('scopes clear history to selectedProjectFilter in the global History view', async () => {
+    const entry = makeEntry({ id: 'e-alpha', projectId: 'proj-alpha' });
+    const call = vi.fn(async (method: string) => {
+      if (method === HISTORY_LIST_METHOD) {
+        return { entries: [entry], total: 1, hasMore: false, historyEnabled: true, storageAvailable: true };
+      }
+      if (method === HISTORY_PROJECTS_METHOD) {
+        return {
+          projects: [
+            { id: 'proj-alpha', name: 'Alpha Workspace' },
+            { id: 'proj-beta', name: 'Beta App' }
+          ]
+        };
+      }
+      if (method === HISTORY_CLEAR_METHOD) {
+        return { ok: true, deletedCount: 1 };
+      }
+      return { ok: true };
+    });
+
+    render(
+      <HistoryView
+        rpc={{ call: call as never }}
+        onLoadIntoStudio={vi.fn()}
+        onInsertIntoComposer={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />
+    );
+
+    const projectSelect = await screen.findByLabelText('Filter by project');
+    fireEvent.change(projectSelect, { target: { value: 'proj-alpha' } });
+
+    const clearBtn = await screen.findByRole('button', { name: 'Clear project history' });
+    fireEvent.click(clearBtn);
+    expect(screen.getByText('Clear history for Alpha Workspace?')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Clear' }));
+    await waitFor(() =>
+      expect(call).toHaveBeenCalledWith(HISTORY_CLEAR_METHOD, {
+        projectId: 'proj-alpha',
+        includeStarred: false
+      })
+    );
+  });
+
+  it('reports status notices when star, delete, or clear return ok=false', async () => {
+    const entry = makeEntry({ id: 'e-fail' });
+    const onStatusNotice = vi.fn();
+    const call = vi.fn(async (method: string) => {
+      if (method === HISTORY_LIST_METHOD) {
+        return { entries: [entry], total: 1, hasMore: false, historyEnabled: true, storageAvailable: true };
+      }
+      if (method === HISTORY_PROJECTS_METHOD) return { projects: [] };
+      if (method === HISTORY_STAR_METHOD) return { ok: false };
+      if (method === HISTORY_DELETE_METHOD) return { ok: false, deleted: false };
+      if (method === HISTORY_CLEAR_METHOD) return { ok: false, deletedCount: 0 };
+      return { ok: false };
+    });
+
+    render(
+      <HistoryView
+        rpc={{ call: call as never }}
+        onLoadIntoStudio={vi.fn()}
+        onInsertIntoComposer={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onStatusNotice={onStatusNotice}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /star$/i }));
+    await waitFor(() => expect(onStatusNotice).toHaveBeenCalledWith('Could not update star status.'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(onStatusNotice).toHaveBeenCalledWith('Could not delete history entry.'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Clear' }));
+    await waitFor(() => expect(onStatusNotice).toHaveBeenCalledWith('Could not clear history.'));
+  });
+
+  it('patches realtime starred/deleted events in place without reloading projects, and refreshes on recorded', async () => {
     let calls = 0;
+    const entry = makeEntry({ id: 'e-live', outputText: 'Initial text', starred: false });
     const call = vi.fn(async (method: string) => {
       if (method === HISTORY_LIST_METHOD) {
         calls++;
         return {
-          entries: calls > 1 ? [makeEntry({ id: 'live-1', outputText: 'Arrived live!' })] : [],
-          total: calls > 1 ? 1 : 0,
+          entries: calls > 1 ? [makeEntry({ id: 'live-1', outputText: 'Arrived live!' })] : [entry],
+          total: 1,
           hasMore: false,
           historyEnabled: false,
           storageAvailable: true
@@ -260,9 +345,25 @@ describe('HistoryView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
 
-    // Emit realtime change
+    const listCallsBefore = call.mock.calls.filter(([m]) => m === HISTORY_LIST_METHOD).length;
+    const projectCallsBefore = call.mock.calls.filter(([m]) => m === HISTORY_PROJECTS_METHOD).length;
+
+    // Realtime starred event patches in place with zero RPC calls
+    fakes.realtimeHandlers.get(HISTORY_CHANGED_EVENT)?.({ action: 'starred', id: 'e-live', starred: true });
+    await waitFor(() => expect(screen.getByRole('button', { name: /starred/i })).toBeTruthy());
+    expect(call.mock.calls.filter(([m]) => m === HISTORY_LIST_METHOD).length).toBe(listCallsBefore);
+    expect(call.mock.calls.filter(([m]) => m === HISTORY_PROJECTS_METHOD).length).toBe(projectCallsBefore);
+
+    // Realtime deleted event removes in place with zero RPC calls
+    fakes.realtimeHandlers.get(HISTORY_CHANGED_EVENT)?.({ action: 'deleted', id: 'e-live' });
+    expect(await screen.findByText(/no activity recorded yet/i)).toBeTruthy();
+    expect(call.mock.calls.filter(([m]) => m === HISTORY_LIST_METHOD).length).toBe(listCallsBefore);
+    expect(call.mock.calls.filter(([m]) => m === HISTORY_PROJECTS_METHOD).length).toBe(projectCallsBefore);
+
+    // Realtime recorded event refreshes list and projects
     fakes.realtimeHandlers.get(HISTORY_CHANGED_EVENT)?.({ action: 'recorded', id: 'live-1' });
     const detailPane = await screen.findByLabelText('Activity details');
     expect(await within(detailPane).findByText('Arrived live!')).toBeTruthy();
+    expect(call.mock.calls.filter(([m]) => m === HISTORY_PROJECTS_METHOD).length).toBe(projectCallsBefore + 1);
   });
 });

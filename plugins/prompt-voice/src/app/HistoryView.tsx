@@ -400,6 +400,7 @@ function HistoryToolbar({
   onScopeModeChange,
   selectedProjectFilter,
   onSelectedProjectFilterChange,
+  effectiveProjectId,
   projects,
   total,
   onRequestClear
@@ -417,11 +418,12 @@ function HistoryToolbar({
   onScopeModeChange: (value: 'project' | 'all') => void;
   selectedProjectFilter: string;
   onSelectedProjectFilterChange: (value: string) => void;
+  effectiveProjectId: string | null;
   projects: HistoryProjectOption[];
   total: number;
   onRequestClear: () => void;
 }) {
-  const clearLabel = projectId && scopeMode === 'project' ? 'Clear project history' : 'Clear all';
+  const clearLabel = effectiveProjectId ? 'Clear project history' : 'Clear all';
 
   return (
     <div className="ps-history-toolbar">
@@ -510,14 +512,14 @@ function HistoryPausedBanner({ onOpenSettings }: { onOpenSettings: () => void })
 }
 
 function HistoryClearConfirmBar({
-  projectScoped,
+  heading,
   includeStarred,
   clearing,
   onIncludeStarredChange,
   onCancel,
   onConfirm
 }: {
-  projectScoped: boolean;
+  heading: string;
   includeStarred: boolean;
   clearing: boolean;
   onIncludeStarredChange: (checked: boolean) => void;
@@ -527,7 +529,7 @@ function HistoryClearConfirmBar({
   return (
     <div className="ps-history-confirm-bar" role="alertdialog" aria-label="Confirm clear history">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <strong>{projectScoped ? 'Clear history for this project?' : 'Clear all activity history?'}</strong>
+        <strong>{heading}</strong>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, cursor: 'pointer' }}>
           <input type="checkbox" checked={includeStarred} onChange={(e) => onIncludeStarredChange(e.target.checked)} />
           <span>Also delete starred entries</span>
@@ -741,6 +743,11 @@ export function HistoryView({
   const selectedProjectName = history.selectedEntry?.projectId
     ? history.projectNameById.get(history.selectedEntry.projectId) ?? history.selectedEntry.projectId
     : null;
+  const clearHeading = !history.effectiveProjectId
+    ? 'Clear all activity history?'
+    : projectId && history.scopeMode === 'project'
+      ? 'Clear history for this project?'
+      : `Clear history for ${history.projectNameById.get(history.effectiveProjectId) ?? history.effectiveProjectId}?`;
 
   return (
     <div className="ps-history-shell" data-testid="ps-history-view">
@@ -760,13 +767,14 @@ export function HistoryView({
         onScopeModeChange={history.setScopeMode}
         selectedProjectFilter={history.selectedProjectFilter}
         onSelectedProjectFilterChange={history.setSelectedProjectFilter}
+        effectiveProjectId={history.effectiveProjectId}
         projects={history.projects}
         total={history.total}
         onRequestClear={() => { setClearIncludeStarred(false); setClearConfirmOpen(true); }}
       />
       {clearConfirmOpen ? (
         <HistoryClearConfirmBar
-          projectScoped={Boolean(projectId && history.scopeMode === 'project')}
+          heading={clearHeading}
           includeStarred={clearIncludeStarred}
           clearing={history.clearing}
           onIncludeStarredChange={setClearIncludeStarred}
