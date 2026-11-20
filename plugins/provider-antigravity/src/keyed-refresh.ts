@@ -39,6 +39,12 @@ export class KeyedRefresh<T> {
     return this.policy.now ? this.policy.now() : Date.now();
   }
 
+  /** Drops all cached successes and failure backoff timers so subsequent refreshes run immediately. */
+  clear(): void {
+    this.successes.clear();
+    this.retryAfter.clear();
+  }
+
   /** A success cached for `key` within the TTL. */
   cached(key: string): T | undefined {
     const hit = this.successes.get(key);

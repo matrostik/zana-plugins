@@ -55,6 +55,9 @@ const USAGE_COMMANDS_WAIT_MS = 1000;
 const USAGE_MAX_TEXT_CHARS = 32_768;
 const CATALOG_RETRY_BACKOFF_MS = 30_000;
 
+const usageRefresh = new KeyedRefresh<NativeUsageResult>({ successTtlMs: USAGE_CACHE_TTL_MS });
+const catalogRefresh = new KeyedRefresh<NativeReadinessResult>({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
+
 /** Writes the auth type everywhere the runtime reads it, then invalidates every cached account result. */
 export function writeNativeAcpAuthType(
   authType: GoogleAcpAuthMethod | null,
@@ -64,9 +67,11 @@ export function writeNativeAcpAuthType(
   clearCachedNativeReadiness(env);
 }
 
-/** Sign-in, sign-out, auth-type and runtime changes: drop cached readiness and every captured account. */
+/** Sign-in, sign-out, auth-type and runtime changes: drop cached readiness, refresh backoffs, and captured accounts. */
 export function clearCachedNativeReadiness(env: NodeJS.ProcessEnv = process.env): void {
   readinessStore.invalidate(env);
+  catalogRefresh.clear();
+  usageRefresh.clear();
   invalidateAccounts();
 }
 
@@ -193,8 +198,6 @@ export interface NativeProbeOptions extends NativeTarget {
   spawnImpl?: typeof spawn;
 }
 
-const usageRefresh = new KeyedRefresh<NativeUsageResult>({ successTtlMs: USAGE_CACHE_TTL_MS });
-
 /** The vendor advertises /usage as a local ACP command; never send it speculatively to a model. */
 export async function queryNativeUsage(options: NativeProbeOptions): Promise<NativeUsageResult> {
   const account = captureAccount(options);
@@ -240,8 +243,6 @@ async function performNativeUsageQuery(options: NativeProbeOptions, account: Acc
     session.close();
   }
 }
-
-const catalogRefresh = new KeyedRefresh<NativeReadinessResult>({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
 
 /**
  * True when a catalog request can be answered from readiness alone, without probing. An empty

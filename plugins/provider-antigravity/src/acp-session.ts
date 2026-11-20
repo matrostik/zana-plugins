@@ -189,7 +189,7 @@ export const extractCatalog = extractModelsFromSessionResult;
 export class NativeAcpSession {
   private readonly child: ChildProcess;
   private readonly pending = new Map<number, Pending>();
-  private readonly notificationListeners: Array<(method: string, params: any) => void> = [];
+  private readonly notificationListeners = new Set<(method: string, params: any) => void>();
   private readonly stderrListeners: Array<(line: string) => void> = [];
   private readonly catalogUpdates = new Map<string, any[]>();
   private readonly availableCommands = new Set<string>();
@@ -283,12 +283,16 @@ export class NativeAcpSession {
   waitForCommand(name: string, waitMs: number): Promise<boolean> {
     if (this.availableCommands.has(name)) return Promise.resolve(true);
     return new Promise(resolve => {
-      const timer = this.later(waitMs, () => resolve(this.availableCommands.has(name)));
-      this.notificationListeners.push(() => {
-        if (!this.availableCommands.has(name)) return;
+      const finish = (found: boolean) => {
+        this.notificationListeners.delete(listener);
         this.cancel(timer);
-        resolve(true);
-      });
+        resolve(found);
+      };
+      const listener = () => {
+        if (this.availableCommands.has(name)) finish(true);
+      };
+      const timer = this.later(waitMs, () => finish(this.availableCommands.has(name)));
+      this.notificationListeners.add(listener);
     });
   }
 
@@ -301,7 +305,7 @@ export class NativeAcpSession {
     const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
     let requestedTools = false;
     let outputLimitError: Error | null = null;
-    this.notificationListeners.push((method, params) => {
+    const listener = (method: string, params: any) => {
       if (method !== 'session/update') return;
       const update = params?.update;
       if (update?.sessionUpdate === 'tool_call') {
@@ -315,12 +319,17 @@ export class NativeAcpSession {
           this.close(outputLimitError);
         }
       }
-    });
-    const result = await this.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: `/${name}` }] });
-    // A tool call can arrive in the same chunk as the reply; it still fails the command.
-    if (requestedTools) throw toolsRequested;
-    if (outputLimitError) throw outputLimitError;
-    return { stopReason: result?.stopReason, text };
+    };
+    this.notificationListeners.add(listener);
+    try {
+      const result = await this.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: `/${name}` }] });
+      // A tool call can arrive in the same chunk as the reply; it still fails the command.
+      if (requestedTools) throw toolsRequested;
+      if (outputLimitError) throw outputLimitError;
+      return { stopReason: result?.stopReason, text };
+    } finally {
+      this.notificationListeners.delete(listener);
+    }
   }
 
   close(reason?: Error): void {
@@ -421,12 +430,16 @@ export class NativeAcpSession {
     // Native notifications can arrive after the session/new response in a separate stdout chunk.
     if (!this.catalogUpdates.has(sessionId) && extractCatalog(session).length === 0) {
       await new Promise<void>(resolve => {
-        const timer = this.later(CATALOG_UPDATE_WAIT_MS, resolve);
-        this.notificationListeners.push(() => {
-          if (!this.catalogUpdates.has(sessionId)) return;
+        const finish = () => {
+          this.notificationListeners.delete(listener);
           this.cancel(timer);
           resolve();
-        });
+        };
+        const listener = () => {
+          if (this.catalogUpdates.has(sessionId)) finish();
+        };
+        const timer = this.later(CATALOG_UPDATE_WAIT_MS, finish);
+        this.notificationListeners.add(listener);
       });
     }
     const update = this.catalogUpdates.get(sessionId);

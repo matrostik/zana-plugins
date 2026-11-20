@@ -31,7 +31,9 @@ export type { DoctorStatusResult } from './src/provider-config.js';
 
 export type ReadinessMode = 'fast' | 'probe' | 'catalog';
 
-const ICON = './icons/antigravity.svg';
+// Composer model selectors render provider icons monochrome, so use the monochrome Gemini sparkle here
+// while package.json `zcc.branding.icon` uses the full-color Google Antigravity arch (`./icons/antigravity.svg`).
+const ICON = './icons/antigravity-composer.svg';
 
 const ANTIGRAVITY_CAPABILITIES = {
   supportsServiceTier: false,
@@ -244,10 +246,16 @@ function registerRpcMethods(
   zcc.rpc.method('auth:recover', (args: unknown) => recover(args));
   zcc.rpc.method('auth:login', (args: unknown) => login(args));
 
-  zcc.rpc.method('usage:status', async () => {
+  zcc.rpc.method('usage:status', async (args: unknown) => {
+    const opts = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
     const { authMethod, customExecutable } = readProviderSettings(await settings.get());
     const runtime = resolveRuntime(customExecutable);
-    return queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod });
+    return queryNativeUsage({
+      command: runtime.executable,
+      args: runtime.args,
+      authMethod,
+      forceRefresh: opts.forceRefresh === true
+    });
   });
 
   zcc.rpc.method('doctor:status', async (args: unknown): Promise<DoctorStatusResult> => {

@@ -120,6 +120,7 @@ describe('antigravity provider app slots', () => {
 
   afterEach(() => {
     document.body.innerHTML = '';
+    vi.restoreAllMocks();
   });
 
   it('registers settingsSection slot when Native ACP runtime is missing', async () => {
@@ -151,12 +152,14 @@ describe('antigravity provider app slots', () => {
     slot.lifecycle.unmount();
   });
 
-  it('keeps previous subscription usage visible with a spinning indicator while refreshing and on transient error', async () => {
+  it('keeps previous subscription usage visible with a spinning indicator while refreshing and passes forceRefresh', async () => {
     let callCount = 0;
     let resolveSecond!: (value: unknown) => void;
+    const usageArgs: unknown[] = [];
     const { slot } = await renderSettingsSlot({
       'doctor:status': () => makeDoctorStatus({ tierName: 'Google AI Pro' }),
-      'usage:status': () => {
+      'usage:status': (input) => {
+        usageArgs.push(input);
         callCount++;
         if (callCount === 1) {
           return {
@@ -176,9 +179,11 @@ describe('antigravity provider app slots', () => {
     await slot.findByText('Antigravity Native ACP Connected');
     ((await slot.findByText('Check subscription usage')) as HTMLElement).click();
     await slot.findByText(/14% remaining/);
+    expect(usageArgs[0]).toBeNull();
 
     ((await slot.findByText('Refresh subscription usage')) as HTMLElement).click();
     await slot.findByText('Checking usage...');
+    expect(usageArgs[1]).toEqual({ forceRefresh: true });
     expect(document.body.textContent).toContain('14% remaining');
     expect(document.querySelector('.agy-refresh-badge .agy-spinner')).toBeTruthy();
 
@@ -190,6 +195,21 @@ describe('antigravity provider app slots', () => {
     expect(document.body.textContent).toContain('14% remaining');
     expect(document.querySelector('.agy-refresh-badge')).toBeNull();
     slot.lifecycle.unmount();
+  });
+
+  it('clears pending OAuth poll timer when settings unmounts mid-login', async () => {
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { slot } = await renderSettingsSlot({
+      'doctor:status': () => makeDoctorStatus({ ready: false, state: 'sign_in_required', authenticated: false }),
+      'auth:login': () => new Promise(() => {})
+    });
+
+    await slot.findByText('Antigravity Native ACP (Sign-in Required)');
+    slot.getByRole('button', { name: 'Sign In with Google' }).click();
+    await slot.findByText('Waiting for Google Sign-In in Browser...');
+    const beforeUnmount = clearIntervalSpy.mock.calls.length;
+    slot.lifecycle.unmount();
+    expect(clearIntervalSpy.mock.calls.length).toBeGreaterThan(beforeUnmount);
   });
 
   it('discards an in-flight usage response after sign-out', async () => {
@@ -286,7 +306,8 @@ describe('antigravity provider app slots', () => {
     const installBtn = (await slot.findByText('Install Native ACP Runtime (v1.4.3)')) as HTMLElement;
     installBtn.click();
 
-    await slot.findByText('Sign In with Google');
+    await slot.findByText('Antigravity Native ACP (Sign-in Required)');
+    expect(slot.getByRole('button', { name: 'Sign In with Google' })).toBeTruthy();
     expect(installedCalled).toBe(true);
     slot.lifecycle.unmount();
   });
