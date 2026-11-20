@@ -21,6 +21,32 @@ const NATIVE_STEPS: NativeSetupState[] = [
   'session_ready'
 ];
 
+export function AntigravityProviderIcon({
+  className,
+  size = 14
+}: {
+  className?: string;
+  size?: number;
+}) {
+  return (
+    <svg
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      width={size}
+      height={size}
+    >
+      <title>Antigravity</title>
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 1.5a.8.8 0 0 1 .72.47c.83 2.27 1.99 4.24 3.62 5.87s3.6 2.79 5.87 3.62a.8.8 0 0 1 0 1.44c-2.27.83-4.24 1.99-5.87 3.62s-2.79 3.6-3.62 5.87a.8.8 0 0 1-1.44 0c-.83-2.27-1.99-4.24-3.62-5.87s-3.6-2.79-5.87-3.62a.8.8 0 0 1 0-1.44c2.27-.83 4.24-1.99 5.87-3.62s2.79-3.6 3.62-5.87A.8.8 0 0 1 12 1.5Z"
+      />
+    </svg>
+  );
+}
+
 function ReloadSpinner({ label, spinning = true }: { label?: string; spinning?: boolean }) {
   return (
     <svg
@@ -545,6 +571,10 @@ export function AntigravityAccountPanel() {
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_providerIcon?.({
+    providerId: 'antigravity',
+    icon: AntigravityProviderIcon
+  });
   app.slots.threadPanelAction({
     id: 'antigravity-account',
     title: 'Antigravity account',

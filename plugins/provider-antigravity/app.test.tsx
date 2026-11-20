@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import './src/test-environment.js';
+import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadPluginApp, renderSlot } from '@zana-ai/zcc-plugin-sdk/testing/app';
 import type { DoctorStatusResult } from './server.js';
@@ -53,6 +54,33 @@ async function renderSettingsSlot(rpcHandlers: Record<string, (input: any) => an
 }
 
 describe('antigravity provider app slots', () => {
+  it('registers a monochrome Gemini sparkle provider icon for the composer harness selector', async () => {
+    const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+    expect(app.providerIcons).toHaveLength(1);
+    expect(app.providerIcons[0]!.providerId).toBe('antigravity');
+    const Icon = app.providerIcons[0]!.icon as React.ComponentType<{ className?: string; size?: number }>;
+
+    const defaultSlot = renderSlot(
+      { component: () => React.createElement(Icon) } as any,
+      { pluginId: 'provider-antigravity' }
+    );
+    const defaultSvg = document.querySelector('svg');
+    expect(defaultSvg?.getAttribute('fill')).toBe('currentColor');
+    expect(defaultSvg?.getAttribute('width')).toBe('14');
+    expect(defaultSvg?.getAttribute('height')).toBe('14');
+    expect(defaultSvg?.querySelector('title')?.textContent).toBe('Antigravity');
+    defaultSlot.lifecycle.unmount();
+
+    const sizedSlot = renderSlot(
+      { component: () => React.createElement(Icon, { className: 'composer-icon', size: 18 }) } as any,
+      { pluginId: 'provider-antigravity' }
+    );
+    const sizedSvg = document.querySelector('svg.composer-icon');
+    expect(sizedSvg?.getAttribute('width')).toBe('18');
+    expect(sizedSvg?.getAttribute('height')).toBe('18');
+    sizedSlot.lifecycle.unmount();
+  });
+
   it('recovers an account from the thread panel and starts browser sign-in only on click', async () => {
     const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
     expect(app.threadPanelActions).toHaveLength(1);
