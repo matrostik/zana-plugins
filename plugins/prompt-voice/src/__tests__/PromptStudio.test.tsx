@@ -87,7 +87,10 @@ describe('PromptStudio Component', () => {
     expect(screen.getByRole('heading', { name: 'Prompt Voice' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Connections' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Local Whisper' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Local Whisper (on this device)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Zana voice' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'OpenAI' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Google Gemini' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Local Whisper (on this device)' })).toBeNull();
     expect(screen.queryByLabelText(/OpenAI API key/)).toBeNull();
     expect(screen.queryByLabelText(/Google AI API key/)).toBeNull();
     expect(screen.queryByLabelText(/Anthropic API key/)).toBeNull();
@@ -526,6 +529,20 @@ describe('PromptStudio Component', () => {
     expect(await screen.findByDisplayValue('spoken voice ideas')).toBeTruthy();
   });
 
+  it('transcribes automatically when the recording limit is reached', async () => {
+    const session = fakeSession();
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.transcribe') return { ok: true, status: 'ok', text: 'limited recording', rawText: 'limited recording' };
+      return {};
+    });
+    render(<PromptStudio startSession={async () => session} />);
+    fireEvent.click(screen.getByRole('button', { name: /start dictation/i }));
+    await screen.findByRole('button', { name: /stop dictation/i });
+    expect(session.onAutoStop).toBeDefined();
+    await act(async () => { session.onAutoStop?.(); });
+    expect(await screen.findByDisplayValue('limited recording')).toBeTruthy();
+  });
+
   it('pastes from clipboard into the input draft', async () => {
     const mockClipboard = {
       readText: vi.fn().mockResolvedValue('Pasted instructions from clipboard'),
@@ -874,9 +891,42 @@ describe('PromptStudio Component', () => {
     expect(cleanupToggle.checked).toBe(false);
   });
 
-  it('configures speech-to-text provider directly from Prompt Studio', async () => {
+  it('omits unconfigured speech-to-text providers from the Speech Provider dropdown', async () => {
     fakes.call.mockImplementation(async (method: string) => {
-      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'system' };
+      if (method === 'promptVoice.status') {
+        return {
+          llmProvider: 'assistant',
+          sttProvider: 'system',
+          sttKeyConfigured: true,
+          availableSttProviders: ['system']
+        };
+      }
+      if (method === 'promptVoice.availableModels') return [];
+      return {};
+    });
+
+    render(<PromptStudio />);
+    const sttSelect = (await screen.findByRole('combobox', { name: /speech-to-text provider/i })) as HTMLSelectElement;
+    await waitFor(() => expect(fakes.call).toHaveBeenCalledWith('promptVoice.status'));
+
+    const options = Array.from(sttSelect.options).map((o) => o.textContent?.trim());
+    expect(options).toEqual(['System (Zana Voice)']);
+    expect(sttSelect.value).toBe('system');
+    expect(screen.queryByRole('option', { name: 'OpenAI (Whisper)' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Google Gemini' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Local Whisper (on this device)' })).toBeNull();
+  });
+
+  it('configures speech-to-text provider directly from Prompt Studio when providers are configured', async () => {
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') {
+        return {
+          llmProvider: 'assistant',
+          sttProvider: 'system',
+          sttKeyConfigured: true,
+          availableSttProviders: ['system', 'google-gemini', 'openai', 'local-whisper']
+        };
+      }
       if (method === 'promptVoice.availableModels') return [];
       if (method === 'promptVoice.settings.update') return {};
       return {};
@@ -884,7 +934,7 @@ describe('PromptStudio Component', () => {
 
     render(<PromptStudio />);
     const sttSelect = (await screen.findByRole('combobox', { name: /speech-to-text provider/i })) as HTMLSelectElement;
-    expect(sttSelect).toBeTruthy();
+    await screen.findByRole('option', { name: 'OpenAI (Whisper)' });
 
     const options = Array.from(sttSelect.options).map((o) => o.textContent?.trim());
     expect(options).toEqual(['Google Gemini', 'Local Whisper (on this device)', 'OpenAI (Whisper)', 'System (Zana Voice)']);
@@ -897,7 +947,7 @@ describe('PromptStudio Component', () => {
       sttProvider: 'openai'
     });
 
-    // Model input appears when non-system
+    // Model input appears when a configured API-key provider is active
     const modelInput = screen.getByRole('textbox', { name: /speech-to-text model/i }) as HTMLInputElement;
     expect(modelInput).toBeTruthy();
     fireEvent.change(modelInput, { target: { value: 'whisper-1' } });
@@ -906,21 +956,58 @@ describe('PromptStudio Component', () => {
     });
   });
 
+  it('updates available speech providers when API keys change via modelsUpdated realtime event', async () => {
+    let availableSttProviders: string[] = ['system'];
+    fakes.call.mockImplementation(async (method: string) => {
+      if (method === 'promptVoice.status') {
+        return { llmProvider: 'assistant', sttProvider: 'system', sttKeyConfigured: true, availableSttProviders };
+      }
+      if (method === 'promptVoice.availableModels') return [];
+      return {};
+    });
+
+    render(<PromptStudio />);
+    await waitFor(() => expect(fakes.call).toHaveBeenCalledWith('promptVoice.status'));
+    expect(screen.queryByRole('option', { name: 'OpenAI (Whisper)' })).toBeNull();
+
+    availableSttProviders = ['system', 'openai'];
+    const handler = fakes.realtimeHandlers.get(MODELS_UPDATED_EVENT);
+    await act(async () => {
+      handler?.([]);
+    });
+
+    expect(await screen.findByRole('option', { name: 'OpenAI (Whisper)' })).toBeTruthy();
+  });
+
   it('initializes speech provider from status response', async () => {
     fakes.call.mockImplementation(async (method: string) => {
-      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'google-gemini' };
+      if (method === 'promptVoice.status') {
+        return {
+          llmProvider: 'assistant',
+          sttProvider: 'google-gemini',
+          sttKeyConfigured: true,
+          availableSttProviders: ['system', 'google-gemini']
+        };
+      }
       if (method === 'promptVoice.availableModels') return [];
       return {};
     });
 
     render(<PromptStudio />);
     const sttSelect = (await screen.findByRole('combobox', { name: /speech-to-text provider/i })) as HTMLSelectElement;
-    expect(sttSelect.value).toBe('google-gemini');
+    await waitFor(() => expect(sttSelect.value).toBe('google-gemini'));
   });
 
-  it('offers a one-click button to switch to System STT when a direct STT key is unconfigured', async () => {
+  it('offers a one-click button to switch to System STT and omits unconfigured OpenAI from options when key is missing', async () => {
     fakes.call.mockImplementation(async (method: string) => {
-      if (method === 'promptVoice.status') return { llmProvider: 'assistant', sttProvider: 'openai', sttKeyConfigured: false };
+      if (method === 'promptVoice.status') {
+        return {
+          llmProvider: 'assistant',
+          sttProvider: 'openai',
+          sttKeyConfigured: false,
+          availableSttProviders: ['system']
+        };
+      }
       if (method === 'promptVoice.availableModels') return [];
       if (method === 'promptVoice.settings.update') return {};
       return {};
@@ -929,6 +1016,8 @@ describe('PromptStudio Component', () => {
     render(<PromptStudio />);
     const switchBtn = await screen.findByRole('button', { name: /switch to system \(zana voice\)/i });
     expect(switchBtn).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'OpenAI (Whisper)' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /speech-to-text model/i })).toBeNull();
 
     fireEvent.click(switchBtn);
     expect(fakes.call).toHaveBeenCalledWith('promptVoice.settings.update', {

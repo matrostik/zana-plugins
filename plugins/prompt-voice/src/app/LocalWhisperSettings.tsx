@@ -165,13 +165,27 @@ export interface LocalWhisperSettingsProps {
   llmProvider?: string;
   /** Saves a settings patch through the page's settings store. */
   onApplyPreset: (patch: Record<string, string>) => void;
+  /** Fires when Local Whisper transitions between ready and not ready. */
+  onReadyChange?: (ready: boolean) => void;
 }
 
 /** Settings → Local Whisper: runtime status, model catalog, and the offline preset. */
-export function LocalWhisperSettings({ rpc, sttProvider, llmProvider, onApplyPreset }: LocalWhisperSettingsProps) {
+export function LocalWhisperSettings({ rpc, sttProvider, llmProvider, onApplyPreset, onReadyChange }: LocalWhisperSettingsProps) {
   const { state, error, pending, run } = useLocalWhisper(rpc);
   const privacy = describePrivacy(sttProvider, llmProvider);
-  const ready = state?.runtime.status === 'installed' && state.activeModelId !== null;
+  const ready = Boolean(state?.platform.supported && state.runtime.status === 'installed' && state.activeModelId !== null);
+  const lastReadyRef = useRef<boolean | null>(null);
+  const onReadyChangeRef = useRef(onReadyChange);
+  onReadyChangeRef.current = onReadyChange;
+
+  useEffect(() => {
+    if (!state) return;
+    if (lastReadyRef.current !== null && lastReadyRef.current !== ready) {
+      onReadyChangeRef.current?.(ready);
+    }
+    lastReadyRef.current = ready;
+  }, [state, ready]);
+
   return (
     <section className="ps-pane" style={{ flex: 'none' }} aria-labelledby="ps-lw-title">
       <div className="ps-pane-header">

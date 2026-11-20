@@ -23,6 +23,7 @@ import type {
   RephraseRequest,
   RephraseResponse,
   StatusResponse,
+  SttProviderId,
   TranscribeFailure,
   TranscribeRequest,
   TranscribeResponse
@@ -169,8 +170,29 @@ function hasRequiredKey(
   return keyName === undefined || keys[keyName].length > 0;
 }
 
+export interface StatusOptions {
+  /** Whether Local Whisper has an installed runtime and an active model on this device. */
+  localWhisperReady?: boolean;
+}
+
+/** Returns only speech-to-text providers that are configured and able to run. */
+export function configuredSttProviders(
+  settings: PromptVoiceSettings,
+  options: StatusOptions = {}
+): SttProviderId[] {
+  const providers: SttProviderId[] = ['system'];
+  if (settings.keys.google.length > 0) providers.push('google-gemini');
+  if (settings.keys.openai.length > 0) providers.push('openai');
+  if (options.localWhisperReady === true) providers.push('local-whisper');
+  return providers;
+}
+
 /** RPC `promptVoice.status`. Reports active providers and whether any key they need is configured. */
-export function statusFromSettings(raw: Record<string, unknown>, availableProviders?: string[]): StatusResponse {
+export function statusFromSettings(
+  raw: Record<string, unknown>,
+  availableProviders?: string[],
+  options: StatusOptions = {}
+): StatusResponse {
   const settings = normalizeSettings(raw);
   return {
     sttProvider: settings.sttProvider,
@@ -178,7 +200,8 @@ export function statusFromSettings(raw: Record<string, unknown>, availableProvid
     llmProvider: settings.llmProvider,
     llmKeyConfigured: hasRequiredKey(settings.llmProvider, LLM_PROVIDER_KEYS, settings.keys),
     audioFormat: settings.sttProvider === 'local-whisper' ? 'wav' : 'recorded',
-    ...(availableProviders ? { availableProviders } : {})
+    ...(availableProviders ? { availableProviders } : {}),
+    availableSttProviders: configuredSttProviders(settings, options)
   };
 }
 

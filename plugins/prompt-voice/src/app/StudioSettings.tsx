@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocalWhisperSettings } from './LocalWhisperSettings.tsx';
 import { VisibilitySettingsSection } from './VisibilitySettingsSection.tsx';
 import {
@@ -26,14 +26,20 @@ import {
 import { INPUT_LANGUAGE_OPTIONS } from '../shared/languages.ts';
 import {
   HISTORY_CLEAR_METHOD,
+  MODELS_UPDATED_EVENT,
+  SETTINGS_CHANGED_EVENT,
   SETTINGS_GET_METHOD,
   SETTINGS_UPDATE_METHOD,
+  STATUS_METHOD,
   TONE_IDS,
-  type HistoryClearResponse
+  resolveAvailableSttProviders,
+  type HistoryClearResponse,
+  type StatusResponse
 } from '../shared/protocol.ts';
 import type { AudioInputDevice } from './audioDevices.ts';
 import { writeCachedAudioPreferences } from './audioPreferencesStorage.ts';
 import { ensureStylesInjected } from './injectStyles.ts';
+import { useSafeRealtime } from './safeSdk.ts';
 import { playSoundCue } from './soundCues.ts';
 import { useAudioDevices, type AudioDevicesState } from './useAudioDevices.ts';
 
@@ -43,7 +49,12 @@ type Field = { key: string; label: string; options?: string[]; multiline?: boole
 
 const sections: Record<string, Field[]> = {
   'Voice & transcription': [
-    { key: 'sttProvider', label: 'Speech-to-text provider', options: ['system', 'google-gemini', 'openai', 'local-whisper'] },
+    {
+      key: 'sttProvider',
+      label: 'Speech-to-text provider',
+      options: ['system', 'google-gemini', 'openai', 'local-whisper'],
+      help: 'Only configured speech providers are shown. Add API keys in Zana’s Prompt Voice plugin settings or set up Local Whisper below.'
+    },
     {
       key: 'inputLanguage',
       label: 'Input language',
@@ -531,11 +542,13 @@ function DictionaryField({
 function SettingField({
   field,
   values,
+  availableSttProviders,
   resetSignal,
   onSave
 }: {
   field: Field;
   values: Settings;
+  availableSttProviders: readonly string[];
   resetSignal: number;
   onSave: (patch: Settings) => void;
 }) {
@@ -543,14 +556,35 @@ function SettingField({
     return <DictionaryField label={field.label} help={field.help} value={values.dictionary ?? ''} resetSignal={resetSignal} onChange={(dictionary) => onSave({ dictionary })} />;
   }
   const currentValue = values[field.key] ?? defaults[field.key] ?? '';
-  const optionValues = field.options && field.key === 'inputLanguage' && currentValue && !field.options.includes(currentValue)
-    ? [...field.options, currentValue]
-    : field.options;
+  let optionValues = field.options;
+  if (optionValues && field.key === 'inputLanguage' && currentValue && !optionValues.includes(currentValue)) {
+    optionValues = [...optionValues, currentValue];
+  } else if (optionValues && field.key === 'sttProvider') {
+    const allowed = new Set(availableSttProviders);
+    allowed.add('system');
+    optionValues = optionValues.filter((opt) => allowed.has(opt));
+  }
+  const isUnconfiguredSelection =
+    field.key === 'sttProvider' &&
+    Boolean(currentValue) &&
+    Boolean(optionValues) &&
+    !optionValues!.includes(currentValue);
   return (
     <label className="ps-field-group">
       <span className="ps-field-label">{field.label}</span>
       {optionValues
-        ? <select className="ps-select" value={currentValue} onChange={(e) => onSave({ [field.key]: e.target.value })}>{optionValues.map((opt) => <option key={opt} value={opt}>{names[opt] ?? opt}</option>)}</select>
+        ? (
+            <select
+              className="ps-select"
+              value={isUnconfiguredSelection ? '' : currentValue}
+              onChange={(e) => onSave({ [field.key]: e.target.value })}
+            >
+              {isUnconfiguredSelection && (
+                <option value="" disabled hidden>{`${names[currentValue] ?? currentValue} (Not configured)`}</option>
+              )}
+              {optionValues.map((opt) => <option key={opt} value={opt}>{names[opt] ?? opt}</option>)}
+            </select>
+          )
         : field.multiline
           ? <textarea className="ps-custom-prompt-input" value={values[field.key] ?? ''} onChange={(e) => onSave({ [field.key]: e.target.value })} />
           : <input type={field.secret ? 'password' : 'text'} className="ps-select" value={values[field.key] ?? ''} onChange={(e) => onSave({ [field.key]: e.target.value })} placeholder={field.secret ? 'Enter API key…' : undefined} />}
@@ -562,15 +596,36 @@ function SettingField({
 export function StudioSettings({ rpc, onBack, pluginId }: { rpc: Rpc; onBack: () => void; pluginId?: string }) {
   ensureStylesInjected();
   const [values, setValues] = useState<Settings>({});
+  const [availableSttProviders, setAvailableSttProviders] = useState<string[]>(['system']);
   const [status, setStatus] = useState('Loading…');
   const [failedPatch, setFailedPatch] = useState<Settings | null>(null);
   const [resetSignal, setResetSignal] = useState(0);
   const saveVersion = useRef(0);
   const latestValues = useRef<Settings>({});
+  const mountedRef = useRef(true);
   const rpcRef = useRef(rpc);
   rpcRef.current = rpc;
 
+  const refreshStatus = useCallback(() => {
+    rpcRef.current
+      .call(STATUS_METHOD)
+      .then((res) => {
+        if (!mountedRef.current) return;
+        setAvailableSttProviders(resolveAvailableSttProviders(res as StatusResponse | null | undefined));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useSafeRealtime(SETTINGS_CHANGED_EVENT, () => {
+    refreshStatus();
+  });
+
+  useSafeRealtime(MODELS_UPDATED_EVENT, () => {
+    refreshStatus();
+  });
+
   useEffect(() => {
+    mountedRef.current = true;
     let active = true;
     rpcRef.current.call(SETTINGS_GET_METHOD).then((v) => {
       if (!active) return;
@@ -580,8 +635,12 @@ export function StudioSettings({ rpc, onBack, pluginId }: { rpc: Rpc; onBack: ()
       writeCachedAudioPreferences(loaded);
       setStatus('Saved');
     }).catch(() => { if (active) setStatus('Could not load settings'); });
-    return () => { active = false; };
-  }, []);
+    refreshStatus();
+    return () => {
+      active = false;
+      mountedRef.current = false;
+    };
+  }, [refreshStatus]);
 
   const save = (patch: Settings) => {
     const version = ++saveVersion.current;
@@ -615,11 +674,26 @@ export function StudioSettings({ rpc, onBack, pluginId }: { rpc: Rpc; onBack: ()
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14 }}>
                   {category === 'Connections' && <p>Manage API keys in Zana’s Prompt Voice plugin settings.</p>}
                   {fields.filter((f) => !(f.key === 'customPrompt' && values.tone !== 'custom')).map((field) => (
-                    <SettingField key={field.key} field={field} values={values} resetSignal={resetSignal} onSave={save} />
+                    <SettingField
+                      key={field.key}
+                      field={field}
+                      values={values}
+                      availableSttProviders={availableSttProviders}
+                      resetSignal={resetSignal}
+                      onSave={save}
+                    />
                   ))}
                 </div>
               </section>
-              {category === 'Voice & transcription' && <LocalWhisperSettings rpc={rpc} sttProvider={values.sttProvider ?? defaults.sttProvider} llmProvider={values.llmProvider} onApplyPreset={save} />}
+              {category === 'Voice & transcription' && (
+                <LocalWhisperSettings
+                  rpc={rpc}
+                  sttProvider={values.sttProvider ?? defaults.sttProvider}
+                  llmProvider={values.llmProvider}
+                  onApplyPreset={save}
+                  onReadyChange={refreshStatus}
+                />
+              )}
             </React.Fragment>
           ))}
           {pluginId ? (

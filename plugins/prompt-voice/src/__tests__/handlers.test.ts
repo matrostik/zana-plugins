@@ -8,6 +8,7 @@ import {
 } from '../server/handlers.ts';
 import type { HistoryStore } from '../server/historyStore.ts';
 import { PromptVoiceError } from '../server/errors.ts';
+import { resolveAvailableSttProviders } from '../shared/protocol.ts';
 
 const VALID_REQUEST = { audio: Buffer.from('audio').toString('base64'), mimeType: 'audio/webm' };
 const OPENAI_STT_URL = 'https://api.openai.com/v1/audio/transcriptions';
@@ -201,8 +202,52 @@ describe('statusFromSettings', () => {
       llmProvider: 'assistant',
       llmKeyConfigured: true,
       audioFormat: 'recorded',
-      availableProviders: ['antigravity', 'claude-code']
+      availableProviders: ['antigravity', 'claude-code'],
+      availableSttProviders: ['system']
     });
+  });
+
+  it('includes only configured speech providers in availableSttProviders', () => {
+    expect(statusFromSettings({}).availableSttProviders).toEqual(['system']);
+    expect(statusFromSettings({ openaiApiKey: 'sk-1' }).availableSttProviders).toEqual(['system', 'openai']);
+    expect(statusFromSettings({ googleApiKey: 'g-1' }).availableSttProviders).toEqual(['system', 'google-gemini']);
+    expect(statusFromSettings({}, undefined, { localWhisperReady: false }).availableSttProviders).toEqual(['system']);
+    expect(statusFromSettings({}, undefined, { localWhisperReady: true }).availableSttProviders).toEqual(['system', 'local-whisper']);
+    expect(
+      statusFromSettings({ openaiApiKey: 'sk-1', googleApiKey: 'g-1' }, undefined, { localWhisperReady: true }).availableSttProviders
+    ).toEqual(['system', 'google-gemini', 'openai', 'local-whisper']);
+  });
+
+  it('resolves availableSttProviders cleanly from explicit lists and legacy status payloads', () => {
+    expect(resolveAvailableSttProviders(null)).toEqual(['system']);
+    expect(
+      resolveAvailableSttProviders({
+        sttProvider: 'openai',
+        sttKeyConfigured: false,
+        llmProvider: 'assistant',
+        llmKeyConfigured: true,
+        audioFormat: 'recorded'
+      })
+    ).toEqual(['system']);
+    expect(
+      resolveAvailableSttProviders({
+        sttProvider: 'google-gemini',
+        sttKeyConfigured: true,
+        llmProvider: 'assistant',
+        llmKeyConfigured: true,
+        audioFormat: 'recorded'
+      })
+    ).toEqual(['system', 'google-gemini']);
+    expect(
+      resolveAvailableSttProviders({
+        sttProvider: 'system',
+        sttKeyConfigured: true,
+        llmProvider: 'assistant',
+        llmKeyConfigured: true,
+        audioFormat: 'recorded',
+        availableSttProviders: ['openai']
+      })
+    ).toEqual(['openai', 'system']);
   });
 
   it('asks the app for WAV only when Local Whisper is the speech provider', () => {

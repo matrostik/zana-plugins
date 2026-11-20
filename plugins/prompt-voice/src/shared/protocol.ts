@@ -162,6 +162,34 @@ export interface StatusResponse {
    */
   audioFormat: AudioUploadFormat;
   availableProviders?: string[];
+  /**
+   * Speech-to-text providers that are configured and ready to use
+   * (always includes `system`, plus direct API providers with a configured key,
+   * and `local-whisper` when its runtime is installed with an active model).
+   */
+  availableSttProviders?: SttProviderId[];
+}
+
+/**
+ * Resolves the configured speech-to-text providers from a `StatusResponse`.
+ * Always includes `system`; omits unconfigured providers that cannot run.
+ */
+export function resolveAvailableSttProviders(status: StatusResponse | null | undefined): SttProviderId[] {
+  if (Array.isArray(status?.availableSttProviders)) {
+    const allowed = new Set<string>(status.availableSttProviders.filter((id): id is string => typeof id === 'string' && id.length > 0));
+    allowed.add('system');
+    return Array.from(allowed);
+  }
+  const fallback: SttProviderId[] = ['system'];
+  if (
+    typeof status?.sttProvider === 'string' &&
+    status.sttProvider.length > 0 &&
+    status.sttProvider !== 'system' &&
+    status.sttKeyConfigured === true
+  ) {
+    fallback.push(status.sttProvider);
+  }
+  return fallback;
 }
 
 export type AudioUploadFormat = 'wav' | 'recorded';

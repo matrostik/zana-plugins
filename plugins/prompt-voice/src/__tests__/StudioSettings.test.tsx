@@ -359,6 +359,34 @@ describe('StudioSettings', () => {
     );
   });
 
+  it('omits unconfigured speech providers in settings and displays only configured ones', async () => {
+    let availableSttProviders: string[] = ['system'];
+    const call = vi.fn(async (method: string) => {
+      if (method === 'promptVoice.settings.get') return { sttProvider: 'system' };
+      if (method === 'promptVoice.status') {
+        return { sttProvider: 'system', sttKeyConfigured: true, availableSttProviders };
+      }
+      return {};
+    });
+    const view = render(<StudioSettings rpc={{ call }} onBack={vi.fn()} />);
+
+    const sttSelect = (await screen.findByLabelText(/speech-to-text provider/i)) as HTMLSelectElement;
+    await waitFor(() => expect(call).toHaveBeenCalledWith('promptVoice.status'));
+    expect(Array.from(sttSelect.options).map((o) => o.value)).toEqual(['system']);
+    expect(within(sttSelect).queryByRole('option', { name: 'OpenAI' })).toBeNull();
+    expect(within(sttSelect).queryByRole('option', { name: 'Google Gemini' })).toBeNull();
+    expect(within(sttSelect).queryByRole('option', { name: 'Local Whisper (on this device)' })).toBeNull();
+
+    view.unmount();
+    availableSttProviders = ['system', 'openai', 'local-whisper'];
+    render(<StudioSettings rpc={{ call }} onBack={vi.fn()} />);
+    const updatedSelect = (await screen.findByLabelText(/speech-to-text provider/i)) as HTMLSelectElement;
+    await waitFor(() =>
+      expect(Array.from(updatedSelect.options).map((o) => o.value)).toEqual(['system', 'openai', 'local-whisper'])
+    );
+    expect(within(updatedSelect).queryByRole('option', { name: 'Google Gemini' })).toBeNull();
+  });
+
   it('registers plugin stylesheet element on render and keeps settings styles in styles.css', () => {
     setup({});
     expect(document.getElementById('zcc-ext-prompt-voice-styles')).toBeTruthy();
