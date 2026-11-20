@@ -1,0 +1,43 @@
+{
+  "name": "@zcc-ext/draft-studio",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Voice dictation, on-device Local Whisper, AI writing refinement, translation, and drafting workspace for Zana Command Center.",
+  "engines": {
+    "zcc": ">=1.0.0",
+    "zccPluginSdk": ">=0.1.0"
+  },
+  "zcc": {
+    "name": "Draft Studio",
+    "description": "Voice dictation and AI writing studio for Zana: dictate with Zana Voice or on-device Local Whisper, refine drafts with tone presets, translate, summarize, build specs, compare diffs, and browse history. No API key needed; nothing is sent automatically.",
+    "branding": {
+      "icon": "Mic"
+    },
+    "server": "./server.mjs",
+    "app": "./app.js",
+    "projectTab": {
+      "label": "Draft Studio",
+      "icon": "Sparkles",
+      "global": false
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "types": "zcc plugin types ."
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^4.1.12",
+    "esbuild": "^0.25.12",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.10"
+  }
+}
