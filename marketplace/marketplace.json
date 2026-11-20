@@ -76,15 +76,17 @@
       }
     },
     {
-      "id": "prompt-voice",
-      "displayName": "Prompt Voice",
-      "description": "Dictate into any composer using Zana host speech-to-text and optional Zana assistant cleanup, with no API key needed. OpenAI, Gemini, and Anthropic can be used instead with your own key. Text is added to your draft for review; nothing is sent automatically.",
+      "id": "draft-studio",
+      "displayName": "Draft Studio",
+      "description": "Voice dictation, on-device Local Whisper, AI writing refinement (5 tones), translation, summarization, technical specs, word diffs, and searchable activity history for Zana — no API key needed.",
+      "overview": "# Draft Studio\n\nVoice dictation and AI writing workbench for Zana Command Center. Speak directly into any thread composer, quick-dictate from Zana's Home screen, or shape spoken, typed, and pasted drafts inside global and per-project **Draft Studio** workspaces.\n\n## Highlights\n\n- **Voice dictation everywhere**: Inline composer mic pill, Home screen quick-dictate card, and studio dictation with mic selection, optional sound cues, and a personal dictionary.\n- **On-device Local Whisper**: Install a verified `whisper.cpp` server and download multilingual Whisper models right from Settings for offline transcription (Windows x64 & Linux x64), or use Zana host voice, OpenAI, or Google Gemini.\n- **AI writing & transformations**: Improve writing across 5 tones (*Standard, Casual, Conversational, Professional, Technical*), summarize into bullet points, generate structured technical specs, translate naturally while preserving code/Markdown, or run custom instructions.\n- **Review before sending**: Inspect word-level diffs, pick from discovered Zana host models (sorted cheapest-first) or direct API keys, and insert into your composer for review — nothing is sent automatically.\n- **Activity history & privacy**: Search, filter, star, and reload past dictations and refinements with configurable retention limits and one-click clearing.",
       "icon": {
         "lucide": "Mic"
       },
       "tags": [
         "community",
         "voice",
+        "writing",
         "productivity"
       ],
       "author": {
@@ -95,7 +97,7 @@
       "source": {
         "git": {
           "url": "https://github.com/matrostik/zana-plugins",
-          "subdir": "plugins/prompt-voice",
+          "subdir": "plugins/draft-studio",
           "ref": "master"
         }
       }
