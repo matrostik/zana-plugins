@@ -212,7 +212,12 @@ function dispatchBridgeMessage(msg: any): { handled: boolean; rewritten: boolean
     return runLocalHandler(msg.id, () => {
       const options = getProviderOptionsFromParams(msg.params);
       const runtime = resolveRequestRuntime(options);
-      void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) })
+      void queryNativeUsage({
+        command: runtime.executable,
+        args: runtime.args,
+        authMethod: resolveAuthMethod(options),
+        forceRefresh: msg.params?.forceRefresh === true
+      })
         .then(result => writeBridgeJsonRpc({ jsonrpc: '2.0', id: msg.id, result }))
         .catch(error => writeBridgeError(msg.id, error));
     });

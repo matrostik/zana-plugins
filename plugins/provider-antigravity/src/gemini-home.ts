@@ -3,12 +3,12 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
-  rmSync,
   statSync,
   writeFileSync
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { writeFileAtomically } from './atomic-write.js';
 import { getZccDataDir } from './native-runtime.js';
 
 export const GOOGLE_ACP_AUTH_METHODS = [
@@ -181,14 +181,10 @@ function writeSettingsFileAtomically(
     };
   }
 
-  mkdirSync(dirname(settingsPath), { recursive: true });
-  const tmpPath = `${settingsPath}.tmp-${process.pid}`;
-  writeFileSync(tmpPath, JSON.stringify(next, null, 2) + '\n', 'utf8');
-  writeFileSync(settingsPath, readFileSync(tmpPath));
   try {
-    rmSync(tmpPath, { force: true });
-  } catch {
-    // Ignore cleanup failure
+    writeFileAtomically(settingsPath, JSON.stringify(next, null, 2) + '\n', { mode: 0o600 });
+  } finally {
+    forgetStatMemo(settingsPath);
   }
 }
 

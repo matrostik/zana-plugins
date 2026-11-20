@@ -65,4 +65,19 @@ describe('KeyedRefresh', () => {
     await expect(refresh.run('a', async () => { throw new Error('boom'); })).rejects.toThrow('boom');
     expect(await refresh.run('a', async () => ({ result: 'recovered', outcome: 'success', key: 'a' }))).toBe('recovered');
   });
+
+  it('clears cached successes and failure backoff timers immediately', async () => {
+    const time = clock();
+    const refresh = new KeyedRefresh<string>({ successTtlMs: 1_000, failureBackoffMs: 1_000, now: time.now });
+    await refresh.run('ok-key', async () => ({ result: 'cached', outcome: 'success', key: 'ok-key' }));
+    await refresh.run('fail-key', async () => ({ result: 'failed', outcome: 'failure', key: 'fail-key' }));
+    expect(refresh.cached('ok-key')).toBe('cached');
+
+    refresh.clear();
+
+    expect(refresh.cached('ok-key')).toBeUndefined();
+    const retry = vi.fn(async (): Promise<RefreshRun<string>> => ({ result: 'retried', outcome: 'success', key: 'fail-key' }));
+    expect(await refresh.run('fail-key', retry, { whileBackingOff: () => 'backed-off' })).toBe('retried');
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
 });

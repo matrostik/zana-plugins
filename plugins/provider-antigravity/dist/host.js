@@ -41514,56 +41514,141 @@ import { execFile as execFile4, execFileSync } from "node:child_process";
 import {
   chmodSync,
   existsSync as existsSync2,
-  mkdirSync as mkdirSync2,
+  mkdirSync as mkdirSync3,
   readFileSync as readFileSync2,
+  renameSync as renameSync2,
+  rmSync as rmSync2,
+  writeFileSync as writeFileSync2
+} from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { dirname as dirname4, join as join3, resolve as resolve4 } from "node:path";
+import { promisify as promisify2 } from "node:util";
+
+// src/atomic-write.ts
+import { randomUUID } from "node:crypto";
+import {
+  lstatSync,
+  mkdirSync as mkdirSync2,
   renameSync,
   rmSync,
   writeFileSync
 } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { dirname as dirname3, join as join3, resolve as resolve4 } from "node:path";
-import { promisify as promisify2 } from "node:util";
+import { dirname as dirname3 } from "node:path";
+var WIN32_RENAME_RETRY_DELAYS_MS = [15, 30, 60];
+function defaultSleepSync(ms) {
+  if (ms <= 0 || typeof SharedArrayBuffer === "undefined" || typeof Atomics?.wait !== "function") {
+    return;
+  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function getErrnoCode(err) {
+  return err && typeof err === "object" && "code" in err ? String(err.code) : void 0;
+}
+function isWin32LockError(err) {
+  const code = getErrnoCode(err);
+  return code === "EPERM" || code === "EBUSY";
+}
+function isTargetSymlink(filePath, lstatFn) {
+  try {
+    return lstatFn(filePath).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+function writeFileAtomically(filePath, content, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const lstatFn = options.lstatFn ?? lstatSync;
+  const writeFileFn = options.writeFileFn ?? writeFileSync;
+  const renameFn = options.renameFn ?? renameSync;
+  const rmFn = options.rmFn ?? rmSync;
+  const sleepFn = options.sleepFn ?? defaultSleepSync;
+  const writeOpts = options.mode !== void 0 ? { encoding: "utf8", mode: options.mode } : "utf8";
+  mkdirSync2(dirname3(filePath), { recursive: true });
+  if (isTargetSymlink(filePath, lstatFn)) {
+    writeFileFn(filePath, content, writeOpts);
+    return;
+  }
+  const tmpPath = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    writeFileFn(tmpPath, content, writeOpts);
+    try {
+      renameFn(tmpPath, filePath);
+      return;
+    } catch (initialErr) {
+      let lastErr = initialErr;
+      if (platform === "win32" && isWin32LockError(lastErr)) {
+        for (const delayMs of WIN32_RENAME_RETRY_DELAYS_MS) {
+          sleepFn(delayMs);
+          try {
+            renameFn(tmpPath, filePath);
+            return;
+          } catch (retryErr) {
+            lastErr = retryErr;
+            if (!isWin32LockError(lastErr)) break;
+          }
+        }
+      }
+      if (platform === "win32" && isWin32LockError(lastErr) || getErrnoCode(lastErr) === "EXDEV") {
+        writeFileFn(filePath, content, writeOpts);
+        return;
+      }
+      throw lastErr;
+    }
+  } finally {
+    rmFn(tmpPath, { force: true });
+  }
+}
+
+// src/native-runtime.ts
 var execFileAsync3 = promisify2(execFile4);
 var PINNED_NATIVE_ACP_VERSION = "1.4.3";
+var WIN32_NATIVE_CMD = "agy_acp_server.exe";
+var POSIX_NATIVE_CMD = "agy_acp_server.par";
+function isWin32Platform(platform = process.platform) {
+  return platform === "win32";
+}
+function defaultNativeCommand(platform = process.platform) {
+  return isWin32Platform(platform) ? WIN32_NATIVE_CMD : POSIX_NATIVE_CMD;
+}
 var NATIVE_ACP_DISTRIBUTIONS = {
   "windows-x86_64": {
     archive: "https://dl.google.com/agy-extensions/releases/windows/agy-acp-server-1.4.3-windows-x86_64.zip",
-    cmd: "agy_acp_server.exe",
+    cmd: WIN32_NATIVE_CMD,
     args: [],
     sha256: "54c2e16378d9a4952e1da70e355f3c33c4f284308d6de48ab3e6e34a127bd325",
     companionFiles: ["localharness_external.exe"]
   },
   "windows-aarch64": {
     archive: "https://dl.google.com/agy-extensions/releases/windows/agy-acp-server-1.4.3-windows-arm64.zip",
-    cmd: "agy_acp_server.exe",
+    cmd: WIN32_NATIVE_CMD,
     args: [],
     sha256: "fcd46431ad33d3b510ce0b98fe7b43d095bd8b3f1c363ee2d57faa7ee981c7bb",
     companionFiles: ["localharness_external.exe"]
   },
   "darwin-aarch64": {
     archive: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.3-darwin-arm64.zip",
-    cmd: "agy_acp_server.par",
+    cmd: POSIX_NATIVE_CMD,
     args: [],
     sha256: "c57db0a9b8b712daa9c3c17cdb990a61842ea569f279e8bd79d7aa85a303b20b",
     companionFiles: ["localharness_external"]
   },
   "darwin-x86_64": {
     archive: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.3-darwin-x86_64.zip",
-    cmd: "agy_acp_server.par",
+    cmd: POSIX_NATIVE_CMD,
     args: [],
     sha256: "9392dbbdad7f0663dbfb5a0bf641297b0cf80d2ee9cd2d49a616bbbc7378731d",
     companionFiles: ["localharness_external"]
   },
   "linux-x86_64": {
     archive: "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.3-linux-x86_64.zip",
-    cmd: "agy_acp_server.par",
+    cmd: POSIX_NATIVE_CMD,
     args: ["--uid="],
     sha256: "0634ce5306ba92c932945455e7a83fda78e2d99c33fa8aa6ee0566206a382714",
     companionFiles: ["localharness_external"]
   },
   "linux-aarch64": {
     archive: "https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.3-linux-arm64.zip",
-    cmd: "agy_acp_server.par",
+    cmd: POSIX_NATIVE_CMD,
     args: ["--uid="],
     sha256: "05c153443b0b1175151c760eeddea538950bc9843e317d54786a1f03670182bc",
     companionFiles: ["localharness_external"]
@@ -41609,7 +41694,7 @@ function checkCompanionFiles(executablePath, platformKey = resolvePlatformKey())
   if (!dist || dist.companionFiles.length === 0) {
     return { ok: true, missing: [] };
   }
-  const dir = dirname3(executablePath);
+  const dir = dirname4(executablePath);
   const missing = dist.companionFiles.filter((file2) => !existsSync2(join3(dir, file2)));
   return { ok: missing.length === 0, missing };
 }
@@ -41633,7 +41718,7 @@ function resolveNativeAcpRuntime(options) {
   const platformKey = resolvePlatformKey(options?.platform, options?.arch);
   const dist = platformKey ? NATIVE_ACP_DISTRIBUTIONS[platformKey] : void 0;
   const defaultArgs = dist ? [...dist.args] : [];
-  const defaultCmd = dist?.cmd ?? (process.platform === "win32" ? "agy_acp_server.exe" : "agy_acp_server.par");
+  const defaultCmd = dist?.cmd ?? defaultNativeCommand(options?.platform);
   const pointer = readManagedRuntimePointer(options?.baseDir);
   const custom2 = options?.customExecutable?.trim();
   if (custom2) {
@@ -41822,7 +41907,7 @@ var NativeAcpSession = class _NativeAcpSession {
   }
   child;
   pending = /* @__PURE__ */ new Map();
-  notificationListeners = [];
+  notificationListeners = /* @__PURE__ */ new Set();
   stderrListeners = [];
   catalogUpdates = /* @__PURE__ */ new Map();
   availableCommands = /* @__PURE__ */ new Set();
@@ -41888,12 +41973,16 @@ var NativeAcpSession = class _NativeAcpSession {
   waitForCommand(name, waitMs) {
     if (this.availableCommands.has(name)) return Promise.resolve(true);
     return new Promise((resolve6) => {
-      const timer = this.later(waitMs, () => resolve6(this.availableCommands.has(name)));
-      this.notificationListeners.push(() => {
-        if (!this.availableCommands.has(name)) return;
+      const finish = (found) => {
+        this.notificationListeners.delete(listener);
         this.cancel(timer);
-        resolve6(true);
-      });
+        resolve6(found);
+      };
+      const listener = () => {
+        if (this.availableCommands.has(name)) finish(true);
+      };
+      const timer = this.later(waitMs, () => finish(this.availableCommands.has(name)));
+      this.notificationListeners.add(listener);
     });
   }
   /**
@@ -41905,7 +41994,7 @@ var NativeAcpSession = class _NativeAcpSession {
     const toolsRequested = new Error(`Native ${name} unexpectedly requested tools; the diagnostic session was stopped.`);
     let requestedTools = false;
     let outputLimitError = null;
-    this.notificationListeners.push((method, params) => {
+    const listener = (method, params) => {
       if (method !== "session/update") return;
       const update = params?.update;
       if (update?.sessionUpdate === "tool_call") {
@@ -41919,11 +42008,16 @@ var NativeAcpSession = class _NativeAcpSession {
           this.close(outputLimitError);
         }
       }
-    });
-    const result = await this.request("session/prompt", { sessionId, prompt: [{ type: "text", text: `/${name}` }] });
-    if (requestedTools) throw toolsRequested;
-    if (outputLimitError) throw outputLimitError;
-    return { stopReason: result?.stopReason, text };
+    };
+    this.notificationListeners.add(listener);
+    try {
+      const result = await this.request("session/prompt", { sessionId, prompt: [{ type: "text", text: `/${name}` }] });
+      if (requestedTools) throw toolsRequested;
+      if (outputLimitError) throw outputLimitError;
+      return { stopReason: result?.stopReason, text };
+    } finally {
+      this.notificationListeners.delete(listener);
+    }
   }
   close(reason) {
     if (!this.closed) {
@@ -42011,12 +42105,16 @@ var NativeAcpSession = class _NativeAcpSession {
     if (typeof sessionId !== "string") return;
     if (!this.catalogUpdates.has(sessionId) && extractCatalog(session).length === 0) {
       await new Promise((resolve6) => {
-        const timer = this.later(CATALOG_UPDATE_WAIT_MS, resolve6);
-        this.notificationListeners.push(() => {
-          if (!this.catalogUpdates.has(sessionId)) return;
+        const finish = () => {
+          this.notificationListeners.delete(listener);
           this.cancel(timer);
           resolve6();
-        });
+        };
+        const listener = () => {
+          if (this.catalogUpdates.has(sessionId)) finish();
+        };
+        const timer = this.later(CATALOG_UPDATE_WAIT_MS, finish);
+        this.notificationListeners.add(listener);
       });
     }
     const update = this.catalogUpdates.get(sessionId);
@@ -42051,14 +42149,13 @@ import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:f
 import {
   copyFileSync,
   existsSync as existsSync3,
-  mkdirSync as mkdirSync3,
+  mkdirSync as mkdirSync4,
   readFileSync as readFileSync3,
-  rmSync as rmSync2,
   statSync,
-  writeFileSync as writeFileSync2
+  writeFileSync as writeFileSync3
 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
-import { dirname as dirname4, join as join4, resolve as resolve5 } from "node:path";
+import { dirname as dirname5, join as join4, resolve as resolve5 } from "node:path";
 var GOOGLE_ACP_AUTH_METHODS = [
   "oauth-personal",
   "oauth-business",
@@ -42087,7 +42184,7 @@ function resolveSourceAndManagedGeminiHome(env = process.env) {
   const configuredHome = env.GEMINI_HOME && env.GEMINI_HOME.trim() ? resolve5(env.GEMINI_HOME.trim()) : null;
   const fallbackUserHome = resolve5(env.USERPROFILE || env.HOME || homedir3(), ".gemini");
   if (configuredHome && isSanitizedGeminiHomePath(configuredHome)) {
-    const sourceGeminiHome2 = configuredHome.replace(/\\/g, "/").endsWith("/antigravity-zcc-home") ? dirname4(configuredHome) : fallbackUserHome;
+    const sourceGeminiHome2 = configuredHome.replace(/\\/g, "/").endsWith("/antigravity-zcc-home") ? dirname5(configuredHome) : fallbackUserHome;
     return { sourceGeminiHome: sourceGeminiHome2, managedGeminiHome: configuredHome };
   }
   const sourceGeminiHome = configuredHome ?? fallbackUserHome;
@@ -42176,13 +42273,10 @@ function writeSettingsFileAtomically(settingsPath, authType) {
       cleared: false
     };
   }
-  mkdirSync3(dirname4(settingsPath), { recursive: true });
-  const tmpPath = `${settingsPath}.tmp-${process.pid}`;
-  writeFileSync2(tmpPath, JSON.stringify(next, null, 2) + "\n", "utf8");
-  writeFileSync2(settingsPath, readFileSync3(tmpPath));
   try {
-    rmSync2(tmpPath, { force: true });
-  } catch {
+    writeFileAtomically(settingsPath, JSON.stringify(next, null, 2) + "\n", { mode: 384 });
+  } finally {
+    forgetStatMemo(settingsPath);
   }
 }
 function writeAuthTypeSettings(authType, env = process.env) {
@@ -42209,7 +42303,7 @@ function syncFileNewer(src, dest) {
         return;
       }
     }
-    mkdirSync3(dirname4(dest), { recursive: true });
+    mkdirSync4(dirname5(dest), { recursive: true });
     copyFileSync(src, dest);
   } catch {
   }
@@ -42245,14 +42339,14 @@ function writeFileIfChanged(filePath, contents) {
     if (readFileSync3(filePath, "utf8") === contents) return;
   } catch {
   }
-  writeFileSync2(filePath, contents, "utf8");
+  writeFileSync3(filePath, contents, "utf8");
 }
 function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
   const disabledDeadMcpServers = [];
   const sourceMcpConfigPath = join4(sourceGeminiHome, "config", "mcp_config.json");
   const targetMcpConfigDir = join4(managedGeminiHome, "config");
   const targetMcpConfigPath = join4(targetMcpConfigDir, "mcp_config.json");
-  mkdirSync3(targetMcpConfigDir, { recursive: true });
+  mkdirSync4(targetMcpConfigDir, { recursive: true });
   if (existsSync3(sourceMcpConfigPath)) {
     try {
       const raw = JSON.parse(readFileSync3(sourceMcpConfigPath, "utf8"));
@@ -42272,7 +42366,7 @@ function sanitizeMcpConfigFile(sourceGeminiHome, managedGeminiHome) {
       writeFileIfChanged(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n");
     }
   } else if (!existsSync3(targetMcpConfigPath)) {
-    writeFileSync2(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
+    writeFileSync3(targetMcpConfigPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n", "utf8");
   }
   return disabledDeadMcpServers;
 }
@@ -42281,7 +42375,7 @@ function prepareSanitizedGeminiHome(options) {
   const { sourceGeminiHome, managedGeminiHome } = resolveSourceAndManagedGeminiHome(env);
   const sourceAcpDir = join4(sourceGeminiHome, "antigravity-acp");
   const managedAcpDir = join4(managedGeminiHome, "antigravity-acp");
-  mkdirSync3(managedAcpDir, { recursive: true });
+  mkdirSync4(managedAcpDir, { recursive: true });
   if (managedGeminiHome !== sourceGeminiHome) {
     syncFileNewer(join4(sourceAcpDir, "acp_token.json"), join4(managedAcpDir, "acp_token.json"));
     syncFileNewer(join4(sourceAcpDir, "settings.json"), join4(managedAcpDir, "settings.json"));
@@ -42452,6 +42546,11 @@ var KeyedRefresh = class {
   retryAfter = /* @__PURE__ */ new Map();
   now() {
     return this.policy.now ? this.policy.now() : Date.now();
+  }
+  /** Drops all cached successes and failure backoff timers so subsequent refreshes run immediately. */
+  clear() {
+    this.successes.clear();
+    this.retryAfter.clear();
   }
   /** A success cached for `key` within the TTL. */
   cached(key) {
@@ -42645,9 +42744,9 @@ function modelListFromReadiness(readiness) {
 }
 
 // src/readiness-store.ts
-import { randomUUID } from "node:crypto";
-import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync5, renameSync as renameSync2, rmSync as rmSync3, writeFileSync as writeFileSync3 } from "node:fs";
-import { dirname as dirname5, join as join5 } from "node:path";
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { existsSync as existsSync5, mkdirSync as mkdirSync5, readFileSync as readFileSync5, renameSync as renameSync3, rmSync as rmSync3, writeFileSync as writeFileSync4 } from "node:fs";
+import { dirname as dirname6, join as join5 } from "node:path";
 function readinessResult(state, subject, fields = {}) {
   return {
     state,
@@ -42732,11 +42831,11 @@ var ReadinessStore = class {
   writePersisted(slot, result, env) {
     try {
       const filePath = this.path(env);
-      mkdirSync4(dirname5(filePath), { recursive: true });
-      const temporary = `${filePath}.${randomUUID()}.tmp`;
+      mkdirSync5(dirname6(filePath), { recursive: true });
+      const temporary = `${filePath}.${randomUUID2()}.tmp`;
       try {
-        writeFileSync3(temporary, JSON.stringify({ key: slot.key, result, fingerprint: slot.fingerprint }, null, 2) + "\n", { mode: 384 });
-        renameSync2(temporary, filePath);
+        writeFileSync4(temporary, JSON.stringify({ key: slot.key, result, fingerprint: slot.fingerprint }, null, 2) + "\n", { mode: 384 });
+        renameSync3(temporary, filePath);
       } finally {
         rmSync3(temporary, { force: true });
         forgetStatMemo(filePath);
@@ -42753,6 +42852,8 @@ var USAGE_CACHE_TTL_MS = 6e4;
 var USAGE_COMMANDS_WAIT_MS = 1e3;
 var USAGE_MAX_TEXT_CHARS = 32768;
 var CATALOG_RETRY_BACKOFF_MS = 3e4;
+var usageRefresh = new KeyedRefresh({ successTtlMs: USAGE_CACHE_TTL_MS });
+var catalogRefresh = new KeyedRefresh({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
 function extractModesFromSessionResult(sessionResult) {
   const available = sessionResult?.modes?.availableModes;
   if (!Array.isArray(available)) return [];
@@ -42843,7 +42944,6 @@ function accountChangedResult(subject, fields) {
     error: "Antigravity sign-in changed while models were being discovered. Retry to load the current account."
   });
 }
-var usageRefresh = new KeyedRefresh({ successTtlMs: USAGE_CACHE_TTL_MS });
 async function queryNativeUsage(options) {
   const account = captureAccount(options);
   const key = account.refreshKey;
@@ -42901,7 +43001,6 @@ async function performNativeUsageQuery(options, account) {
     session.close();
   }
 }
-var catalogRefresh = new KeyedRefresh({ failureBackoffMs: CATALOG_RETRY_BACKOFF_MS });
 function isCatalogSettled(readiness, account, forceRefresh) {
   return !forceRefresh && (readiness.state === "runtime_missing" || readiness.state === "sign_in_required" && !hasLocalCredentials(account.target.authMethod, account.effectiveEnv, account.configuredAuthType) || readiness.state === "session_ready" && readiness.models.length > 0);
 }
@@ -43129,7 +43228,12 @@ function dispatchBridgeMessage(msg) {
     return runLocalHandler(msg.id, () => {
       const options = getProviderOptionsFromParams(msg.params);
       const runtime = resolveRequestRuntime(options);
-      void queryNativeUsage({ command: runtime.executable, args: runtime.args, authMethod: resolveAuthMethod(options) }).then((result) => writeBridgeJsonRpc({ jsonrpc: "2.0", id: msg.id, result })).catch((error62) => writeBridgeError(msg.id, error62));
+      void queryNativeUsage({
+        command: runtime.executable,
+        args: runtime.args,
+        authMethod: resolveAuthMethod(options),
+        forceRefresh: msg.params?.forceRefresh === true
+      }).then((result) => writeBridgeJsonRpc({ jsonrpc: "2.0", id: msg.id, result })).catch((error62) => writeBridgeError(msg.id, error62));
     });
   }
   if (msg.method === "provider/health" && msg.id !== void 0) {

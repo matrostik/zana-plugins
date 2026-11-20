@@ -144,7 +144,7 @@ describe('antigravity provider plugin', () => {
     expect(provider).toMatchObject({
       id: 'antigravity',
       displayName: 'Antigravity',
-      icon: './icons/antigravity.svg',
+      icon: './icons/antigravity-composer.svg',
       family: 'acp',
       capabilities: {
         fork: 'none',
@@ -351,7 +351,7 @@ describe('antigravity provider plugin', () => {
     await harness.dispose();
   });
 
-  it('checks usage against the configured runtime and trims its override', async () => {
+  it('checks usage against the configured runtime, trims its override, and forwards forceRefresh', async () => {
     const query = vi.spyOn(nativeAuth, 'queryNativeUsage').mockResolvedValue({ supported: true, usage: {
       status: 'ok', planLabel: 'Pro', accountEmail: null, checkedAt: 1, source: 'native-acp-/usage', windows: []
     } });
@@ -361,7 +361,18 @@ describe('antigravity provider plugin', () => {
     harness.setSettings({ authMethod: 'agent-platform', nativeExecutable: `  ${executable}  ` });
 
     expect(((await harness.callRpc('usage:status')) as any).usage.planLabel).toBe('Pro');
-    expect(query).toHaveBeenCalledWith(expect.objectContaining({ command: executable, authMethod: 'agent-platform' }));
+    expect(query).toHaveBeenCalledWith(expect.objectContaining({
+      command: executable,
+      authMethod: 'agent-platform',
+      forceRefresh: false
+    }));
+
+    await harness.callRpc('usage:status', { forceRefresh: true });
+    expect(query).toHaveBeenLastCalledWith(expect.objectContaining({
+      command: executable,
+      authMethod: 'agent-platform',
+      forceRefresh: true
+    }));
     await harness.dispose();
   });
 });

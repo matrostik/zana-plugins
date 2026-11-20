@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import './test-environment.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,9 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   checkCompanionFiles,
   computeSha256Hex,
+  defaultNativeCommand,
   getManagedRuntimesRoot,
   getZccDataDir,
   installNativeAcpRuntime,
+  isWin32Platform,
   killProcessTree,
   NATIVE_ACP_DISTRIBUTIONS,
   PINNED_NATIVE_ACP_VERSION,
@@ -42,6 +44,14 @@ afterEach(() => {
 });
 
 describe('native-runtime.ts unit tests', () => {
+  it('defaultNativeCommand and isWin32Platform select platform-specific defaults', () => {
+    expect(isWin32Platform('win32')).toBe(true);
+    expect(isWin32Platform('linux')).toBe(false);
+    expect(defaultNativeCommand('win32')).toBe('agy_acp_server.exe');
+    expect(defaultNativeCommand('darwin')).toBe('agy_acp_server.par');
+    expect(defaultNativeCommand('linux')).toBe('agy_acp_server.par');
+  });
+
   it.each(posixPlatforms)('requires the harness for existing %s/%s installs', (platform, arch, key) => {
     const baseDir = makeTempDir('missing-harness-');
     const versionDir = join(getManagedRuntimesRoot(baseDir), PINNED_NATIVE_ACP_VERSION);
@@ -204,6 +214,108 @@ describe('native-runtime.ts unit tests', () => {
         fetchImpl: (async () => ({ ok: false, status: 404, statusText: 'Not Found' })) as any
       })
     ).rejects.toThrow(/Failed to download native ACP archive/i);
+  });
+
+  it('installNativeAcpRuntime passes a timeout AbortSignal to fetchImpl and leaves no temp pointer files', async () => {
+    const baseDir = makeTempDir('install-timeout-signal-');
+    const dist = NATIVE_ACP_DISTRIBUTIONS['linux-x86_64']!;
+    const fakeData = new Uint8Array([42, 43, 44]);
+    vi.spyOn(dist, 'sha256', 'get').mockReturnValue(computeSha256Hex(fakeData));
+    let receivedSignal: AbortSignal | undefined;
+
+    const installed = await installNativeAcpRuntime({
+      baseDir,
+      platform: 'linux',
+      arch: 'x64',
+      downloadTimeoutMs: 5_000,
+      fetchImpl: (async (_url, init) => {
+        receivedSignal = init?.signal ?? undefined;
+        return new Response(fakeData);
+      }) as typeof fetch,
+      extractImpl: async (_zip, destDir) => {
+        mkdirSync(destDir, { recursive: true });
+        writeFileSync(join(destDir, dist.cmd), 'binary');
+        writeFileSync(join(destDir, 'localharness_external'), 'harness');
+      }
+    });
+
+    expect(installed.installed).toBe(true);
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    const rootFiles = readdirSync(getManagedRuntimesRoot(baseDir));
+    expect(rootFiles.some(f => f.endsWith('.tmp'))).toBe(false);
+  });
+
+  it('installNativeAcpRuntime resets idle timeout on each streamed chunk even if total download exceeds timeout', async () => {
+    const baseDir = makeTempDir('install-stream-idle-');
+    const dist = NATIVE_ACP_DISTRIBUTIONS['linux-x86_64']!;
+    const chunks = [new Uint8Array([1, 2]), new Uint8Array([3, 4]), new Uint8Array([5, 6])];
+    const combined = new Uint8Array([1, 2, 3, 4, 5, 6]);
+    vi.spyOn(dist, 'sha256', 'get').mockReturnValue(computeSha256Hex(combined));
+
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        for (const chunk of chunks) {
+          await new Promise((resolve) => setTimeout(resolve, 35));
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      }
+    });
+
+    const installed = await installNativeAcpRuntime({
+      baseDir,
+      platform: 'linux',
+      arch: 'x64',
+      downloadTimeoutMs: 80,
+      fetchImpl: (async () => new Response(stream)) as typeof fetch,
+      extractImpl: async (_zip, destDir) => {
+        mkdirSync(destDir, { recursive: true });
+        writeFileSync(join(destDir, dist.cmd), 'binary');
+        writeFileSync(join(destDir, 'localharness_external'), 'harness');
+      }
+    });
+
+    expect(installed.installed).toBe(true);
+  });
+
+  it('installNativeAcpRuntime aborts with a clear timeout error when headers or stream stalls', async () => {
+    const baseDir = makeTempDir('install-stall-');
+    let headerSignal: AbortSignal | undefined;
+
+    await expect(
+      installNativeAcpRuntime({
+        baseDir,
+        platform: 'linux',
+        arch: 'x64',
+        downloadTimeoutMs: 30,
+        fetchImpl: (async (_url, init) => {
+          headerSignal = init?.signal ?? undefined;
+          return new Promise(() => {});
+        }) as typeof fetch
+      })
+    ).rejects.toThrow(/Native ACP archive download timed out after 30ms without receiving data/i);
+    expect(headerSignal?.aborted).toBe(true);
+
+    let streamSignal: AbortSignal | undefined;
+    const stalledStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2]));
+      }
+    });
+
+    await expect(
+      installNativeAcpRuntime({
+        baseDir,
+        platform: 'linux',
+        arch: 'x64',
+        downloadTimeoutMs: 30,
+        fetchImpl: (async (_url, init) => {
+          streamSignal = init?.signal ?? undefined;
+          return new Response(stalledStream);
+        }) as typeof fetch
+      })
+    ).rejects.toThrow(/Native ACP archive download timed out after 30ms without receiving data/i);
+    expect(streamSignal?.aborted).toBe(true);
   });
 
   it('installNativeAcpRuntime detects checksum mismatch on downloaded bytes', async () => {

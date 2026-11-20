@@ -12,10 +12,23 @@ import {
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { writeFileAtomically } from './atomic-write.js';
 
 const execFileAsync = promisify(execFile);
 
 export const PINNED_NATIVE_ACP_VERSION = '1.4.3';
+export const RUNTIME_DOWNLOAD_TIMEOUT_MS = 120_000;
+
+const WIN32_NATIVE_CMD = 'agy_acp_server.exe';
+const POSIX_NATIVE_CMD = 'agy_acp_server.par';
+
+export function isWin32Platform(platform: NodeJS.Platform = process.platform): boolean {
+  return platform === 'win32';
+}
+
+export function defaultNativeCommand(platform: NodeJS.Platform = process.platform): string {
+  return isWin32Platform(platform) ? WIN32_NATIVE_CMD : POSIX_NATIVE_CMD;
+}
 
 export interface NativeBinaryDistribution {
   archive: string;
@@ -32,42 +45,42 @@ export interface NativeBinaryDistribution {
 export const NATIVE_ACP_DISTRIBUTIONS: Readonly<Record<string, NativeBinaryDistribution>> = {
   'windows-x86_64': {
     archive: 'https://dl.google.com/agy-extensions/releases/windows/agy-acp-server-1.4.3-windows-x86_64.zip',
-    cmd: 'agy_acp_server.exe',
+    cmd: WIN32_NATIVE_CMD,
     args: [],
     sha256: '54c2e16378d9a4952e1da70e355f3c33c4f284308d6de48ab3e6e34a127bd325',
     companionFiles: ['localharness_external.exe']
   },
   'windows-aarch64': {
     archive: 'https://dl.google.com/agy-extensions/releases/windows/agy-acp-server-1.4.3-windows-arm64.zip',
-    cmd: 'agy_acp_server.exe',
+    cmd: WIN32_NATIVE_CMD,
     args: [],
     sha256: 'fcd46431ad33d3b510ce0b98fe7b43d095bd8b3f1c363ee2d57faa7ee981c7bb',
     companionFiles: ['localharness_external.exe']
   },
   'darwin-aarch64': {
     archive: 'https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.3-darwin-arm64.zip',
-    cmd: 'agy_acp_server.par',
+    cmd: POSIX_NATIVE_CMD,
     args: [],
     sha256: 'c57db0a9b8b712daa9c3c17cdb990a61842ea569f279e8bd79d7aa85a303b20b',
     companionFiles: ['localharness_external']
   },
   'darwin-x86_64': {
     archive: 'https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.4.3-darwin-x86_64.zip',
-    cmd: 'agy_acp_server.par',
+    cmd: POSIX_NATIVE_CMD,
     args: [],
     sha256: '9392dbbdad7f0663dbfb5a0bf641297b0cf80d2ee9cd2d49a616bbbc7378731d',
     companionFiles: ['localharness_external']
   },
   'linux-x86_64': {
     archive: 'https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.3-linux-x86_64.zip',
-    cmd: 'agy_acp_server.par',
+    cmd: POSIX_NATIVE_CMD,
     args: ['--uid='],
     sha256: '0634ce5306ba92c932945455e7a83fda78e2d99c33fa8aa6ee0566206a382714',
     companionFiles: ['localharness_external']
   },
   'linux-aarch64': {
     archive: 'https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.4.3-linux-arm64.zip',
-    cmd: 'agy_acp_server.par',
+    cmd: POSIX_NATIVE_CMD,
     args: ['--uid='],
     sha256: '05c153443b0b1175151c760eeddea538950bc9843e317d54786a1f03670182bc',
     companionFiles: ['localharness_external']
@@ -138,17 +151,8 @@ export function readManagedRuntimePointer(baseDir?: string): ManagedRuntimePoint
 }
 
 function writeManagedRuntimePointer(pointer: ManagedRuntimePointer, baseDir?: string): void {
-  const root = getManagedRuntimesRoot(baseDir);
-  mkdirSync(root, { recursive: true });
-  const pointerPath = join(root, 'current.json');
-  const tmpPath = `${pointerPath}.tmp-${process.pid}`;
-  writeFileSync(tmpPath, JSON.stringify(pointer, null, 2) + '\n', 'utf8');
-  writeFileSync(pointerPath, readFileSync(tmpPath));
-  try {
-    rmSync(tmpPath, { force: true });
-  } catch {
-    // Ignore temp cleanup failure
-  }
+  const pointerPath = join(getManagedRuntimesRoot(baseDir), 'current.json');
+  writeFileAtomically(pointerPath, JSON.stringify(pointer, null, 2) + '\n');
 }
 
 export function checkCompanionFiles(
@@ -198,7 +202,7 @@ export function resolveNativeAcpRuntime(options?: {
   const platformKey = resolvePlatformKey(options?.platform, options?.arch);
   const dist = platformKey ? NATIVE_ACP_DISTRIBUTIONS[platformKey] : undefined;
   const defaultArgs = dist ? [...dist.args] : [];
-  const defaultCmd = dist?.cmd ?? (process.platform === 'win32' ? 'agy_acp_server.exe' : 'agy_acp_server.par');
+  const defaultCmd = dist?.cmd ?? defaultNativeCommand(options?.platform);
   const pointer = readManagedRuntimePointer(options?.baseDir);
 
   const custom = options?.customExecutable?.trim();
@@ -275,19 +279,118 @@ export interface InstallNativeRuntimeOptions {
   arch?: string;
   fetchImpl?: typeof fetch;
   extractImpl?: (zipPath: string, destinationDir: string) => Promise<void>;
+  downloadTimeoutMs?: number;
+}
+
+function formatTimeoutDuration(timeoutMs: number): string {
+  return timeoutMs >= 1000 && timeoutMs % 1000 === 0
+    ? `${timeoutMs / 1000}s`
+    : `${timeoutMs}ms`;
+}
+
+async function readResponseBytesWithIdleTimeout(
+  response: Response,
+  resetIdleTimer: () => void,
+  signal: AbortSignal
+): Promise<Uint8Array> {
+  const body = response.body;
+  if (!body || typeof body.getReader !== 'function') {
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  const abortReader = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', abortReader, { once: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.byteLength > 0) {
+        resetIdleTimer();
+        chunks.push(value);
+        totalLength += value.byteLength;
+      }
+    }
+  } finally {
+    signal.removeEventListener('abort', abortReader);
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
 }
 
 async function downloadAndVerifyArchive(
   dist: NativeBinaryDistribution,
   stagingDir: string,
-  fetchFn: typeof fetch
+  fetchFn: typeof fetch,
+  timeoutMs: number = RUNTIME_DOWNLOAD_TIMEOUT_MS
 ): Promise<{ archivePath: string; actualSha256: string }> {
   const archivePath = join(stagingDir, `agy-acp-server-${PINNED_NATIVE_ACP_VERSION}.zip`);
-  const response = await fetchFn(dist.archive);
-  if (!response.ok) {
-    throw new Error(`Failed to download native ACP archive (${response.status} ${response.statusText})`);
+  const controller = new AbortController();
+  const timeoutError = new Error(
+    `Native ACP archive download timed out after ${formatTimeoutDuration(timeoutMs)} without receiving data.`
+  );
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let rejectOnTimeout!: (err: Error) => void;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    rejectOnTimeout = reject;
+  });
+  timeoutPromise.catch(() => {});
+
+  const clearIdleTimer = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const resetIdleTimer = () => {
+    clearIdleTimer();
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      rejectOnTimeout(timeoutError);
+    }, timeoutMs);
+  };
+
+  let bytes: Uint8Array;
+  try {
+    resetIdleTimer();
+    const response = await Promise.race([
+      fetchFn(dist.archive, { signal: controller.signal }),
+      timeoutPromise
+    ]);
+    if (!response.ok) {
+      throw new Error(`Failed to download native ACP archive (${response.status} ${response.statusText})`);
+    }
+    resetIdleTimer();
+    bytes = await Promise.race([
+      readResponseBytesWithIdleTimeout(response, resetIdleTimer, controller.signal),
+      timeoutPromise
+    ]);
+    if (timedOut) {
+      throw timeoutError;
+    }
+  } catch (err) {
+    if (timedOut) {
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    clearIdleTimer();
   }
-  const bytes = new Uint8Array(await response.arrayBuffer());
+
   const actualSha256 = computeSha256Hex(bytes);
   if (actualSha256.toLowerCase() !== dist.sha256.toLowerCase()) {
     throw new Error(
@@ -302,7 +405,6 @@ function stageRuntimeFiles(
   extractDir: string,
   stagingVersionDir: string,
   dist: NativeBinaryDistribution,
-  platformKey: string,
   isWin32: boolean
 ): void {
   mkdirSync(stagingVersionDir, { recursive: true });
@@ -406,7 +508,12 @@ export async function installNativeAcpRuntime(
 
   try {
     const fetchFn = options?.fetchImpl ?? globalThis.fetch;
-    const { archivePath, actualSha256 } = await downloadAndVerifyArchive(dist, stagingDir, fetchFn);
+    const { archivePath, actualSha256 } = await downloadAndVerifyArchive(
+      dist,
+      stagingDir,
+      fetchFn,
+      options?.downloadTimeoutMs ?? RUNTIME_DOWNLOAD_TIMEOUT_MS
+    );
 
     const extractDir = join(stagingDir, 'unpacked');
     const extractFn = options?.extractImpl ?? extractZipArchive;
@@ -415,8 +522,7 @@ export async function installNativeAcpRuntime(
     verifyExtractedArchive(extractDir, dist, platformKey);
 
     const stagingVersionDir = join(stagingDir, 'staged-version');
-    const isWin32 = (options?.platform ?? process.platform) === 'win32';
-    stageRuntimeFiles(extractDir, stagingVersionDir, dist, platformKey, isWin32);
+    stageRuntimeFiles(extractDir, stagingVersionDir, dist, isWin32Platform(options?.platform));
     swapVersionDirectory(stagingVersionDir, versionDir, root);
 
     updatePointerAfterInstall(options?.baseDir, version, actualSha256, platformKey);
@@ -446,7 +552,7 @@ export function rollbackNativeAcpRuntime(options?: {
   }
   const platformKey = resolvePlatformKey(options?.platform, options?.arch);
   const dist = platformKey ? NATIVE_ACP_DISTRIBUTIONS[platformKey] : undefined;
-  const cmd = dist?.cmd ?? (process.platform === 'win32' ? 'agy_acp_server.exe' : 'agy_acp_server.par');
+  const cmd = dist?.cmd ?? defaultNativeCommand(options?.platform);
   const root = getManagedRuntimesRoot(options?.baseDir);
   const prevExe = join(root, pointer.previousVersion, cmd);
   if (!existsSync(prevExe)) {

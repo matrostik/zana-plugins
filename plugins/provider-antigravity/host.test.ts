@@ -282,16 +282,17 @@ describe('host.ts provider bridge and launch helpers', () => {
     expect(nativeAuth.resolveNativeCatalog).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: true }));
   });
 
-  it('returns observed quota windows through provider/usage', async () => {
+  it('returns observed quota windows through provider/usage and forwards forceRefresh', async () => {
     vi.spyOn(nativeRuntime, 'resolveNativeAcpRuntime').mockReturnValue(makeRuntimeFixture());
-    vi.spyOn(nativeAuth, 'queryNativeUsage').mockResolvedValue({ supported: true, usage: {
+    const query = vi.spyOn(nativeAuth, 'queryNativeUsage').mockResolvedValue({ supported: true, usage: {
       status: 'ok', planLabel: 'Pro', accountEmail: null, checkedAt: 123, source: 'native-acp-/usage',
       windows: [{ label: 'Gemini — Weekly', usedPercent: 86, resetsAt: null }]
     } });
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 72, method: 'provider/usage' }));
+    experimental_providerBridge.handleLine(JSON.stringify({ jsonrpc: '2.0', id: 72, method: 'provider/usage', params: { forceRefresh: true } }));
     await vi.waitFor(() => expect(write).toHaveBeenCalled());
     expect(JSON.parse(String(write.mock.calls[0][0])).result.usage.windows[0].usedPercent).toBe(86);
+    expect(query).toHaveBeenCalledWith(expect.objectContaining({ forceRefresh: true }));
   });
 
   it('answers provider/usage and model/list with an error when synchronous setup throws', () => {
