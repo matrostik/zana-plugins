@@ -162,6 +162,8 @@ export async function listHistoryHandler(args: unknown, deps: HistoryRpcDeps): P
     };
   }
   try {
+    const removed = deps.historyStore.prune({ maxEntries: settings.historyMaxEntries, maxDays: settings.historyMaxDays });
+    if (removed > 0) deps.onHistoryChanged?.({ action: 'pruned' });
     const req = asObject(args) as HistoryListRequest;
     const page = deps.historyStore.list(req);
     return {

@@ -11,6 +11,7 @@ import {
   SETTINGS_UPDATE_METHOD,
   STATUS_METHOD,
   TRANSCRIBE_METHOD,
+  resolveAvailableSttProviders,
   type AvailableModelsResponse,
   type DiscoveredProvider,
   type HistoryEntry,
@@ -814,6 +815,7 @@ export function PromptStudio({
   const [sttProvider, setSttProvider] = useState<string>('system');
   const [sttModel, setSttModel] = useState<string>('');
   const [sttKeyConfigured, setSttKeyConfigured] = useState<boolean>(true);
+  const [availableSttProviders, setAvailableSttProviders] = useState<string[]>(['system']);
   const [dictationError, setDictationError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -916,6 +918,7 @@ export function PromptStudio({
     }
     if (status.sttProvider) setSttProvider(status.sttProvider);
     if (typeof status.sttKeyConfigured === 'boolean') setSttKeyConfigured(status.sttKeyConfigured);
+    setAvailableSttProviders(resolveAvailableSttProviders(status));
   }, []);
 
   const refreshStatus = useCallback(() => {
@@ -1031,6 +1034,7 @@ export function PromptStudio({
     setIsLoadingModels(false);
     setModelsLoadError(null);
     clearModelsRetryTimer();
+    refreshStatus();
   });
 
   useEffect(() => {
@@ -1045,6 +1049,14 @@ export function PromptStudio({
       clearModelsRetryTimer();
     };
   }, [clearModelsRetryTimer, loadAvailableModels, loadStudioSettings]);
+
+  const visibleSttOptions = useMemo(() => {
+    const allowed = new Set(availableSttProviders);
+    allowed.add('system');
+    return STT_PROVIDER_OPTIONS.filter((opt) => allowed.has(opt.id));
+  }, [availableSttProviders]);
+
+  const isCurrentSttAvailable = visibleSttOptions.some((opt) => opt.id === sttProvider);
 
   const hasHostProviders = useMemo(
     () =>
@@ -1390,7 +1402,10 @@ export function PromptStudio({
         playSoundCue('error', cueOpts);
         setStatusNotice(response.message);
         setDictationError(response.message);
-        if (response.code === 'MISSING_KEY') setSttKeyConfigured(false);
+        if (response.code === 'MISSING_KEY') {
+          setSttKeyConfigured(false);
+          refreshStatus();
+        }
       }
     } catch (err) {
       playSoundCue('error', cueOpts);
@@ -1403,7 +1418,7 @@ export function PromptStudio({
   const startStudioRecording = async (prefs: AudioPreferences, cueOpts: { enabled: boolean; volume: number }) => {
     setDictationError(null);
     setStatusNotice(null);
-    if (sttProvider !== 'system' && !sttKeyConfigured) {
+    if (usesSttApiKey(sttProvider) && !sttKeyConfigured) {
       playSoundCue('error', cueOpts);
       const provName = sttProvider === 'openai' ? 'OpenAI' : 'Google Gemini';
       setDictationError(`API key required for direct ${provName} speech-to-text. Switch to System (Zana Voice) below to dictate using host voice.`);
@@ -1435,6 +1450,10 @@ export function PromptStudio({
         playSoundCue('error', cueOpts);
         setDictationError(err.message);
         setStatusNotice(err.message);
+      };
+      session.onAutoStop = () => {
+        setStatusNotice('Recording limit reached. Transcribing captured audio.');
+        void stopAndTranscribeStudio(cueOpts);
       };
       activeSessionRef.current = session;
       recordingStartedAtRef.current = Date.now();
@@ -1854,14 +1873,19 @@ export function PromptStudio({
                 id="ps-stt-provider-select"
                 className="ps-select"
                 aria-label="Speech-to-text provider"
-                value={sttProvider}
+                value={isCurrentSttAvailable ? sttProvider : ''}
                 onChange={(e) => {
                   setDictationError(null);
                   handleSttProviderChange(e.target.value);
                 }}
                 disabled={isRecording || isTranscribing}
               >
-                {STT_PROVIDER_OPTIONS.map((p) => (
+                {!isCurrentSttAvailable && (
+                  <option value="" disabled hidden>
+                    {`${STT_SHORT_LABELS[sttProvider] ?? sttProvider} (Not configured)`}
+                  </option>
+                )}
+                {visibleSttOptions.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.label}
                   </option>
@@ -1869,7 +1893,7 @@ export function PromptStudio({
               </select>
             </div>
 
-            {usesSttApiKey(sttProvider) && (
+            {usesSttApiKey(sttProvider) && isCurrentSttAvailable && (
               <div className="ps-field-group">
                 <label htmlFor="ps-stt-model-input" className="ps-field-label">
                   Speech Model (Optional)
@@ -1917,7 +1941,7 @@ export function PromptStudio({
               </div>
             )}
 
-            {sttProvider !== 'system' && !sttKeyConfigured && !dictationError && (
+            {usesSttApiKey(sttProvider) && !sttKeyConfigured && !dictationError && (
               <div
                 style={{
                   padding: '8px 10px',

@@ -22,7 +22,7 @@ Configure in the plugin's settings section in Zana (and via **Prompt Studio → 
 | Show on main Home screen | `true` | Shows or hides the quick-dictate & studio card on Zana's Home screen |
 | Show Prompt Studio in projects | `true` | Enables or hides the per-project **Prompt Studio** tab via `registerProjectTabAvailability` |
 | Composer mic button | `both` | `both`, `main` (main screen only), `projects` (inside projects only), or `off` |
-| Speech-to-text provider | `system` | `system` (Zana host voice transcription, no key), `local-whisper`, `openai`, or `google-gemini` (need an API key) |
+| Speech-to-text provider | `system` | `system` uses Zana host voice transcription. `local-whisper` requires an installed runtime and model. `openai` and `google-gemini` require an API key. Prompt Studio shows configured providers. |
 | Speech-to-text model | empty | OpenAI / Gemini only. System transcription always uses the host-configured model |
 | Cleanup (LLM) provider | `assistant` | `assistant` (Zana assistant inference, no key), `none`, or `openai` / `anthropic` / `google` (need an API key) |
 | Cleanup model | empty | OpenAI / Anthropic / Google / Zana host model |
@@ -31,6 +31,8 @@ Configure in the plugin's settings section in Zana (and via **Prompt Studio → 
 | Personal dictionary | empty | Names and jargon; one per line or comma-separated |
 | Input language | `auto` | BCP-47 tag such as `en` or `de-DE`, or `auto` |
 | Microphone input & sound cues | `default`, chimes `on` (`75%`) | Configured in Prompt Studio Settings |
+| Activity history | `true` | Saves successful dictations and refinements. Turn off to stop adding entries. |
+| History retention | 500 entries, 90 days | Applies to unstarred entries. Set either limit to `0` for unlimited entries or indefinite retention. |
 | OpenAI / Google AI / Anthropic API key | empty | Secret. Only needed for the matching direct-API provider |
 
 > [!NOTE]
@@ -38,12 +40,18 @@ Configure in the plugin's settings section in Zana (and via **Prompt Studio → 
 
 ## Behavior
 
-- Recording captures browser microphone audio. Recordings are capped at about two minutes (10 MB decoded).
+- Recording captures browser microphone audio. Recordings are capped at about two minutes (10 MB decoded). Prompt Studio stops and transcribes the captured audio when a limit is reached.
 - Speech-to-text routes to Zana's host transcription endpoint (`/api/v1/system/voice-transcription`), Local Whisper on-device server, or OpenAI / Google Gemini.
 - Transcript refinement (cleanup) uses Zana's built-in assistant inference (`zcc.sdk.assistant.complete`), dynamically discovered Zana host models, or a direct API provider.
-- If cleanup fails, the raw transcript is inserted and a notice explains why. The dictation is never lost.
+- If cleanup fails, the raw transcript is returned. Composer dictation displays a notice explaining the failure.
 - Silence or non-speech audio shows "No speech detected." and inserts nothing.
 - Visibility setting changes broadcast immediately via `zcc.realtime` (`promptVoice:settingsChanged`) and update active surfaces live.
+
+## Activity history
+
+History stores successful transcripts and refinements for review. You can search and filter entries, star entries, load them into Prompt Studio, or delete them. Disabling history stops new entries from being saved. Existing entries remain available until deleted or pruned.
+
+Retention limits apply to unstarred entries when new activity is saved, retention settings change, or History is opened. Starred entries are exempt from automatic pruning and can be deleted manually. Expired entries may remain stored until one of these events occurs.
 
 ## Known limits
 

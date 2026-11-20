@@ -259,7 +259,37 @@ describe('createPromptVoicePlugin', () => {
         sttKeyConfigured: true,
         llmProvider: 'none',
         llmKeyConfigured: true,
-        availableProviders: ['antigravity', 'claude-code']
+        availableProviders: ['antigravity', 'claude-code'],
+        availableSttProviders: ['system']
+      })
+    );
+  });
+
+  it('reports only configured speech providers in status based on API keys and Local Whisper readiness', async () => {
+    const { zcc, methods, setSettings } = fakeZcc({ openaiApiKey: 'sk-test' });
+    const readyLocalWhisper = {
+      getState: () => ({
+        platform: { supported: true },
+        runtime: { status: 'installed', version: 'v1.9.5', requirements: [] },
+        server: { state: 'stopped' },
+        activeModelId: 'base',
+        models: [],
+        lastError: null
+      }),
+      dispose: vi.fn(async () => undefined)
+    };
+    await createPromptVoicePlugin(zcc as never, { localWhisper: readyLocalWhisper as never });
+
+    expect(await methods.get(STATUS_METHOD)?.({})).toEqual(
+      expect.objectContaining({
+        availableSttProviders: ['system', 'openai', 'local-whisper']
+      })
+    );
+
+    setSettings({ googleApiKey: 'g-test' });
+    expect(await methods.get(STATUS_METHOD)?.({})).toEqual(
+      expect.objectContaining({
+        availableSttProviders: ['system', 'google-gemini', 'local-whisper']
       })
     );
   });
@@ -577,6 +607,21 @@ describe('createPromptVoicePlugin', () => {
       });
     } finally {
       vi.unstubAllGlobals();
+    }
+  });
+
+  it('prunes expired entries when history is opened without a new recording', async () => {
+    const { zcc, methods } = fakeZcc({ llmProvider: 'none', historyMaxDays: '1' }, true, { withDb: true });
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await createPromptVoicePlugin(zcc as never, { localWhisper: null });
+      await methods.get(REPHRASE_METHOD)?.({ text: 'expired entry', source: 'studio' });
+      clock.mockReturnValue(now + 2 * 24 * 60 * 60 * 1000);
+      const list = (await methods.get(HISTORY_LIST_METHOD)?.({})) as HistoryListResponse;
+      expect(list.total).toBe(0);
+    } finally {
+      clock.mockRestore();
     }
   });
 

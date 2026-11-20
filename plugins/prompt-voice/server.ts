@@ -76,6 +76,12 @@ function patchTouchesFields(patch: unknown, fields: readonly string[]): boolean 
   return fields.some((field) => field in rec);
 }
 
+function isLocalWhisperReady(localWhisper: LocalWhisperManager | null): boolean {
+  if (!localWhisper || typeof localWhisper.getState !== 'function') return false;
+  const state = localWhisper.getState();
+  return state.platform.supported && state.runtime.status === 'installed' && state.activeModelId !== null;
+}
+
 function initHistoryStore(zcc: ZccPluginApi, injected: HistoryStore | null | undefined): HistoryStore | null {
   if (injected !== undefined) return injected;
   if (typeof zcc.storage?.database !== 'function') return null;
@@ -232,7 +238,11 @@ export default async function createPromptVoicePlugin(zcc: ZccPluginApi, deps: P
           return [];
         })
       : [];
-    return statusFromSettings(raw, available.map((p) => p.id));
+    return statusFromSettings(
+      raw,
+      available.map((p) => p.id),
+      { localWhisperReady: isLocalWhisperReady(localWhisper) }
+    );
   });
 
   zcc.rpc.method(AVAILABLE_MODELS_METHOD, (args) => {
