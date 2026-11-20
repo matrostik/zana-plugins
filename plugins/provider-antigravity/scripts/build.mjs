@@ -121,6 +121,19 @@ function hostReactPlugin() {
   };
 }
 
+// CSS imported as text inherits Git checkout line endings; canonicalize CRLF to LF for cross-OS bundle parity.
+function normalizedCssTextPlugin() {
+  return {
+    name: 'normalized-css-text',
+    setup(build) {
+      build.onLoad({ filter: /\.css$/ }, (args) => ({
+        contents: readFileSync(args.path, 'utf8').replace(/\r\n/g, '\n'),
+        loader: 'text'
+      }));
+    }
+  };
+}
+
 function writeArtifactMetadata(filePath, overrides = {}) {
   const meta = {
     sdkMajor: 0,
@@ -164,7 +177,7 @@ async function buildAppArtifact() {
     jsx: 'automatic',
     minify: true,
     loader: { '.css': 'text' },
-    plugins: [hostReactPlugin()],
+    plugins: [hostReactPlugin(), normalizedCssTextPlugin()],
     external: ['@zana-ai/zcc-plugin-sdk/server']
   });
   writeArtifactMetadata(join(pluginRoot, 'app.meta.json'));
