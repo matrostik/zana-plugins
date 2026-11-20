@@ -1,0 +1,2 @@
+# Preserve the exact bytes hashed in dist/host.meta.json on every checkout.
+dist/host.js text eol=lf
