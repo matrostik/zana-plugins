@@ -1,3 +1,30 @@
+/* Older composer pickers render a text initial for plugin providers. */
+.model-reasoning-picker-tab[data-testid='model-reasoning-provider-antigravity']:not(:has(> svg)),
+.model-reasoning-picker-trigger[title^='Antigravity:' i] > .model-reasoning-picker-trigger-icon:not(:has(> svg)) {
+  font-size: 0;
+}
+
+.model-reasoning-picker-tab[data-testid='model-reasoning-provider-antigravity']:not(:has(> svg))::before,
+.model-reasoning-picker-trigger[title^='Antigravity:' i] > .model-reasoning-picker-trigger-icon:not(:has(> svg))::before {
+  content: '';
+  display: block;
+  flex: 0 0 auto;
+  width: var(--agy-composer-icon-size, 14px);
+  height: var(--agy-composer-icon-size, 14px);
+  background-color: currentColor;
+  mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%201.5a.8.8%200%200%201%20.72.47c.83%202.27%201.99%204.24%203.62%205.87s3.6%202.79%205.87%203.62a.8.8%200%200%201%200%201.44c-2.27.83-4.24%201.99-5.87%203.62s-2.79%203.6-3.62%205.87a.8.8%200%200%201-1.44%200c-.83-2.27-1.99-4.24-3.62-5.87s-3.6-2.79-5.87-3.62a.8.8%200%200%201%200-1.44c2.27-.83%204.24-1.99%205.87-3.62s2.79-3.6%203.62-5.87A.8.8%200%200%201%2012%201.5Z%22%2F%3E%3C%2Fsvg%3E') center / contain no-repeat;
+}
+
+.model-reasoning-picker-menu--mobile .model-reasoning-picker-tab[data-testid='model-reasoning-provider-antigravity']:not(:has(> svg)) {
+  --agy-composer-icon-size: 22px;
+  row-gap: 0;
+}
+
+.model-reasoning-picker-menu--mobile .model-reasoning-picker-tab[data-testid='model-reasoning-provider-antigravity']:not(:has(> svg)) > span {
+  font-size: 13px;
+  margin-block-start: 8px;
+}
+
 .agy-account-panel {
   display: flex;
   flex-direction: column;
