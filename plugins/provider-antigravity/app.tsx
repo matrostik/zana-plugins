@@ -571,6 +571,7 @@ export function AntigravityAccountPanel() {
 }
 
 export default definePluginApp((app) => {
+  ensureStyles();
   app.slots.experimental_providerIcon?.({
     providerId: 'antigravity',
     icon: AntigravityProviderIcon

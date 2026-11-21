@@ -2,6 +2,10 @@
 
 Google Antigravity ACP thread provider for Zana Command Center, powered directly by Google's official **Native ACP Server (`agy_acp_server`)**.
 
+## 0.3.4 — Composer icon
+
+- The Antigravity harness tab and model picker button use the Gemini sparkle in Zana versions that display a letter for plugin providers.
+
 ## 0.3.0 — Catalog recovery, Plan and subscription usage
 
 - Model selection refreshes an expired or cold catalog automatically. Concurrent refreshes share one probe; transient failures preserve the last catalog for the same credentials. Sign-out and credential changes invalidate it.

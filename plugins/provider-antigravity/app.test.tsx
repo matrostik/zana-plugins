@@ -54,7 +54,39 @@ async function renderSettingsSlot(rpcHandlers: Record<string, (input: any) => an
 }
 
 describe('antigravity provider app slots', () => {
-  it('registers a monochrome Gemini sparkle provider icon for the composer harness selector', async () => {
+  it('styles the Antigravity composer fallback when the plugin loads', async () => {
+    document.getElementById('antigravity-provider-styles')?.remove();
+    const composer = document.createElement('div');
+    composer.innerHTML = `
+      <button class="model-reasoning-picker-tab" data-testid="model-reasoning-provider-antigravity">A</button>
+      <button class="model-reasoning-picker-tab" data-testid="model-reasoning-provider-antigravity"><svg></svg></button>
+      <button class="model-reasoning-picker-tab" data-testid="model-reasoning-provider-hermes">H</button>
+      <button class="model-reasoning-picker-trigger" title="Antigravity: Gemini 4 Neon">
+        <span class="model-reasoning-picker-trigger-icon">A</span>
+      </button>
+      <button class="model-reasoning-picker-trigger" title="Hermes: Gemini 4 Neon">
+        <span class="model-reasoning-picker-trigger-icon">H</span>
+      </button>
+    `;
+    document.body.appendChild(composer);
+    try {
+      await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
+      const style = document.querySelector<HTMLStyleElement>('#antigravity-provider-styles');
+      const iconRule = Array.from(style?.sheet?.cssRules ?? []).find((rule): rule is CSSStyleRule =>
+        'style' in rule && (rule.style as CSSStyleDeclaration).getPropertyValue('mask').includes('data:image/svg+xml')
+      );
+      expect(iconRule).toBeDefined();
+      const iconTargets = composer.querySelectorAll(iconRule!.selectorText.replaceAll('::before', ''));
+      expect(Array.from(iconTargets)).toEqual([composer.children[0], composer.children[3]!.firstElementChild]);
+      expect(getComputedStyle(composer.children[0]!).fontSize).toBe('0px');
+      expect(getComputedStyle(composer.children[2]!).fontSize).not.toBe('0px');
+    } finally {
+      composer.remove();
+      document.getElementById('antigravity-provider-styles')?.remove();
+    }
+  });
+
+  it('registers a monochrome Gemini sparkle with Zana’s provider icon slot', async () => {
     const app = await loadPluginApp(() => import('./app.js'), 'provider-antigravity');
     expect(app.providerIcons).toHaveLength(1);
     expect(app.providerIcons[0]!.providerId).toBe('antigravity');
